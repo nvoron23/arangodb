@@ -627,12 +627,13 @@ static void MapSetNamedShapedJson (v8::Local<v8::String> name,
   void* marker = TRI_UnwrapClass<void*>(self, WRP_SHAPED_JSON_TYPE);
 
   if (marker == nullptr) {
-    TRI_V8_RETURN(v8::Handle<v8::Value>());
+    return;
   }
 
   if (self->HasRealNamedProperty(name)) {
     // object already has the property. use the regular property setter
-    TRI_V8_RETURN(v8::Handle<v8::Value>());
+    self->ForceSet(name, value);
+    TRI_V8_RETURN_TRUE();
   }
 
   // copy all attributes from the shaped json into the object
@@ -642,7 +643,8 @@ static void MapSetNamedShapedJson (v8::Local<v8::String> name,
   self->SetInternalField(SLOT_CLASS, v8::External::New(isolate, nullptr));
 
   // and now use the regular property setter
-  TRI_V8_RETURN(v8::Handle<v8::Value>());
+  self->ForceSet(name, value);
+  TRI_V8_RETURN_TRUE();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -661,14 +663,15 @@ static void MapDeleteNamedShapedJson (v8::Local<v8::String> name,
 
   if (self->InternalFieldCount() <= SLOT_BARRIER) {
     // we better not throw here... otherwise this will cause a segfault
-    TRI_V8_RETURN_FALSE(); // not intercepted
+    return;
   }
 
   // get shaped json
   void* marker = TRI_UnwrapClass<void*>(self, WRP_SHAPED_JSON_TYPE);
 
   if (marker == nullptr) {
-    TRI_V8_RETURN_FALSE();
+    self->ForceDelete(name);
+    TRI_V8_RETURN_TRUE();
   }
   
   // copy all attributes from the shaped json into the object
@@ -677,7 +680,7 @@ static void MapDeleteNamedShapedJson (v8::Local<v8::String> name,
   // remove pointer to marker, so the object becomes stand-alone
   self->SetInternalField(SLOT_CLASS, v8::External::New(isolate, nullptr));
 
-  // and now use the regular property deleter
+  self->ForceDelete(name);
   TRI_V8_RETURN_TRUE();
 }
 
@@ -784,7 +787,7 @@ static void MapSetIndexedShapedJson (uint32_t idx,
   char buffer[11];
   size_t len = TRI_StringUInt32InPlace(idx, (char*) &buffer);
 
-  v8::Local<v8::String> strVal = TRI_V8_PAIR_STRING((char*) &buffer, (int) len);
+  v8::Local<v8::String> strVal = TRI_V8_PAIR_STRING((char*)&buffer, (int) len);
 
   MapSetNamedShapedJson(strVal, value, args);
 }
