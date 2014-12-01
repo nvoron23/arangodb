@@ -1702,8 +1702,8 @@ void TRI_InitV8Buffer (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
   TRI_V8_AddProtoMethod(isolate, ft, TRI_V8_SYMBOL("fill"), JS_Fill);
   TRI_V8_AddProtoMethod(isolate, ft, TRI_V8_SYMBOL("copy"), JS_Copy);
 
-  TRI_V8_AddMethod(isolate, rt, TRI_V8_SYMBOL("byteLength"), JS_ByteLength);
-  TRI_V8_AddMethod(isolate, rt, TRI_V8_SYMBOL("makeFastBuffer"), JS_MakeFastBuffer);
+  TRI_V8_AddMethod(isolate, ft, TRI_V8_SYMBOL("byteLength"), JS_ByteLength);
+  TRI_V8_AddMethod(isolate, ft, TRI_V8_SYMBOL("makeFastBuffer"), JS_MakeFastBuffer);
 
   // create the exports
   v8::Handle<v8::Object> exports = v8::Object::New(isolate);
