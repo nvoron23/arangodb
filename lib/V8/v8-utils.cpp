@@ -150,13 +150,13 @@ static void CreateErrorObject (v8::Isolate *isolate,
   errorObject->Set(TRI_V8_SYMBOL("errorNum"), v8::Number::New(isolate, errorNumber));
   errorObject->Set(TRI_V8_SYMBOL("errorMessage"), errorMessage);
 
-  TRI_v8_global_t* v8g = static_cast<TRI_v8_global_t*>(isolate->GetData(V8DataSlot));
+  TRI_GET_GLOBALS();
+  TRI_GET_GLOBAL(ArangoErrorTempl, v8::ObjectTemplate);
 
-  auto protoT = v8::Local<v8::ObjectTemplate>::New(isolate, v8g->ArangoErrorTempl);
-  auto proto = protoT->NewInstance();
+  v8::Handle<v8::Object> ArangoError = ArangoErrorTempl->NewInstance();
 
-  if (! proto.IsEmpty()) {
-    errorObject->SetPrototype(proto);
+  if (! ArangoError.IsEmpty()) {
+    errorObject->SetPrototype(ArangoError);
   }
   isolate->ThrowException(errorObject);
 }
