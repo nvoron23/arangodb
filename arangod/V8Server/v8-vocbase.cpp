@@ -260,7 +260,8 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   // extract the "action" property
-  static const string actionError = "missing/invalid action definition for transaction";
+  static const string actionErrorPrototype = "missing/invalid action definition for transaction";
+  string actionError = actionErrorPrototype;
 
   if (! object->Has(TRI_V8_SYMBOL("action"))) {
     TRI_V8_EXCEPTION_PARAMETER(actionError);
@@ -295,6 +296,7 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
     action = v8::Handle<v8::Function>::Cast(object->Get(TRI_V8_SYMBOL("action")));
   }
   else if (object->Get(TRI_V8_SYMBOL("action"))->IsString()) {
+    v8::TryCatch tryCatch;
     // get built-in Function constructor (see ECMA-262 5th edition 15.3.2)
     v8::Local<v8::Function> ctor = v8::Local<v8::Function>::Cast(current->Get(TRI_V8_SYMBOL("Function")));
 
@@ -305,6 +307,16 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
     v8::Local<v8::Object> function = ctor->NewInstance(2, args);
 
     action = v8::Local<v8::Function>::Cast(function);
+    if (tryCatch.HasCaught()) {
+      actionError += " - ";
+      actionError += *v8::String::Utf8Value(tryCatch.Message()->Get());
+      actionError += " - ";
+      actionError += *v8::String::Utf8Value(tryCatch.StackTrace());
+      
+      TRI_CreateErrorObject(isolate, TRI_ERROR_BAD_PARAMETER, actionError);
+      tryCatch.ReThrow();
+      return;
+    }
   }
   else {
     TRI_V8_EXCEPTION_PARAMETER(actionError);
