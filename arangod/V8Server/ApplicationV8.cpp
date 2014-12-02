@@ -427,9 +427,6 @@ void ApplicationV8::exitContext (V8Context* context) {
   context->_hasDeadObjects = v8g->_hasDeadObjects;
   ++context->_numExecutions;
 
-  v8::HandleScope scope(isolate);
-
-  auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
   /// TODO do we need this?  v8::Context::Scope contextScope(localContext);
 /*
    // HasOutOfMemoryException must be called while there is still an isolate!
@@ -440,17 +437,25 @@ void ApplicationV8::exitContext (V8Context* context) {
   v8g->_canceled = false;
 
   // exit the context
-  localContext->Exit();
+  {
+    v8::HandleScope scope(isolate);
+    auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+    localContext->Exit();
+  }
   isolate->Exit();
 
   // if the execution was canceled, we need to cleanup
   if (canceled) {
     isolate->Enter();
-    localContext->Enter();
+    {
+      v8::HandleScope scope(isolate);
+      auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+      localContext->Enter();
 
-    context->handleCancelationCleanup();
+      context->handleCancelationCleanup();
 
-    localContext->Exit();
+      localContext->Exit();
+    }
     isolate->Exit();
   }
 
@@ -464,14 +469,19 @@ void ApplicationV8::exitContext (V8Context* context) {
 
     if (runGlobal) {
       isolate->Enter();
-      localContext->Enter();
+      {
+        v8::HandleScope scope(isolate);
+        auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
 
-      TRI_ASSERT(context->_locker->IsLocked(isolate));
-      TRI_ASSERT(v8::Locker::IsLocked(isolate));
+        localContext->Enter();
 
-      context->handleGlobalContextMethods();
+        TRI_ASSERT(context->_locker->IsLocked(isolate));
+        TRI_ASSERT(v8::Locker::IsLocked(isolate));
 
-      localContext->Exit();
+        context->handleGlobalContextMethods();
+
+        localContext->Exit();
+      }
       isolate->Exit();
     }
   }
@@ -529,17 +539,22 @@ void ApplicationV8::exitContext (V8Context* context) {
       guard.unlock();
 
       isolate->Enter();
-      localContext->Enter();
+      {
+        v8::HandleScope scope(isolate);
+        auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+
+        localContext->Enter();
       
-      TRI_ASSERT(context->_locker->IsLocked(isolate));
-      TRI_ASSERT(v8::Locker::IsLocked(isolate));
+        TRI_ASSERT(context->_locker->IsLocked(isolate));
+        TRI_ASSERT(v8::Locker::IsLocked(isolate));
 
-      isolate->LowMemoryNotification();
-      // todo 1000 was the old V8-default, is this really good?
-      while(! isolate->IdleNotification(1000)) {
+        isolate->LowMemoryNotification();
+        // todo 1000 w    as the old V8-default, is this really good?
+        while(! isolate->IdleNotification(1000)) {
+        }
+
+        localContext->Exit();
       }
-
-      localContext->Exit();
       isolate->Exit();
 
       guard.lock();
@@ -639,22 +654,24 @@ void ApplicationV8::collectGarbage () {
       auto isolate = context->isolate;
       context->_locker = new v8::Locker(isolate);
       isolate->Enter();
-      v8::HandleScope scope(isolate);
+      {
+        v8::HandleScope scope(isolate);
 
-      auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+        auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
       /// TODO: do we need this? v8::Context::Scope contextScope(localContext);
 
-      localContext->Enter();
+        localContext->Enter();
       
-      TRI_ASSERT(context->_locker->IsLocked(isolate));
-      TRI_ASSERT(v8::Locker::IsLocked(isolate));
+        TRI_ASSERT(context->_locker->IsLocked(isolate));
+        TRI_ASSERT(v8::Locker::IsLocked(isolate));
 
-      isolate->LowMemoryNotification();
-      // todo 1000 was the old V8-default, is this really good?
-      while(! isolate->IdleNotification(1000)) {
+        isolate->LowMemoryNotification();
+        // todo 1000 was the old V8-default, is this really good?
+        while(! isolate->IdleNotification(1000)) {
+        }
+
+        localContext->Exit();
       }
-
-      localContext->Exit();
       isolate->Exit();
       delete context->_locker;
 
@@ -705,96 +722,97 @@ void ApplicationV8::upgradeDatabase (bool skip,
 
   context->_locker = new v8::Locker(context->isolate);
   auto isolate = context->isolate;
-  v8::HandleScope scope(isolate);
-
-  auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-  //// TODO do we need this? v8::Context::Scope contextScope(localContext);
   isolate->Enter();
-  localContext->Enter();
+  {
+    v8::HandleScope scope(isolate);
 
-  // run upgrade script
-  if (! skip) {
-    LOG_DEBUG("running database init/upgrade");
+    auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+  //// TODO do we need this? v8::Context::Scope contextScope(localContext);
+    localContext->Enter();
 
-    // can do this without a lock as this is the startup
-    for (size_t j = 0; j < _server->_databases._nrAlloc; ++j) {
-      TRI_vocbase_t* vocbase = static_cast<TRI_vocbase_t*>(_server->_databases._table[j]);
+    // run upgrade script 
+    if (! skip) {
+      LOG_DEBUG("running database init/upgrade");
 
-      if (vocbase != nullptr) {
-        // special check script to be run just once in first thread (not in all)
-        // but for all databases
-        v8::HandleScope scope(isolate);
+      // can do this without a lock as this is the startup
+      for (size_t j = 0; j < _server->_databases._nrAlloc; ++j) {
+        TRI_vocbase_t* vocbase = static_cast<TRI_vocbase_t*>(_server->_databases._table[j]);
 
-        v8::Handle<v8::Object> args = v8::Object::New(isolate);
-        args->Set(TRI_V8_SYMBOL("upgrade"), v8::Boolean::New(isolate, perform));
+        if (vocbase != nullptr) {
+          // special check script to be run just once in first thread (not in all)
+          // but for all databases
+          v8::HandleScope scope(isolate);
 
-        localContext->Global()->Set(TRI_V8_SYMBOL("UPGRADE_ARGS"), args);
+          v8::Handle<v8::Object> args = v8::Object::New(isolate);
+          args->Set(TRI_V8_SYMBOL("upgrade"), v8::Boolean::New(isolate, perform));
 
-        bool ok = TRI_UpgradeDatabase(vocbase, &_startupLoader, localContext);
+          localContext->Global()->Set(TRI_V8_SYMBOL("UPGRADE_ARGS"), args);
 
-        if (! ok) {
-          if (localContext->Global()->Has(TRI_V8_SYMBOL("UPGRADE_STARTED"))) {
-            if (perform) {
-              LOG_FATAL_AND_EXIT(
-                "Database '%s' upgrade failed. Please inspect the logs from the upgrade procedure",
-                vocbase->_name);
+          bool ok = TRI_UpgradeDatabase(vocbase, &_startupLoader, localContext);
+
+          if (! ok) {
+            if (localContext->Global()->Has(TRI_V8_SYMBOL("UPGRADE_STARTED"))) {
+              if (perform) {
+                LOG_FATAL_AND_EXIT(
+                                   "Database '%s' upgrade failed. Please inspect the logs from the upgrade procedure",
+                                   vocbase->_name);
+              }
+              else {
+                LOG_FATAL_AND_EXIT(
+                                   "Database '%s' needs upgrade. Please start the server with the --upgrade option",
+                                   vocbase->_name);
+              }
             }
             else {
-              LOG_FATAL_AND_EXIT(
-                "Database '%s' needs upgrade. Please start the server with the --upgrade option",
-                vocbase->_name);
+              LOG_FATAL_AND_EXIT("JavaScript error during server start");
             }
           }
-          else {
-            LOG_FATAL_AND_EXIT("JavaScript error during server start");
+
+          LOG_DEBUG("database '%s' init/upgrade done", vocbase->_name);
+        }
+      }
+    }
+
+    if (perform) {
+
+      // issue #391: when invoked with --upgrade, the server will not always shut down
+      LOG_INFO("database upgrade passed");
+      localContext->Exit();
+      delete context->_locker;
+
+      // regular shutdown... wait for all threads to finish
+
+      // again, can do this without the lock
+      for (size_t j = 0; j < _server->_databases._nrAlloc; ++j) {
+        TRI_vocbase_t* vocbase = static_cast<TRI_vocbase_t*>(_server->_databases._table[j]);
+
+        if (vocbase != nullptr) {
+          vocbase->_state = 2;
+
+          int res = TRI_ERROR_NO_ERROR;
+
+          res |= TRI_StopCompactorVocBase(vocbase);
+          vocbase->_state = 3;
+          res |= TRI_JoinThread(&vocbase->_cleanup);
+
+          if (res != TRI_ERROR_NO_ERROR) {
+            LOG_ERROR("unable to join database threads for database '%s'", vocbase->_name);
           }
         }
-
-        LOG_DEBUG("database '%s' init/upgrade done", vocbase->_name);
       }
+
+      LOG_INFO("finished");
+      TRI_EXIT_FUNCTION(EXIT_SUCCESS, NULL);
     }
-  }
-
-  if (perform) {
-
-    // issue #391: when invoked with --upgrade, the server will not always shut down
-    LOG_INFO("database upgrade passed");
-    localContext->Exit();
-    isolate->Exit();
-    delete context->_locker;
-
-    // regular shutdown... wait for all threads to finish
-
-    // again, can do this without the lock
-    for (size_t j = 0; j < _server->_databases._nrAlloc; ++j) {
-      TRI_vocbase_t* vocbase = static_cast<TRI_vocbase_t*>(_server->_databases._table[j]);
-
-      if (vocbase != nullptr) {
-        vocbase->_state = 2;
-
-        int res = TRI_ERROR_NO_ERROR;
-
-        res |= TRI_StopCompactorVocBase(vocbase);
-        vocbase->_state = 3;
-        res |= TRI_JoinThread(&vocbase->_cleanup);
-
-        if (res != TRI_ERROR_NO_ERROR) {
-          LOG_ERROR("unable to join database threads for database '%s'", vocbase->_name);
-        }
-      }
-    }
-
-    LOG_INFO("finished");
-    TRI_EXIT_FUNCTION(EXIT_SUCCESS, NULL);
-  }
-  else {
-    // and return from the context
-    localContext->Exit();
-    isolate->Exit();
-    delete context->_locker;
+    else {
+      // and return from the context
+      localContext->Exit();
+      delete context->_locker;
     
-    LOG_TRACE("finished database init/upgrade");
+      LOG_TRACE("finished database init/upgrade");
+    }
   }
+  isolate->Exit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -802,6 +820,7 @@ void ApplicationV8::upgradeDatabase (bool skip,
 ////////////////////////////////////////////////////////////////////////////////
 
 void ApplicationV8::versionCheck () {
+  int result = 1;
   static const string name = "STANDARD";
   LOG_TRACE("starting version check");
 
@@ -810,43 +829,44 @@ void ApplicationV8::versionCheck () {
 
   context->_locker = new v8::Locker(context->isolate);
   auto isolate = context->isolate;
-  auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-  v8::Context::Scope contextScope(localContext);
   isolate->Enter();
-  localContext->Enter();
+  {
+    v8::HandleScope scope(isolate);
+    auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+    v8::Context::Scope contextScope(localContext);
+    localContext->Enter();
 
-  // run upgrade script
-  LOG_DEBUG("running database version check");
+    // run upgrade script
+    LOG_DEBUG("running database version check");
 
-  // can do this without a lock as this is the startup
-  int result = 1;
+    // can do this without a lock as this is the startup
 
-  for (size_t j = 0; j < _server->_databases._nrAlloc; ++j) {
-    TRI_vocbase_t* vocbase = static_cast<TRI_vocbase_t*>(_server->_databases._table[j]);
+    for (size_t j = 0; j < _server->_databases._nrAlloc; ++j) {
+      TRI_vocbase_t* vocbase = static_cast<TRI_vocbase_t*>(_server->_databases._table[j]);
 
-    if (vocbase != nullptr) {
-      // special check script to be run just once in first thread (not in all)
-      // but for all databases
-      v8::HandleScope scope(isolate);
+      if (vocbase != nullptr) {
+        // special check script to be run just once in first thread (not in all)
+        // but for all databases
 
-      int status = TRI_CheckDatabaseVersion(vocbase, &_startupLoader, localContext);
+        int status = TRI_CheckDatabaseVersion(vocbase, &_startupLoader, localContext);
 
-      if (status < 0) {
-        LOG_FATAL_AND_EXIT(
-          "Database version check failed for '%s'. Please inspect the logs from any errors",
-          vocbase->_name);
-      }
-      else if (status == 3) {
-        result = 3;
-      }
-      else if (status == 2 && result == 1) {
-        result = 2;
+        if (status < 0) {
+          LOG_FATAL_AND_EXIT(
+                             "Database version check failed for '%s'. Please inspect the logs from any errors",
+                             vocbase->_name);
+        }
+        else if (status == 3) {
+          result = 3;
+        }
+        else if (status == 2 && result == 1) {
+          result = 2;
+        }
       }
     }
-  }
 
-  // issue #391: when invoked with --upgrade, the server will not always shut down
-  localContext->Exit();
+    // issue #391: when invoked with --upgrade, the server will not always shut down
+    localContext->Exit();
+  }
   isolate->Exit();
   delete context->_locker;
 
@@ -921,37 +941,39 @@ bool ApplicationV8::prepareNamedContexts (const string& name,
 
     context->_locker = new v8::Locker(context->isolate);
     auto isolate = context->isolate;
-    auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-    v8::Context::Scope contextScope(localContext);
     isolate->Enter();
-    localContext->Enter();
-
     {
-      v8::TryCatch tryCatch;
       v8::HandleScope scope(isolate);
+      auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+      v8::Context::Scope contextScope(localContext);
+      localContext->Enter();
 
-      v8::Handle<v8::Value> wfunc = TRI_ExecuteJavaScriptString(
-        isolate, 
-        localContext,
-        TRI_V8_STD_STRING(worker),
-        TRI_V8_STD_STRING(name),
-        false);
+      {
+        v8::TryCatch tryCatch;
 
-      if (tryCatch.HasCaught()) {
-        TRI_LogV8Exception(isolate, &tryCatch);
-        result = false;
-      }
-      else {
-        if (! wfunc.IsEmpty() && wfunc->IsFunction()) {
-          TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("MAIN"), wfunc);
-        }
-        else {
+        v8::Handle<v8::Value> wfunc = TRI_ExecuteJavaScriptString(
+                                                                  isolate, 
+                                                                  localContext,
+                                                                  TRI_V8_STD_STRING(worker),
+                                                                  TRI_V8_STD_STRING(name),
+                                                                  false);
+
+        if (tryCatch.HasCaught()) {
+          TRI_LogV8Exception(isolate, &tryCatch);
           result = false;
         }
+        else {
+          if (! wfunc.IsEmpty() && wfunc->IsFunction()) {
+            TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("MAIN"), wfunc);
+          }
+          else {
+            result = false;
+          }
+        }
       }
+      
+      localContext->Exit();
     }
-
-    localContext->Exit();
     isolate->Exit();
     delete context->_locker;
   }
@@ -1276,81 +1298,83 @@ bool ApplicationV8::prepareV8Instance (const string& name, size_t i, bool useAct
   context->isolate->Enter();
 
   // create the context
-  v8::HandleScope handle_scope(isolate);
-
-  v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New(isolate);
-
-  v8::Persistent<v8::Context> persistentContext;
-  persistentContext.Reset(isolate, v8::Context::New(isolate, 0, global));
-  auto localContext = v8::Local<v8::Context>::New(isolate, persistentContext);
-
-  localContext->Enter();
-  /// TODO  v8::Context::Scope contextScope(localContext);
-
-  context->_context.Reset(context->isolate, localContext);
-
-  if (context->_context.IsEmpty()) {
-    LOG_FATAL_AND_EXIT("cannot initialize V8 engine");
-  }
-
-  TRI_InitV8VocBridge(isolate, this, localContext, _queryRegistry, _server, _vocbase, &_startupLoader, i);
-  TRI_InitV8Queries(isolate, localContext);
-  TRI_InitV8UserStructures(isolate, localContext);
-
-  TRI_InitV8Cluster(isolate, localContext);
-  if (_dispatcher->dispatcher() != nullptr) {
-    // don't initialise dispatcher if there is no scheduler (server started with --no-server option)
-    TRI_InitV8Dispatcher(isolate, localContext, _vocbase, _scheduler, _dispatcher, this);
-  }
-
-  if (useActions) {
-    TRI_InitV8Actions(isolate, localContext, _vocbase, this);
-  }
-
-  string modulesPath = _startupPath + TRI_DIR_SEPARATOR_STR + "server" + TRI_DIR_SEPARATOR_STR + "modules;" +
-                       _startupPath + TRI_DIR_SEPARATOR_STR + "common" + TRI_DIR_SEPARATOR_STR + "modules;" +
-                       _startupPath + TRI_DIR_SEPARATOR_STR + "node";
-
-  TRI_InitV8Buffer(isolate, localContext);
-  TRI_InitV8Conversions(localContext);
-  TRI_InitV8Utils(isolate, localContext, _startupPath, modulesPath);
-  TRI_InitV8Shell(isolate, localContext);
-
   {
-    v8::HandleScope scope(isolate);
+    v8::HandleScope handle_scope(isolate);
 
-    char const* logfile = TRI_GetFilenameLogging();
-    if (logfile != 0) {
-      TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("LOGFILE_PATH"),        TRI_V8_STRING(logfile));
-    }
-    else {
-      TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("LOGFILE_PATH"),        v8::Null(isolate));
-    }
-    TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("APP_PATH"),            TRI_V8_STD_STRING(_appPath));
-    TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("DEV_APP_PATH"),        TRI_V8_STD_STRING(_devAppPath));
-    TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("DEVELOPMENT_MODE"),    v8::Boolean::New(isolate, _developmentMode));
-    TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("FE_DEVELOPMENT_MODE"), v8::Boolean::New(isolate, _frontendDevelopmentMode));
+    v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New(isolate);
 
-    for (auto j : _definedBooleans) {
-      localContext->Global()->ForceSet(TRI_V8_STD_STRING(j.first), v8::Boolean::New(isolate, j.second), v8::ReadOnly);
+    v8::Persistent<v8::Context> persistentContext;
+    persistentContext.Reset(isolate, v8::Context::New(isolate, 0, global));
+    auto localContext = v8::Local<v8::Context>::New(isolate, persistentContext);
+
+    localContext->Enter();
+    /// TODO  v8::Context::Scope contextScope(localContext);
+
+    context->_context.Reset(context->isolate, localContext);
+
+    if (context->_context.IsEmpty()) {
+      LOG_FATAL_AND_EXIT("cannot initialize V8 engine");
     }
 
-    for (auto j : _definedDoubles) {
-      localContext->Global()->ForceSet(TRI_V8_STD_STRING(j.first), v8::Number::New(isolate, j.second), v8::ReadOnly);
+    TRI_InitV8VocBridge(isolate, this, localContext, _queryRegistry, _server, _vocbase, &_startupLoader, i);
+    TRI_InitV8Queries(isolate, localContext);
+    TRI_InitV8UserStructures(isolate, localContext);
+
+    TRI_InitV8Cluster(isolate, localContext);
+    if (_dispatcher->dispatcher() != nullptr) {
+      // don't initialise dispatcher if there is no scheduler (server started with --no-server option)
+      TRI_InitV8Dispatcher(isolate, localContext, _vocbase, _scheduler, _dispatcher, this);
     }
+
+    if (useActions) {
+      TRI_InitV8Actions(isolate, localContext, _vocbase, this);
+    }
+
+    string modulesPath = _startupPath + TRI_DIR_SEPARATOR_STR + "server" + TRI_DIR_SEPARATOR_STR + "modules;" +
+      _startupPath + TRI_DIR_SEPARATOR_STR + "common" + TRI_DIR_SEPARATOR_STR + "modules;" +
+      _startupPath + TRI_DIR_SEPARATOR_STR + "node";
+
+    TRI_InitV8Buffer(isolate, localContext);
+    TRI_InitV8Conversions(localContext);
+    TRI_InitV8Utils(isolate, localContext, _startupPath, modulesPath);
+    TRI_InitV8Shell(isolate, localContext);
+
+    {
+      v8::HandleScope scope(isolate);
+
+      char const* logfile = TRI_GetFilenameLogging();
+      if (logfile != 0) {
+        TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("LOGFILE_PATH"),        TRI_V8_STRING(logfile));
+      }
+      else {
+        TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("LOGFILE_PATH"),        v8::Null(isolate));
+      }
+      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("APP_PATH"),            TRI_V8_STD_STRING(_appPath));
+      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("DEV_APP_PATH"),        TRI_V8_STD_STRING(_devAppPath));
+      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("DEVELOPMENT_MODE"),    v8::Boolean::New(isolate, _developmentMode));
+      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("FE_DEVELOPMENT_MODE"), v8::Boolean::New(isolate, _frontendDevelopmentMode));
+
+      for (auto j : _definedBooleans) {
+        localContext->Global()->ForceSet(TRI_V8_STD_STRING(j.first), v8::Boolean::New(isolate, j.second), v8::ReadOnly);
+      }
+
+      for (auto j : _definedDoubles) {
+        localContext->Global()->ForceSet(TRI_V8_STD_STRING(j.first), v8::Number::New(isolate, j.second), v8::ReadOnly);
+      }
+    }
+
+    // load all init files
+    for (size_t j = 0;  j < files.size();  ++j) {
+      bool ok = _startupLoader.loadScript(isolate, localContext, files[j]);
+
+      if (! ok) {
+        LOG_FATAL_AND_EXIT("cannot load JavaScript utilities from file '%s'", files[j].c_str());
+      }
+    }
+
+    // and return from the context
+    localContext->Exit();
   }
-
-  // load all init files
-  for (size_t j = 0;  j < files.size();  ++j) {
-    bool ok = _startupLoader.loadScript(isolate, localContext, files[j]);
-
-    if (! ok) {
-      LOG_FATAL_AND_EXIT("cannot load JavaScript utilities from file '%s'", files[j].c_str());
-    }
-  }
-
-  // and return from the context
-  localContext->Exit();
   isolate->Exit();
   delete context->_locker;
 
@@ -1378,20 +1402,23 @@ void ApplicationV8::prepareV8Server (const string& name, const size_t i, const s
   auto isolate = context->isolate;
   context->_locker = new v8::Locker(isolate);
   v8::HandleScope scope(isolate);
-  auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-  /// TODO: do we need this? v8::Context::Scope contextScope(localContext);
   isolate->Enter();
-  localContext->Enter();
+  {
+    v8::HandleScope handle_scope(isolate);
+    auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+    /// TODO: do we need this? v8::Context::Scope contextScope(localContext);
+    localContext->Enter();
 
-  // load server startup file
-  bool ok = _startupLoader.loadScript(isolate, localContext, startupFile);
+    // load server startup file
+    bool ok = _startupLoader.loadScript(isolate, localContext, startupFile);
 
-  if (! ok) {
-    LOG_FATAL_AND_EXIT("cannot load JavaScript utilities from file '%s'", startupFile.c_str());
+    if (! ok) {
+      LOG_FATAL_AND_EXIT("cannot load JavaScript utilities from file '%s'", startupFile.c_str());
+    }
+
+    // and return from the context
+    localContext->Exit();
   }
-
-  // and return from the context
-  localContext->Exit();
   isolate->Exit();
   delete context->_locker;
 
@@ -1409,13 +1436,13 @@ void ApplicationV8::shutdownV8Instance (const string& name, size_t i) {
   V8Context* context = _contexts[name][i];
 
   auto isolate = context->isolate;
+  isolate->Enter();
   context->_locker = new v8::Locker(isolate);
   {
     v8::HandleScope scope(isolate);
 
     auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
     //// TODO v8::Context::Scope contextScope(localContext);
-    isolate->Enter();
     localContext->Enter();
 
     isolate->LowMemoryNotification();
