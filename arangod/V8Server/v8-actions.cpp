@@ -160,42 +160,43 @@ class v8_action_t : public TRI_action_t {
       // locate the callback
       READ_LOCKER(_callbacksLock);
 
-      map< v8::Isolate*, v8::Persistent<v8::Function> >::iterator i = _callbacks.find(context->isolate);
-
-      if (i == _callbacks.end()) {
-        LOG_WARNING("no callback function for JavaScript action '%s'", _url.c_str());
-
-        GlobalV8Dealer->exitContext(context);
-
-        result.isValid = true;
-        result.response = new HttpResponse(HttpResponse::NOT_FOUND, request->compatibility());
-
-        return result;
-      }
-
-      // and execute it
       {
-        MUTEX_LOCKER(*dataLock);
+        map< v8::Isolate*, v8::Persistent<v8::Function> >::iterator i = _callbacks.find(context->isolate);
 
-        if (*data != 0) {
-          result.canceled = true;
+        if (i == _callbacks.end()) {
+          LOG_WARNING("no callback function for JavaScript action '%s'", _url.c_str());
 
           GlobalV8Dealer->exitContext(context);
+
+          result.isValid = true;
+          result.response = new HttpResponse(HttpResponse::NOT_FOUND, request->compatibility());
 
           return result;
         }
 
-        *data = (void*) context->isolate;
-      }
-      v8::HandleScope scope(context->isolate);
-      auto localFunction = v8::Local<v8::Function>::New(context->isolate, i->second);
-      result = ExecuteActionVocbase(vocbase, context->isolate, this, localFunction, request);
+        // and execute it
+        {
+          MUTEX_LOCKER(*dataLock);
 
-      {
-        MUTEX_LOCKER(*dataLock);
-        *data = 0;
-      }
+          if (*data != 0) {
+            result.canceled = true;
 
+            GlobalV8Dealer->exitContext(context);
+
+            return result;
+          }
+
+          *data = (void*) context->isolate;
+        }
+        v8::HandleScope scope(context->isolate);
+        auto localFunction = v8::Local<v8::Function>::New(context->isolate, i->second);
+        result = ExecuteActionVocbase(vocbase, context->isolate, this, localFunction, request);
+
+        {
+          MUTEX_LOCKER(*dataLock);
+          *data = 0;
+        }
+      }
       GlobalV8Dealer->exitContext(context);
 
       return result;
