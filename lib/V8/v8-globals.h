@@ -201,7 +201,7 @@ static const uint32_t V8DataSlot = 0;
 
 #define TRI_V8_LOG_THROW_EXCEPTION(TRYCATCH)                    \
   TRI_LogV8Exception(isolate, &TRYCATCH);                       \
-  args.GetIsolate()->ThrowException(TRYCATCH.Exception());      \
+  TRYCATCH.ReThrow();                                           \
   return
 
 ////////////////////////////////////////////////////////////////////////////////

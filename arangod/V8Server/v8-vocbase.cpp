@@ -314,24 +314,25 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_EXCEPTION_PARAMETER(actionError);
   }
 
+  // start actual transaction
+  ExplicitTransaction trx(vocbase,
+                          readCollections,
+                          writeCollections,
+                          lockTimeout,
+                          waitForSync,
+                          embed);
+
+  int res = trx.begin();
+  
+  if (res != TRI_ERROR_NO_ERROR) {
+      TRI_V8_EXCEPTION(res);
+  }
+
+  v8::Handle<v8::Value> result;
   {
     v8::TryCatch tryCatch;
-    // start actual transaction
-    ExplicitTransaction trx(vocbase,
-                            readCollections,
-                            writeCollections,
-                            lockTimeout,
-                            waitForSync,
-                            embed);
-
-    int res = trx.begin();
-
-    if (res != TRI_ERROR_NO_ERROR) {
-      TRI_V8_EXCEPTION(res);
-    }
-
     v8::Handle<v8::Value> arguments = params;
-    v8::Handle<v8::Value> result = action->Call(current, 1, &arguments);
+    result = action->Call(current, 1, &arguments);
 
     if (tryCatch.HasCaught()) {
       trx.abort();
@@ -344,14 +345,14 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
         TRI_V8_RETURN(result);
       }
     }
-    res = trx.commit();
-
-    if (res != TRI_ERROR_NO_ERROR) {
-      TRI_V8_EXCEPTION(res);
-    }
-
-    TRI_V8_RETURN(result);
   }
+  res = trx.commit();
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    TRI_V8_EXCEPTION(res);
+  }
+  
+  TRI_V8_RETURN(result);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
