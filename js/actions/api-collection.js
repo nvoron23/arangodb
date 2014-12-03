@@ -205,10 +205,9 @@ function parseBodyForCreateCollection (req, res) {
 ///   collection. Setting this option will make the resulting collection be
 ///   slightly faster than regular collections because ArangoDB does not
 ///   enforce any synchronisation to disk and does not calculate any CRC
-///   checksums for datafiles (as there are no datafiles).
-///
-///   This option should threrefore be used for cache-type collections only,
-///   and not for data that cannot be re-created otherwise.
+///   checksums for datafiles (as there are no datafiles). This option 
+///   should threrefore be used for cache-type collections only, and not 
+///   for data that cannot be re-created otherwise.
 ///
 /// - *keyOptions* (optional) additional options for key generation. If
 ///   specified, then *keyOptions* should be a JSON array containing the
@@ -445,6 +444,8 @@ function get_api_collections (req, res) {
 /// - *type*: The type of the collection as number.
 ///   - 2: document collection (normal case)
 ///   - 3: edges collection
+///
+/// - *isSystem*: If *true* then the collection is a system collection.
 ///
 /// @RESTRETURNCODES
 ///

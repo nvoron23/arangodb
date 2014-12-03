@@ -1024,6 +1024,12 @@ static void JS_ExplainAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
     else {
       result->Set(TRI_V8_SYMBOL("warnings"), TRI_ObjectJson(isolate, queryResult.warnings));
     }
+    if (queryResult.stats == nullptr) {
+      result->Set(TRI_V8_STRING("stats"), v8::Object::New());
+    }
+    else {
+      result->Set(TRI_V8_STRING("stats"), TRI_ObjectJson(queryResult.stats));
+    }
   }
 
   TRI_V8_RETURN(result);

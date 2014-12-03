@@ -79,12 +79,14 @@ AggregatorGroup::~AggregatorGroup () {
 void AggregatorGroup::initialize (size_t capacity) {
   TRI_ASSERT(capacity > 0);
 
+  groupValues.clear();
+  collections.clear();
   groupValues.reserve(capacity);
   collections.reserve(capacity);
 
   for (size_t i = 0; i < capacity; ++i) {
-    groupValues[i] = AqlValue();
-    collections[i] = nullptr;
+    groupValues.emplace_back();
+    collections.push_back(nullptr);
   }
 }
 
@@ -93,7 +95,8 @@ void AggregatorGroup::reset () {
     delete (*it);
   }
   groupBlocks.clear();
-  groupValues[0].erase();
+  groupValues[0].erase();   // only need to erase [0], because we have
+                            // only copies of references anyway
 }
 
 void AggregatorGroup::addValues (AqlItemBlock const* src,
@@ -717,7 +720,8 @@ AqlItemBlock* EnumerateCollectionBlock::getSome (size_t, // atLeast,
   }
 
   if (_buffer.empty()) {
-    if (! ExecutionBlock::getBlock(DefaultBatchSize, DefaultBatchSize)) {
+    size_t toFetch = (std::min)(DefaultBatchSize, atMost);
+    if (! ExecutionBlock::getBlock(toFetch, toFetch)) {
       _done = true;
       return nullptr;
     }
@@ -798,7 +802,8 @@ size_t EnumerateCollectionBlock::skipSome (size_t atLeast, size_t atMost) {
 
   while (skipped < atLeast) {
     if (_buffer.empty()) {
-      if (! getBlock(DefaultBatchSize, DefaultBatchSize)) {
+      size_t toFetch = (std::min)(DefaultBatchSize, atMost);
+      if (! getBlock(toFetch, toFetch)) {
         _done = true;
         return skipped;
       }
@@ -1169,7 +1174,8 @@ AqlItemBlock* IndexRangeBlock::getSome (size_t atLeast,
     // try again!
 
     if (_buffer.empty()) {
-      if (! ExecutionBlock::getBlock(DefaultBatchSize, DefaultBatchSize) 
+      size_t toFetch = (std::min)(DefaultBatchSize, atMost);
+      if (! ExecutionBlock::getBlock(toFetch, toFetch) 
           || (! initIndex())) {
         _done = true;
         return nullptr;
@@ -1275,7 +1281,8 @@ size_t IndexRangeBlock::skipSome (size_t atLeast,
 
   while (skipped < atLeast) {
     if (_buffer.empty()) {
-      if (! ExecutionBlock::getBlock(DefaultBatchSize, DefaultBatchSize) 
+      size_t toFetch = (std::min)(DefaultBatchSize, atMost);
+      if (! ExecutionBlock::getBlock(toFetch, toFetch) 
           || (! initIndex())) {
         _done = true;
         return skipped;
@@ -1415,9 +1422,10 @@ void IndexRangeBlock::readHashIndex (IndexOrCondition const& ranges) {
     searchValue._values = nullptr;
   };
 
-  auto setupSearchValue = [&]() {
+  auto setupSearchValue = [&]() -> bool {
     size_t const n = hashIndex->_paths._length;
     searchValue._length = 0;
+    // initialize the whole range of shapes with zeros
     searchValue._values = static_cast<TRI_shaped_json_t*>(TRI_Allocate(TRI_CORE_MEM_ZONE, 
           n * sizeof(TRI_shaped_json_t), true));
 
@@ -1426,6 +1434,7 @@ void IndexRangeBlock::readHashIndex (IndexOrCondition const& ranges) {
     }
     
     searchValue._length = n;
+    bool valid = true;
 
     for (size_t i = 0; i < n; ++i) {
       TRI_shape_pid_t pid = *(static_cast<TRI_shape_pid_t*>(TRI_AtVector(&hashIndex->_paths, i)));
@@ -1436,16 +1445,27 @@ void IndexRangeBlock::readHashIndex (IndexOrCondition const& ranges) {
       for (auto x : ranges.at(0)) {
         if (x._attr == std::string(name)) {    //found attribute
           auto shaped = TRI_ShapedJsonJson(shaper, x._lowConst.bound().json(), false); 
-          // here x->_low->_bound = x->_high->_bound 
-          searchValue._values[i] = *shaped;
-          TRI_Free(shaper->_memoryZone, shaped);
+
+          if (shaped == nullptr) {
+            valid = false;
+          }
+          else {
+            // here x->_low->_bound = x->_high->_bound 
+            searchValue._values[i] = *shaped;
+            TRI_Free(shaper->_memoryZone, shaped);
+          }
           break; 
         }
       }
     }
+
+    return valid;
   };
  
-  setupSearchValue();  
+  if (! setupSearchValue()) {
+    destroySearchValue();
+    return;
+  }
   TRI_vector_pointer_t list = TRI_LookupHashIndex(idx, &searchValue);
   destroySearchValue();
   
@@ -1727,7 +1747,8 @@ AqlItemBlock* EnumerateListBlock::getSome (size_t, size_t atMost) {
     // try again!
 
     if (_buffer.empty()) {
-      if (! ExecutionBlock::getBlock(DefaultBatchSize, DefaultBatchSize)) {
+      size_t toFetch = (std::min)(DefaultBatchSize, atMost);
+      if (! ExecutionBlock::getBlock(toFetch, toFetch)) {
         _done = true;
         return nullptr;
       }
@@ -1848,7 +1869,8 @@ size_t EnumerateListBlock::skipSome (size_t atLeast, size_t atMost) {
 
   while (skipped < atLeast) {
     if (_buffer.empty()) {
-      if (! ExecutionBlock::getBlock(DefaultBatchSize, DefaultBatchSize)) {
+      size_t toFetch = (std::min)(DefaultBatchSize, atMost);
+      if (! ExecutionBlock::getBlock(toFetch, toFetch)) {
         _done = true;
         return skipped;
       }
@@ -2074,7 +2096,7 @@ AqlItemBlock* CalculationBlock::getSome (size_t atLeast,
                                          size_t atMost) {
 
   unique_ptr<AqlItemBlock> res(ExecutionBlock::getSomeWithoutRegisterClearout(
-                                                     DefaultBatchSize, DefaultBatchSize));
+                               atLeast, atMost));
 
   if (res.get() == nullptr) {
     return nullptr;
@@ -2342,6 +2364,10 @@ bool FilterBlock::hasMore () {
   }
 
   if (_buffer.empty()) {
+    // QUESTION: Is this sensible? Asking whether there is more might
+    // trigger an expensive fetching operation, even if later on only
+    // a single document is needed due to a LIMIT...
+    // However, how should we know this here?
     if (! getBlock(DefaultBatchSize, DefaultBatchSize)) {
       _done = true;
       return false;
@@ -2396,13 +2422,17 @@ AggregateBlock::AggregateBlock (ExecutionEngine* engine,
     }
 
     // iterate over all our variables
-    for (auto it = en->getRegisterPlan()->varInfo.begin(); 
-         it != en->getRegisterPlan()->varInfo.end(); ++it) {
-      // find variable in the global variable map
-      auto itVar = en->_variableMap.find((*it).first);
+    for (auto& vi : en->getRegisterPlan()->varInfo) {
+      if (vi.second.depth > 0 || en->getDepth() == 1) {
+        // Do not keep variables from depth 0, unless we are depth 1 ourselves
+        // (which means no FOR in which we are contained)
+ 
+        // find variable in the global variable map
+        auto itVar = en->_variableMap.find(vi.first);
 
-      if (itVar != en->_variableMap.end()) {
-        _variableNames[(*it).second.registerId] = (*itVar).second;
+        if (itVar != en->_variableMap.end()) {
+          _variableNames[vi.second.registerId] = (*itVar).second;
+        }
       }
     }
   }
@@ -2463,7 +2493,7 @@ int AggregateBlock::getOrSkipSome (size_t atLeast,
   }
 
   while (skipped < atMost) {
-    // read the next input tow
+    // read the next input row
 
     bool newGroup = false;
     if (_currentGroup.groupValues[0].isEmpty()) {
@@ -2585,6 +2615,15 @@ int AggregateBlock::getOrSkipSome (size_t atLeast,
 void AggregateBlock::emitGroup (AqlItemBlock const* cur,
                                 AqlItemBlock* res,
                                 size_t row) {
+
+  if (row > 0) {
+    // re-use already copied aqlvalues
+    for (RegisterId i = 0; i < cur->getNrRegs(); i++) {
+      res->setValue(row, i, res->getValue(0, i));
+      // Note: if this throws, then all values will be deleted
+      // properly since the first one is.
+    }
+  }
 
   size_t i = 0;
   for (auto it = _aggregateRegisters.begin(); it != _aggregateRegisters.end(); ++it) {
@@ -3370,7 +3409,7 @@ void UpdateBlock::work (std::vector<AqlItemBlock*>& blocks) {
               TRI_json_t* old = TRI_JsonShapedJson(_collection->documentCollection()->getShaper(), &shapedJson);
 
               if (old != nullptr) {
-                TRI_json_t* patchedJson = TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, old, json.json(), ep->_options.nullMeansRemove);
+                TRI_json_t* patchedJson = TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, old, json.json(), ep->_options.nullMeansRemove, ep->_options.mergeArrays);
                 TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, old); 
 
                 if (patchedJson != nullptr) {

@@ -93,6 +93,7 @@ TRI_v8_global_s::TRI_v8_global_s (v8::Isolate* isolate)
     KeyOptionsKey(),
     LengthKey(),
     LifeTimeKey(),
+    MergeArraysKey(),
     NameKey(),
     OperationIDKey(),
     ParametersKey(),
@@ -180,6 +181,7 @@ TRI_v8_global_s::TRI_v8_global_s (v8::Isolate* isolate)
   KeyOptionsKey.Reset(isolate, TRI_V8_SYMBOL("keyOptions"));
   LengthKey.Reset(isolate, TRI_V8_SYMBOL("length"));
   LifeTimeKey.Reset(isolate, TRI_V8_SYMBOL("lifeTime"));
+  MergeArraysKey.Reset(isolate, TRI_V8_SYMBOL("mergeArrays"));
   NameKey.Reset(isolate, TRI_V8_SYMBOL("name"));
   OperationIDKey.Reset(isolate, TRI_V8_SYMBOL("operationID"));
   OverwriteKey.Reset(isolate, TRI_V8_SYMBOL("overwrite"));
