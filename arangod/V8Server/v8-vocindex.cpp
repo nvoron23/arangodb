@@ -38,6 +38,7 @@
 #include "Utils/V8TransactionContext.h"
 
 #include "CapConstraint/cap-constraint.h"
+#include "V8/v8-globals.h"
 #include "V8/v8-utils.h"
 
 using namespace std;
@@ -525,7 +526,9 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
 
   // extract type
   TRI_json_t* value = TRI_LookupArrayJson(json, "type");
-  TRI_ASSERT(TRI_IsStringJson(value));
+  if (! TRI_IsStringJson(value)) {
+    TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
 
   TRI_idx_type_e type = TRI_TypeIndex(value->_value._string.data);
 
@@ -558,8 +561,14 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     for (size_t i = 0; i < value->_value._objects._length; ++i) {
       TRI_json_t const* v = static_cast<TRI_json_t const*>(TRI_AtVector(&value->_value._objects, i));
 
-      TRI_ASSERT(TRI_IsStringJson(v));
-      TRI_PushBackVectorPointer(&attributes, v->_value._string.data);
+      if (TRI_IsStringJson(v)) {
+        TRI_PushBackVectorPointer(&attributes, v->_value._string.data);
+      }
+    }
+
+    // check if copying was successful
+    if (value->_value._objects._length != TRI_LengthVectorPointer(&attributes)) {
+      TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
     }
   }
 
@@ -598,6 +607,10 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     }
 
     case TRI_IDX_TYPE_GEO1_INDEX: {
+      if (attributes._length != 1) {
+        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      }
+
       TRI_ASSERT(attributes._length == 1);
 
       bool ignoreNull = false;
@@ -632,6 +645,10 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     }
 
     case TRI_IDX_TYPE_GEO2_INDEX: {
+      if (attributes._length != 2) {
+        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      }
+      
       TRI_ASSERT(attributes._length == 2);
 
       bool ignoreNull = false;
@@ -660,6 +677,10 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     }
 
     case TRI_IDX_TYPE_HASH_INDEX: {
+      if (attributes._length == 0) {
+        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      }
+
       TRI_ASSERT(attributes._length > 0);
 
       if (create) {
@@ -679,6 +700,10 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     }
 
     case TRI_IDX_TYPE_SKIPLIST_INDEX: {
+      if (attributes._length == 0) {
+        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      }
+
       TRI_ASSERT(attributes._length > 0);
 
       if (create) {
@@ -697,6 +722,10 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     }
 
     case TRI_IDX_TYPE_FULLTEXT_INDEX: {
+      if (attributes._length != 1) {
+        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      }
+
       TRI_ASSERT(attributes._length == 1);
 
       int minWordLength = TRI_FULLTEXT_MIN_WORD_LENGTH_DEFAULT;

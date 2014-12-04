@@ -64,6 +64,7 @@ namespace triagens {
       _returnMessage = "";
       _contentLength = 0;
       _returnCode = 0;
+      _foundHeader = false;
       _hasContentLength = false;
       _chunked = false;
       _deflated = false;
@@ -156,8 +157,6 @@ namespace triagens {
         if (keyString.size() == strlen("content-length") &&
             keyString == "content-length") {
           setContentLength((size_t) StringUtils::int64(value, valueLength));
-          std::cout << "Simple: Content-length found: "
-                    << getContentLength() << std::endl;
         }
         else if (keyString.size() == strlen("content-encoding") &&
                  keyString == "content-encoding") {

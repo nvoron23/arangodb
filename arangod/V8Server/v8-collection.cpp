@@ -91,7 +91,7 @@ struct InsertOptions {
 struct UpdateOptions {
   bool overwrite   = false;
   bool keepNull    = true;
-  bool mergeArrays = true;
+  bool mergeObjects = true;
   bool waitForSync = false;
   bool silent      = false;
 };
@@ -692,7 +692,7 @@ static void ModifyVocbaseColCoordinator (TRI_vocbase_col_t const* collection,
                                          bool waitForSync,
                                          bool isPatch,
                                          bool keepNull, // only counts if isPatch==true
-                                         bool mergeArrays, // only counts if isPatch==true                                         bool silent,
+                                         bool mergeObjects, // only counts if isPatch==true                                         bool silent,
                                          bool silent,
                                          const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
@@ -727,7 +727,7 @@ static void ModifyVocbaseColCoordinator (TRI_vocbase_col_t const* collection,
 
   error = triagens::arango::modifyDocumentOnCoordinator(
         dbname, collname, key, rev, policy, waitForSync, isPatch,
-        keepNull, mergeArrays, json, headers, responseCode, resultHeaders, resultBody);
+        keepNull, mergeObjects, json, headers, responseCode, resultHeaders, resultBody);
   // Note that the json has been freed inside!
 
   if (error != TRI_ERROR_NO_ERROR) {
@@ -872,7 +872,7 @@ void ReplaceVocbaseCol (bool useCollection,
                                 options.waitForSync,
                                 false,  // isPatch
                                 true,   // keepNull, does not matter
-                                false,   // mergeArrays, does not matter                                options.silent,
+                                false,   // mergeObjects, does not matter                                options.silent,
                                 options.silent,
                                 args);
     return;
@@ -1091,7 +1091,7 @@ static void UpdateVocbaseCol (bool useCollection,
   TRI_GET_GLOBALS();
 
   if (argLength < 2 || argLength > 5) {
-    TRI_V8_EXCEPTION_USAGE("update(<document>, <data>, {overwrite: booleanValue, keepNull: booleanValue, mergeArrays: booleanValue, waitForSync: booleanValue})");
+    TRI_V8_EXCEPTION_USAGE("update(<document>, <data>, {overwrite: booleanValue, keepNull: booleanValue, mergeObjects: booleanValue, waitForSync: booleanValue})");
   }
 
   if (argLength > 2) {
@@ -1106,9 +1106,9 @@ static void UpdateVocbaseCol (bool useCollection,
       if (optionsObject->Has(KeepNullKey)) {
         options.keepNull = TRI_ObjectToBoolean(optionsObject->Get(KeepNullKey));
       }
-      TRI_GET_GLOBAL_STRING(MergeArraysKey);
-      if (optionsObject->Has(MergeArraysKey)) {
-        options.mergeArrays = TRI_ObjectToBoolean(optionsObject->Get(MergeArraysKey));
+      TRI_GET_GLOBAL_STRING(MergeObjectsKey);
+      if (optionsObject->Has(MergeObjectsKey)) {
+        options.mergeObjects = TRI_ObjectToBoolean(optionsObject->Get(MergeObjectsKey));
       }
       TRI_GET_GLOBAL_STRING(WaitForSyncKey);
       if (optionsObject->Has(WaitForSyncKey)) {
@@ -1178,7 +1178,7 @@ static void UpdateVocbaseCol (bool useCollection,
                                 options.waitForSync,
                                 true,  // isPatch
                                 options.keepNull,
-                                options.mergeArrays,
+                                options.mergeObjects,
                                 options.silent,
                                 args);
     return;
@@ -1246,7 +1246,7 @@ static void UpdateVocbaseCol (bool useCollection,
     }
   }
 
-  TRI_json_t* patchedJson = TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, old, json, ! options.keepNull, options.mergeArrays);
+  TRI_json_t* patchedJson = TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, old, json, ! options.keepNull, options.mergeObjects);
   TRI_FreeJson(zone, old);
   TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
 

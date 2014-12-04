@@ -71,7 +71,6 @@ namespace triagens {
       if (_connection->isConnected()) {
         _state = FINISHED;
       }
-      // XXX std::cout << "Simple: contructor done, state: " << _state << std::endl;
     }
 
     SimpleHttpClient::~SimpleHttpClient () {
@@ -95,8 +94,6 @@ namespace triagens {
       // ensure connection has not yet been invalidated
       TRI_ASSERT(_connection != nullptr);
 
-      // XXX std::cout << "Simple: close called" << std::endl;
-
       _connection->disconnect();
       _state = IN_CONNECT;
 
@@ -114,7 +111,6 @@ namespace triagens {
       size_t bodyLength,
       std::map<std::string, std::string> const& headerFields) {
       
-      std::cout << "Simple: request, location: " << location << std::endl;
       // ensure connection has not yet been invalidated
       TRI_ASSERT(_connection != nullptr);
 
@@ -147,12 +143,9 @@ namespace triagens {
         // strange effect that the write (if it is small enough) proceeds
         // but the following read runs into an error. In that case we try
         // to reconnect one and then give up if this does not work.
-        std::cout << "Simple: Main loop, state " << _state << " remaining time "
-                  << remainingTime << std::endl;
         switch (_state) {
           case (IN_CONNECT): {
             handleConnect();
-            // XXX std::cout << "Simple: handleConnect state: " << _state << std::endl;
             // If this goes wrong, _state is set to DEAD
             break;
           }
@@ -173,7 +166,7 @@ namespace triagens {
                 setErrorMessage(TRI_last_error(), false);
               }
 
-              this->close();   // this sets _state to IN_CONNECT for a retry
+              this->close(); // this sets _state to IN_CONNECT for a retry
             }
             else {
               _written += bytesWritten;
@@ -192,24 +185,25 @@ namespace triagens {
           case (IN_READ_CHUNKED_BODY): {
             TRI_set_errno(TRI_ERROR_NO_ERROR);
 
-            // we need to read a at least one byte to make progress
-            bool progress;
-            bool res = _connection->handleRead(remainingTime, _readBuffer, progress);
+            // we need to notice if the other side has closed the connection:
+            bool connectionClosed;
+
+            bool res = _connection->handleRead(remainingTime, _readBuffer,
+                                               connectionClosed);
+
 
             // If there was an error, then we are doomed:
             if (! res) {
-              std::cout << "doomed\n";
-              this->close();   // this sets the state to IN_CONNECT for a retry
+              this->close(); // this sets the state to IN_CONNECT for a retry
               break;
             }
 
-            if (! progress) {
-              std::cout << "no progress\n";
+            if (connectionClosed) {
               // write might have succeeded even if the server has closed 
               // the connection, this will then show up here with us being
               // in state IN_READ_HEADER but nothing read.
               if (_state == IN_READ_HEADER && 0 == _readBuffer.length()) {
-                this->close();   // sets _state to IN_CONNECT again for a retry
+                this->close(); // sets _state to IN_CONNECT again for a retry
                 continue;
               }
 
@@ -224,20 +218,20 @@ namespace triagens {
 
                 if (_state != FINISHED) {
                   // If the body was not fully found we give up:
-                  this->close();   // this sets the state to retry
+                  this->close(); // this sets the state IN_CONNECT to retry
                 }
 
                 break;
               }
 
               else {
-                // In all other cases of no progress, we are doomed:
-                this->close();   // this sets the state to retry
+                // In all other cases of closed connection, we are doomed:
+                this->close(); // this sets the state to IN_CONNECT retry
                 break;
               }
             }
 
-            // we made progress, we process whatever we are in progress to do
+            // the connection is still alive:
             switch (_state) {
               case (IN_READ_HEADER):
                 processHeader();
@@ -278,7 +272,6 @@ namespace triagens {
 
       _result = nullptr;
 
-      std::cout << "Simple: request() done, result code: " << result->getHttpReturnCode() << std::endl;
       return result;
     }
 
@@ -494,11 +487,20 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     void SimpleHttpClient::processHeader () {
+      TRI_ASSERT(_readBufferOffset <= _readBuffer.length());
       size_t remain = _readBuffer.length() - _readBufferOffset;
       char const* ptr = _readBuffer.c_str() + _readBufferOffset;
       char const* pos = (char*) memchr(ptr, '\n', remain);
 
+      // We enforce the following invariants:
+      //   ptr = _readBuffer.c_str() + _readBufferOffset
+      //   _readBuffer.length() >= _readBufferOffset
+      //   remain = _readBuffer.length() - _readBufferOffset
       while (pos) {
+        TRI_ASSERT(_readBufferOffset <= _readBuffer.length());
+        TRI_ASSERT(ptr == _readBuffer.c_str() + _readBufferOffset);
+        TRI_ASSERT(remain == _readBuffer.length() - _readBufferOffset);
+
         if (pos > ptr && *(pos - 1) == '\r') {
           // adjust eol position
           --pos;
@@ -506,12 +508,16 @@ namespace triagens {
 
         // end of header found
         if (*ptr == '\r' || *ptr == '\0') {
-          size_t len = pos - (_readBuffer.c_str() + _readBufferOffset);
-          _readBufferOffset += (len + 1);
+          size_t len = pos - ptr;
+          _readBufferOffset += len + 1;
+          ptr += len + 1;
+          remain -= len + 1;
 
           if (*pos == '\r') {
             // adjust offset if line ended with \r\n
             ++_readBufferOffset;
+            ptr++;
+            remain--;
           }
 
           // handle chunks
@@ -536,6 +542,7 @@ namespace triagens {
             if (! _keepAlive) {
               _connection->disconnect();
             }
+            return;
           }
 
           // found content-length header in response
@@ -573,14 +580,18 @@ namespace triagens {
           }
         
           ptr += len + 1;
-          
-          TRI_ASSERT(remain >= (len + 1));
+          _readBufferOffset += len + 1;
           remain -= (len + 1);
-
+          
+          TRI_ASSERT(_readBufferOffset <= _readBuffer.length());
+          TRI_ASSERT(ptr == _readBuffer.c_str() + _readBufferOffset);
+          TRI_ASSERT(remain == _readBuffer.length() - _readBufferOffset);
           pos = (char*) memchr(ptr, '\n', remain);
 
           if (pos == nullptr) {
-            _readBufferOffset = ptr - _readBuffer.c_str() + 1;
+            _readBufferOffset++;
+            ptr++;
+            remain--;
           } 
         }
       }
@@ -613,7 +624,6 @@ namespace triagens {
 
       // body is compressed using deflate. inflate it
       if (_result->isDeflated()) {
-        std::cout << "isDeflated: " << _result->isDeflated();
         _readBuffer.inflate(_result->getBody(), 16384, _readBufferOffset);
       }
 
