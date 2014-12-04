@@ -127,7 +127,7 @@ static v8::Handle<v8::Object> WrapClass (v8::Isolate *isolate,
 
   // set the c++ pointer for unwrapping later
   result->SetInternalField(SLOT_CLASS_TYPE, v8::Integer::New(isolate, type));
-  result->SetInternalField(SLOT_CLASS, v8::External::New(isolate, y));
+  result->SetInternalField(SLOT_CLASS,      v8::External::New(isolate, y));
 
   return scope.Escape<v8::Object>(result);
 }
@@ -1112,13 +1112,13 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
     // return the array value as it is. this is a performance optimisation
     v8::Handle<v8::Object> result = v8::Object::New(isolate);
     if (queryResult.json != nullptr) {
-      result->Set(TRI_V8_SYMBOL("json"), TRI_ObjectJson(isolate, queryResult.json));
+      result->Set(TRI_V8_SYMBOL("json"),     TRI_ObjectJson(isolate, queryResult.json));
     }
     if (queryResult.stats != nullptr) {
-      result->Set(TRI_V8_SYMBOL("stats"), TRI_ObjectJson(isolate, queryResult.stats));
+      result->Set(TRI_V8_SYMBOL("stats"),    TRI_ObjectJson(isolate, queryResult.stats));
     }
     if (queryResult.profile != nullptr) {
-      result->Set(TRI_V8_SYMBOL("profile"), TRI_ObjectJson(isolate, queryResult.profile));
+      result->Set(TRI_V8_SYMBOL("profile"),  TRI_ObjectJson(isolate, queryResult.profile));
     }
     if (queryResult.warnings == nullptr) {
       result->Set(TRI_V8_SYMBOL("warnings"), v8::Array::New(isolate));
@@ -1276,10 +1276,10 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
     result->Set(TRI_V8_SYMBOL("json"), queryResult.result);
 
     if (queryResult.stats != nullptr) {
-      result->Set(TRI_V8_SYMBOL("stats"), TRI_ObjectJson(isolate, queryResult.stats));
+      result->Set(TRI_V8_SYMBOL("stats"),    TRI_ObjectJson(isolate, queryResult.stats));
     }
     if (queryResult.profile != nullptr) {
-      result->Set(TRI_V8_SYMBOL("profile"), TRI_ObjectJson(isolate, queryResult.profile));
+      result->Set(TRI_V8_SYMBOL("profile"),  TRI_ObjectJson(isolate, queryResult.profile));
     }
     if (queryResult.warnings == nullptr) {
       result->Set(TRI_V8_SYMBOL("warnings"), v8::Array::New(isolate));
@@ -1417,7 +1417,7 @@ static void MapGetVocBase (v8::Local<v8::String> const name,
   cacheKey.push_back('*');
 
   v8::Local<v8::String> cacheName = TRI_V8_STD_STRING(cacheKey);
-  v8::Handle<v8::Object> holder = args.Holder()->ToObject();
+  v8::Handle<v8::Object> holder   = args.Holder()->ToObject();
 
   if (*key == '_') {
     // special treatment for all properties starting with _

@@ -103,8 +103,8 @@ static v8::Handle<v8::Value> EmptyResult (v8::Isolate* isolate) {
 
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   result->Set(TRI_V8_SYMBOL("documents"), v8::Array::New(isolate));
-  result->Set(TRI_V8_SYMBOL("total"), v8::Number::New(isolate, 0));
-  result->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, 0));
+  result->Set(TRI_V8_SYMBOL("total"),     v8::Number::New(isolate, 0));
+  result->Set(TRI_V8_SYMBOL("count"),     v8::Number::New(isolate, 0));
 
   return scope.Escape<v8::Value>(result);
 }
@@ -593,8 +593,7 @@ static int SetupSearchValue (TRI_vector_t const* paths,
       DestroySearchValue(shaper->_memoryZone, result);
 
       if (res != TRI_RESULT_ELEMENT_NOT_FOUND) {
-        TRI_V8_EXCEPTION_MESSAGE(res,
-                                 "cannot convert value to JSON")
+        TRI_V8_EXCEPTION_MESSAGE(res, "cannot convert value to JSON")
           res;
       }
       return res;
@@ -1584,13 +1583,17 @@ static void ByExampleHashIndexQuery (SingleCollectionReadOnlyTransaction& trx,
 
   TRI_document_collection_t* document = trx.documentCollection();
   TRI_shaper_t* shaper = document->getShaper();  // PROTECTED by trx from above
-  int res = SetupSearchValue(&hashIndex->_paths, example, shaper, searchValue, args);
+  {
+    v8::TryCatch tryCatch;
+    int res = SetupSearchValue(&hashIndex->_paths, example, shaper, searchValue, args);
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    if (res == TRI_RESULT_ELEMENT_NOT_FOUND) {
-      TRI_V8_RETURN(EmptyResult(isolate)); //// TODO: test whether this removes the exception!
+    if (res != TRI_ERROR_NO_ERROR) {
+      if (res == TRI_RESULT_ELEMENT_NOT_FOUND) {
+        TRI_V8_RETURN(EmptyResult(isolate));
+      }
+      tryCatch.ReThrow();
+      return ;
     }
-    return ;
   }
 
   // find the matches
@@ -1610,7 +1613,9 @@ static void ByExampleHashIndexQuery (SingleCollectionReadOnlyTransaction& trx,
 
     if (s < e) {
       for (size_t i = s;  i < e;  ++i) {
-        v8::Handle<v8::Value> doc = WRAP_SHAPED_JSON(trx, collection->_cid, static_cast<TRI_doc_mptr_t*>(TRI_AtVectorPointer(&list, i))->getDataPtr());
+        v8::Handle<v8::Value> doc = WRAP_SHAPED_JSON(trx,
+                                                     collection->_cid,
+                                                     static_cast<TRI_doc_mptr_t*>(TRI_AtVectorPointer(&list, i))->getDataPtr());
 
         if (doc.IsEmpty()) {
           error = true;

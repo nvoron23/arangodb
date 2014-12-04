@@ -374,7 +374,7 @@ ApplicationV8::V8Context* ApplicationV8::enterContext (std::string const& name,
 
   v8::HandleScope scope(isolate);
   auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-  v8::Context::Scope contextScope(localContext);
+  /// v8::Context::Scope contextScope(localContext);
   localContext->Enter();
 
   TRI_ASSERT(context->_locker->IsLocked(isolate));
@@ -428,10 +428,6 @@ void ApplicationV8::exitContext (V8Context* context) {
   ++context->_numExecutions;
 
   /// TODO do we need this?  v8::Context::Scope contextScope(localContext);
-/*
-   // HasOutOfMemoryException must be called while there is still an isolate!
-  bool const hasOutOfMemoryException = context->_context->HasOutOfMemoryException();
-*/
   // check for cancelation requests
   bool const canceled = v8g->_canceled;
   v8g->_canceled = false;
@@ -499,12 +495,6 @@ void ApplicationV8::exitContext (V8Context* context) {
       LOG_TRACE("V8 context has reached maximum number of requests and will be scheduled for GC");
       performGarbageCollection = true;
     }
-    /*
-    else if (hasOutOfMemoryException) {
-      LOG_INFO("V8 context has encountered out of memory and will be scheduled for GC");
-      performGarbageCollection = true;
-    }
-    TODO */
 
     if (performGarbageCollection) {
       _dirtyContexts[name].push_back(context);
@@ -527,12 +517,7 @@ void ApplicationV8::exitContext (V8Context* context) {
       LOG_TRACE("V8 context has reached maximum number of requests and will be scheduled for GC");
       performGarbageCollection = true;
     }
-    /* TODO
-    else if (hasOutOfMemoryException) {
-      LOG_INFO("V8 context has encountered out of memory and will be scheduled for GC");
-      performGarbageCollection = true;
-    }
-    */
+
     _busyContexts[name].erase(context);
 
     if (performGarbageCollection) {
@@ -833,7 +818,7 @@ void ApplicationV8::versionCheck () {
   {
     v8::HandleScope scope(isolate);
     auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-    v8::Context::Scope contextScope(localContext);
+    /// v8::Context::Scope contextScope(localContext);
     localContext->Enter();
 
     // run upgrade script
@@ -945,14 +930,13 @@ bool ApplicationV8::prepareNamedContexts (const string& name,
     {
       v8::HandleScope scope(isolate);
       auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-      v8::Context::Scope contextScope(localContext);
+      ///             v8::Context::Scope contextScope(localContext);
       localContext->Enter();
 
       {
         v8::TryCatch tryCatch;
 
-        v8::Handle<v8::Value> wfunc = TRI_ExecuteJavaScriptString(
-                                                                  isolate, 
+        v8::Handle<v8::Value> wfunc = TRI_ExecuteJavaScriptString(isolate, 
                                                                   localContext,
                                                                   TRI_V8_STD_STRING(worker),
                                                                   TRI_V8_STD_STRING(name),

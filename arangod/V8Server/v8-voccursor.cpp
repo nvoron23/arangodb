@@ -298,7 +298,6 @@ static void JS_CountGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& ar
 
 static void JS_NextGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
-  v8::TryCatch tryCatch;
   v8::HandleScope scope(isolate);
 
 
@@ -325,6 +324,7 @@ static void JS_NextGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& arg
 
     // exceptions must be caught in the following part because we hold an exclusive
     // lock that might otherwise not be freed
+    v8::TryCatch tryCatch;
 
     try {
       TRI_general_cursor_row_t row = cursor->next(cursor);

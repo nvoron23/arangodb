@@ -806,18 +806,18 @@ static void JS_GetCollectionInfoClusterInfo (const v8::FunctionCallbackInfo<v8::
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   const std::string cid = triagens::basics::StringUtils::itoa(ci->id());
   const std::string& name = ci->name();
-  result->Set(TRI_V8_SYMBOL("id"), TRI_V8_STD_STRING(cid));
-  result->Set(TRI_V8_SYMBOL("name"), TRI_V8_STD_STRING(name));
-  result->Set(TRI_V8_SYMBOL("type"), v8::Number::New(isolate, (int) ci->type()));
-  result->Set(TRI_V8_SYMBOL("status"), v8::Number::New(isolate, (int) ci->status()));
+  result->Set(TRI_V8_SYMBOL("id"),          TRI_V8_STD_STRING(cid));
+  result->Set(TRI_V8_SYMBOL("name"),        TRI_V8_STD_STRING(name));
+  result->Set(TRI_V8_SYMBOL("type"),        v8::Number::New(isolate, (int) ci->type()));
+  result->Set(TRI_V8_SYMBOL("status"),      v8::Number::New(isolate, (int) ci->status()));
 
   const string statusString = ci->statusString();
   result->Set(TRI_V8_SYMBOL("statusString"), TRI_V8_STD_STRING(statusString));
 
-  result->Set(TRI_V8_SYMBOL("deleted"), v8::Boolean::New(isolate, ci->deleted()));
-  result->Set(TRI_V8_SYMBOL("doCompact"), v8::Boolean::New(isolate, ci->doCompact()));
-  result->Set(TRI_V8_SYMBOL("isSystem"), v8::Boolean::New(isolate, ci->isSystem()));
-  result->Set(TRI_V8_SYMBOL("isVolatile"), v8::Boolean::New(isolate, ci->isVolatile()));
+  result->Set(TRI_V8_SYMBOL("deleted"),     v8::Boolean::New(isolate, ci->deleted()));
+  result->Set(TRI_V8_SYMBOL("doCompact"),   v8::Boolean::New(isolate, ci->doCompact()));
+  result->Set(TRI_V8_SYMBOL("isSystem"),    v8::Boolean::New(isolate, ci->isSystem()));
+  result->Set(TRI_V8_SYMBOL("isVolatile"),  v8::Boolean::New(isolate, ci->isVolatile()));
   result->Set(TRI_V8_SYMBOL("waitForSync"), v8::Boolean::New(isolate, ci->waitForSync()));
   result->Set(TRI_V8_SYMBOL("journalSize"), v8::Number::New(isolate, ci->journalSize()));
 
@@ -1471,17 +1471,17 @@ static void PrepareClusterCommRequest (
 
   if (args.Length() > 6 && args[6]->IsObject()) {
     v8::Handle<v8::Object> opt = args[6].As<v8::Object>();
-    TRI_GET_GLOBAL(ClientTransactionIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(ClientTransactionIDKey);
     if (opt->Has(ClientTransactionIDKey)) {
       clientTransactionID
         = TRI_ObjectToString(opt->Get(ClientTransactionIDKey));
     }
-    TRI_GET_GLOBAL(CoordTransactionIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(CoordTransactionIDKey);
     if (opt->Has(CoordTransactionIDKey)) {
       coordTransactionID
         = TRI_ObjectToUInt64(opt->Get(CoordTransactionIDKey), true);
     }
-    TRI_GET_GLOBAL(TimeoutKey, v8::String);
+    TRI_GET_GLOBAL_STRING(TimeoutKey);
     if (opt->Has(TimeoutKey)) {
       timeout
         = TRI_ObjectToDouble(opt->Get(TimeoutKey));
@@ -1509,37 +1509,37 @@ void PrepareClusterCommResultForJS(const v8::FunctionCallbackInfo<v8::Value>& ar
 
   v8::Handle<v8::Object> r = v8::Object::New(isolate);
   if (0 == res) {
-    TRI_GET_GLOBAL(ErrorMessageKey, v8::String);
+    TRI_GET_GLOBAL_STRING(ErrorMessageKey);
     r->Set(ErrorMessageKey, TRI_V8_SYMBOL("out of memory"));
   } else if (res->dropped) {
-    TRI_GET_GLOBAL(ErrorMessageKey, v8::String);    
+    TRI_GET_GLOBAL_STRING(ErrorMessageKey);
     r->Set(ErrorMessageKey, TRI_V8_SYMBOL("operation was dropped"));
   } else {
-    TRI_GET_GLOBAL(ClientTransactionIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(ClientTransactionIDKey);
     r->Set(ClientTransactionIDKey,
            TRI_V8_STD_STRING(res->clientTransactionID));
 
     // convert the ids to strings as uint64_t might be too big for JavaScript numbers
-    TRI_GET_GLOBAL(CoordTransactionIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(CoordTransactionIDKey);
     std::string id = StringUtils::itoa(res->coordTransactionID);
     r->Set(CoordTransactionIDKey, TRI_V8_STD_STRING(id));
 
     id = StringUtils::itoa(res->operationID);
-    TRI_GET_GLOBAL(OperationIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(OperationIDKey);
     r->Set(OperationIDKey, TRI_V8_STD_STRING(id));
 
-    TRI_GET_GLOBAL(ShardIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(ShardIDKey);
     r->Set(ShardIDKey, TRI_V8_STD_STRING(res->shardID));
     if (res->status == CL_COMM_SUBMITTED) {
-      TRI_GET_GLOBAL(StatusKey, v8::String);
+      TRI_GET_GLOBAL_STRING(StatusKey);
       r->Set(StatusKey, TRI_V8_SYMBOL("SUBMITTED"));
     }
     else if (res->status == CL_COMM_SENDING) {
-      TRI_GET_GLOBAL(StatusKey, v8::String);
+      TRI_GET_GLOBAL_STRING(StatusKey);
       r->Set(StatusKey, TRI_V8_SYMBOL("SENDING"));
     }
     else if (res->status == CL_COMM_SENT) {
-      TRI_GET_GLOBAL(StatusKey, v8::String);
+      TRI_GET_GLOBAL_STRING(StatusKey);
       r->Set(StatusKey, TRI_V8_SYMBOL("SENT"));
       // This might be the result of a synchronous request and thus
       // contain the actual response. If it is an asynchronous request
@@ -1561,13 +1561,13 @@ void PrepareClusterCommResultForJS(const v8::FunctionCallbackInfo<v8::Value>& ar
       }
     }
     else if (res->status == CL_COMM_TIMEOUT) {
-      TRI_GET_GLOBAL(StatusKey, v8::String);
+      TRI_GET_GLOBAL_STRING(StatusKey);
       r->Set(StatusKey, TRI_V8_SYMBOL("TIMEOUT"));
-      TRI_GET_GLOBAL(TimeoutKey, v8::String);
+      TRI_GET_GLOBAL_STRING(TimeoutKey);
       r->Set(TimeoutKey,v8::BooleanObject::New(true));
     }
     else if (res->status == CL_COMM_ERROR) {
-      TRI_GET_GLOBAL(StatusKey, v8::String);
+      TRI_GET_GLOBAL_STRING(StatusKey);
       r->Set(StatusKey, TRI_V8_SYMBOL("ERROR"));
 
       if (res->result && res->result->isComplete()) {
@@ -1577,25 +1577,25 @@ void PrepareClusterCommResultForJS(const v8::FunctionCallbackInfo<v8::Value>& ar
         details->Set(TRI_V8_SYMBOL("body"), TRI_V8_STD_STRING(res->result->getBody()));
 
         r->Set(TRI_V8_SYMBOL("details"), details);
-        TRI_GET_GLOBAL(ErrorMessageKey, v8::String);
+        TRI_GET_GLOBAL_STRING(ErrorMessageKey);
         r->Set(ErrorMessageKey, TRI_V8_SYMBOL("got bad HTTP response"));
       }
       else {
-        TRI_GET_GLOBAL(ErrorMessageKey, v8::String);
+        TRI_GET_GLOBAL_STRING(ErrorMessageKey);
         r->Set(ErrorMessageKey, TRI_V8_SYMBOL("got no HTTP response, DBserver seems gone"));
       }
     }
     else if (res->status == CL_COMM_DROPPED) {
-      TRI_GET_GLOBAL(StatusKey, v8::String);
+      TRI_GET_GLOBAL_STRING(StatusKey);
       r->Set(StatusKey, TRI_V8_SYMBOL("DROPPED"));
-      TRI_GET_GLOBAL(ErrorMessageKey, v8::String);
+      TRI_GET_GLOBAL_STRING(ErrorMessageKey);
       r->Set(ErrorMessageKey, TRI_V8_SYMBOL("request dropped whilst waiting for answer"));
     }
     else {   // Everything is OK
       TRI_ASSERT(res->status == CL_COMM_RECEIVED);
       // The headers:
       v8::Handle<v8::Object> h = v8::Object::New(isolate);
-      TRI_GET_GLOBAL(StatusKey, v8::String);
+      TRI_GET_GLOBAL_STRING(StatusKey);
       r->Set(StatusKey, TRI_V8_SYMBOL("RECEIVED"));
       map<string,string> headers = res->answer->headers();
       map<string,string>::iterator i;
@@ -1817,25 +1817,25 @@ static void JS_Wait (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (args[0]->IsObject()) {
     v8::Handle<v8::Object> obj = args[0].As<v8::Object>();
-    TRI_GET_GLOBAL(ClientTransactionIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(ClientTransactionIDKey);
     if (obj->Has(ClientTransactionIDKey)) {
       myclientTransactionID
         = TRI_ObjectToString(obj->Get(ClientTransactionIDKey));
     }
-    TRI_GET_GLOBAL(CoordTransactionIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(CoordTransactionIDKey);
     if (obj->Has(CoordTransactionIDKey)) {
       mycoordTransactionID
         = TRI_ObjectToUInt64(obj->Get(CoordTransactionIDKey), true);
     }
-    TRI_GET_GLOBAL(OperationIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(OperationIDKey);
     if (obj->Has(OperationIDKey)) {
       myoperationID = TRI_ObjectToUInt64(obj->Get(OperationIDKey), true);
     }
-    TRI_GET_GLOBAL(ShardIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(ShardIDKey);
     if (obj->Has(ShardIDKey)) {
       myshardID = TRI_ObjectToString(obj->Get(ShardIDKey));
     }
-    TRI_GET_GLOBAL(TimeoutKey, v8::String);
+    TRI_GET_GLOBAL_STRING(TimeoutKey);
     if (obj->Has(TimeoutKey)) {
       mytimeout = TRI_ObjectToDouble(obj->Get(TimeoutKey));
       if (mytimeout == 0.0) {
@@ -1897,21 +1897,21 @@ static void JS_Drop (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (args[0]->IsObject()) {
     v8::Handle<v8::Object> obj = args[0].As<v8::Object>();
-    TRI_GET_GLOBAL(ClientTransactionIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(ClientTransactionIDKey);
     if (obj->Has(ClientTransactionIDKey)) {
       myclientTransactionID
         = TRI_ObjectToString(obj->Get(ClientTransactionIDKey));
     }
-    TRI_GET_GLOBAL(CoordTransactionIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(CoordTransactionIDKey);
     if (obj->Has(CoordTransactionIDKey)) {
       mycoordTransactionID
         = TRI_ObjectToUInt64(obj->Get(CoordTransactionIDKey), true);
     }
-    TRI_GET_GLOBAL(OperationIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(OperationIDKey);
     if (obj->Has(OperationIDKey)) {
       myoperationID = TRI_ObjectToUInt64(obj->Get(OperationIDKey), true);
     }
-    TRI_GET_GLOBAL(ShardIDKey, v8::String);
+    TRI_GET_GLOBAL_STRING(ShardIDKey);
     if (obj->Has(ShardIDKey)) {
       myshardID = TRI_ObjectToString(obj->Get(ShardIDKey));
     }
@@ -2082,5 +2082,5 @@ void TRI_InitV8Cluster (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
 
 // Local Variables:
 // mode: outline-minor
-// outline-regexp: /// @brief\\|/// {@inheritDoc}\\|/// @page\\|// --SECTION--\\|/// @\\}"
+// outline-regexp: "/// @brief\\|/// {@inheritDoc}\\|/// @page\\|// --SECTION--\\|/// @\\}"
 // End:

@@ -380,7 +380,7 @@ void Executor::HandleV8Error (v8::TryCatch& tryCatch,
         
       if (objValue->HasOwnProperty(errorNum) && 
           objValue->HasOwnProperty(errorMessage)) {
-        v8::Handle<v8::Value> errorNumValue = objValue->Get(errorNum); //// TODO: do we ned v8::number here?
+        v8::Handle<v8::Value> errorNumValue = objValue->Get(errorNum);
         v8::Handle<v8::Value> errorMessageValue = objValue->Get(errorMessage);
 
         // found something that looks like an ArangoError
@@ -417,7 +417,7 @@ v8::Handle<v8::Value> Executor::compileExpression () {
   TRI_ASSERT(_buffer != nullptr);
   ISOLATE;
 
-  v8::Handle<v8::Script> compiled = v8::Script::Compile(TRI_V8_PAIR_STRING(_buffer->c_str(), (int) _buffer->length()),
+  v8::Handle<v8::Script> compiled = v8::Script::Compile(TRI_V8_STD_STRING((*_buffer)),
                                                         TRI_V8_SYMBOL("--script--"));
   
   if (compiled.IsEmpty()) {

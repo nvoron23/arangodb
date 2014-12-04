@@ -689,7 +689,7 @@ v8::Handle<v8::Object> V8Buffer::New (v8::Isolate* isolate,
 
   // get Buffer from global scope.
   v8::Local<v8::Object> global = isolate->GetCurrentContext()->Global();
-  TRI_GET_GLOBAL(BufferConstant, v8::String);
+  TRI_GET_GLOBAL_STRING(BufferConstant);
   v8::Local<v8::Value> bv = global->Get(BufferConstant);
 
   if (! bv->IsFunction()) {
@@ -735,6 +735,7 @@ V8Buffer* V8Buffer::New (v8::Isolate* isolate, const char* data, size_t length) 
 
   V8Buffer* buffer = V8Buffer::unwrap(obj);
   buffer->replace(isolate, const_cast<char*>(data), length, NULL, NULL);
+
 
   return buffer;
 }

@@ -271,7 +271,7 @@ static bool LoadJavaScriptDirectory (v8::Isolate* isolate,
       }
       else {
         TRI_GET_GLOBALS();
-        v8g->_canceled = true;/// TODO break here?
+        v8g->_canceled = true;
       }
     }
   }
@@ -890,6 +890,7 @@ static void JS_Execute (const v8::FunctionCallbackInfo<v8::Value>& args) {
         TRI_V8_LOG_THROW_EXCEPTION(tryCatch);
       }
       else {
+        tryCatch.ReThrow();
         TRI_V8_CANCEL_FUNCTION();
       }
     }
@@ -907,6 +908,7 @@ static void JS_Execute (const v8::FunctionCallbackInfo<v8::Value>& args) {
         TRI_V8_LOG_THROW_EXCEPTION(tryCatch);
       }
       else {
+        tryCatch.ReThrow();
         TRI_V8_CANCEL_FUNCTION();
       }
     }

@@ -220,7 +220,7 @@ namespace triagens {
 
 
       string sslPBKDF2 (char const* salt, size_t saltLength, char const* pass, size_t passLength, int iter, int keyLength) {
-        unsigned char* dk = (unsigned char*) TRI_SystemAllocate(2 * (EVP_MAX_MD_SIZE + 1), false);
+        unsigned char* dk = (unsigned char*) TRI_SystemAllocate(EVP_MAX_MD_SIZE + 1, false);
 
         PKCS5_PBKDF2_HMAC_SHA1(pass, (int) passLength, (const unsigned char*) salt, (int) saltLength, iter, keyLength, dk);
 
@@ -255,7 +255,7 @@ namespace triagens {
           evp_md = const_cast<EVP_MD*>(EVP_sha256());
         }
 
-        unsigned char* md = (unsigned char*) TRI_SystemAllocate(2 * (EVP_MAX_MD_SIZE + 1), false);
+        unsigned char* md = (unsigned char*) TRI_SystemAllocate(EVP_MAX_MD_SIZE + 1, false);
         unsigned int md_len;
 
         HMAC(evp_md, key, (int) keyLength, (const unsigned char*) message, messageLen, md, &md_len);

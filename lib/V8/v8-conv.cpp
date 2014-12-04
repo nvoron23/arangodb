@@ -591,6 +591,7 @@ static int FillShapeValueArray (v8::Isolate* isolate,
                                 set<int>& seenHashes,
                                 vector<v8::Handle<v8::Object>>& seenObjects,
                                 bool create) {
+  v8::HandleScope scope(isolate);
   TRI_shape_value_t* values;
   TRI_shape_value_t* p;
   TRI_shape_value_t* e;
@@ -847,6 +848,7 @@ static int FillShapeValueJson (v8::Isolate* isolate,
                                set<int>& seenHashes,
                                vector<v8::Handle<v8::Object>>& seenObjects,
                                bool create) {
+  v8::HandleScope scope(isolate);
   if (json->IsRegExp() || json->IsFunction() || json->IsExternal()) {
     LOG_TRACE("shaper failed because regexp/function/external/date object cannot be converted");
     return TRI_ERROR_BAD_PARAMETER;
@@ -1023,6 +1025,7 @@ static v8::Handle<v8::Value> JsonShapeDataArray (v8::Isolate* isolate,
                                                  TRI_shape_t const* shape,
                                                  char const* data,
                                                  size_t size) {
+  v8::EscapableHandleScope scope(isolate);
   TRI_array_shape_t const* s;
   TRI_shape_aid_t const* aids;
   TRI_shape_sid_t const* sids;
@@ -1118,7 +1121,7 @@ static v8::Handle<v8::Value> JsonShapeDataArray (v8::Isolate* isolate,
     array->Set(TRI_V8_STRING(name), element);
   }
 
-  return array;
+  return scope.Escape<v8::Value>(array);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1130,6 +1133,7 @@ static v8::Handle<v8::Value> JsonShapeDataArray (v8::Isolate* isolate,
                                                  TRI_shape_t const* shape,
                                                  char const* data,
                                                  size_t size) {
+  v8::EscapableHandleScope scope(isolate);
   TRI_array_shape_t const* s;
   TRI_shape_aid_t const* aids;
   TRI_shape_sid_t const* sids;
@@ -1226,7 +1230,7 @@ static v8::Handle<v8::Value> JsonShapeDataArray (v8::Isolate* isolate,
     array->Set(TRI_V8_STRING(name), element);
   }
 
-  return array;
+  return scope.Escape<v8::Value>(array);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1238,6 +1242,7 @@ static v8::Handle<v8::Value> JsonShapeDataList (v8::Isolate* isolate,
                                                 TRI_shape_t const* shape,
                                                 char const* data,
                                                 size_t size) {
+  v8::EscapableHandleScope scope(isolate);
   TRI_shape_length_list_t i;
   TRI_shape_length_list_t l;
   TRI_shape_sid_t const* sids;
@@ -1284,7 +1289,7 @@ static v8::Handle<v8::Value> JsonShapeDataList (v8::Isolate* isolate,
     list->Set(v8::Number::New(isolate, i), element);
   }
 
-  return list;
+  return scope.Escape<v8::Value>(list);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1296,6 +1301,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousList (v8::Isolate* isolate,
                                                            TRI_shape_t const* shape,
                                                            char const* data,
                                                            size_t size) {
+  v8::EscapableHandleScope scope(isolate);
   TRI_homogeneous_list_shape_t const* s;
   TRI_shape_length_list_t i;
   TRI_shape_length_list_t l;
@@ -1329,7 +1335,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousList (v8::Isolate* isolate,
     list->Set(v8::Number::New(isolate, i), element);
   }
 
-  return list;
+  return scope.Escape<v8::Value>(list);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1341,6 +1347,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousSizedList (v8::Isolate* iso
                                                                 TRI_shape_t const* shape,
                                                                 char const* data,
                                                                 size_t size) {
+  v8::EscapableHandleScope scope(isolate);
   TRI_homogeneous_sized_list_shape_t const* s;
   TRI_shape_length_list_t i;
   TRI_shape_length_list_t l;
@@ -1377,7 +1384,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousSizedList (v8::Isolate* iso
     list->Set(v8::Number::New(isolate, i), element);
   }
 
-  return list;
+  return scope.Escape<v8::Value>(list);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1391,7 +1398,8 @@ static v8::Handle<v8::Value> JsonShapeData (v8::Isolate* isolate,
                                             char const* data,
                                             size_t size) {
   if (shape == nullptr) {
-    return v8::Null(isolate);
+    v8::EscapableHandleScope scope(isolate);
+    return scope.Escape<v8::Value>(v8::Null(isolate));
   }
 
   TRI_ASSERT(shape->_type == TRI_SHAPE_ARRAY);
@@ -1408,7 +1416,8 @@ static v8::Handle<v8::Value> JsonShapeData (v8::Isolate* isolate,
                                             char const* data,
                                             size_t size) {
   if (shape == nullptr) {
-    return v8::Null(isolate);
+    v8::EscapableHandleScope scope(isolate);
+    return scope.Escape<v8::Value>(v8::Null(isolate));
   }
 
   switch (shape->_type) {
@@ -1440,7 +1449,8 @@ static v8::Handle<v8::Value> JsonShapeData (v8::Isolate* isolate,
       return JsonShapeDataHomogeneousSizedList(isolate, shaper, shape, data, size);
   }
 
-  return v8::Null(isolate);
+  v8::EscapableHandleScope scope(isolate);
+  return scope.Escape<v8::Value>(v8::Null(isolate));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1448,7 +1458,8 @@ static v8::Handle<v8::Value> JsonShapeData (v8::Isolate* isolate,
 ////////////////////////////////////////////////////////////////////////////////
 
 static inline v8::Handle<v8::Value> ObjectJsonNull (v8::Isolate* isolate, TRI_json_t const* json) {
-  return v8::Null(isolate);
+  v8::EscapableHandleScope scope(isolate);
+  return scope.Escape<v8::Value>(v8::Null(isolate)); 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1456,7 +1467,8 @@ static inline v8::Handle<v8::Value> ObjectJsonNull (v8::Isolate* isolate, TRI_js
 ////////////////////////////////////////////////////////////////////////////////
 
 static inline v8::Handle<v8::Value> ObjectJsonBoolean (v8::Isolate* isolate, TRI_json_t const* json) {
-  return v8::Boolean::New(isolate, json->_value._boolean);
+  v8::EscapableHandleScope scope(isolate);
+  return scope.Escape<v8::Value>(v8::Boolean::New(isolate, json->_value._boolean));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1464,7 +1476,8 @@ static inline v8::Handle<v8::Value> ObjectJsonBoolean (v8::Isolate* isolate, TRI
 ////////////////////////////////////////////////////////////////////////////////
 
 static inline v8::Handle<v8::Value> ObjectJsonNumber (v8::Isolate* isolate, TRI_json_t const* json) {
-  return v8::Number::New(isolate, json->_value._number);
+  v8::EscapableHandleScope scope(isolate);
+  return scope.Escape<v8::Value>(v8::Number::New(isolate, json->_value._number));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1472,7 +1485,8 @@ static inline v8::Handle<v8::Value> ObjectJsonNumber (v8::Isolate* isolate, TRI_
 ////////////////////////////////////////////////////////////////////////////////
 
 static inline v8::Handle<v8::Value> ObjectJsonString (v8::Isolate* isolate, TRI_json_t const* json) {
-  return TRI_V8_PAIR_STRING(json->_value._string.data, json->_value._string.length - 1);
+  v8::EscapableHandleScope scope(isolate);
+  return scope.Escape<v8::Value>(TRI_V8_PAIR_STRING(json->_value._string.data, json->_value._string.length - 1));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1480,6 +1494,7 @@ static inline v8::Handle<v8::Value> ObjectJsonString (v8::Isolate* isolate, TRI_
 ////////////////////////////////////////////////////////////////////////////////
 
 static v8::Handle<v8::Value> ObjectJsonArray (v8::Isolate* isolate, TRI_json_t const* json) {
+  v8::EscapableHandleScope scope(isolate);
   v8::Handle<v8::Object> object = v8::Object::New(isolate);
 
   size_t const n = json->_value._objects._length;
@@ -1495,7 +1510,7 @@ static v8::Handle<v8::Value> ObjectJsonArray (v8::Isolate* isolate, TRI_json_t c
     object->Set(TRI_V8_PAIR_STRING(key->_value._string.data, key->_value._string.length - 1), TRI_ObjectJson(isolate, j));
   }
 
-  return object;
+  return scope.Escape<v8::Value>(object);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1503,6 +1518,7 @@ static v8::Handle<v8::Value> ObjectJsonArray (v8::Isolate* isolate, TRI_json_t c
 ////////////////////////////////////////////////////////////////////////////////
 
 static v8::Handle<v8::Value> ObjectJsonList (v8::Isolate* isolate, TRI_json_t const* json) {
+  v8::EscapableHandleScope scope(isolate);
   uint32_t const n = (uint32_t) json->_value._objects._length;
 
   v8::Handle<v8::Array> object = v8::Array::New(isolate, (int) n);
@@ -1514,7 +1530,7 @@ static v8::Handle<v8::Value> ObjectJsonList (v8::Isolate* isolate, TRI_json_t co
     object->Set(v8::Number::New(isolate, i), val);
   }
 
-  return object;
+  return scope.Escape<v8::Value>(object);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1524,8 +1540,9 @@ static v8::Handle<v8::Value> ObjectJsonList (v8::Isolate* isolate, TRI_json_t co
 static v8::Handle<v8::Value> ExtractArray (v8::Isolate* isolate,
                                            TRI_json_t const* json,
                                            size_t offset) {
+  v8::EscapableHandleScope scope(isolate);
   if (json == nullptr || json->_type != TRI_JSON_ARRAY) {
-    return v8::Undefined(isolate);
+    return scope.Escape<v8::Value>(v8::Undefined(isolate));
   }
   
   size_t const n = TRI_LengthVector(&json->_value._objects);
@@ -1541,7 +1558,7 @@ static v8::Handle<v8::Value> ExtractArray (v8::Isolate* isolate,
     }
   }
 
-  return result;
+  return scope.Escape<v8::Value>(result);
 }
 
 // -----------------------------------------------------------------------------
@@ -1554,6 +1571,7 @@ static v8::Handle<v8::Value> ExtractArray (v8::Isolate* isolate,
 
 v8::Handle<v8::Array> TRI_ArrayAssociativePointer (v8::Isolate* isolate,
                                                    TRI_associative_pointer_t const* array) {
+  v8::EscapableHandleScope scope(isolate);
   v8::Handle<v8::Array> result = v8::Array::New(isolate);
 
   uint32_t j = 0;
@@ -1569,7 +1587,7 @@ v8::Handle<v8::Array> TRI_ArrayAssociativePointer (v8::Isolate* isolate,
     result->Set(v8::Number::New(isolate, j++), v8::String::NewFromUtf8(isolate, value));/// TODO: strlen...
   }
 
-  return result;
+  return scope.Escape<v8::Array>(result);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1726,6 +1744,7 @@ static bool ShapedJsonToJson (v8::Isolate *isolate,
                               TRI_json_t* dst,
                               triagens::utils::V8StringConverter& converter,
                               v8::Handle<v8::Value> const parameter) {
+  v8::HandleScope scope(isolate);
   if (parameter->IsBoolean()) {
     v8::Handle<v8::Boolean> booleanParameter = parameter->ToBoolean();
     TRI_InitBooleanJson(dst, booleanParameter->Value());
@@ -1843,6 +1862,7 @@ static TRI_json_t* ObjectToJson (v8::Isolate* isolate,
                                  v8::Handle<v8::Value> const parameter,
                                  set<int>& seenHashes,
                                  vector<v8::Handle<v8::Object>>& seenObjects) {
+  v8::HandleScope scope(isolate);
   if (parameter->IsBoolean()) {
     v8::Handle<v8::Boolean> booleanParameter = parameter->ToBoolean();
     return TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, booleanParameter->Value());

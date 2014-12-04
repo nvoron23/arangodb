@@ -86,7 +86,7 @@ AqlValue V8Expression::execute (v8::Isolate* isolate,
 
     TRI_ASSERT(! argv[reg].isEmpty());
 
-    values->ForceSet(TRI_V8_PAIR_STRING(varname.c_str(), (int) varname.size()), argv[startPos + reg].toV8(isolate, trx, docColls[reg]));
+    values->ForceSet(TRI_V8_STD_STRING(varname), argv[startPos + reg].toV8(isolate, trx, docColls[reg]));
   }
 
   TRI_ASSERT(query != nullptr);

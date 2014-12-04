@@ -191,7 +191,7 @@ void V8Completer::getAlternatives(char const * text, vector<string> & result) {
 
     if (1 < splitted._length) {
       for (size_t i = 0;  i < splitted._length - 1;  ++i) {
-        v8::Handle<v8::String> name = TRI_V8_SYMBOL(splitted._buffer[i]);
+        v8::Handle<v8::String> name = TRI_V8_STRING(splitted._buffer[i]);
 
         if (! current->Has(name)) {
           TRI_DestroyVectorString(&splitted);

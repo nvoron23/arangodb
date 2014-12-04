@@ -120,8 +120,8 @@ Job::status_t V8Job::work () {
     v8::HandleScope scope(isolate);
 
     // get built-in Function constructor (see ECMA-262 5th edition 15.3.2)
-    v8::Handle<v8::Object> current = isolate->GetCurrentContext()->Global();
-    v8::Local<v8::Function> ctor = v8::Local<v8::Function>::Cast(current->Get(TRI_V8_SYMBOL("Function")));
+    auto current = isolate->GetCurrentContext()->Global();
+    auto ctor = v8::Local<v8::Function>::Cast(current->Get(TRI_V8_SYMBOL("Function")));
 
     // Invoke Function constructor to create function with the given body and no arguments
     v8::Handle<v8::Value> args[2] = { TRI_V8_SYMBOL("params"), TRI_V8_STD_STRING(_command) };

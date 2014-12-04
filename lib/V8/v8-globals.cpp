@@ -234,7 +234,7 @@ TRI_v8_global_s::~TRI_v8_global_s () {
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_v8_global_t* TRI_CreateV8Globals (v8::Isolate* isolate) {
-  TRI_v8_global_t* v8g = static_cast<TRI_v8_global_t*>(isolate->GetData(V8DataSlot));
+  TRI_GET_GLOBALS();
 
   TRI_ASSERT(v8g == nullptr);
   v8g = new TRI_v8_global_t(isolate);
@@ -248,7 +248,7 @@ TRI_v8_global_t* TRI_CreateV8Globals (v8::Isolate* isolate) {
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_v8_global_t* TRI_GetV8Globals (v8::Isolate* isolate) {
-  TRI_v8_global_t* v8g = static_cast<TRI_v8_global_t*>(isolate->GetData(V8DataSlot));
+  TRI_GET_GLOBALS();
   if (v8g == nullptr) {
     v8g = TRI_CreateV8Globals(isolate);
   }

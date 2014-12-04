@@ -254,7 +254,7 @@ static void ParseActionOptions (v8::Isolate* isolate,
                                 TRI_action_t* action,
                                 v8::Handle<v8::Object> options) {
   
-  TRI_GET_GLOBAL(PrefixKey, v8::String);
+  TRI_GET_GLOBAL_STRING(PrefixKey);
   // check the "prefix" field
   if (options->Has(PrefixKey)) {
     action->_isPrefix = TRI_ObjectToBoolean(options->Get(PrefixKey));
@@ -264,7 +264,7 @@ static void ParseActionOptions (v8::Isolate* isolate,
   }
 
   // check the "allowUseDatabase" field
-  TRI_GET_GLOBAL(AllowUseDatabaseKey, v8::String);
+  TRI_GET_GLOBAL_STRING(AllowUseDatabaseKey);
   if (options->Has(AllowUseDatabaseKey)) {
     action->_allowUseDatabase = TRI_ObjectToBoolean(options->Get(AllowUseDatabaseKey));
   }
@@ -1269,26 +1269,26 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
     res = cc->wait("", 0, opID, "");
 
     if (0 == res) {
-      r->Set(TRI_V8_SYMBOL("errorMsg"),TRI_V8_SYMBOL("out of memory"));
+      r->Set(TRI_V8_SYMBOL("errorMsg"), TRI_V8_SYMBOL("out of memory"));
       LOG_DEBUG("JS_ClusterTest: out of memory");
     }
     else if (res->status == CL_COMM_TIMEOUT) {
-      r->Set(TRI_V8_SYMBOL("timeout"),v8::BooleanObject::New(true));
+      r->Set(TRI_V8_SYMBOL("timeout"), v8::BooleanObject::New(true));
       LOG_DEBUG("JS_ClusterTest: timeout");
     }
     else if (res->status == CL_COMM_ERROR) {
       if (res->result && res->result->isComplete()) {
         v8::Handle<v8::Object> details = v8::Object::New(isolate);
         details->Set(TRI_V8_SYMBOL("code"),
-                     v8::Number::New(isolate, res->result->getHttpReturnCode()));
+                     v8::Number::New(isolate,
+                     res->result->getHttpReturnCode()));
         details->Set(TRI_V8_SYMBOL("message"),
-                  TRI_V8_STD_STRING(res->result->getHttpReturnMessage()));
+                     TRI_V8_STD_STRING(res->result->getHttpReturnMessage()));
         details->Set(TRI_V8_SYMBOL("body"),
-                TRI_V8_STD_STRING(res->result->getBody()));
+                     TRI_V8_STD_STRING(res->result->getBody()));
         TRI_GET_GLOBAL_STRING(ErrorMessageKey);
         r->Set(TRI_V8_SYMBOL("details"), details);
-        r->Set(ErrorMessageKey,
-               TRI_V8_SYMBOL("got bad HTTP response"));
+        r->Set(ErrorMessageKey, TRI_V8_SYMBOL("got bad HTTP response"));
       }
       else {
         TRI_GET_GLOBAL_STRING(ErrorMessageKey);
@@ -1315,7 +1315,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
       r->Set(TRI_V8_SYMBOL("headers"), h);
 
       // The body:
-      if (0 != res->answer->body()) {
+      if (nullptr != res->answer->body()) {
         r->Set(TRI_V8_SYMBOL("body"),
                TRI_V8_PAIR_STRING(res->answer->body(),
                                   (int) res->answer->bodySize()));
@@ -1332,7 +1332,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
                 "status: %d",res->status);
     }
 
-    if (0 == res) {
+    if (nullptr == res) {
       r->Set(TRI_V8_SYMBOL("errorMsg"), TRI_V8_SYMBOL("out of memory"));
       LOG_DEBUG("JS_ClusterTest: out of memory");
     }

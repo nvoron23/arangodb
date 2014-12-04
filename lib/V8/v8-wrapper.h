@@ -176,9 +176,9 @@ class V8Wrapper {
 ////////////////////////////////////////////////////////////////////////////////
 
     virtual void unref () {
-      //TRI_ASSERT(! _handle.IsEmpty());
-      //TRI_ASSERT(! _handle.IsWeak(_isolate));
-      //TRI_ASSERT(_refs > 0);
+      TRI_ASSERT(! _handle.IsEmpty());
+      TRI_ASSERT(! _handle.IsWeak());
+      TRI_ASSERT(_refs > 0);
 
       if (--_refs == 0) {
         makeWeak();

@@ -110,6 +110,7 @@ static bool IsIndexHandle (v8::Handle<v8::Value> const arg,
 static v8::Handle<v8::Value> IndexRep (v8::Isolate* isolate,
                                        string const& collectionName,
                                        TRI_json_t const* idx) {
+  v8::EscapableHandleScope scope(isolate);
   TRI_ASSERT(idx != nullptr);
 
   v8::Handle<v8::Object> rep = TRI_ObjectJson(isolate, idx)->ToObject();
@@ -118,7 +119,7 @@ static v8::Handle<v8::Value> IndexRep (v8::Isolate* isolate,
   string const id = collectionName + TRI_INDEX_HANDLE_SEPARATOR_STR + iid;
   rep->Set(TRI_V8_SYMBOL("id"), TRI_V8_STD_STRING(id));
 
-  return rep; /// TODO ok?
+  return scope.Escape<v8::Value>(rep);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -130,6 +131,7 @@ int ProcessIndexFields (v8::Isolate* isolate,
                         TRI_json_t* json,
                         int numFields,
                         bool create) {
+  v8::HandleScope scope(isolate);
   set<string> fields;
 
   v8::Handle<v8::String> fieldsString = TRI_V8_SYMBOL("fields");
@@ -182,6 +184,7 @@ int ProcessIndexFields (v8::Isolate* isolate,
 int ProcessIndexGeoJsonFlag (v8::Isolate* isolate,
                              v8::Handle<v8::Object> const obj,
                              TRI_json_t* json) {
+  v8::HandleScope scope(isolate);
   bool geoJson = ExtractBoolFlag(isolate, obj, TRI_V8_SYMBOL("geoJson"), false);
   TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "geoJson", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, geoJson));
 
@@ -196,6 +199,7 @@ int ProcessIndexUniqueFlag (v8::Isolate* isolate,
                             v8::Handle<v8::Object> const obj,
                             TRI_json_t* json,
                             bool fillConstraint = false) {
+  v8::HandleScope scope(isolate);
   bool unique = ExtractBoolFlag(isolate, obj, TRI_V8_SYMBOL("unique"), false);
   TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "unique", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, unique));
   if (fillConstraint) {
@@ -212,6 +216,7 @@ int ProcessIndexUniqueFlag (v8::Isolate* isolate,
 int ProcessIndexIgnoreNullFlag (v8::Isolate* isolate,
                                 v8::Handle<v8::Object> const obj,
                                 TRI_json_t* json) {
+  v8::HandleScope scope(isolate);
   bool ignoreNull = ExtractBoolFlag(isolate, obj, TRI_V8_SYMBOL("ignoreNull"), false);
   TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "ignoreNull", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, ignoreNull));
 
@@ -225,6 +230,7 @@ int ProcessIndexIgnoreNullFlag (v8::Isolate* isolate,
 int ProcessIndexUndefinedFlag (v8::Isolate* isolate,
                                v8::Handle<v8::Object> const obj,
                                TRI_json_t* json) {
+  v8::HandleScope scope(isolate);
   bool undefined = ExtractBoolFlag(isolate, obj, TRI_V8_SYMBOL("undefined"), false);
   TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "undefined", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, undefined));
 
@@ -1015,14 +1021,14 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
     TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 
-  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "id", TRI_CreateString2CopyJson(TRI_UNKNOWN_MEM_ZONE, cid.c_str(), cid.size()));
-  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "name", TRI_CreateString2CopyJson(TRI_UNKNOWN_MEM_ZONE, name.c_str(), name.size()));
-  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "type", TRI_CreateNumberJson(TRI_UNKNOWN_MEM_ZONE, (int) collectionType));
-  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "status", TRI_CreateNumberJson(TRI_UNKNOWN_MEM_ZONE, (int) TRI_VOC_COL_STATUS_LOADED));
-  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "deleted", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._deleted));
-  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "doCompact", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._doCompact));
-  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "isSystem", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._isSystem));
-  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "isVolatile", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._isVolatile));
+  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "id",          TRI_CreateString2CopyJson(TRI_UNKNOWN_MEM_ZONE, cid.c_str(), cid.size()));
+  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "name",        TRI_CreateString2CopyJson(TRI_UNKNOWN_MEM_ZONE, name.c_str(), name.size()));
+  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "type",        TRI_CreateNumberJson(TRI_UNKNOWN_MEM_ZONE, (int) collectionType));
+  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "status",      TRI_CreateNumberJson(TRI_UNKNOWN_MEM_ZONE, (int) TRI_VOC_COL_STATUS_LOADED));
+  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "deleted",     TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._deleted));
+  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "doCompact",   TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._doCompact));
+  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "isSystem",    TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._isSystem));
+  TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "isVolatile",  TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._isVolatile));
   TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "waitForSync", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, parameter._waitForSync));
   TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "journalSize", TRI_CreateNumberJson(TRI_UNKNOWN_MEM_ZONE, parameter._maximalSize));
 

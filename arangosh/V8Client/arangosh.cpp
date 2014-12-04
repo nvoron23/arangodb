@@ -602,6 +602,7 @@ static void ClientConnection_DestructorCallback (const v8::WeakCallbackData<v8::
 ////////////////////////////////////////////////////////////////////////////////
 
 static v8::Handle<v8::Value> wrapV8ClientConnection (v8::Isolate* isolate, V8ClientConnection* connection) {
+  v8::EscapableHandleScope scope(isolate);
   auto localConnectionTempl = v8::Local<v8::ObjectTemplate>::New(isolate, ConnectionTempl);
   v8::Handle<v8::Object> result = localConnectionTempl->NewInstance();
   v8::Persistent<v8::External> persistent;
@@ -611,7 +612,7 @@ static v8::Handle<v8::Value> wrapV8ClientConnection (v8::Isolate* isolate, V8Cli
   result->SetInternalField(SLOT_CLASS, myConnection);
   persistent.SetWeak(&persistent, ClientConnection_DestructorCallback);
 
-  return result;
+  return scope.Escape<v8::Value>(result);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -964,10 +964,10 @@ void ReplaceVocbaseCol (bool useCollection,
     TRI_GET_GLOBAL_STRING(_RevKey);
     TRI_GET_GLOBAL_STRING(_OldRevKey);
     TRI_GET_GLOBAL_STRING(_KeyKey);
-    result->Set(_IdKey, V8DocumentId(isolate, trx.resolver()->getCollectionName(col->_cid), docKey));
-    result->Set(_RevKey, V8RevisionId(isolate, mptr._rid));
+    result->Set(_IdKey,     V8DocumentId(isolate, trx.resolver()->getCollectionName(col->_cid), docKey));
+    result->Set(_RevKey,    V8RevisionId(isolate, mptr._rid));
     result->Set(_OldRevKey, V8RevisionId(isolate, actualRevision));
-    result->Set(_KeyKey, TRI_V8_STRING(docKey));
+    result->Set(_KeyKey,    TRI_V8_STRING(docKey));
 
     TRI_V8_RETURN(result);
   }
@@ -1066,7 +1066,7 @@ static void InsertVocbaseCol (TRI_vocbase_col_t* col,
     TRI_GET_GLOBAL_STRING(_IdKey);
     TRI_GET_GLOBAL_STRING(_RevKey);
     TRI_GET_GLOBAL_STRING(_KeyKey);
-    result->Set(_IdKey, V8DocumentId(isolate, trx.resolver()->getCollectionName(col->_cid), docKey));
+    result->Set(_IdKey,  V8DocumentId(isolate, trx.resolver()->getCollectionName(col->_cid), docKey));
     result->Set(_RevKey, V8RevisionId(isolate, mptr._rid));
     result->Set(_KeyKey, TRI_V8_STRING(docKey));
 
@@ -1277,10 +1277,10 @@ static void UpdateVocbaseCol (bool useCollection,
     TRI_GET_GLOBAL_STRING(_RevKey);
     TRI_GET_GLOBAL_STRING(_OldRevKey);
     TRI_GET_GLOBAL_STRING(_KeyKey);
-    result->Set(_IdKey, V8DocumentId(isolate, trx.resolver()->getCollectionName(col->_cid), docKey));
-    result->Set(_RevKey, V8RevisionId(isolate, mptr._rid));
+    result->Set(_IdKey,     V8DocumentId(isolate, trx.resolver()->getCollectionName(col->_cid), docKey));
+    result->Set(_RevKey,    V8RevisionId(isolate, mptr._rid));
     result->Set(_OldRevKey, V8RevisionId(isolate, actualRevision));
-    result->Set(_KeyKey, TRI_V8_STRING(docKey));
+    result->Set(_KeyKey,    TRI_V8_STRING(docKey));
 
     TRI_V8_RETURN(result);
   }
@@ -1810,62 +1810,62 @@ static void JS_FiguresVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& arg
   v8::Handle<v8::Object> alive = v8::Object::New(isolate);
 
   result->Set(TRI_V8_SYMBOL("alive"), alive);
-  alive->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberAlive));
-  alive->Set(TRI_V8_SYMBOL("size"), v8::Number::New(isolate, (double) info->_sizeAlive));
+  alive->Set(TRI_V8_SYMBOL("count"),       v8::Number::New(isolate, (double) info->_numberAlive));
+  alive->Set(TRI_V8_SYMBOL("size"),        v8::Number::New(isolate, (double) info->_sizeAlive));
 
   v8::Handle<v8::Object> dead = v8::Object::New(isolate);
 
   result->Set(TRI_V8_SYMBOL("dead"), dead);
-  dead->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberDead));
-  dead->Set(TRI_V8_SYMBOL("size"), v8::Number::New(isolate, (double) info->_sizeDead));
-  dead->Set(TRI_V8_SYMBOL("deletion"), v8::Number::New(isolate, (double) info->_numberDeletion));
+  dead->Set(TRI_V8_SYMBOL("count"),        v8::Number::New(isolate, (double) info->_numberDead));
+  dead->Set(TRI_V8_SYMBOL("size"),         v8::Number::New(isolate, (double) info->_sizeDead));
+  dead->Set(TRI_V8_SYMBOL("deletion"),     v8::Number::New(isolate, (double) info->_numberDeletion));
 
   // datafile info
   v8::Handle<v8::Object> dfs = v8::Object::New(isolate);
 
   result->Set(TRI_V8_SYMBOL("datafiles"), dfs);
-  dfs->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberDatafiles));
-  dfs->Set(TRI_V8_SYMBOL("fileSize"), v8::Number::New(isolate, (double) info->_datafileSize));
+  dfs->Set(TRI_V8_SYMBOL("count"),         v8::Number::New(isolate, (double) info->_numberDatafiles));
+  dfs->Set(TRI_V8_SYMBOL("fileSize"),      v8::Number::New(isolate, (double) info->_datafileSize));
 
   // journal info
   v8::Handle<v8::Object> js = v8::Object::New(isolate);
 
   result->Set(TRI_V8_SYMBOL("journals"), js);
-  js->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberJournalfiles));
-  js->Set(TRI_V8_SYMBOL("fileSize"), v8::Number::New(isolate, (double) info->_journalfileSize));
+  js->Set(TRI_V8_SYMBOL("count"),          v8::Number::New(isolate, (double) info->_numberJournalfiles));
+  js->Set(TRI_V8_SYMBOL("fileSize"),       v8::Number::New(isolate, (double) info->_journalfileSize));
 
   // compactors info
   v8::Handle<v8::Object> cs = v8::Object::New(isolate);
 
   result->Set(TRI_V8_SYMBOL("compactors"), cs);
-  cs->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberCompactorfiles));
-  cs->Set(TRI_V8_SYMBOL("fileSize"), v8::Number::New(isolate, (double) info->_compactorfileSize));
+  cs->Set(TRI_V8_SYMBOL("count"),          v8::Number::New(isolate, (double) info->_numberCompactorfiles));
+  cs->Set(TRI_V8_SYMBOL("fileSize"),       v8::Number::New(isolate, (double) info->_compactorfileSize));
 
   // shapefiles info
   v8::Handle<v8::Object> sf = v8::Object::New(isolate);
 
   result->Set(TRI_V8_SYMBOL("shapefiles"), sf);
-  sf->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberShapefiles));
-  sf->Set(TRI_V8_SYMBOL("fileSize"), v8::Number::New(isolate, (double) info->_shapefileSize));
+  sf->Set(TRI_V8_SYMBOL("count"),          v8::Number::New(isolate, (double) info->_numberShapefiles));
+  sf->Set(TRI_V8_SYMBOL("fileSize"),       v8::Number::New(isolate, (double) info->_shapefileSize));
 
   // shape info
   v8::Handle<v8::Object> shapes = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("shapes"), shapes);
-  shapes->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberShapes));
-  shapes->Set(TRI_V8_SYMBOL("size"), v8::Number::New(isolate, (double) info->_sizeShapes));
+  result->Set(TRI_V8_SYMBOL("shapes"),     shapes);
+  shapes->Set(TRI_V8_SYMBOL("count"),      v8::Number::New(isolate, (double) info->_numberShapes));
+  shapes->Set(TRI_V8_SYMBOL("size"),       v8::Number::New(isolate, (double) info->_sizeShapes));
 
   // attributes info
   v8::Handle<v8::Object> attributes = v8::Object::New(isolate);
   result->Set(TRI_V8_SYMBOL("attributes"), attributes);
-  attributes->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberAttributes));
-  attributes->Set(TRI_V8_SYMBOL("size"), v8::Number::New(isolate, (double) info->_sizeAttributes));
+  attributes->Set(TRI_V8_SYMBOL("count"),  v8::Number::New(isolate, (double) info->_numberAttributes));
+  attributes->Set(TRI_V8_SYMBOL("size"),   v8::Number::New(isolate, (double) info->_sizeAttributes));
 
   v8::Handle<v8::Object> indexes = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("indexes"), indexes);
-  indexes->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) info->_numberIndexes));
-  indexes->Set(TRI_V8_SYMBOL("size"), v8::Number::New(isolate, (double) info->_sizeIndexes));
+  result->Set(TRI_V8_SYMBOL("indexes"),    indexes);
+  indexes->Set(TRI_V8_SYMBOL("count"),     v8::Number::New(isolate, (double) info->_numberIndexes));
+  indexes->Set(TRI_V8_SYMBOL("size"),      v8::Number::New(isolate, (double) info->_sizeIndexes));
 
-  result->Set(TRI_V8_SYMBOL("lastTick"), V8TickId(isolate, info->_tickMax));
+  result->Set(TRI_V8_SYMBOL("lastTick"),   V8TickId(isolate, info->_tickMax));
   result->Set(TRI_V8_SYMBOL("uncollectedLogfileEntries"), v8::Number::New(isolate, (double) info->_uncollectedLogfileEntries));
 
   TRI_Free(TRI_UNKNOWN_MEM_ZONE, info);
@@ -2142,11 +2142,11 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
     TRI_GET_GLOBAL_STRING(IsVolatileKey);
     TRI_GET_GLOBAL_STRING(JournalSizeKey);
     TRI_GET_GLOBAL_STRING(WaitForSyncKey);
-    result->Set(DoCompactKey, info._doCompact ? v8::True(isolate) : v8::False(isolate));
-    result->Set(IsSystemKey, info._isSystem ? v8::True(isolate) : v8::False(isolate));
-    result->Set(IsVolatileKey, info._isVolatile ? v8::True(isolate) : v8::False(isolate));
-    result->Set(JournalSizeKey, v8::Number::New(isolate, info._maximalSize));
-    result->Set(WaitForSyncKey, info._waitForSync ? v8::True(isolate) : v8::False(isolate));
+    result->Set(DoCompactKey,   v8::Boolean::New(isolate, info._doCompact));
+    result->Set(IsSystemKey,    v8::Boolean::New(isolate, info._isSystem));
+    result->Set(IsVolatileKey,  v8::Boolean::New(isolate, info._isVolatile));
+    result->Set(JournalSizeKey, v8::Number::New (isolate, info._maximalSize));
+    result->Set(WaitForSyncKey, v8::Boolean::New(isolate, info._waitForSync));
 
     shared_ptr<CollectionInfo> c = ClusterInfo::instance()->getCollection(databaseName, StringUtils::itoa(collection->_cid));
     v8::Handle<v8::Array> shardKeys = v8::Array::New(isolate);
@@ -2280,10 +2280,10 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
   TRI_GET_GLOBAL_STRING(IsSystemKey);
   TRI_GET_GLOBAL_STRING(IsVolatileKey);
   TRI_GET_GLOBAL_STRING(JournalSizeKey);
-  result->Set(DoCompactKey, base->_info._doCompact ? v8::True(isolate) : v8::False(isolate));
-  result->Set(IsSystemKey, base->_info._isSystem ? v8::True(isolate) : v8::False(isolate));
-  result->Set(IsVolatileKey, base->_info._isVolatile ? v8::True(isolate) : v8::False(isolate));
-  result->Set(JournalSizeKey, v8::Number::New(isolate, base->_info._maximalSize));
+  result->Set(DoCompactKey,   v8::Boolean::New(isolate, base->_info._doCompact));
+  result->Set(IsSystemKey,    v8::Boolean::New(isolate, base->_info._isSystem));
+  result->Set(IsVolatileKey,  v8::Boolean::New(isolate, base->_info._isVolatile));
+  result->Set(JournalSizeKey, v8::Number::New( isolate, base->_info._maximalSize));
 
   TRI_json_t* keyOptions = document->_keyGenerator->toJson(TRI_UNKNOWN_MEM_ZONE);
 
@@ -2297,7 +2297,7 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
     result->Set(KeyOptionsKey, v8::Array::New(isolate));
   }
   TRI_GET_GLOBAL_STRING(WaitForSyncKey);
-  result->Set(WaitForSyncKey, base->_info._waitForSync ? v8::True(isolate) : v8::False(isolate));
+  result->Set(WaitForSyncKey, v8::Boolean::New(isolate, base->_info._waitForSync));
 
   ReleaseCollection(collection);
   TRI_V8_RETURN(result);
@@ -3034,7 +3034,7 @@ static void InsertEdgeCol (TRI_vocbase_col_t* col,
     TRI_GET_GLOBAL_STRING(_IdKey);
     TRI_GET_GLOBAL_STRING(_RevKey);
     TRI_GET_GLOBAL_STRING(_KeyKey);
-    result->Set(_IdKey, V8DocumentId(isolate, trx.resolver()->getCollectionName(col->_cid), docKey));
+    result->Set(_IdKey,  V8DocumentId(isolate, trx.resolver()->getCollectionName(col->_cid), docKey));
     result->Set(_RevKey, V8RevisionId(isolate, mptr._rid));
     result->Set(_KeyKey, TRI_V8_STRING(docKey));
 

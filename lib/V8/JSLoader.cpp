@@ -123,7 +123,7 @@ bool JSLoader::loadScript (v8::Isolate* isolate,
                               context,
                               TRI_V8_STD_STRING(i->second),
                               TRI_V8_STD_STRING(name),
-                              true); //// todo false);
+                              false);
 
   if (tryCatch.HasCaught()) {
     if (tryCatch.CanContinue()) {
