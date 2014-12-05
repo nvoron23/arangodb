@@ -474,7 +474,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
         (! config._restrictType.empty() && config._restrictCollections.empty()) ||
         (! config._restrictType.empty() && config._restrictType != "include" && config._restrictType != "exclude")) {
       TRI_DestroyConfigurationReplicationApplier(&config);
-      TRI_V8_EXCEPTION_PARAMETER(scope, "invalid value for <restrictCollections> or <restrictType>");
+      TRI_V8_EXCEPTION_PARAMETER("invalid value for <restrictCollections> or <restrictType>");
     }
 
     int res = TRI_ConfigureReplicationApplier(vocbase->_replicationApplier, &config);

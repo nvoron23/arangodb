@@ -1232,7 +1232,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
       
     v8::Handle<v8::String> optionName = TRI_V8_SYMBOL("batchSize");
     if (argValue->Has(optionName)) {
-      batchSize = static_cast<decltype(batchSize)>(TRI_ObjectToInt64(argsalue->Get(optionName)));
+      batchSize = static_cast<decltype(batchSize)>(TRI_ObjectToInt64(argValue->Get(optionName)));
       if (batchSize == 0) {
         TRI_V8_TYPE_ERROR("expecting non-zero value for <batchSize>");
         // well, this makes no sense
@@ -1241,7 +1241,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
       
     optionName = TRI_V8_SYMBOL("count");
     if (argValue->Has(optionName)) {
-      doCount = TRI_ObjectToBoolean(argsalue->Get(optionName));
+      doCount = TRI_ObjectToBoolean(argValue->Get(optionName));
     }
     optionName = TRI_V8_SYMBOL("ttl");
     if (argValue->Has(optionName)) {
@@ -2156,7 +2156,7 @@ static void DropDatabaseCoordinator (const v8::FunctionCallbackInfo<v8::Value>& 
   while (++tries <= 6000) {
     TRI_vocbase_t* vocbase = TRI_UseByIdCoordinatorDatabaseServer((TRI_server_t*) v8g->_server, id);
 
-    if (vocbase == 0) {
+    if (vocbase == nullptr) {
       // object has vanished
       break;
     }
@@ -2205,6 +2205,7 @@ static void JS_DropDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   // If we are a coordinator in a cluster, we have to behave differently:
   if (ServerState::instance()->isCoordinator()) {
     DropDatabaseCoordinator(args);
+    return;
   }
 
   string const name = TRI_ObjectToString(args[0]);
