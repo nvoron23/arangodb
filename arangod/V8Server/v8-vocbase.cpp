@@ -1092,7 +1092,7 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
       
     optionName = TRI_V8_SYMBOL("ttl");
     if (argValue->Has(optionName)) {
-      ttl = TRI_ObjectToBoolean(argValue->Get(optionName));
+      ttl = TRI_ObjectToDouble(argValue->Get(optionName));
       ttl = (ttl <= 0.0 ? 30.0 : ttl);
     }
       
@@ -1228,10 +1228,10 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
       TRI_V8_TYPE_ERROR("expecting object for <options>");
     }
 
-    v8::Handle<v8::Object> argsalue = v8::Handle<v8::Object>::Cast(args[2]);
+    v8::Handle<v8::Object> argValue = v8::Handle<v8::Object>::Cast(args[2]);
       
     v8::Handle<v8::String> optionName = TRI_V8_SYMBOL("batchSize");
-    if (argsalue->Has(optionName)) {
+    if (argValue->Has(optionName)) {
       batchSize = static_cast<decltype(batchSize)>(TRI_ObjectToInt64(argsalue->Get(optionName)));
       if (batchSize == 0) {
         TRI_V8_TYPE_ERROR("expecting non-zero value for <batchSize>");
@@ -1240,13 +1240,12 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
       
     optionName = TRI_V8_SYMBOL("count");
-    if (argsalue->Has(optionName)) {
+    if (argValue->Has(optionName)) {
       doCount = TRI_ObjectToBoolean(argsalue->Get(optionName));
     }
-      
     optionName = TRI_V8_SYMBOL("ttl");
-    if (argsalue->Has(optionName)) {
-      ttl = TRI_ObjectToBoolean(argsalue->Get(optionName));
+    if (argValue->Has(optionName)) {
+      ttl = TRI_ObjectToDouble(argValue->Get(optionName));
       ttl = (ttl <= 0.0 ? 30.0 : ttl);
     }
       

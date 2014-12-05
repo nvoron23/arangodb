@@ -113,7 +113,7 @@ static void JS_LastLoggerReplication (const v8::FunctionCallbackInfo<v8::Value>&
     TRI_V8_EXCEPTION_USAGE("REPLICATION_LOGGER_LAST(<fromTick>, <toTick>)");
   }
 
-  TRI_replication_dump_t dump(vocbase, 0); 
+  TRI_replication_dump_t dump(vocbase, 0, true); 
   TRI_voc_tick_t tickStart = TRI_ObjectToUInt64(args[0], true);
   TRI_voc_tick_t tickEnd = TRI_ObjectToUInt64(args[1], true);
 
@@ -180,7 +180,7 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
     password = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("password")));
   }
 
-  map<string, bool> restrictCollections;
+  std::unordered_map<std::string, bool> restrictCollections;
   if (object->Has(TRI_V8_SYMBOL("restrictCollections")) && object->Get(TRI_V8_SYMBOL("restrictCollections"))->IsArray()) {
     v8::Handle<v8::Array> a = v8::Handle<v8::Array>::Cast(object->Get(TRI_V8_SYMBOL("restrictCollections")));
 
@@ -190,12 +190,12 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
       v8::Handle<v8::Value> cname = a->Get(v8::Number::New(isolate, i));
 
       if (cname->IsString()) {
-        restrictCollections.insert(pair<string, bool>(TRI_ObjectToString(cname), true));
+        restrictCollections.emplace(std::make_pair(TRI_ObjectToString(cname), true));
       }
     }
   }
 
-  string restrictType;
+  std::string restrictType;
   if (object->Has(TRI_V8_SYMBOL("restrictType"))) {
     restrictType = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("restrictType")));
   }
@@ -225,6 +225,12 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
   if (object->Has(TRI_V8_SYMBOL("chunkSize"))) {
     if (object->Get(TRI_V8_SYMBOL("chunkSize"))->IsNumber()) {
       config._chunkSize = TRI_ObjectToUInt64(object->Get(TRI_V8_SYMBOL("chunkSize")), true);
+    }
+  }
+ 
+  if (object->Has(TRI_V8_SYMBOL("includeSystem"))) {
+    if (object->Get(TRI_V8_SYMBOL("includeSystem"))->IsBoolean()) {
+      config._includeSystem = TRI_ObjectToBoolean(object->Get(TRI_V8_SYMBOL("includeSystem")));
     }
   }
 
@@ -310,7 +316,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
     TRI_json_t* json = TRI_JsonConfigurationReplicationApplier(&config);
     TRI_DestroyConfigurationReplicationApplier(&config);
 
-    if (json == 0) {
+    if (json == nullptr) {
       TRI_V8_EXCEPTION_MEMORY();
     }
 
@@ -343,7 +349,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
       if (object->Get(TRI_V8_SYMBOL("endpoint"))->IsString()) {
         string endpoint = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("endpoint")));
 
-        if (config._endpoint != 0) {
+        if (config._endpoint != nullptr) {
           TRI_Free(TRI_CORE_MEM_ZONE, config._endpoint);
         }
         config._endpoint = TRI_DuplicateString2Z(TRI_CORE_MEM_ZONE, endpoint.c_str(), endpoint.size());
@@ -354,26 +360,26 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
       if (object->Get(TRI_V8_SYMBOL("database"))->IsString()) {
         string database = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("database")));
 
-        if (config._database != 0) {
+        if (config._database != nullptr) {
           TRI_Free(TRI_CORE_MEM_ZONE, config._database);
         }
         config._database = TRI_DuplicateString2Z(TRI_CORE_MEM_ZONE, database.c_str(), database.size());
       }
     }
     else {
-      if (config._database == 0) {
+      if (config._database == nullptr) {
         // no database set, use current
         config._database = TRI_DuplicateStringZ(TRI_CORE_MEM_ZONE, vocbase->_name);
       }
     }
 
-    TRI_ASSERT(config._database != 0);
+    TRI_ASSERT(config._database != nullptr);
 
     if (object->Has(TRI_V8_SYMBOL("username"))) {
       if (object->Get(TRI_V8_SYMBOL("username"))->IsString()) {
         string username = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("username")));
 
-        if (config._username != 0) {
+        if (config._username != nullptr) {
           TRI_Free(TRI_CORE_MEM_ZONE, config._username);
         }
         config._username = TRI_DuplicateString2Z(TRI_CORE_MEM_ZONE, username.c_str(), username.size());
@@ -384,7 +390,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
       if (object->Get(TRI_V8_SYMBOL("password"))->IsString()) {
         string password = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("password")));
 
-        if (config._password != 0) {
+        if (config._password != nullptr) {
           TRI_Free(TRI_CORE_MEM_ZONE, config._password);
         }
         config._password = TRI_DuplicateString2Z(TRI_CORE_MEM_ZONE, password.c_str(), password.size());
@@ -438,6 +444,38 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
         config._adaptivePolling = TRI_ObjectToBoolean(object->Get(TRI_V8_SYMBOL("adaptivePolling")));
       }
     }
+    
+    if (object->Has(TRI_V8_SYMBOL("includeSystem"))) {
+      if (object->Get(TRI_V8_SYMBOL("includeSystem"))->IsBoolean()) {
+        config._includeSystem = TRI_ObjectToBoolean(object->Get(TRI_V8_SYMBOL("includeSystem")));
+      }
+    }
+  
+    if (object->Has(TRI_V8_SYMBOL("restrictCollections")) && object->Get(TRI_V8_SYMBOL("restrictCollections"))->IsArray()) {
+      config._restrictCollections.clear();
+      v8::Handle<v8::Array> a = v8::Handle<v8::Array>::Cast(object->Get(TRI_V8_SYMBOL("restrictCollections")));
+
+      uint32_t const n = a->Length();
+
+      for (uint32_t i = 0; i < n; ++i) {
+        v8::Handle<v8::Value> cname = a->Get(i);
+
+        if (cname->IsString()) {
+          config._restrictCollections.insert(pair<string, bool>(TRI_ObjectToString(cname), true));
+        }
+      }
+    }
+    
+    if (object->Has(TRI_V8_SYMBOL("restrictType"))) {
+      config._restrictType = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("restrictType")));
+    }
+  
+    if ((config._restrictType.empty() && ! config._restrictCollections.empty()) ||
+        (! config._restrictType.empty() && config._restrictCollections.empty()) ||
+        (! config._restrictType.empty() && config._restrictType != "include" && config._restrictType != "exclude")) {
+      TRI_DestroyConfigurationReplicationApplier(&config);
+      TRI_V8_EXCEPTION_PARAMETER(scope, "invalid value for <restrictCollections> or <restrictType>");
+    }
 
     int res = TRI_ConfigureReplicationApplier(vocbase->_replicationApplier, &config);
 
@@ -449,7 +487,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
     TRI_json_t* json = TRI_JsonConfigurationReplicationApplier(&config);
     TRI_DestroyConfigurationReplicationApplier(&config);
 
-    if (json == 0) {
+    if (json == nullptr) {
       TRI_V8_EXCEPTION_MEMORY();
     }
 
@@ -556,7 +594,7 @@ static void JS_StateApplierReplication (const v8::FunctionCallbackInfo<v8::Value
 
   TRI_json_t* json = TRI_JsonReplicationApplier(vocbase->_replicationApplier);
 
-  if (json == 0) {
+  if (json == nullptr) {
     TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 
