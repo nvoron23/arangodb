@@ -3332,14 +3332,14 @@ static void JS_ExecuteAndWaitExternal (const v8::FunctionCallbackInfo<v8::Value>
     char* readPipe = TRI_EncodeHexString((const char *)external._readPipe,
                                          sizeof(HANDLE), &readPipe_len);
     result->Set(TRI_V8_SYMBOL("readPipe"),
-                v8::String::New(readPipe, (int) readPipe_len));
+                TRI_V8_PAIR_STRING(readPipe, (int) readPipe_len));
     TRI_FreeString(TRI_CORE_MEM_ZONE, readPipe);
   }
   if (0 != external._writePipe) {
     char* writePipe = TRI_EncodeHexString((const char *)external._writePipe,
                                           sizeof(HANDLE), &writePipe_len);
     result->Set(TRI_V8_SYMBOL("writePipe"),
-                v8::String::New(writePipe, (int) writePipe_len));
+                TRI_V8_PAIR_STRING(writePipe, (int) writePipe_len));
     TRI_FreeString(TRI_CORE_MEM_ZONE, writePipe);
   }
 #endif
@@ -3900,7 +3900,7 @@ void TRI_CreateErrorObject (v8::Isolate *isolate,
     // compilers. v8 expects uint16_t (2 bytes)
     // ..........................................................................
 
-    TRI_V8_RETURN(TRI_V8_SYMBOL_UTF16( result.getBuffer(), result.length()));
+    TRI_V8_RETURN(TRI_V8_SYMBOL_UTF16( (const uint16_t*) result.getBuffer(), result.length()));
   }
   else {
     TRI_V8_RETURN(v8::String::NewFromUtf8(isolate, ""));
