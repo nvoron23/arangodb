@@ -1502,8 +1502,8 @@ static void PrepareClusterCommRequest (
 /// @brief prepare a ClusterCommResult for JavaScript
 ////////////////////////////////////////////////////////////////////////////////
 
-void PrepareClusterCommResultForJS(const v8::FunctionCallbackInfo<v8::Value>& args,
-                                   ClusterCommResult const* res) {
+void Return_PrepareClusterCommResultForJS(const v8::FunctionCallbackInfo<v8::Value>& args,
+                                          ClusterCommResult const* res) {
   v8::Isolate* isolate = args.GetIsolate();
   TRI_V8_CURRENT_GLOBALS_AND_SCOPE;
 
@@ -1672,7 +1672,7 @@ static void JS_AsyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   LOG_DEBUG("JS_AsyncRequest: request has been submitted");
 
-  PrepareClusterCommResultForJS(args, res);
+  Return_PrepareClusterCommResultForJS(args, res);
   delete res;
 }
 
@@ -1735,7 +1735,7 @@ static void JS_SyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   LOG_DEBUG("JS_SyncRequest: request has been done");
 
-  PrepareClusterCommResultForJS(args, res);
+  Return_PrepareClusterCommResultForJS(args, res);
   delete res;
 }
 
@@ -1773,7 +1773,7 @@ static void JS_Enquire (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   res = cc->enquire(operationID);
 
-  PrepareClusterCommResultForJS(args, res);
+  Return_PrepareClusterCommResultForJS(args, res);
   delete res;
 }
 
@@ -1854,7 +1854,7 @@ static void JS_Wait (const v8::FunctionCallbackInfo<v8::Value>& args) {
                  myshardID,
                  mytimeout);
 
-  PrepareClusterCommResultForJS(args, res);
+  Return_PrepareClusterCommResultForJS(args, res);
   delete res;
 }
 

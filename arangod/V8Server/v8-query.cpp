@@ -218,7 +218,8 @@ static int SetupExampleObject (v8::Handle<v8::Object> const example,
 
   if (pids == 0) {
     // out of memory
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_EXCEPTION_MEMORY()
+      TRI_ERROR_OUT_OF_MEMORY;
   }
 
   values = (TRI_shaped_json_t**) TRI_Allocate(TRI_UNKNOWN_MEM_ZONE,
@@ -228,7 +229,7 @@ static int SetupExampleObject (v8::Handle<v8::Object> const example,
     // out of memory
     TRI_Free(TRI_UNKNOWN_MEM_ZONE, pids);
     pids = 0;
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_EXCEPTION_MEMORY() TRI_ERROR_OUT_OF_MEMORY;
   }
 
   // convert

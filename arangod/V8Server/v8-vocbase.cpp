@@ -358,6 +358,7 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
       }
     }
   }
+
   res = trx.commit();
 
   if (res != TRI_ERROR_NO_ERROR) {

@@ -2747,6 +2747,7 @@ static void JS_Wait (const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (args.Length() > 1) {
     gc = TRI_ObjectToBoolean(args[1]);
   }
+
   if (gc) {
     // wait with gc
     isolate->LowMemoryNotification();

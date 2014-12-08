@@ -1178,7 +1178,6 @@ static void JS_EnsureIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>&
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
-
   PREVENT_EMBEDDED_TRANSACTION();
 
   EnsureIndex(args, true, "ensureIndex");
@@ -1192,7 +1191,6 @@ static void JS_LookupIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>&
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
-
   EnsureIndex(args, false, "lookupIndex");
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -1204,7 +1202,6 @@ static void DropIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& arg
                                   v8::Handle<v8::Value> const val) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
 
   string collectionName;
   TRI_idx_iid_t iid = 0;

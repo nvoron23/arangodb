@@ -176,7 +176,8 @@ static const uint32_t V8DataSlot = 0;
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_V8_EXCEPTION_MEMORY()                       \
-  TRI_CreateErrorObject(isolate, TRI_ERROR_OUT_OF_MEMORY);
+  TRI_CreateErrorObject(isolate, TRI_ERROR_OUT_OF_MEMORY); \
+  return
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing an exception for an system error
