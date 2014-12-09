@@ -1042,13 +1042,14 @@ int ArangoServer::runUnitTests (TRI_vocbase_t* vocbase) {
   ApplicationV8::V8Context* context = _applicationV8->enterContext("STANDARD", vocbase, true, true);
 
   auto isolate = context->isolate;
-  auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
   /// todo: do we need this? v8::Context::Scope contextScope(localContext);
 
   bool ok = false;
   {
     v8::TryCatch tryCatch;
     v8::HandleScope scope(isolate);
+  
+    auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
 
     // set-up unit tests array
     v8::Handle<v8::Array> sysTestFiles = v8::Array::New(isolate);
