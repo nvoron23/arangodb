@@ -1014,8 +1014,9 @@ bool RestDocumentHandler::checkDocument () {
 /// of *true*.
 ///
 /// The body of the response contains a JSON object with the information about
-/// the handle and the revision.  The attribute *_id* contains the known
-/// *document-handle* of the updated document, the attribute *_rev*
+/// the handle and the revision. The attribute *_id* contains the known
+/// *document-handle* of the updated document, *_key* contains the key which 
+/// uniquely identifies a document in a given collection, and the attribute *_rev*
 /// contains the new document revision.
 ///
 /// If the document does not exist, then a *HTTP 404* is returned and the
@@ -1249,7 +1250,8 @@ bool RestDocumentHandler::replaceDocument () {
 ///
 /// The body of the response contains a JSON object with the information about
 /// the handle and the revision. The attribute *_id* contains the known
-/// *document-handle* of the updated document, the attribute *_rev*
+/// *document-handle* of the updated document, *_key* contains the key which 
+/// uniquely identifies a document in a given collection, and the attribute *_rev*
 /// contains the new document revision.
 ///
 /// If the document does not exist, then a *HTTP 404* is returned and the
@@ -1313,6 +1315,36 @@ bool RestDocumentHandler::replaceDocument () {
 ///     var response5 = logCurlRequest("GET", url);
 ///     assert(response5.code === 200);
 ///     logJsonResponse(response5);
+/// @END_EXAMPLE_ARANGOSH_RUN
+///
+/// Merging attributes of an object using `mergeObjects`:
+///
+/// @EXAMPLE_ARANGOSH_RUN{RestDocumentHandlerPatchDocumentMerge}
+///     var cn = "products";
+///     db._drop(cn);
+///     db._create(cn);
+///
+///     var document = db.products.save({"inhabitants":{"china":1366980000,"india":1263590000,"usa":319220000}});
+///     var url = "/_api/document/" + document._id;
+///
+///     var response = logCurlRequest("GET", url);
+///     assert(response.code === 200);
+///     logJsonResponse(response);
+///
+///     var response = logCurlRequest("PATCH", url + "?mergeObjects=true", { "inhabitants": {"indonesia":252164800,"brazil":203553000 }});
+///     assert(response.code === 202);
+///
+///     var response2 = logCurlRequest("GET", url);
+///     assert(response2.code === 200);
+///     logJsonResponse(response2);
+///
+///     var response3 = logCurlRequest("PATCH", url + "?mergeObjects=false", { "inhabitants": { "pakistan":188346000 }});
+///     assert(response3.code === 202);
+///     logJsonResponse(response3);
+///
+///     var response4 = logCurlRequest("GET", url);
+///     assert(response4.code === 200);
+///     logJsonResponse(response4);
 /// @END_EXAMPLE_ARANGOSH_RUN
 /// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
@@ -1649,9 +1681,10 @@ bool RestDocumentHandler::modifyDocumentCoordinator (
 ///
 /// @RESTDESCRIPTION
 /// The body of the response contains a JSON object with the information about
-/// the handle and the revision.  The attribute *_id* contains the known
-/// *document-handle* of the deleted document, the attribute *_rev*
-/// contains the document revision.
+/// the handle and the revision. The attribute *_id* contains the known
+/// *document-handle* of the deleted document, *_key* contains the key which 
+/// uniquely identifies a document in a given collection, and the attribute *_rev*
+/// contains the new document revision.
 ///
 /// If the *waitForSync* parameter is not specified or set to
 /// *false*, then the collection's default *waitForSync* behavior is

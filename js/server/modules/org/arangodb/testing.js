@@ -1119,7 +1119,8 @@ var impTodo = [
 testFuncs.importing = function (options) {
   if (options.cluster) {
     print("Skipped because of cluster.");
-    return {"ok":true, "skipped":0};
+    return {"importing": {"status":true, "skipped":true, 
+                          "message": "skipped because of cluster"}};
   }
 
   var instanceInfo = startInstance("tcp", options, [ ], "importing");
@@ -1561,6 +1562,7 @@ function UnitTest (which, options) {
   else {
     var r;
     results[which] = r = testFuncs[which](options);
+    print("Testresult:", r);
     ok = true;
     for (i in r) {
       if (r.hasOwnProperty(i) &&

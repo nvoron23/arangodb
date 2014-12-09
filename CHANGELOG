@@ -32,9 +32,14 @@ v2.4.0 (XXXX-XX-XX)
   The HTTP API methods for fetching the replication inventory and for dumping collections
   also support the `includeSystem` control flag via a URL parameter.
 
+* renamed option `mergeArrays` to `mergeObjects` for AQL data-modification query options
+  and HTTP document modification API
+  
 
 v2.3.2 (XXXX-XX-XX)
 -------------------
+
+* fixed issue #1163: invalid fullCount value returned from AQL
 
 * fixed range operator precedence 
 
@@ -56,6 +61,7 @@ v2.3.2 (XXXX-XX-XX)
   This change provides the `KEEP` clause for `COLLECT ... INTO`. The `KEEP` clause
   allows controlling which variables will be kept in the variable created by `INTO`.
   
+* fixed issue #1147, must protect dispatcher ID for etcd
 
 v2.3.1 (2014-11-28)
 -------------------
