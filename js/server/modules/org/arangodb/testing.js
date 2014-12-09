@@ -590,27 +590,28 @@ function runThere (options, instanceInfo, file) {
 
 
 function runHere (options, instanceInfo, file) {
-  var r;
+  var result;
   try {
-    var t;
+    var test;
     if (file.indexOf("-spec") === -1) {
-      t = 'var runTest = require("jsunity").runTest; '+
-          'r = runTest(' + JSON.stringify(file) + ');';
+      test = 'var runTest = require("jsunity").runTest; '+
+          'result = runTest(' + JSON.stringify(file) + ');';
     }
     else {
       var jasmineReportFormat = options.jasmineReportFormat || 'progress';
-      t = 'var executeTestSuite = require("jasmine").executeTestSuite; '+
-          'r = executeTestSuite([' + JSON.stringify(file) + '],{"format": '+
+      test = 'var executeTestSuite = require("jasmine").executeTestSuite; '+
+          'result = executeTestSuite([' + JSON.stringify(file) + '],{"format": '+
           JSON.stringify(jasmineReportFormat) + '});';
     }
+    eval(test);
     if (file.indexOf("-spec") !== -1) {
-      r = {status: r, message: ''};
+      result = {status: result, message: ''};
     }
  }
   catch (err) {
-    r = err;
+    result = err;
   }
-  return r;
+  return result;
 }
 
 function executeAndWait (cmd, args) {
