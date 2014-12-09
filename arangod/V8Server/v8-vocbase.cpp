@@ -350,7 +350,8 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
       trx.abort();
 
       if (tryCatch.CanContinue()) {
-        TRI_V8_LOG_THROW_EXCEPTION(tryCatch);
+        tryCatch.ReThrow();
+        return;
       }
       else {
         v8g->_canceled = true;

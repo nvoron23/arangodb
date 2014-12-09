@@ -329,7 +329,7 @@ static void JS_NextGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& arg
     try {
       TRI_general_cursor_row_t row = cursor->next(cursor);
 
-      if (row == 0) {
+      if (row == nullptr) {
         value = v8::Undefined(isolate);
       }
       else {
@@ -349,7 +349,8 @@ static void JS_NextGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& arg
 
     if (tryCatch.HasCaught()) {
       if (tryCatch.CanContinue()) {
-        TRI_V8_LOG_THROW_EXCEPTION(tryCatch);
+        tryCatch.ReThrow();
+        TRI_V8_RETURN_UNDEFINED();
       }
       else {
         TRI_GET_GLOBALS();
@@ -434,7 +435,8 @@ static void JS_ToArrayGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& 
 
     if (tryCatch.HasCaught()) {
       if (tryCatch.CanContinue()) {
-        TRI_V8_LOG_THROW_EXCEPTION(tryCatch);
+        tryCatch.ReThrow();
+        TRI_V8_RETURN_UNDEFINED();
       }
       else {
         TRI_GET_GLOBALS();
