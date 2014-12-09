@@ -1323,7 +1323,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousList (v8::Isolate* isolate,
 
   if (subshape == nullptr) {
     LOG_WARNING("cannot find shape #%u", (unsigned int) sid);
-    return v8::Array::New(isolate);
+    return scope.Escape<v8::Value>(v8::Array::New(isolate));
   }
 
   v8::Handle<v8::Array> list = v8::Array::New(isolate, l);
@@ -1362,7 +1362,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousSizedList (v8::Isolate* iso
   l = * (TRI_shape_length_list_t const*) ptr;
 
   if (l == 0) {
-    return v8::Array::New(isolate);
+    return scope.Escape<v8::Value>(v8::Array::New(isolate));
   }
 
   sid    = s->_sidEntry;
@@ -1372,7 +1372,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousSizedList (v8::Isolate* iso
 
   if (subshape == nullptr) {
     LOG_WARNING("cannot find shape #%u", (unsigned int) sid);
-    return v8::Array::New(isolate);
+    return scope.Escape<v8::Value>(v8::Array::New(isolate));
   }
 
   TRI_shape_size_t offset = sizeof(TRI_shape_length_list_t);
@@ -1448,9 +1448,10 @@ static v8::Handle<v8::Value> JsonShapeData (v8::Isolate* isolate,
     case TRI_SHAPE_HOMOGENEOUS_SIZED_LIST:
       return JsonShapeDataHomogeneousSizedList(isolate, shaper, shape, data, size);
   }
-
-  v8::EscapableHandleScope scope(isolate);
-  return scope.Escape<v8::Value>(v8::Null(isolate));
+  {
+    v8::EscapableHandleScope scope(isolate);
+    return scope.Escape<v8::Value>(v8::Null(isolate));
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
