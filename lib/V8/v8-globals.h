@@ -242,7 +242,7 @@ static const uint32_t V8DataSlot = 0;
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection)        \
-  if (collection != 0 && ! collection->_isLocal) {                     \
+  if (collection != nullptr && ! collection->_isLocal) {               \
     TRI_V8_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);                       \
   }
 

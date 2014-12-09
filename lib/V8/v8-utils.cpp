@@ -120,7 +120,8 @@ TRI_Utf8ValueNFC::~TRI_Utf8ValueNFC () {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a Javascript error object
 ////////////////////////////////////////////////////////////////////////////////
-static void CreateErrorObject (v8::Isolate *isolate,
+
+static void CreateErrorObject (v8::Isolate* isolate,
                                int errorNumber,
                                string const& message) {
   if (errorNumber == TRI_ERROR_OUT_OF_MEMORY) {
@@ -130,7 +131,8 @@ static void CreateErrorObject (v8::Isolate *isolate,
   v8::Handle<v8::String> errorMessage = TRI_V8_STD_STRING(message);
 
   if (errorMessage.IsEmpty()) {
-     v8::Object::New(isolate);
+    isolate->ThrowException(v8::Object::New(isolate));
+    return;
   }
 
   v8::Handle<v8::Value> err = v8::Exception::Error(errorMessage);

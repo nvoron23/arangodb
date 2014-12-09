@@ -760,7 +760,12 @@ static TRI_action_result_t ExecuteActionVocbase (TRI_vocbase_t* vocbase,
   // convert the result
   result.isValid = true;
 
-  if (tryCatch.HasCaught()) {
+  if (v8g->_canceled) {
+    result.isValid = false;
+    result.canceled = true;
+  }
+
+  else if (tryCatch.HasCaught()) {
     if (tryCatch.CanContinue()) {
       v8::Handle<v8::Value> exception = tryCatch.Exception();
       TRI_GET_GLOBAL(SleepAndRequeueFuncTempl, v8::FunctionTemplate);
