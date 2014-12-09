@@ -1254,7 +1254,7 @@ static v8::Handle<v8::Value> JsonShapeDataList (v8::Isolate* isolate,
   l = * (TRI_shape_length_list_t const*) ptr;
 
   if (l == 0) {
-    return v8::Array::New(isolate, 0);
+    return scope.Escape<v8::Value>(v8::Array::New(isolate, 0));
   }
 
   shapeCache._sid   = 0;
