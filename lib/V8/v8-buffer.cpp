@@ -587,9 +587,11 @@ namespace {
 ////////////////////////////////////////////////////////////////////////////////
 
   v8::RetainedObjectInfo* WrapperInfo (uint16_t classId, v8::Handle<v8::Value> wrapper) {
+#ifdef TRI_ENABLE_MAINTAINER_MODE
     ISOLATE;
     TRI_ASSERT(classId == TRI_V8_BUFFER_CID);
     TRI_ASSERT(V8Buffer::hasInstance(isolate, wrapper));
+#endif
 
     V8Buffer* buffer = V8Buffer::unwrap(wrapper.As<v8::Object>());
     return new RetainedBufferInfo(buffer);
@@ -810,8 +812,11 @@ bool V8Buffer::hasInstance (v8::Isolate *isolate, v8::Handle<v8::Value> val) {
     return true;
   }
 
+#ifdef TRI_ENABLE_MAINTAINER_MODE
   TRI_GET_GLOBAL(FastBufferConstructor, v8::Function);
   TRI_ASSERT(! FastBufferConstructor.IsEmpty());
+#endif
+
   return strcmp(*v8::String::Utf8Value(obj->GetConstructorName()), "Buffer") == 0;
 }
 

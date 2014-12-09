@@ -502,11 +502,9 @@ static v8::Handle<v8::Object> RequestCppToV8 (v8::Isolate* isolate,
   map<string, string> values = request->values();
 
   for (map<string, string>::iterator i = values.begin();
-       i != values.end();  ++i) {
-    string const& k = i->first;
-    string const& v = i->second;
-
-    valuesObject->Set(TRI_V8_STD_STRING(k), TRI_V8_STD_STRING(v));
+       i != values.end();
+       ++i) {
+    valuesObject->Set(TRI_V8_STD_STRING(i->first), TRI_V8_STD_STRING(i->second));
   }
 
   // copy request array parameter (a[]=1&a[]=2&...)

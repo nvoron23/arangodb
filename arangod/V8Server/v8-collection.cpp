@@ -4082,7 +4082,7 @@ static void JS_VersionServer (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
-  return TRI_V8_RETURN(TRI_V8_SYMBOL(TRI_VERSION));
+  TRI_V8_RETURN(TRI_V8_SYMBOL(TRI_VERSION));
 }
 
 // -----------------------------------------------------------------------------
