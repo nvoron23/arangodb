@@ -426,7 +426,7 @@ static v8::Handle<v8::Object> RequestCppToV8 (v8::Isolate* isolate,
   TRI_GET_GLOBAL_STRING(ClientKey);
   req->Set(ClientKey, clientArray);
 
-  req->Set(TRI_V8_SYMBOL("internals"), v8::External::New(isolate, request));
+  req->Set(TRI_V8_ASCII_STRING("internals"), v8::External::New(isolate, request));
 
   // copy prefix
   string path = request->prefix();
@@ -518,7 +518,7 @@ static v8::Handle<v8::Object> RequestCppToV8 (v8::Isolate* isolate,
     v8::Handle<v8::Array> list = v8::Array::New(isolate);
 
     for (size_t i = 0; i < v->size(); ++i) {
-      list->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_SYMBOL(v->at(i)));
+      list->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_ASCII_STRING(v->at(i)));
     }
 
     valuesObject->Set(TRI_V8_STD_STRING(k), list);
@@ -935,7 +935,7 @@ static void JS_RawRequestBody (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::Handle<v8::Value> current = args[0];
   if (current->IsObject()) {
     v8::Handle<v8::Object> obj = v8::Handle<v8::Object>::Cast(current);
-    v8::Handle<v8::Value> property = obj->Get(TRI_V8_SYMBOL("internals"));
+    v8::Handle<v8::Value> property = obj->Get(TRI_V8_ASCII_STRING("internals"));
     if (property->IsExternal()) {
       v8::Handle<v8::External> e = v8::Handle<v8::External>::Cast(property);
       auto request = static_cast<triagens::rest::HttpRequest*>(e->Value());
@@ -968,7 +968,7 @@ static void JS_RequestParts (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Value> current = args[0];
   if (current->IsObject()) {
     v8::Handle<v8::Object> obj = v8::Handle<v8::Object>::Cast(current);
-    v8::Handle<v8::Value> property = obj->Get(TRI_V8_SYMBOL("internals"));
+    v8::Handle<v8::Value> property = obj->Get(TRI_V8_ASCII_STRING("internals"));
     if (property->IsExternal()) {
       v8::Handle<v8::External> e = v8::Handle<v8::External>::Cast(property);
       auto request = static_cast<triagens::rest::HttpRequest*>(e->Value());
@@ -1099,12 +1099,12 @@ static void JS_RequestParts (const v8::FunctionCallbackInfo<v8::Value>& args) {
         }
 
         v8::Handle<v8::Object> partObject = v8::Object::New(isolate);
-        partObject->Set(TRI_V8_SYMBOL("headers"), headersObject);
+        partObject->Set(TRI_V8_ASCII_STRING("headers"), headersObject);
  
         V8Buffer* buffer = V8Buffer::New(isolate, data, end - data);
         auto localHandle = v8::Local<v8::Object>::New(isolate, buffer->_handle);
 
-        partObject->Set(TRI_V8_SYMBOL("data"), localHandle); 
+        partObject->Set(TRI_V8_ASCII_STRING("data"), localHandle); 
         
         result->Set(v8::Number::New(isolate, j++), partObject);
       }
@@ -1181,7 +1181,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
     = triagens::rest::HttpRequest::HTTP_REQUEST_GET;
   if (args[0]->IsObject()) {
     v8::Handle<v8::Object> obj = args[0].As<v8::Object>();
-    v8::Handle<v8::Value> meth = obj->Get(TRI_V8_SYMBOL("requestType"));
+    v8::Handle<v8::Value> meth = obj->Get(TRI_V8_ASCII_STRING("requestType"));
     if (meth->IsString()) {
       TRI_Utf8ValueNFC UTF8(TRI_UNKNOWN_MEM_ZONE, meth);
       string methstring = *UTF8;
@@ -1272,38 +1272,38 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
     res = cc->wait("", 0, opID, "");
 
     if (0 == res) {
-      r->Set(TRI_V8_SYMBOL("errorMsg"), TRI_V8_SYMBOL("out of memory"));
+      r->Set(TRI_V8_ASCII_STRING("errorMsg"), TRI_V8_ASCII_STRING("out of memory"));
       LOG_DEBUG("JS_ClusterTest: out of memory");
     }
     else if (res->status == CL_COMM_TIMEOUT) {
-      r->Set(TRI_V8_SYMBOL("timeout"), v8::BooleanObject::New(true));
+      r->Set(TRI_V8_ASCII_STRING("timeout"), v8::BooleanObject::New(true));
       LOG_DEBUG("JS_ClusterTest: timeout");
     }
     else if (res->status == CL_COMM_ERROR) {
       if (res->result && res->result->isComplete()) {
         v8::Handle<v8::Object> details = v8::Object::New(isolate);
-        details->Set(TRI_V8_SYMBOL("code"),
+        details->Set(TRI_V8_ASCII_STRING("code"),
                      v8::Number::New(isolate,
                      res->result->getHttpReturnCode()));
-        details->Set(TRI_V8_SYMBOL("message"),
+        details->Set(TRI_V8_ASCII_STRING("message"),
                      TRI_V8_STD_STRING(res->result->getHttpReturnMessage()));
-        details->Set(TRI_V8_SYMBOL("body"),
+        details->Set(TRI_V8_ASCII_STRING("body"),
                      TRI_V8_STD_STRING(res->result->getBody()));
         TRI_GET_GLOBAL_STRING(ErrorMessageKey);
-        r->Set(TRI_V8_SYMBOL("details"), details);
-        r->Set(ErrorMessageKey, TRI_V8_SYMBOL("got bad HTTP response"));
+        r->Set(TRI_V8_ASCII_STRING("details"), details);
+        r->Set(ErrorMessageKey, TRI_V8_ASCII_STRING("got bad HTTP response"));
       }
       else {
         TRI_GET_GLOBAL_STRING(ErrorMessageKey);
         r->Set(ErrorMessageKey,
-               TRI_V8_SYMBOL("got no HTTP response, DBserver seems gone"));
+               TRI_V8_ASCII_STRING("got no HTTP response, DBserver seems gone"));
       }
       LOG_DEBUG("JS_ClusterTest: communications error");
     }
     else if (res->status == CL_COMM_DROPPED) {
       // Note that this can basically not happen
-      r->Set(TRI_V8_SYMBOL("errorMessage"),
-             TRI_V8_SYMBOL("request dropped whilst waiting for answer"));
+      r->Set(TRI_V8_ASCII_STRING("errorMessage"),
+             TRI_V8_ASCII_STRING("request dropped whilst waiting for answer"));
       LOG_DEBUG("JS_ClusterTest: dropped");
     }
     else {   // Everything is OK
@@ -1315,11 +1315,11 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
         h->Set(TRI_V8_STD_STRING(i->first),
                TRI_V8_STD_STRING(i->second));
       }
-      r->Set(TRI_V8_SYMBOL("headers"), h);
+      r->Set(TRI_V8_ASCII_STRING("headers"), h);
 
       // The body:
       if (nullptr != res->answer->body()) {
-        r->Set(TRI_V8_SYMBOL("body"),
+        r->Set(TRI_V8_ASCII_STRING("body"),
                TRI_V8_PAIR_STRING(res->answer->body(),
                                   (int) res->answer->bodySize()));
       }
@@ -1336,22 +1336,22 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
 
     if (nullptr == res) {
-      r->Set(TRI_V8_SYMBOL("errorMsg"), TRI_V8_SYMBOL("out of memory"));
+      r->Set(TRI_V8_ASCII_STRING("errorMsg"), TRI_V8_ASCII_STRING("out of memory"));
       LOG_DEBUG("JS_ClusterTest: out of memory");
     }
     else if (res->status == CL_COMM_TIMEOUT) {
-      r->Set(TRI_V8_SYMBOL("timeout"),v8::BooleanObject::New(true));
+      r->Set(TRI_V8_ASCII_STRING("timeout"),v8::BooleanObject::New(true));
       LOG_DEBUG("JS_ClusterTest: timeout");
     }
     else if (res->status == CL_COMM_ERROR) {
-      r->Set(TRI_V8_SYMBOL("errorMessage"),
-             TRI_V8_SYMBOL("could not send request, DBServer gone"));
+      r->Set(TRI_V8_ASCII_STRING("errorMessage"),
+             TRI_V8_ASCII_STRING("could not send request, DBServer gone"));
       LOG_DEBUG("JS_ClusterTest: communications error");
     }
     else if (res->status == CL_COMM_DROPPED) {
       // Note that this can basically not happen
-      r->Set(TRI_V8_SYMBOL("errorMessage"),
-             TRI_V8_SYMBOL("request dropped whilst waiting for answer"));
+      r->Set(TRI_V8_ASCII_STRING("errorMessage"),
+             TRI_V8_ASCII_STRING("request dropped whilst waiting for answer"));
       LOG_DEBUG("JS_ClusterTest: dropped");
     }
     else {   // Everything is OK
@@ -1362,11 +1362,11 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
       for (i = headers.begin(); i != headers.end(); ++i) {
         h->Set(TRI_V8_STD_STRING(i->first), TRI_V8_STD_STRING(i->second));
       }
-      r->Set(TRI_V8_SYMBOL("headers"), h);
+      r->Set(TRI_V8_ASCII_STRING("headers"), h);
 
       // The body:
       StringBuffer& theBody = res->result->getBody();
-      r->Set(TRI_V8_SYMBOL("body"), TRI_V8_STD_STRING(theBody));
+      r->Set(TRI_V8_ASCII_STRING("body"), TRI_V8_STD_STRING(theBody));
       LOG_DEBUG("JS_ClusterTest: success");
 
     }
@@ -1398,13 +1398,13 @@ void TRI_InitV8Actions (v8::Isolate* isolate,
   // create the global functions
   // .............................................................................
 
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_DEFINE_ACTION"), JS_DefineAction);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_EXECUTE_GLOBAL_CONTEXT_FUNCTION"), JS_ExecuteGlobalContextFunction);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_GET_CURRENT_REQUEST"), JS_GetCurrentRequest);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_GET_CURRENT_RESPONSE"), JS_GetCurrentResponse);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_CLUSTER_TEST"), JS_ClusterTest, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_RAW_REQUEST_BODY"), JS_RawRequestBody, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_REQUEST_PARTS"), JS_RequestParts, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_DEFINE_ACTION"), JS_DefineAction);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_EXECUTE_GLOBAL_CONTEXT_FUNCTION"), JS_ExecuteGlobalContextFunction);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_GET_CURRENT_REQUEST"), JS_GetCurrentRequest);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_GET_CURRENT_RESPONSE"), JS_GetCurrentResponse);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_CLUSTER_TEST"), JS_ClusterTest, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_RAW_REQUEST_BODY"), JS_RawRequestBody, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_REQUEST_PARTS"), JS_RequestParts, true);
 }
 
 // -----------------------------------------------------------------------------

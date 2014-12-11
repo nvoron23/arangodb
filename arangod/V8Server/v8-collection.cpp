@@ -1809,64 +1809,64 @@ static void JS_FiguresVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& arg
 
   v8::Handle<v8::Object> alive = v8::Object::New(isolate);
 
-  result->Set(TRI_V8_SYMBOL("alive"), alive);
-  alive->Set(TRI_V8_SYMBOL("count"),       v8::Number::New(isolate, (double) info->_numberAlive));
-  alive->Set(TRI_V8_SYMBOL("size"),        v8::Number::New(isolate, (double) info->_sizeAlive));
+  result->Set(TRI_V8_ASCII_STRING("alive"), alive);
+  alive->Set(TRI_V8_ASCII_STRING("count"),       v8::Number::New(isolate, (double) info->_numberAlive));
+  alive->Set(TRI_V8_ASCII_STRING("size"),        v8::Number::New(isolate, (double) info->_sizeAlive));
 
   v8::Handle<v8::Object> dead = v8::Object::New(isolate);
 
-  result->Set(TRI_V8_SYMBOL("dead"), dead);
-  dead->Set(TRI_V8_SYMBOL("count"),        v8::Number::New(isolate, (double) info->_numberDead));
-  dead->Set(TRI_V8_SYMBOL("size"),         v8::Number::New(isolate, (double) info->_sizeDead));
-  dead->Set(TRI_V8_SYMBOL("deletion"),     v8::Number::New(isolate, (double) info->_numberDeletion));
+  result->Set(TRI_V8_ASCII_STRING("dead"), dead);
+  dead->Set(TRI_V8_ASCII_STRING("count"),        v8::Number::New(isolate, (double) info->_numberDead));
+  dead->Set(TRI_V8_ASCII_STRING("size"),         v8::Number::New(isolate, (double) info->_sizeDead));
+  dead->Set(TRI_V8_ASCII_STRING("deletion"),     v8::Number::New(isolate, (double) info->_numberDeletion));
 
   // datafile info
   v8::Handle<v8::Object> dfs = v8::Object::New(isolate);
 
-  result->Set(TRI_V8_SYMBOL("datafiles"), dfs);
-  dfs->Set(TRI_V8_SYMBOL("count"),         v8::Number::New(isolate, (double) info->_numberDatafiles));
-  dfs->Set(TRI_V8_SYMBOL("fileSize"),      v8::Number::New(isolate, (double) info->_datafileSize));
+  result->Set(TRI_V8_ASCII_STRING("datafiles"), dfs);
+  dfs->Set(TRI_V8_ASCII_STRING("count"),         v8::Number::New(isolate, (double) info->_numberDatafiles));
+  dfs->Set(TRI_V8_ASCII_STRING("fileSize"),      v8::Number::New(isolate, (double) info->_datafileSize));
 
   // journal info
   v8::Handle<v8::Object> js = v8::Object::New(isolate);
 
-  result->Set(TRI_V8_SYMBOL("journals"), js);
-  js->Set(TRI_V8_SYMBOL("count"),          v8::Number::New(isolate, (double) info->_numberJournalfiles));
-  js->Set(TRI_V8_SYMBOL("fileSize"),       v8::Number::New(isolate, (double) info->_journalfileSize));
+  result->Set(TRI_V8_ASCII_STRING("journals"), js);
+  js->Set(TRI_V8_ASCII_STRING("count"),          v8::Number::New(isolate, (double) info->_numberJournalfiles));
+  js->Set(TRI_V8_ASCII_STRING("fileSize"),       v8::Number::New(isolate, (double) info->_journalfileSize));
 
   // compactors info
   v8::Handle<v8::Object> cs = v8::Object::New(isolate);
 
-  result->Set(TRI_V8_SYMBOL("compactors"), cs);
-  cs->Set(TRI_V8_SYMBOL("count"),          v8::Number::New(isolate, (double) info->_numberCompactorfiles));
-  cs->Set(TRI_V8_SYMBOL("fileSize"),       v8::Number::New(isolate, (double) info->_compactorfileSize));
+  result->Set(TRI_V8_ASCII_STRING("compactors"), cs);
+  cs->Set(TRI_V8_ASCII_STRING("count"),          v8::Number::New(isolate, (double) info->_numberCompactorfiles));
+  cs->Set(TRI_V8_ASCII_STRING("fileSize"),       v8::Number::New(isolate, (double) info->_compactorfileSize));
 
   // shapefiles info
   v8::Handle<v8::Object> sf = v8::Object::New(isolate);
 
-  result->Set(TRI_V8_SYMBOL("shapefiles"), sf);
-  sf->Set(TRI_V8_SYMBOL("count"),          v8::Number::New(isolate, (double) info->_numberShapefiles));
-  sf->Set(TRI_V8_SYMBOL("fileSize"),       v8::Number::New(isolate, (double) info->_shapefileSize));
+  result->Set(TRI_V8_ASCII_STRING("shapefiles"), sf);
+  sf->Set(TRI_V8_ASCII_STRING("count"),          v8::Number::New(isolate, (double) info->_numberShapefiles));
+  sf->Set(TRI_V8_ASCII_STRING("fileSize"),       v8::Number::New(isolate, (double) info->_shapefileSize));
 
   // shape info
   v8::Handle<v8::Object> shapes = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("shapes"),     shapes);
-  shapes->Set(TRI_V8_SYMBOL("count"),      v8::Number::New(isolate, (double) info->_numberShapes));
-  shapes->Set(TRI_V8_SYMBOL("size"),       v8::Number::New(isolate, (double) info->_sizeShapes));
+  result->Set(TRI_V8_ASCII_STRING("shapes"),     shapes);
+  shapes->Set(TRI_V8_ASCII_STRING("count"),      v8::Number::New(isolate, (double) info->_numberShapes));
+  shapes->Set(TRI_V8_ASCII_STRING("size"),       v8::Number::New(isolate, (double) info->_sizeShapes));
 
   // attributes info
   v8::Handle<v8::Object> attributes = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("attributes"), attributes);
-  attributes->Set(TRI_V8_SYMBOL("count"),  v8::Number::New(isolate, (double) info->_numberAttributes));
-  attributes->Set(TRI_V8_SYMBOL("size"),   v8::Number::New(isolate, (double) info->_sizeAttributes));
+  result->Set(TRI_V8_ASCII_STRING("attributes"), attributes);
+  attributes->Set(TRI_V8_ASCII_STRING("count"),  v8::Number::New(isolate, (double) info->_numberAttributes));
+  attributes->Set(TRI_V8_ASCII_STRING("size"),   v8::Number::New(isolate, (double) info->_sizeAttributes));
 
   v8::Handle<v8::Object> indexes = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("indexes"),    indexes);
-  indexes->Set(TRI_V8_SYMBOL("count"),     v8::Number::New(isolate, (double) info->_numberIndexes));
-  indexes->Set(TRI_V8_SYMBOL("size"),      v8::Number::New(isolate, (double) info->_sizeIndexes));
+  result->Set(TRI_V8_ASCII_STRING("indexes"),    indexes);
+  indexes->Set(TRI_V8_ASCII_STRING("count"),     v8::Number::New(isolate, (double) info->_numberIndexes));
+  indexes->Set(TRI_V8_ASCII_STRING("size"),      v8::Number::New(isolate, (double) info->_sizeIndexes));
 
-  result->Set(TRI_V8_SYMBOL("lastTick"),   V8TickId(isolate, info->_tickMax));
-  result->Set(TRI_V8_SYMBOL("uncollectedLogfileEntries"), v8::Number::New(isolate, (double) info->_uncollectedLogfileEntries));
+  result->Set(TRI_V8_ASCII_STRING("lastTick"),   V8TickId(isolate, info->_tickMax));
+  result->Set(TRI_V8_ASCII_STRING("uncollectedLogfileEntries"), v8::Number::New(isolate, (double) info->_uncollectedLogfileEntries));
 
   TRI_Free(TRI_UNKNOWN_MEM_ZONE, info);
 
@@ -2154,8 +2154,8 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
     for (size_t i = 0; i < sks.size(); ++i) {
       shardKeys->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STD_STRING(sks[i]));
     }
-    result->Set(TRI_V8_SYMBOL("shardKeys"), shardKeys);
-    result->Set(TRI_V8_SYMBOL("numberOfShards"), v8::Number::New(isolate, (*c).numberOfShards()));
+    result->Set(TRI_V8_ASCII_STRING("shardKeys"), shardKeys);
+    result->Set(TRI_V8_ASCII_STRING("numberOfShards"), v8::Number::New(isolate, (*c).numberOfShards()));
 
     if (info._keyOptions != nullptr) {
       TRI_GET_GLOBAL_STRING(KeyOptionsKey);
@@ -3777,30 +3777,30 @@ static void JS_CompletionsVocbase (const v8::FunctionCallbackInfo<v8::Value>& ar
   TRI_DestroyVectorString(&names);
 
   // add function names. these are hard coded
-  result->Set(j++, TRI_V8_SYMBOL("_changeMode()"));
-  result->Set(j++, TRI_V8_SYMBOL("_collection()"));
-  result->Set(j++, TRI_V8_SYMBOL("_collections()"));
-  result->Set(j++, TRI_V8_SYMBOL("_create()"));
-  result->Set(j++, TRI_V8_SYMBOL("_createDatabase()"));
-  result->Set(j++, TRI_V8_SYMBOL("_createDocumentCollection()"));
-  result->Set(j++, TRI_V8_SYMBOL("_createEdgeCollection()"));
-  result->Set(j++, TRI_V8_SYMBOL("_createStatement()"));
-  result->Set(j++, TRI_V8_SYMBOL("_document()"));
-  result->Set(j++, TRI_V8_SYMBOL("_drop()"));
-  result->Set(j++, TRI_V8_SYMBOL("_dropDatabase()"));
-  result->Set(j++, TRI_V8_SYMBOL("_executeTransaction()"));
-  result->Set(j++, TRI_V8_SYMBOL("_exists()"));
-  result->Set(j++, TRI_V8_SYMBOL("_id"));
-  result->Set(j++, TRI_V8_SYMBOL("_isSystem()"));
-  result->Set(j++, TRI_V8_SYMBOL("_listDatabases()"));
-  result->Set(j++, TRI_V8_SYMBOL("_name()"));
-  result->Set(j++, TRI_V8_SYMBOL("_path()"));
-  result->Set(j++, TRI_V8_SYMBOL("_query()"));
-  result->Set(j++, TRI_V8_SYMBOL("_remove()"));
-  result->Set(j++, TRI_V8_SYMBOL("_replace()"));
-  result->Set(j++, TRI_V8_SYMBOL("_update()"));
-  result->Set(j++, TRI_V8_SYMBOL("_useDatabase()"));
-  result->Set(j++, TRI_V8_SYMBOL("_version()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_changeMode()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_collection()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_collections()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_create()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_createDatabase()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_createDocumentCollection()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_createEdgeCollection()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_createStatement()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_document()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_drop()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_dropDatabase()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_executeTransaction()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_exists()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_id"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_isSystem()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_listDatabases()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_name()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_path()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_query()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_remove()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_replace()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_update()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_useDatabase()"));
+  result->Set(j++, TRI_V8_ASCII_STRING("_version()"));
 
   TRI_V8_RETURN(result);
 }
@@ -4082,7 +4082,7 @@ static void JS_VersionServer (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
-  TRI_V8_RETURN(TRI_V8_SYMBOL(TRI_VERSION));
+  TRI_V8_RETURN(TRI_V8_ASCII_STRING(TRI_VERSION));
 }
 
 // -----------------------------------------------------------------------------
@@ -4196,7 +4196,7 @@ static void JS_DatafilesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
 
   // journals
   v8::Handle<v8::Array> journals = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("journals"), journals);
+  result->Set(TRI_V8_ASCII_STRING("journals"), journals);
 
   for (size_t i = 0;  i < structure._journals._length;  ++i) {
     journals->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STRING(structure._journals._buffer[i]));
@@ -4204,7 +4204,7 @@ static void JS_DatafilesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
 
   // compactors
   v8::Handle<v8::Array> compactors = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("compactors"), compactors);
+  result->Set(TRI_V8_ASCII_STRING("compactors"), compactors);
 
   for (size_t i = 0;  i < structure._compactors._length;  ++i) {
     compactors->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STRING(structure._compactors._buffer[i]));
@@ -4212,7 +4212,7 @@ static void JS_DatafilesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
 
   // datafiles
   v8::Handle<v8::Array> datafiles = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("datafiles"), datafiles);
+  result->Set(TRI_V8_ASCII_STRING("datafiles"), datafiles);
 
   for (size_t i = 0;  i < structure._datafiles._length;  ++i) {
     datafiles->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STRING(structure._datafiles._buffer[i]));
@@ -4269,27 +4269,27 @@ static void JS_DatafileScanVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>
   // build result
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
 
-  result->Set(TRI_V8_SYMBOL("currentSize"),   v8::Number::New(isolate, scan._currentSize));
-  result->Set(TRI_V8_SYMBOL("maximalSize"),   v8::Number::New(isolate, scan._maximalSize));
-  result->Set(TRI_V8_SYMBOL("endPosition"),   v8::Number::New(isolate, scan._endPosition));
-  result->Set(TRI_V8_SYMBOL("numberMarkers"), v8::Number::New(isolate, scan._numberMarkers));
-  result->Set(TRI_V8_SYMBOL("status"),        v8::Number::New(isolate, scan._status));
-  result->Set(TRI_V8_SYMBOL("isSealed"),     v8::Boolean::New(isolate, scan._isSealed));
+  result->Set(TRI_V8_ASCII_STRING("currentSize"),   v8::Number::New(isolate, scan._currentSize));
+  result->Set(TRI_V8_ASCII_STRING("maximalSize"),   v8::Number::New(isolate, scan._maximalSize));
+  result->Set(TRI_V8_ASCII_STRING("endPosition"),   v8::Number::New(isolate, scan._endPosition));
+  result->Set(TRI_V8_ASCII_STRING("numberMarkers"), v8::Number::New(isolate, scan._numberMarkers));
+  result->Set(TRI_V8_ASCII_STRING("status"),        v8::Number::New(isolate, scan._status));
+  result->Set(TRI_V8_ASCII_STRING("isSealed"),     v8::Boolean::New(isolate, scan._isSealed));
 
   v8::Handle<v8::Array> entries = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("entries"), entries);
+  result->Set(TRI_V8_ASCII_STRING("entries"), entries);
 
   for (size_t i = 0;  i < scan._entries._length;  ++i) {
     TRI_df_scan_entry_t* entry = (TRI_df_scan_entry_t*) TRI_AtVector(&scan._entries, i);
 
     v8::Handle<v8::Object> o = v8::Object::New(isolate);
 
-    o->Set(TRI_V8_SYMBOL("position"), v8::Number::New(isolate, entry->_position));
-    o->Set(TRI_V8_SYMBOL("size"),     v8::Number::New(isolate, entry->_size));
-    o->Set(TRI_V8_SYMBOL("realSize"), v8::Number::New(isolate, entry->_realSize));
-    o->Set(TRI_V8_SYMBOL("tick"),     V8TickId(isolate, entry->_tick));
-    o->Set(TRI_V8_SYMBOL("type"),     v8::Number::New(isolate, (int) entry->_type));
-    o->Set(TRI_V8_SYMBOL("status"),   v8::Number::New(isolate, (int) entry->_status));
+    o->Set(TRI_V8_ASCII_STRING("position"), v8::Number::New(isolate, entry->_position));
+    o->Set(TRI_V8_ASCII_STRING("size"),     v8::Number::New(isolate, entry->_size));
+    o->Set(TRI_V8_ASCII_STRING("realSize"), v8::Number::New(isolate, entry->_realSize));
+    o->Set(TRI_V8_ASCII_STRING("tick"),     V8TickId(isolate, entry->_tick));
+    o->Set(TRI_V8_ASCII_STRING("type"),     v8::Number::New(isolate, (int) entry->_type));
+    o->Set(TRI_V8_ASCII_STRING("status"),   v8::Number::New(isolate, (int) entry->_status));
 
     entries->Set(v8::Number::New(isolate, (uint32_t) i), o);
   }
@@ -4313,58 +4313,58 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
                            v8::Isolate* isolate,
                            v8::Handle<v8::ObjectTemplate>  ArangoDBNS){
 
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_changeMode"), JS_ChangeOperationModeVocbase);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_collection"), JS_CollectionVocbase);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_collections"), JS_CollectionsVocbase);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_COMPLETIONS"), JS_CompletionsVocbase, true);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_document"), JS_DocumentVocbase);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_exists"), JS_ExistsVocbase);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_remove"), JS_RemoveVocbase);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_replace"), JS_ReplaceVocbase);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_update"), JS_UpdateVocbase);
-  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_SYMBOL("_version"), JS_VersionServer);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_changeMode"), JS_ChangeOperationModeVocbase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_collection"), JS_CollectionVocbase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_collections"), JS_CollectionsVocbase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_COMPLETIONS"), JS_CompletionsVocbase, true);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_document"), JS_DocumentVocbase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_exists"), JS_ExistsVocbase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_remove"), JS_RemoveVocbase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_replace"), JS_ReplaceVocbase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_update"), JS_UpdateVocbase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_version"), JS_VersionServer);
 
   v8::Handle<v8::ObjectTemplate> rt;
   v8::Handle<v8::FunctionTemplate> ft;
 
   ft = v8::FunctionTemplate::New(isolate);
-  ft->SetClassName(TRI_V8_SYMBOL("ArangoCollection"));
+  ft->SetClassName(TRI_V8_ASCII_STRING("ArangoCollection"));
 
   rt = ft->InstanceTemplate();
   rt->SetInternalFieldCount(3);
 
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("checkPointers"), JS_CheckPointersVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("checkPointers"), JS_CheckPointersVocbaseCol);
 #endif  
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("count"), JS_CountVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("datafiles"), JS_DatafilesVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("datafileScan"), JS_DatafileScanVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("document"), JS_DocumentVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("drop"), JS_DropVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("exists"), JS_ExistsVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("figures"), JS_FiguresVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("insert"), JS_InsertVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("load"), JS_LoadVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("name"), JS_NameVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("planId"), JS_PlanIdVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("properties"), JS_PropertiesVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("remove"), JS_RemoveVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("revision"), JS_RevisionVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("rename"), JS_RenameVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("replace"), JS_ReplaceVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("rotate"), JS_RotateVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("save"), JS_InsertVocbaseCol); // note: save is now an alias for insert
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("status"), JS_StatusVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("TRUNCATE"), JS_TruncateVocbaseCol, true);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("truncateDatafile"), JS_TruncateDatafileVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("type"), JS_TypeVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("unload"), JS_UnloadVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("update"), JS_UpdateVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("version"), JS_VersionVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("count"), JS_CountVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("datafiles"), JS_DatafilesVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("datafileScan"), JS_DatafileScanVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("document"), JS_DocumentVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("drop"), JS_DropVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("exists"), JS_ExistsVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("figures"), JS_FiguresVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("insert"), JS_InsertVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("load"), JS_LoadVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("name"), JS_NameVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("planId"), JS_PlanIdVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("properties"), JS_PropertiesVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("remove"), JS_RemoveVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("revision"), JS_RevisionVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("rename"), JS_RenameVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("replace"), JS_ReplaceVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("rotate"), JS_RotateVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("save"), JS_InsertVocbaseCol); // note: save is now an alias for insert
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("status"), JS_StatusVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("TRUNCATE"), JS_TruncateVocbaseCol, true);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("truncateDatafile"), JS_TruncateDatafileVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("type"), JS_TypeVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("unload"), JS_UnloadVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("update"), JS_UpdateVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("version"), JS_VersionVocbaseCol);
 
   TRI_InitV8indexCollection(isolate, rt);
 
   v8g->VocbaseColTempl.Reset(isolate, rt);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("ArangoCollection"), ft->GetFunction());
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoCollection"), ft->GetFunction());
 }

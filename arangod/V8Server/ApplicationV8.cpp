@@ -230,7 +230,7 @@ void ApplicationV8::V8Context::handleGlobalContextMethods () {
     TRI_ExecuteJavaScriptString(isolate,
                                 isolate->GetCurrentContext(),
                                 TRI_V8_STD_STRING(func),
-                                TRI_V8_SYMBOL("global context method"),
+                                TRI_V8_ASCII_STRING("global context method"),
                                 false);
 
     if (tryCatch.HasCaught()) {
@@ -254,8 +254,8 @@ void ApplicationV8::V8Context::handleCancelationCleanup () {
 
   TRI_ExecuteJavaScriptString(isolate,
                               isolate->GetCurrentContext(),
-                              TRI_V8_SYMBOL("require('internal').cleanupCancelation();"),
-                              TRI_V8_SYMBOL("context cleanup method"),
+                              TRI_V8_ASCII_STRING("require('internal').cleanupCancelation();"),
+                              TRI_V8_ASCII_STRING("context cleanup method"),
                               false);
 }
 
@@ -394,8 +394,8 @@ ApplicationV8::V8Context* ApplicationV8::enterContext (std::string const& name,
 
     TRI_ExecuteJavaScriptString(isolate,
                                 localContext,
-                                TRI_V8_SYMBOL("require(\"internal\").resetEngine()"),
-                                TRI_V8_SYMBOL("global context method"),
+                                TRI_V8_ASCII_STRING("require(\"internal\").resetEngine()"),
+                                TRI_V8_ASCII_STRING("global context method"),
                                 false);
   }
 
@@ -729,14 +729,14 @@ void ApplicationV8::upgradeDatabase (bool skip,
           v8::HandleScope scope(isolate);
 
           v8::Handle<v8::Object> args = v8::Object::New(isolate);
-          args->Set(TRI_V8_SYMBOL("upgrade"), v8::Boolean::New(isolate, perform));
+          args->Set(TRI_V8_ASCII_STRING("upgrade"), v8::Boolean::New(isolate, perform));
 
-          localContext->Global()->Set(TRI_V8_SYMBOL("UPGRADE_ARGS"), args);
+          localContext->Global()->Set(TRI_V8_ASCII_STRING("UPGRADE_ARGS"), args);
 
           bool ok = TRI_UpgradeDatabase(vocbase, &_startupLoader, localContext);
 
           if (! ok) {
-            if (localContext->Global()->Has(TRI_V8_SYMBOL("UPGRADE_STARTED"))) {
+            if (localContext->Global()->Has(TRI_V8_ASCII_STRING("UPGRADE_STARTED"))) {
               if (perform) {
                 LOG_FATAL_AND_EXIT(
                                    "Database '%s' upgrade failed. Please inspect the logs from the upgrade procedure",
@@ -948,7 +948,7 @@ bool ApplicationV8::prepareNamedContexts (const string& name,
         }
         else {
           if (! wfunc.IsEmpty() && wfunc->IsFunction()) {
-            TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("MAIN"), wfunc);
+            TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_ASCII_STRING("MAIN"), wfunc);
           }
           else {
             result = false;
@@ -1328,15 +1328,15 @@ bool ApplicationV8::prepareV8Instance (const string& name, size_t i, bool useAct
 
       char const* logfile = TRI_GetFilenameLogging();
       if (logfile != 0) {
-        TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("LOGFILE_PATH"),        TRI_V8_STRING(logfile));
+        TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_ASCII_STRING("LOGFILE_PATH"),        TRI_V8_STRING(logfile));
       }
       else {
-        TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_SYMBOL("LOGFILE_PATH"),        v8::Null(isolate));
+        TRI_AddGlobalVariableVocbase(isolate, localContext, TRI_V8_ASCII_STRING("LOGFILE_PATH"),        v8::Null(isolate));
       }
-      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("APP_PATH"),            TRI_V8_STD_STRING(_appPath));
-      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("DEV_APP_PATH"),        TRI_V8_STD_STRING(_devAppPath));
-      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("DEVELOPMENT_MODE"),    v8::Boolean::New(isolate, _developmentMode));
-      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_SYMBOL("FE_DEVELOPMENT_MODE"), v8::Boolean::New(isolate, _frontendDevelopmentMode));
+      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_ASCII_STRING("APP_PATH"),            TRI_V8_STD_STRING(_appPath));
+      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_ASCII_STRING("DEV_APP_PATH"),        TRI_V8_STD_STRING(_devAppPath));
+      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_ASCII_STRING("DEVELOPMENT_MODE"),    v8::Boolean::New(isolate, _developmentMode));
+      TRI_AddGlobalVariableVocbase(isolate, localContext,   TRI_V8_ASCII_STRING("FE_DEVELOPMENT_MODE"), v8::Boolean::New(isolate, _frontendDevelopmentMode));
 
       for (auto j : _definedBooleans) {
         localContext->Global()->ForceSet(TRI_V8_STD_STRING(j.first), v8::Boolean::New(isolate, j.second), v8::ReadOnly);

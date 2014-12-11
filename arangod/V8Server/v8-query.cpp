@@ -102,9 +102,9 @@ static v8::Handle<v8::Value> EmptyResult (v8::Isolate* isolate) {
   v8::EscapableHandleScope scope(isolate);
 
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("documents"), v8::Array::New(isolate));
-  result->Set(TRI_V8_SYMBOL("total"),     v8::Number::New(isolate, 0));
-  result->Set(TRI_V8_SYMBOL("count"),     v8::Number::New(isolate, 0));
+  result->Set(TRI_V8_ASCII_STRING("documents"), v8::Array::New(isolate));
+  result->Set(TRI_V8_ASCII_STRING("total"),     v8::Number::New(isolate, 0));
+  result->Set(TRI_V8_ASCII_STRING("count"),     v8::Number::New(isolate, 0));
 
   return scope.Escape<v8::Value>(result);
 }
@@ -669,7 +669,7 @@ static void ExecuteSkiplistQuery (const v8::FunctionCallbackInfo<v8::Value>& arg
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
 
   v8::Handle<v8::Array> documents = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   // .............................................................................
   // inside a read transaction
@@ -762,8 +762,8 @@ static void ExecuteSkiplistQuery (const v8::FunctionCallbackInfo<v8::Value>& arg
   // free data allocated by skiplist index result
   TRI_FreeSkiplistIterator(skiplistIterator);
 
-  result->Set(TRI_V8_SYMBOL("total"), v8::Number::New(isolate, (double) total));
-  result->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, count));
+  result->Set(TRI_V8_ASCII_STRING("total"), v8::Number::New(isolate, (double) total));
+  result->Set(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, count));
 
   if (error) {
     TRI_V8_EXCEPTION_MEMORY();
@@ -1066,7 +1066,7 @@ static void JS_AllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   v8::Handle<v8::Array> documents = v8::Array::New(isolate, (int) n);
   // reserve full capacity in one go
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   for (size_t i = 0; i < n; ++i) {
     v8::Handle<v8::Value> doc = WRAP_SHAPED_JSON(trx, col->_cid, docs[i].getDataPtr());
@@ -1079,8 +1079,8 @@ static void JS_AllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
 
-  result->Set(TRI_V8_SYMBOL("total"), v8::Number::New(isolate, total));
-  result->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, count));
+  result->Set(TRI_V8_ASCII_STRING("total"), v8::Number::New(isolate, total));
+  result->Set(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, count));
  
   TRI_V8_RETURN(result);
 }
@@ -1142,7 +1142,7 @@ static void JS_NthQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   v8::Handle<v8::Array> documents = v8::Array::New(isolate, (int) n);
   // reserve full capacity in one go
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   for (size_t i = 0; i < n; ++i) {
     v8::Handle<v8::Value> doc = WRAP_SHAPED_JSON(trx, col->_cid, docs[i].getDataPtr());
@@ -1155,8 +1155,8 @@ static void JS_NthQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
 
-  result->Set(TRI_V8_SYMBOL("total"), v8::Number::New(isolate, total));
-  result->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, count));
+  result->Set(TRI_V8_ASCII_STRING("total"), v8::Number::New(isolate, total));
+  result->Set(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, count));
 
   TRI_V8_RETURN(result);
 }
@@ -1218,15 +1218,15 @@ static void JS_Nth2Query (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   v8::Handle<v8::Array> documents = v8::Array::New(isolate, (int) n);
   // reserve full capacity in one go
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   for (size_t i = 0; i < n; ++i) {
     char const* key = TRI_EXTRACT_MARKER_KEY(static_cast<TRI_df_marker_t const*>(docs[i].getDataPtr()));
     documents->Set(v8::Number::New(isolate, count++), TRI_V8_STRING(key));
   }
 
-  result->Set(TRI_V8_SYMBOL("total"), v8::Number::New(isolate, total));
-  result->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, count));
+  result->Set(TRI_V8_ASCII_STRING("total"), v8::Number::New(isolate, total));
+  result->Set(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, count));
 
   TRI_V8_RETURN(result);
 }
@@ -1314,7 +1314,7 @@ static void JS_OffsetQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   v8::Handle<v8::Array> documents = v8::Array::New(isolate, (int) n);
   // reserve full capacity in one go
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   for (size_t i = 0; i < n; ++i) {
     v8::Handle<v8::Value> document = WRAP_SHAPED_JSON(trx, col->_cid, docs[i].getDataPtr());
@@ -1327,9 +1327,9 @@ static void JS_OffsetQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
 
-  result->Set(TRI_V8_SYMBOL("total"), v8::Number::New(isolate, total));
-  result->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, count));
-  result->Set(TRI_V8_SYMBOL("skip"), v8::Number::New(isolate, internalSkip));
+  result->Set(TRI_V8_ASCII_STRING("total"), v8::Number::New(isolate, total));
+  result->Set(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, count));
+  result->Set(TRI_V8_ASCII_STRING("skip"), v8::Number::New(isolate, internalSkip));
 
   TRI_V8_RETURN(result);
 }
@@ -1463,7 +1463,7 @@ static void JS_ByExampleQuery (const v8::FunctionCallbackInfo<v8::Value>& args) 
   // setup result
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   v8::Handle<v8::Array> documents = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   // ...........................................................................
   // inside a read transaction
@@ -1514,8 +1514,8 @@ static void JS_ByExampleQuery (const v8::FunctionCallbackInfo<v8::Value>& args) 
   }
 
 
-  result->Set(TRI_V8_SYMBOL("total"), v8::Integer::New(isolate, (int32_t) total));
-  result->Set(TRI_V8_SYMBOL("count"), v8::Integer::New(isolate, (int32_t) count));
+  result->Set(TRI_V8_ASCII_STRING("total"), v8::Integer::New(isolate, (int32_t) total));
+  result->Set(TRI_V8_ASCII_STRING("count"), v8::Integer::New(isolate, (int32_t) count));
 
   CleanupExampleObject(shaper->_memoryZone, n, pids, values);
 
@@ -1564,7 +1564,7 @@ static void ByExampleHashIndexQuery (SingleCollectionReadOnlyTransaction& trx,
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
 
   v8::Handle<v8::Array> documents = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   // extract the index
   TRI_index_t* idx = TRI_LookupIndexByHandle(isolate, trx.resolver(), collection, args[0], false);
@@ -1632,8 +1632,8 @@ static void ByExampleHashIndexQuery (SingleCollectionReadOnlyTransaction& trx,
   // free data allocated by hash index result
   TRI_DestroyVectorPointer(&list);
 
-  result->Set(TRI_V8_SYMBOL("total"), v8::Number::New(isolate, (double) total));
-  result->Set(TRI_V8_SYMBOL("count"), v8::Number::New(isolate, (double) count));
+  result->Set(TRI_V8_ASCII_STRING("total"), v8::Number::New(isolate, (double) total));
+  result->Set(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, (double) count));
 
   if (error) {
     TRI_V8_EXCEPTION_MEMORY();
@@ -1885,8 +1885,8 @@ static void JS_ChecksumCollection (const v8::FunctionCallbackInfo<v8::Value>& ar
   // .............................................................................
 
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("checksum"), v8::Number::New(isolate, helper._checksum));
-  result->Set(TRI_V8_SYMBOL("revision"), TRI_V8_STD_STRING(rid));
+  result->Set(TRI_V8_ASCII_STRING("checksum"), v8::Number::New(isolate, helper._checksum));
+  result->Set(TRI_V8_ASCII_STRING("revision"), TRI_V8_STD_STRING(rid));
 
   TRI_V8_RETURN(result);
 }
@@ -2096,7 +2096,7 @@ static void FulltextQuery (SingleCollectionReadOnlyTransaction& trx,
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
 
   v8::Handle<v8::Array> documents = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   bool error = false;
 
@@ -2306,10 +2306,10 @@ static void NearQuery (SingleCollectionReadOnlyTransaction& trx,
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
 
   v8::Handle<v8::Array> documents = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   v8::Handle<v8::Array> distances = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("distances"), distances);
+  result->Set(TRI_V8_ASCII_STRING("distances"), distances);
 
   GeoCoordinates* cors = TRI_NearestGeoIndex(idx, latitude, longitude, limit);
 
@@ -2433,10 +2433,10 @@ static void WithinQuery (SingleCollectionReadOnlyTransaction& trx,
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
 
   v8::Handle<v8::Array> documents = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("documents"), documents);
+  result->Set(TRI_V8_ASCII_STRING("documents"), documents);
 
   v8::Handle<v8::Array> distances = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("distances"), distances);
+  result->Set(TRI_V8_ASCII_STRING("distances"), distances);
 
   GeoCoordinates* cors = TRI_WithinGeoIndex(idx, latitude, longitude, radius);
 
@@ -2517,30 +2517,30 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   // generate the TRI_vocbase_col_t template
   // .............................................................................
 
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("ALL"), JS_AllQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("ANY"), JS_AnyQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("BY_CONDITION_SKIPLIST"), JS_ByConditionSkiplist, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("BY_EXAMPLE"), JS_ByExampleQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("BY_EXAMPLE_HASH"), JS_ByExampleHashIndex, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("BY_EXAMPLE_SKIPLIST"), JS_ByExampleSkiplist, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("checksum"), JS_ChecksumCollection);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("EDGES"), JS_EdgesQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("FIRST"), JS_FirstQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("FULLTEXT"), JS_FulltextQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("INEDGES"), JS_InEdgesQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("LAST"), JS_LastQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("NEAR"), JS_NearQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("ALL"), JS_AllQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("ANY"), JS_AnyQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("BY_CONDITION_SKIPLIST"), JS_ByConditionSkiplist, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("BY_EXAMPLE"), JS_ByExampleQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("BY_EXAMPLE_HASH"), JS_ByExampleHashIndex, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("BY_EXAMPLE_SKIPLIST"), JS_ByExampleSkiplist, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("checksum"), JS_ChecksumCollection);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("EDGES"), JS_EdgesQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("FIRST"), JS_FirstQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("FULLTEXT"), JS_FulltextQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("INEDGES"), JS_InEdgesQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("LAST"), JS_LastQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NEAR"), JS_NearQuery, true);
 
   // internal method. not intended to be used by end-users
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("NTH"), JS_NthQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("NTH2"), JS_Nth2Query, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("NTH3"), JS_Nth3Query, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NTH"), JS_NthQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NTH2"), JS_Nth2Query, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NTH3"), JS_Nth3Query, true);
 
   // internal method. not intended to be used by end-users
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("OFFSET"), JS_OffsetQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("OFFSET"), JS_OffsetQuery, true);
 
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("OUTEDGES"), JS_OutEdgesQuery, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_SYMBOL("WITHIN"), JS_WithinQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("OUTEDGES"), JS_OutEdgesQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("WITHIN"), JS_WithinQuery, true);
 }
 
 // -----------------------------------------------------------------------------

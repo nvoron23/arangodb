@@ -374,8 +374,8 @@ void Executor::HandleV8Error (v8::TryCatch& tryCatch,
       // cast the exception to an object
 
       v8::Handle<v8::Array> objValue = v8::Handle<v8::Array>::Cast(tryCatch.Exception());
-      v8::Handle<v8::String> errorNum = TRI_V8_SYMBOL("errorNum");
-      v8::Handle<v8::String> errorMessage = TRI_V8_SYMBOL("errorMessage");
+      v8::Handle<v8::String> errorNum = TRI_V8_ASCII_STRING("errorNum");
+      v8::Handle<v8::String> errorMessage = TRI_V8_ASCII_STRING("errorMessage");
         
       if (objValue->HasOwnProperty(errorNum) && 
           objValue->HasOwnProperty(errorMessage)) {
@@ -417,7 +417,7 @@ v8::Handle<v8::Value> Executor::compileExpression () {
   ISOLATE;
 
   v8::Handle<v8::Script> compiled = v8::Script::Compile(TRI_V8_STD_STRING((*_buffer)),
-                                                        TRI_V8_SYMBOL("--script--"));
+                                                        TRI_V8_ASCII_STRING("--script--"));
   
   if (compiled.IsEmpty()) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to compile v8 expression");

@@ -821,7 +821,7 @@ void TRI_InitV8ShapedJson (v8::Isolate *isolate,
   v8::Handle<v8::FunctionTemplate> ft;
 
   ft = v8::FunctionTemplate::New(isolate);
-  ft->SetClassName(TRI_V8_SYMBOL("ShapedJson"));
+  ft->SetClassName(TRI_V8_ASCII_STRING("ShapedJson"));
 
   rt = ft->InstanceTemplate();
   rt->SetInternalFieldCount(3);
@@ -845,6 +845,6 @@ void TRI_InitV8ShapedJson (v8::Isolate *isolate,
                                );
 
   v8g->ShapedJsonTempl.Reset(isolate, rt);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("ShapedJson"), ft->GetFunction());
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("ShapedJson"), ft->GetFunction());
 }
 

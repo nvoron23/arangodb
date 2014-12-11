@@ -225,7 +225,7 @@ void V8Completer::getAlternatives(char const * text, vector<string> & result) {
 
   // compute all possible completions
   v8::Handle<v8::Array> properties;
-  v8::Handle<v8::String> cpl = TRI_V8_SYMBOL("_COMPLETIONS");
+  v8::Handle<v8::String> cpl = TRI_V8_ASCII_STRING("_COMPLETIONS");
 
   if (current->HasOwnProperty(cpl)) {
     v8::Handle<v8::Value> funcVal = current->Get(cpl);

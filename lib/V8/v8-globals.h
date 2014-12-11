@@ -33,7 +33,6 @@
 #include "Basics/Common.h"
 
 #include <v8.h>
-#include <string>
 // -----------------------------------------------------------------------------
 // --SECTION--                                              forward declarations
 // -----------------------------------------------------------------------------
@@ -65,8 +64,8 @@ static const uint32_t V8DataSlot = 0;
 /// @param name local string constant to source
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_SYMBOL(name)                                             \
-  v8::String::NewFromUtf8(isolate, name, v8::String::kNormalString, (int) strlen(name))
+#define TRI_V8_ASCII_STRING(name)                                             \
+  v8::String::NewFromOneByte(isolate, (const uint8_t*) name, v8::String::kNormalString, (int) strlen(name))
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for creating a v8 string for the specified string
@@ -92,7 +91,7 @@ static const uint32_t V8DataSlot = 0;
 ///   implicites isolate available.
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_SYMBOL_UTF16(name, length)                                      \
+#define TRI_V8_STRING_UTF16(name, length)                               \
   v8::String::NewFromTwoByte(isolate, name, v8::String::kNormalString, length)
 
 

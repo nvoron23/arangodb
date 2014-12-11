@@ -58,19 +58,19 @@ static void JS_StateLoggerReplication (const v8::FunctionCallbackInfo<v8::Value>
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
 
   v8::Handle<v8::Object> state = v8::Object::New(isolate);
-  state->Set(TRI_V8_SYMBOL("running"),     v8::True(isolate));
-  state->Set(TRI_V8_SYMBOL("lastLogTick"), V8TickId(isolate, s.lastTick));
-  state->Set(TRI_V8_SYMBOL("totalEvents"), v8::Number::New(isolate, (double) s.numEvents));
-  state->Set(TRI_V8_SYMBOL("time"),        TRI_V8_STD_STRING(s.timeString));
-  result->Set(TRI_V8_SYMBOL("state"),      state);
+  state->Set(TRI_V8_ASCII_STRING("running"),     v8::True(isolate));
+  state->Set(TRI_V8_ASCII_STRING("lastLogTick"), V8TickId(isolate, s.lastTick));
+  state->Set(TRI_V8_ASCII_STRING("totalEvents"), v8::Number::New(isolate, (double) s.numEvents));
+  state->Set(TRI_V8_ASCII_STRING("time"),        TRI_V8_STD_STRING(s.timeString));
+  result->Set(TRI_V8_ASCII_STRING("state"),      state);
 
   v8::Handle<v8::Object> server = v8::Object::New(isolate);
-  server->Set(TRI_V8_SYMBOL("version"),  TRI_V8_SYMBOL(TRI_VERSION));
-  server->Set(TRI_V8_SYMBOL("serverId"), TRI_V8_STD_STRING(StringUtils::itoa(TRI_GetIdServer()))); /// TODO
-  result->Set(TRI_V8_SYMBOL("server"), server);
+  server->Set(TRI_V8_ASCII_STRING("version"),  TRI_V8_ASCII_STRING(TRI_VERSION));
+  server->Set(TRI_V8_ASCII_STRING("serverId"), TRI_V8_STD_STRING(StringUtils::itoa(TRI_GetIdServer()))); /// TODO
+  result->Set(TRI_V8_ASCII_STRING("server"), server);
   
   v8::Handle<v8::Object> clients = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("clients"), clients);
+  result->Set(TRI_V8_ASCII_STRING("clients"), clients);
 
   TRI_V8_RETURN(result);
 }
@@ -86,10 +86,10 @@ static void JS_ConfigureLoggerReplication (const v8::FunctionCallbackInfo<v8::Va
   // the replication logger is actually non-existing in ArangoDB 2.2 and higher
   // as there is the WAL. To be downwards-compatible, we'll return dummy values
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("autoStart"),        v8::True(isolate));
-  result->Set(TRI_V8_SYMBOL("logRemoteChanges"), v8::True(isolate));
-  result->Set(TRI_V8_SYMBOL("maxEvents"),        v8::Number::New(isolate, 0));
-  result->Set(TRI_V8_SYMBOL("maxEventsSize"),    v8::Number::New(isolate, 0));
+  result->Set(TRI_V8_ASCII_STRING("autoStart"),        v8::True(isolate));
+  result->Set(TRI_V8_ASCII_STRING("logRemoteChanges"), v8::True(isolate));
+  result->Set(TRI_V8_ASCII_STRING("maxEvents"),        v8::Number::New(isolate, 0));
+  result->Set(TRI_V8_ASCII_STRING("maxEventsSize"),    v8::Number::New(isolate, 0));
 
   TRI_V8_RETURN(result);
 }
@@ -158,31 +158,31 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
   v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(args[0]);
 
   string endpoint;
-  if (object->Has(TRI_V8_SYMBOL("endpoint"))) {
-    endpoint = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("endpoint")));
+  if (object->Has(TRI_V8_ASCII_STRING("endpoint"))) {
+    endpoint = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("endpoint")));
   }
 
   string database;
-  if (object->Has(TRI_V8_SYMBOL("database"))) {
-    database = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("database")));
+  if (object->Has(TRI_V8_ASCII_STRING("database"))) {
+    database = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("database")));
   }
   else {
     database = string(vocbase->_name);
   }
 
   string username;
-  if (object->Has(TRI_V8_SYMBOL("username"))) {
-    username = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("username")));
+  if (object->Has(TRI_V8_ASCII_STRING("username"))) {
+    username = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("username")));
   }
 
   string password;
-  if (object->Has(TRI_V8_SYMBOL("password"))) {
-    password = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("password")));
+  if (object->Has(TRI_V8_ASCII_STRING("password"))) {
+    password = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("password")));
   }
 
   std::unordered_map<std::string, bool> restrictCollections;
-  if (object->Has(TRI_V8_SYMBOL("restrictCollections")) && object->Get(TRI_V8_SYMBOL("restrictCollections"))->IsArray()) {
-    v8::Handle<v8::Array> a = v8::Handle<v8::Array>::Cast(object->Get(TRI_V8_SYMBOL("restrictCollections")));
+  if (object->Has(TRI_V8_ASCII_STRING("restrictCollections")) && object->Get(TRI_V8_ASCII_STRING("restrictCollections"))->IsArray()) {
+    v8::Handle<v8::Array> a = v8::Handle<v8::Array>::Cast(object->Get(TRI_V8_ASCII_STRING("restrictCollections")));
 
     const uint32_t n = a->Length();
 
@@ -196,13 +196,13 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
   }
 
   std::string restrictType;
-  if (object->Has(TRI_V8_SYMBOL("restrictType"))) {
-    restrictType = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("restrictType")));
+  if (object->Has(TRI_V8_ASCII_STRING("restrictType"))) {
+    restrictType = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("restrictType")));
   }
 
   bool verbose = true;
-  if (object->Has(TRI_V8_SYMBOL("verbose"))) {
-    verbose = TRI_ObjectToBoolean(object->Get(TRI_V8_SYMBOL("verbose")));
+  if (object->Has(TRI_V8_ASCII_STRING("verbose"))) {
+    verbose = TRI_ObjectToBoolean(object->Get(TRI_V8_ASCII_STRING("verbose")));
   }
 
   if (endpoint.empty()) {
@@ -222,15 +222,15 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
   config._username = TRI_DuplicateString2Z(TRI_CORE_MEM_ZONE, username.c_str(), username.size());
   config._password = TRI_DuplicateString2Z(TRI_CORE_MEM_ZONE, password.c_str(), password.size());
 
-  if (object->Has(TRI_V8_SYMBOL("chunkSize"))) {
-    if (object->Get(TRI_V8_SYMBOL("chunkSize"))->IsNumber()) {
-      config._chunkSize = TRI_ObjectToUInt64(object->Get(TRI_V8_SYMBOL("chunkSize")), true);
+  if (object->Has(TRI_V8_ASCII_STRING("chunkSize"))) {
+    if (object->Get(TRI_V8_ASCII_STRING("chunkSize"))->IsNumber()) {
+      config._chunkSize = TRI_ObjectToUInt64(object->Get(TRI_V8_ASCII_STRING("chunkSize")), true);
     }
   }
  
-  if (object->Has(TRI_V8_SYMBOL("includeSystem"))) {
-    if (object->Get(TRI_V8_SYMBOL("includeSystem"))->IsBoolean()) {
-      config._includeSystem = TRI_ObjectToBoolean(object->Get(TRI_V8_SYMBOL("includeSystem")));
+  if (object->Has(TRI_V8_ASCII_STRING("includeSystem"))) {
+    if (object->Get(TRI_V8_ASCII_STRING("includeSystem"))->IsBoolean()) {
+      config._includeSystem = TRI_ObjectToBoolean(object->Get(TRI_V8_ASCII_STRING("includeSystem")));
     }
   }
 
@@ -244,7 +244,7 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
   try {
     res = syncer.run(errorMsg);
 
-    result->Set(TRI_V8_SYMBOL("lastLogTick"), V8TickId(isolate, syncer.getLastLogTick()));
+    result->Set(TRI_V8_ASCII_STRING("lastLogTick"), V8TickId(isolate, syncer.getLastLogTick()));
 
     map<TRI_voc_cid_t, string>::const_iterator it;
     map<TRI_voc_cid_t, string> const& c = syncer.getProcessedCollections();
@@ -255,13 +255,13 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
       const string cidString = StringUtils::itoa((*it).first);
 
       v8::Handle<v8::Object> ci = v8::Object::New(isolate);
-      ci->Set(TRI_V8_SYMBOL("id"),   TRI_V8_STD_STRING(cidString));
-      ci->Set(TRI_V8_SYMBOL("name"), TRI_V8_STD_STRING((*it).second));
+      ci->Set(TRI_V8_ASCII_STRING("id"),   TRI_V8_STD_STRING(cidString));
+      ci->Set(TRI_V8_ASCII_STRING("name"), TRI_V8_STD_STRING((*it).second));
 
       collections->Set(v8::Number::New(isolate, j++), ci);
     }
 
-    result->Set(TRI_V8_SYMBOL("collections"), collections);
+    result->Set(TRI_V8_ASCII_STRING("collections"), collections);
   }
   catch (...) {
   }
@@ -345,9 +345,9 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
     // treat the argument as an object from now on
     v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(args[0]);
 
-    if (object->Has(TRI_V8_SYMBOL("endpoint"))) {
-      if (object->Get(TRI_V8_SYMBOL("endpoint"))->IsString()) {
-        string endpoint = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("endpoint")));
+    if (object->Has(TRI_V8_ASCII_STRING("endpoint"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("endpoint"))->IsString()) {
+        string endpoint = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("endpoint")));
 
         if (config._endpoint != nullptr) {
           TRI_Free(TRI_CORE_MEM_ZONE, config._endpoint);
@@ -356,9 +356,9 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("database"))) {
-      if (object->Get(TRI_V8_SYMBOL("database"))->IsString()) {
-        string database = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("database")));
+    if (object->Has(TRI_V8_ASCII_STRING("database"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("database"))->IsString()) {
+        string database = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("database")));
 
         if (config._database != nullptr) {
           TRI_Free(TRI_CORE_MEM_ZONE, config._database);
@@ -375,9 +375,9 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
 
     TRI_ASSERT(config._database != nullptr);
 
-    if (object->Has(TRI_V8_SYMBOL("username"))) {
-      if (object->Get(TRI_V8_SYMBOL("username"))->IsString()) {
-        string username = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("username")));
+    if (object->Has(TRI_V8_ASCII_STRING("username"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("username"))->IsString()) {
+        string username = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("username")));
 
         if (config._username != nullptr) {
           TRI_Free(TRI_CORE_MEM_ZONE, config._username);
@@ -386,9 +386,9 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("password"))) {
-      if (object->Get(TRI_V8_SYMBOL("password"))->IsString()) {
-        string password = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("password")));
+    if (object->Has(TRI_V8_ASCII_STRING("password"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("password"))->IsString()) {
+        string password = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("password")));
 
         if (config._password != nullptr) {
           TRI_Free(TRI_CORE_MEM_ZONE, config._password);
@@ -397,63 +397,63 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("requestTimeout"))) {
-      if (object->Get(TRI_V8_SYMBOL("requestTimeout"))->IsNumber()) {
-        config._requestTimeout = TRI_ObjectToDouble(object->Get(TRI_V8_SYMBOL("requestTimeout")));
+    if (object->Has(TRI_V8_ASCII_STRING("requestTimeout"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("requestTimeout"))->IsNumber()) {
+        config._requestTimeout = TRI_ObjectToDouble(object->Get(TRI_V8_ASCII_STRING("requestTimeout")));
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("connectTimeout"))) {
-      if (object->Get(TRI_V8_SYMBOL("connectTimeout"))->IsNumber()) {
-        config._connectTimeout = TRI_ObjectToDouble(object->Get(TRI_V8_SYMBOL("connectTimeout")));
+    if (object->Has(TRI_V8_ASCII_STRING("connectTimeout"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("connectTimeout"))->IsNumber()) {
+        config._connectTimeout = TRI_ObjectToDouble(object->Get(TRI_V8_ASCII_STRING("connectTimeout")));
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("ignoreErrors"))) {
-      if (object->Get(TRI_V8_SYMBOL("ignoreErrors"))->IsNumber()) {
-        config._ignoreErrors = TRI_ObjectToUInt64(object->Get(TRI_V8_SYMBOL("ignoreErrors")), false);
+    if (object->Has(TRI_V8_ASCII_STRING("ignoreErrors"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("ignoreErrors"))->IsNumber()) {
+        config._ignoreErrors = TRI_ObjectToUInt64(object->Get(TRI_V8_ASCII_STRING("ignoreErrors")), false);
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("maxConnectRetries"))) {
-      if (object->Get(TRI_V8_SYMBOL("maxConnectRetries"))->IsNumber()) {
-        config._maxConnectRetries = TRI_ObjectToUInt64(object->Get(TRI_V8_SYMBOL("maxConnectRetries")), false);
+    if (object->Has(TRI_V8_ASCII_STRING("maxConnectRetries"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("maxConnectRetries"))->IsNumber()) {
+        config._maxConnectRetries = TRI_ObjectToUInt64(object->Get(TRI_V8_ASCII_STRING("maxConnectRetries")), false);
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("sslProtocol"))) {
-      if (object->Get(TRI_V8_SYMBOL("sslProtocol"))->IsNumber()) {
-        config._sslProtocol = (uint32_t) TRI_ObjectToUInt64(object->Get(TRI_V8_SYMBOL("sslProtocol")), false);
+    if (object->Has(TRI_V8_ASCII_STRING("sslProtocol"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("sslProtocol"))->IsNumber()) {
+        config._sslProtocol = (uint32_t) TRI_ObjectToUInt64(object->Get(TRI_V8_ASCII_STRING("sslProtocol")), false);
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("chunkSize"))) {
-      if (object->Get(TRI_V8_SYMBOL("chunkSize"))->IsNumber()) {
-        config._chunkSize = TRI_ObjectToUInt64(object->Get(TRI_V8_SYMBOL("chunkSize")), true);
+    if (object->Has(TRI_V8_ASCII_STRING("chunkSize"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("chunkSize"))->IsNumber()) {
+        config._chunkSize = TRI_ObjectToUInt64(object->Get(TRI_V8_ASCII_STRING("chunkSize")), true);
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("autoStart"))) {
-      if (object->Get(TRI_V8_SYMBOL("autoStart"))->IsBoolean()) {
-        config._autoStart = TRI_ObjectToBoolean(object->Get(TRI_V8_SYMBOL("autoStart")));
+    if (object->Has(TRI_V8_ASCII_STRING("autoStart"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("autoStart"))->IsBoolean()) {
+        config._autoStart = TRI_ObjectToBoolean(object->Get(TRI_V8_ASCII_STRING("autoStart")));
       }
     }
 
-    if (object->Has(TRI_V8_SYMBOL("adaptivePolling"))) {
-      if (object->Get(TRI_V8_SYMBOL("adaptivePolling"))->IsBoolean()) {
-        config._adaptivePolling = TRI_ObjectToBoolean(object->Get(TRI_V8_SYMBOL("adaptivePolling")));
+    if (object->Has(TRI_V8_ASCII_STRING("adaptivePolling"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("adaptivePolling"))->IsBoolean()) {
+        config._adaptivePolling = TRI_ObjectToBoolean(object->Get(TRI_V8_ASCII_STRING("adaptivePolling")));
       }
     }
     
-    if (object->Has(TRI_V8_SYMBOL("includeSystem"))) {
-      if (object->Get(TRI_V8_SYMBOL("includeSystem"))->IsBoolean()) {
-        config._includeSystem = TRI_ObjectToBoolean(object->Get(TRI_V8_SYMBOL("includeSystem")));
+    if (object->Has(TRI_V8_ASCII_STRING("includeSystem"))) {
+      if (object->Get(TRI_V8_ASCII_STRING("includeSystem"))->IsBoolean()) {
+        config._includeSystem = TRI_ObjectToBoolean(object->Get(TRI_V8_ASCII_STRING("includeSystem")));
       }
     }
   
-    if (object->Has(TRI_V8_SYMBOL("restrictCollections")) && object->Get(TRI_V8_SYMBOL("restrictCollections"))->IsArray()) {
+    if (object->Has(TRI_V8_ASCII_STRING("restrictCollections")) && object->Get(TRI_V8_ASCII_STRING("restrictCollections"))->IsArray()) {
       config._restrictCollections.clear();
-      v8::Handle<v8::Array> a = v8::Handle<v8::Array>::Cast(object->Get(TRI_V8_SYMBOL("restrictCollections")));
+      v8::Handle<v8::Array> a = v8::Handle<v8::Array>::Cast(object->Get(TRI_V8_ASCII_STRING("restrictCollections")));
 
       uint32_t const n = a->Length();
 
@@ -466,8 +466,8 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
       }
     }
     
-    if (object->Has(TRI_V8_SYMBOL("restrictType"))) {
-      config._restrictType = TRI_ObjectToString(object->Get(TRI_V8_SYMBOL("restrictType")));
+    if (object->Has(TRI_V8_ASCII_STRING("restrictType"))) {
+      config._restrictType = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("restrictType")));
     }
   
     if ((config._restrictType.empty() && ! config._restrictCollections.empty()) ||
@@ -646,16 +646,16 @@ void TRI_InitV8replication (v8::Isolate* isolate,
                             TRI_v8_global_t* v8g){
 
   // replication functions. not intended to be used by end users
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_LOGGER_STATE"), JS_StateLoggerReplication, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_LOGGER_CONFIGURE"), JS_ConfigureLoggerReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_LOGGER_STATE"), JS_StateLoggerReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_LOGGER_CONFIGURE"), JS_ConfigureLoggerReplication, true);
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_LOGGER_LAST"), JS_LastLoggerReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_LOGGER_LAST"), JS_LastLoggerReplication, true);
 #endif
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_SYNCHRONISE"), JS_SynchroniseReplication, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_SERVER_ID"), JS_ServerIdReplication, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_APPLIER_CONFIGURE"), JS_ConfigureApplierReplication, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_APPLIER_START"), JS_StartApplierReplication, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_APPLIER_SHUTDOWN"), JS_ShutdownApplierReplication, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_APPLIER_STATE"), JS_StateApplierReplication, true);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("REPLICATION_APPLIER_FORGET"), JS_ForgetApplierReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_SYNCHRONISE"), JS_SynchroniseReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_SERVER_ID"), JS_ServerIdReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_APPLIER_CONFIGURE"), JS_ConfigureApplierReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_APPLIER_START"), JS_StartApplierReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_APPLIER_SHUTDOWN"), JS_ShutdownApplierReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_APPLIER_STATE"), JS_StateApplierReplication, true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("REPLICATION_APPLIER_FORGET"), JS_ForgetApplierReplication, true);
 }

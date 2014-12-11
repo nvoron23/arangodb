@@ -138,8 +138,8 @@ static void JS_ProcessCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::Handle<v8::Function> cb = v8::Handle<v8::Function>::Cast(args[1]);
 
   // extract the options
-  v8::Handle<v8::String> separatorKey = TRI_V8_SYMBOL("separator");
-  v8::Handle<v8::String> quoteKey = TRI_V8_SYMBOL("quote");
+  v8::Handle<v8::String> separatorKey = TRI_V8_ASCII_STRING("separator");
+  v8::Handle<v8::String> quoteKey = TRI_V8_ASCII_STRING("quote");
 
   string separator = ",";
   string quote = "\"";
@@ -329,8 +329,8 @@ void TRI_InitV8Shell (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
   // create the global functions
   // .............................................................................
 
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_PROCESS_CSV_FILE"), JS_ProcessCsvFile);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("SYS_PROCESS_JSON_FILE"), JS_ProcessJsonFile);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_PROCESS_CSV_FILE"), JS_ProcessCsvFile);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_PROCESS_JSON_FILE"), JS_ProcessJsonFile);
 
   bool isTty = (isatty(STDOUT_FILENO) != 0);
   // on Linux, isatty() == 0 may also indicate an error. we can ignore this safely
@@ -343,83 +343,83 @@ void TRI_InitV8Shell (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
 
   v8::Handle<v8::Object> colors = v8::Object::New(isolate);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_RED"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_RED) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_RED"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_RED) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BOLD_RED"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BOLD_RED) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BOLD_RED"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BOLD_RED) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_GREEN"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_GREEN) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_GREEN"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_GREEN) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BOLD_GREEN"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BOLD_GREEN) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BOLD_GREEN"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BOLD_GREEN) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BLUE"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BLUE) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BLUE"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BLUE) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BOLD_BLUE"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BOLD_BLUE) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BOLD_BLUE"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BOLD_BLUE) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_YELLOW"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_YELLOW) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_YELLOW"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_YELLOW) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BOLD_YELLOW"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BOLD_YELLOW) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BOLD_YELLOW"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BOLD_YELLOW) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_WHITE"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_WHITE) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_WHITE"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_WHITE) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BOLD_WHITE"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BOLD_WHITE) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BOLD_WHITE"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BOLD_WHITE) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_CYAN"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_CYAN) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_CYAN"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_CYAN) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BOLD_CYAN"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BOLD_CYAN) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BOLD_CYAN"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BOLD_CYAN) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_MAGENTA"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_MAGENTA) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_MAGENTA"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_MAGENTA) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BOLD_MAGENTA"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BOLD_MAGENTA) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BOLD_MAGENTA"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BOLD_MAGENTA) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BLACK"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BLACK) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BLACK"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BLACK) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BOLD_BLACK"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BOLD_BLACK) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BOLD_BLACK"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BOLD_BLACK) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BLINK"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BLINK) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BLINK"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BLINK) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_BRIGHT"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_BRIGHT) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_BRIGHT"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_BRIGHT) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  colors->ForceSet(TRI_V8_SYMBOL("COLOR_RESET"),
-                   isTty ? TRI_V8_SYMBOL(TRI_SHELL_COLOR_RESET) : v8::String::Empty(isolate),
+  colors->ForceSet(TRI_V8_ASCII_STRING("COLOR_RESET"),
+                   isTty ? TRI_V8_ASCII_STRING(TRI_SHELL_COLOR_RESET) : v8::String::Empty(isolate),
                    v8::ReadOnly);
 
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("COLORS"), colors);
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("COLORS"), colors);
 }
 
 // -----------------------------------------------------------------------------

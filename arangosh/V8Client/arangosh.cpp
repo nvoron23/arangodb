@@ -292,8 +292,8 @@ static void JS_ImportCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   // extract the options
-  v8::Handle<v8::String> separatorKey = TRI_V8_SYMBOL("separator");
-  v8::Handle<v8::String> quoteKey = TRI_V8_SYMBOL("quote");
+  v8::Handle<v8::String> separatorKey = TRI_V8_ASCII_STRING("separator");
+  v8::Handle<v8::String> quoteKey = TRI_V8_ASCII_STRING("quote");
 
   string separator = ",";
   string quote = "\"";
@@ -329,9 +329,9 @@ static void JS_ImportCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (ih.importDelimited(collectionName, fileName, ImportHelper::CSV)) {
     v8::Handle<v8::Object> result = v8::Object::New(isolate);
-    result->Set(TRI_V8_SYMBOL("lines"),   v8::Integer::New(isolate, (int32_t) ih.getReadLines()));
-    result->Set(TRI_V8_SYMBOL("created"), v8::Integer::New(isolate, (int32_t) ih.getImportedLines()));
-    result->Set(TRI_V8_SYMBOL("errors"),  v8::Integer::New(isolate, (int32_t) ih.getErrorLines()));
+    result->Set(TRI_V8_ASCII_STRING("lines"),   v8::Integer::New(isolate, (int32_t) ih.getReadLines()));
+    result->Set(TRI_V8_ASCII_STRING("created"), v8::Integer::New(isolate, (int32_t) ih.getImportedLines()));
+    result->Set(TRI_V8_ASCII_STRING("errors"),  v8::Integer::New(isolate, (int32_t) ih.getErrorLines()));
     TRI_V8_RETURN(result);
   }
 
@@ -377,9 +377,9 @@ static void JS_ImportJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
   if (ih.importJson(collectionName, fileName)) {
     v8::Handle<v8::Object> result = v8::Object::New(isolate);
-    result->Set(TRI_V8_SYMBOL("lines"),   v8::Integer::New(isolate, (int32_t) ih.getReadLines()));
-    result->Set(TRI_V8_SYMBOL("created"), v8::Integer::New(isolate, (int32_t) ih.getImportedLines()));
-    result->Set(TRI_V8_SYMBOL("errors"),  v8::Integer::New(isolate, (int32_t) ih.getErrorLines()));
+    result->Set(TRI_V8_ASCII_STRING("lines"),   v8::Integer::New(isolate, (int32_t) ih.getReadLines()));
+    result->Set(TRI_V8_ASCII_STRING("created"), v8::Integer::New(isolate, (int32_t) ih.getImportedLines()));
+    result->Set(TRI_V8_ASCII_STRING("errors"),  v8::Integer::New(isolate, (int32_t) ih.getErrorLines()));
     TRI_V8_RETURN(result);
   }
 
@@ -745,12 +745,12 @@ static void ClientConnection_reconnect (const v8::FunctionCallbackInfo<v8::Value
 
     args.Holder()->SetInternalField(SLOT_CLASS, v8::External::New(isolate, newConnection));
 
-    v8::Handle<v8::Value> db = isolate->GetCurrentContext()->Global()->Get(TRI_V8_SYMBOL("db"));
+    v8::Handle<v8::Value> db = isolate->GetCurrentContext()->Global()->Get(TRI_V8_ASCII_STRING("db"));
     if (db->IsObject()) {
       v8::Handle<v8::Object> dbObj = v8::Handle<v8::Object>::Cast(db);
 
-      if (dbObj->Has(TRI_V8_SYMBOL("_flushCache")) && dbObj->Get(TRI_V8_SYMBOL("_flushCache"))->IsFunction()) {
-        v8::Handle<v8::Function> func = v8::Handle<v8::Function>::Cast(dbObj->Get(TRI_V8_SYMBOL("_flushCache")));
+      if (dbObj->Has(TRI_V8_ASCII_STRING("_flushCache")) && dbObj->Get(TRI_V8_ASCII_STRING("_flushCache"))->IsFunction()) {
+        v8::Handle<v8::Function> func = v8::Handle<v8::Function>::Cast(dbObj->Get(TRI_V8_ASCII_STRING("_flushCache")));
 
         v8::Handle<v8::Value>* args = nullptr;
         func->Call(dbObj, 0, args);
@@ -1465,7 +1465,7 @@ static void SignalHandler (int signal) {
 
 static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, bool promptError) {
   v8::Context::Scope contextScope(context);
-  v8::Local<v8::String> name(TRI_V8_SYMBOL("(shell)"));
+  v8::Local<v8::String> name(TRI_V8_ASCII_STRING("(shell)"));
 
   Console = new V8LineEditor(context, ".arangosh.history");
   Console->open(BaseClient.autoComplete());
@@ -1615,10 +1615,10 @@ static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, boo
     v8::Handle<v8::Value> v = TRI_ExecuteJavaScriptString(isolate, context, TRI_V8_STRING(input), name, true);
 
     if (v.IsEmpty()) {
-      context->Global()->Set(TRI_V8_SYMBOL("_last"), v8::Undefined(isolate));
+      context->Global()->Set(TRI_V8_ASCII_STRING("_last"), v8::Undefined(isolate));
     }
     else {
-      context->Global()->Set(TRI_V8_SYMBOL("_last"), v);
+      context->Global()->Set(TRI_V8_ASCII_STRING("_last"), v);
     }
 
     TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, input);
@@ -1674,13 +1674,13 @@ static bool RunUnitTests (v8::Isolate* isolate, v8::Handle<v8::Context> context)
     sysTestFiles->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STD_STRING(UnitTests[i]));
   }
 
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("SYS_UNIT_TESTS"), sysTestFiles);
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_UNIT_TESTS"), sysTestFiles);
   // do not use TRI_AddGlobalVariableVocBase because it creates read-only variables!!
-  context->Global()->Set(TRI_V8_SYMBOL("SYS_UNIT_TESTS_RESULT"), v8::True(isolate));
+  context->Global()->Set(TRI_V8_ASCII_STRING("SYS_UNIT_TESTS_RESULT"), v8::True(isolate));
 
   // run tests
-  auto input = TRI_V8_SYMBOL("require(\"org/arangodb/testrunner\").runCommandLineTests();");
-  auto name  = TRI_V8_SYMBOL("(arangosh)");
+  auto input = TRI_V8_ASCII_STRING("require(\"org/arangodb/testrunner\").runCommandLineTests();");
+  auto name  = TRI_V8_ASCII_STRING("(arangosh)");
   TRI_ExecuteJavaScriptString(isolate, context, input, name, true);
 
   if (tryCatch.HasCaught()) {
@@ -1689,7 +1689,7 @@ static bool RunUnitTests (v8::Isolate* isolate, v8::Handle<v8::Context> context)
     ok = false;
   }
   else {
-    ok = TRI_ObjectToBoolean(context->Global()->Get(TRI_V8_SYMBOL("SYS_UNIT_TESTS_RESULT")));
+    ok = TRI_ObjectToBoolean(context->Global()->Get(TRI_V8_ASCII_STRING("SYS_UNIT_TESTS_RESULT")));
   }
 
   return ok;
@@ -1775,7 +1775,7 @@ static bool RunString (v8::Isolate* isolate,
   v8::Handle<v8::Value> result = TRI_ExecuteJavaScriptString(isolate, 
                                                              context,
                                                              TRI_V8_STD_STRING(script),
-                                                             TRI_V8_SYMBOL("(command-line)"),
+                                                             TRI_V8_ASCII_STRING("(command-line)"),
                                                              false);
 
   if (tryCatch.HasCaught()) {
@@ -1817,12 +1817,12 @@ static bool RunJsLint (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
     sysTestFiles->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STD_STRING(JsLint[i]));
   }
 
-  context->Global()->Set(TRI_V8_SYMBOL("SYS_UNIT_TESTS"), sysTestFiles);
-  context->Global()->Set(TRI_V8_SYMBOL("SYS_UNIT_TESTS_RESULT"), v8::True(isolate));
+  context->Global()->Set(TRI_V8_ASCII_STRING("SYS_UNIT_TESTS"), sysTestFiles);
+  context->Global()->Set(TRI_V8_ASCII_STRING("SYS_UNIT_TESTS_RESULT"), v8::True(isolate));
 
   // run tests
-  auto input = TRI_V8_SYMBOL("require(\"jslint\").runCommandLineTests({ });");
-  auto name  = TRI_V8_SYMBOL("(arangosh)");
+  auto input = TRI_V8_ASCII_STRING("require(\"jslint\").runCommandLineTests({ });");
+  auto name  = TRI_V8_ASCII_STRING("(arangosh)");
   TRI_ExecuteJavaScriptString(isolate, context, input, name, true);
 
   if (tryCatch.HasCaught()) {
@@ -1830,7 +1830,7 @@ static bool RunJsLint (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
     ok = false;
   }
   else {
-    ok = TRI_ObjectToBoolean(context->Global()->Get(TRI_V8_SYMBOL("SYS_UNIT_TESTS_RESULT")));
+    ok = TRI_ObjectToBoolean(context->Global()->Get(TRI_V8_ASCII_STRING("SYS_UNIT_TESTS_RESULT")));
   }
 
   return ok;
@@ -2073,13 +2073,13 @@ void InitCallbacks(v8::Isolate *isolate,
 
   auto context = isolate->GetCurrentContext();
   // set pretty print default: (used in print.js)
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("PRETTY_PRINT"), v8::Boolean::New(isolate, BaseClient.prettyPrint()));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("PRETTY_PRINT"), v8::Boolean::New(isolate, BaseClient.prettyPrint()));
 
   // add colors for print.js
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("COLOR_OUTPUT"), v8::Boolean::New(isolate, BaseClient.colors()));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("COLOR_OUTPUT"), v8::Boolean::New(isolate, BaseClient.colors()));
 
   // add function SYS_OUTPUT to use pager
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("SYS_OUTPUT"), v8::FunctionTemplate::New(isolate, JS_PagerOutput)->GetFunction());
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_OUTPUT"), v8::FunctionTemplate::New(isolate, JS_PagerOutput)->GetFunction());
 
   TRI_InitV8Buffer(isolate, context);
 
@@ -2092,7 +2092,7 @@ void InitCallbacks(v8::Isolate *isolate,
 
   if (useServer) {
     v8::Handle<v8::FunctionTemplate> connection_templ = v8::FunctionTemplate::New(isolate);
-    connection_templ->SetClassName(TRI_V8_SYMBOL("ArangoConnection"));
+    connection_templ->SetClassName(TRI_V8_ASCII_STRING("ArangoConnection"));
 
     v8::Handle<v8::ObjectTemplate> connection_proto = connection_templ->PrototypeTemplate();
 
@@ -2125,28 +2125,28 @@ void InitCallbacks(v8::Isolate *isolate,
     v8::Handle<v8::ObjectTemplate> connection_inst = connection_templ->InstanceTemplate();
     connection_inst->SetInternalFieldCount(2);
 
-    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("ArangoConnection"), connection_proto->NewInstance());
+    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoConnection"), connection_proto->NewInstance());
     ConnectionTempl.Reset(isolate, connection_inst);
 
     // add the client connection to the context:
-    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("SYS_ARANGO"), wrapV8ClientConnection(isolate, ClientConnection));
+    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_ARANGO"), wrapV8ClientConnection(isolate, ClientConnection));
   }
 
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("SYS_START_PAGER"),      v8::FunctionTemplate::New(isolate, JS_StartOutputPager)->GetFunction());
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("SYS_STOP_PAGER"),       v8::FunctionTemplate::New(isolate, JS_StopOutputPager)->GetFunction());
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("SYS_IMPORT_CSV_FILE"),  v8::FunctionTemplate::New(isolate, JS_ImportCsvFile)->GetFunction());
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("SYS_IMPORT_JSON_FILE"), v8::FunctionTemplate::New(isolate, JS_ImportJsonFile)->GetFunction());
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("NORMALIZE_STRING"),     v8::FunctionTemplate::New(isolate, JS_normalize_string)->GetFunction());
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("COMPARE_STRING"),       v8::FunctionTemplate::New(isolate, JS_compare_string)->GetFunction());
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_START_PAGER"),      v8::FunctionTemplate::New(isolate, JS_StartOutputPager)->GetFunction());
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_STOP_PAGER"),       v8::FunctionTemplate::New(isolate, JS_StopOutputPager)->GetFunction());
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_IMPORT_CSV_FILE"),  v8::FunctionTemplate::New(isolate, JS_ImportCsvFile)->GetFunction());
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("SYS_IMPORT_JSON_FILE"), v8::FunctionTemplate::New(isolate, JS_ImportJsonFile)->GetFunction());
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("NORMALIZE_STRING"),     v8::FunctionTemplate::New(isolate, JS_normalize_string)->GetFunction());
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("COMPARE_STRING"),       v8::FunctionTemplate::New(isolate, JS_compare_string)->GetFunction());
 
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("ARANGO_QUIET"),         v8::Boolean::New(isolate, BaseClient.quiet()));
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("VALGRIND"),             v8::Boolean::New(isolate, (RUNNING_ON_VALGRIND > 0)));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("ARANGO_QUIET"),         v8::Boolean::New(isolate, BaseClient.quiet()));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("VALGRIND"),             v8::Boolean::New(isolate, (RUNNING_ON_VALGRIND > 0)));
 
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("IS_EXECUTE_SCRIPT"),    v8::Boolean::New(isolate, runMode == eExecuteScript));
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("IS_EXECUTE_STRING"),    v8::Boolean::New(isolate, runMode == eExecuteString));
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("IS_CHECK_SCRIPT"),      v8::Boolean::New(isolate, runMode == eCheckScripts));
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("IS_UNIT_TESTS"),        v8::Boolean::New(isolate, runMode == eUnitTests));
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("IS_JS_LINT"),           v8::Boolean::New(isolate, runMode == eJsLint));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("IS_EXECUTE_SCRIPT"),    v8::Boolean::New(isolate, runMode == eExecuteScript));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("IS_EXECUTE_STRING"),    v8::Boolean::New(isolate, runMode == eExecuteString));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("IS_CHECK_SCRIPT"),      v8::Boolean::New(isolate, runMode == eCheckScripts));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("IS_UNIT_TESTS"),        v8::Boolean::New(isolate, runMode == eUnitTests));
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("IS_JS_LINT"),           v8::Boolean::New(isolate, runMode == eJsLint));
 
 }
 
@@ -2203,7 +2203,7 @@ int warmupEnvironment(v8::Isolate *isolate,
     p->Set(v8::Number::New(isolate, i), TRI_V8_STD_STRING(positionals[i]));
   }
 
-  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("ARGUMENTS"), p);
+  TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("ARGUMENTS"), p);
   return EXIT_SUCCESS;
 }
 

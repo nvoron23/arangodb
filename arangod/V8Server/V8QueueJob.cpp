@@ -119,7 +119,7 @@ Job::status_t V8QueueJob::work () {
 
     // get built-in Function constructor (see ECMA-262 5th edition 15.3.2)
     auto current = isolate->GetCurrentContext()->Global();
-    auto main = v8::Local<v8::Function>::Cast(current->Get(TRI_V8_SYMBOL("MAIN")));
+    auto main = v8::Local<v8::Function>::Cast(current->Get(TRI_V8_ASCII_STRING("MAIN")));
 
     if (main.IsEmpty()) {
       _v8Dealer->exitContext(context);

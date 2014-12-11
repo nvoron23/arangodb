@@ -123,7 +123,7 @@ void ConsoleThread::inner () {
   // run the shell
   std::cout << "ArangoDB JavaScript emergency console (" << rest::Version::getVerboseVersionString() << ")" << std::endl;
 
-  v8::Local<v8::String> name(TRI_V8_SYMBOL("(arango)"));
+  v8::Local<v8::String> name(TRI_V8_ASCII_STRING("(arango)"));
 
   auto localContext = v8::Local<v8::Context>::New(isolate, _context->_context);
   ///  v8::Context::Scope contextScope(localContext);
@@ -140,7 +140,7 @@ void ConsoleThread::inner () {
   TRI_ExecuteJavaScriptString(isolate,
                               localContext,
                               TRI_V8_STD_STRING(pretty),
-                              TRI_V8_SYMBOL("(internal)"),
+                              TRI_V8_ASCII_STRING("(internal)"),
                               false);
 
   V8LineEditor console(localContext, ".arangod.history");

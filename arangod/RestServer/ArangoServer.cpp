@@ -1058,13 +1058,13 @@ int ArangoServer::runUnitTests (TRI_vocbase_t* vocbase) {
       sysTestFiles->Set(v8::Number::New(isolate,(uint32_t) i), TRI_V8_STD_STRING(_unitTests[i]));
     }
 
-    localContext->Global()->Set(TRI_V8_SYMBOL("SYS_UNIT_TESTS"), sysTestFiles);
-    localContext->Global()->Set(TRI_V8_SYMBOL("SYS_UNIT_TESTS_RESULT"), v8::True(isolate));
+    localContext->Global()->Set(TRI_V8_ASCII_STRING("SYS_UNIT_TESTS"), sysTestFiles);
+    localContext->Global()->Set(TRI_V8_ASCII_STRING("SYS_UNIT_TESTS_RESULT"), v8::True(isolate));
 
-    v8::Local<v8::String> name(TRI_V8_SYMBOL("(arango)"));
+    v8::Local<v8::String> name(TRI_V8_ASCII_STRING("(arango)"));
 
     // run tests
-    auto input = TRI_V8_SYMBOL("require(\"org/arangodb/testrunner\").runCommandLineTests();");
+    auto input = TRI_V8_ASCII_STRING("require(\"org/arangodb/testrunner\").runCommandLineTests();");
     TRI_ExecuteJavaScriptString(isolate, localContext, input, name, true);
 
     if (tryCatch.HasCaught()) {
@@ -1077,7 +1077,7 @@ int ArangoServer::runUnitTests (TRI_vocbase_t* vocbase) {
       }
     }
     else {
-      ok = TRI_ObjectToBoolean(localContext->Global()->Get(TRI_V8_SYMBOL("SYS_UNIT_TESTS_RESULT")));
+      ok = TRI_ObjectToBoolean(localContext->Global()->Get(TRI_V8_ASCII_STRING("SYS_UNIT_TESTS_RESULT")));
     }
   }
 
@@ -1122,7 +1122,7 @@ int ArangoServer::runScript (TRI_vocbase_t* vocbase) {
   }
 
   // call main
-  v8::Handle<v8::String> mainFuncName = TRI_V8_SYMBOL("main");
+  v8::Handle<v8::String> mainFuncName = TRI_V8_ASCII_STRING("main");
   v8::Handle<v8::Function> main = v8::Handle<v8::Function>::Cast(localContext->Global()->Get(mainFuncName));
 
   bool ok = false;

@@ -64,10 +64,10 @@ static void CreateAgencyException (const v8::FunctionCallbackInfo<v8::Value>& ar
   v8::Handle<v8::String> errorMessage = TRI_V8_STD_STRING(errorDetails);
   v8::Handle<v8::Object> errorObject = v8::Exception::Error(errorMessage)->ToObject();
 
-  errorObject->Set(TRI_V8_SYMBOL("code"), v8::Number::New(isolate, result.httpCode()));
-  errorObject->Set(TRI_V8_SYMBOL("errorNum"), v8::Number::New(isolate, result.errorCode()));
-  errorObject->Set(TRI_V8_SYMBOL("errorMessage"), errorMessage);
-  errorObject->Set(TRI_V8_SYMBOL("error"), v8::True(isolate));
+  errorObject->Set(TRI_V8_ASCII_STRING("code"), v8::Number::New(isolate, result.httpCode()));
+  errorObject->Set(TRI_V8_ASCII_STRING("errorNum"), v8::Number::New(isolate, result.errorCode()));
+  errorObject->Set(TRI_V8_ASCII_STRING("errorMessage"), errorMessage);
+  errorObject->Set(TRI_V8_ASCII_STRING("error"), v8::True(isolate));
 
   TRI_GET_GLOBAL(ArangoErrorTempl, v8::ObjectTemplate);
   v8::Handle<v8::Value> proto = ArangoErrorTempl->NewInstance();
@@ -251,8 +251,8 @@ static void JS_GetAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
       if (json != 0) {
         v8::Handle<v8::Object> sub = v8::Object::New(isolate);
 
-        sub->Set(TRI_V8_SYMBOL("value"), TRI_ObjectJson(isolate, json));
-        sub->Set(TRI_V8_SYMBOL("index"), TRI_V8_STD_STRING(idx));
+        sub->Set(TRI_V8_ASCII_STRING("value"), TRI_ObjectJson(isolate, json));
+        sub->Set(TRI_V8_ASCII_STRING("index"), TRI_V8_STD_STRING(idx));
 
         l->Set(TRI_V8_STD_STRING(key), sub);
       }
@@ -806,27 +806,27 @@ static void JS_GetCollectionInfoClusterInfo (const v8::FunctionCallbackInfo<v8::
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   const std::string cid = triagens::basics::StringUtils::itoa(ci->id());
   const std::string& name = ci->name();
-  result->Set(TRI_V8_SYMBOL("id"),          TRI_V8_STD_STRING(cid));
-  result->Set(TRI_V8_SYMBOL("name"),        TRI_V8_STD_STRING(name));
-  result->Set(TRI_V8_SYMBOL("type"),        v8::Number::New(isolate, (int) ci->type()));
-  result->Set(TRI_V8_SYMBOL("status"),      v8::Number::New(isolate, (int) ci->status()));
+  result->Set(TRI_V8_ASCII_STRING("id"),          TRI_V8_STD_STRING(cid));
+  result->Set(TRI_V8_ASCII_STRING("name"),        TRI_V8_STD_STRING(name));
+  result->Set(TRI_V8_ASCII_STRING("type"),        v8::Number::New(isolate, (int) ci->type()));
+  result->Set(TRI_V8_ASCII_STRING("status"),      v8::Number::New(isolate, (int) ci->status()));
 
   const string statusString = ci->statusString();
-  result->Set(TRI_V8_SYMBOL("statusString"), TRI_V8_STD_STRING(statusString));
+  result->Set(TRI_V8_ASCII_STRING("statusString"), TRI_V8_STD_STRING(statusString));
 
-  result->Set(TRI_V8_SYMBOL("deleted"),     v8::Boolean::New(isolate, ci->deleted()));
-  result->Set(TRI_V8_SYMBOL("doCompact"),   v8::Boolean::New(isolate, ci->doCompact()));
-  result->Set(TRI_V8_SYMBOL("isSystem"),    v8::Boolean::New(isolate, ci->isSystem()));
-  result->Set(TRI_V8_SYMBOL("isVolatile"),  v8::Boolean::New(isolate, ci->isVolatile()));
-  result->Set(TRI_V8_SYMBOL("waitForSync"), v8::Boolean::New(isolate, ci->waitForSync()));
-  result->Set(TRI_V8_SYMBOL("journalSize"), v8::Number::New(isolate, ci->journalSize()));
+  result->Set(TRI_V8_ASCII_STRING("deleted"),     v8::Boolean::New(isolate, ci->deleted()));
+  result->Set(TRI_V8_ASCII_STRING("doCompact"),   v8::Boolean::New(isolate, ci->doCompact()));
+  result->Set(TRI_V8_ASCII_STRING("isSystem"),    v8::Boolean::New(isolate, ci->isSystem()));
+  result->Set(TRI_V8_ASCII_STRING("isVolatile"),  v8::Boolean::New(isolate, ci->isVolatile()));
+  result->Set(TRI_V8_ASCII_STRING("waitForSync"), v8::Boolean::New(isolate, ci->waitForSync()));
+  result->Set(TRI_V8_ASCII_STRING("journalSize"), v8::Number::New(isolate, ci->journalSize()));
 
   const std::vector<std::string>& sks = ci->shardKeys();
   v8::Handle<v8::Array> shardKeys = v8::Array::New(isolate, (int) sks.size());
   for (uint32_t i = 0, n = (uint32_t) sks.size(); i < n; ++i) {
     shardKeys->Set(v8::Number::New(isolate, i), TRI_V8_STD_STRING(sks[i]));
   }
-  result->Set(TRI_V8_SYMBOL("shardKeys"), shardKeys);
+  result->Set(TRI_V8_ASCII_STRING("shardKeys"), shardKeys);
 
   const std::map<std::string, std::string>& sis = ci->shardIds();
   v8::Handle<v8::Object> shardIds = v8::Object::New(isolate);
@@ -836,11 +836,11 @@ static void JS_GetCollectionInfoClusterInfo (const v8::FunctionCallbackInfo<v8::
                   TRI_V8_STD_STRING((*it).second));
     ++it;
   }
-  result->Set(TRI_V8_SYMBOL("shards"), shardIds);
+  result->Set(TRI_V8_ASCII_STRING("shards"), shardIds);
 
   // TODO: fill "indexes"
   v8::Handle<v8::Array> indexes = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("indexes"), indexes);
+  result->Set(TRI_V8_ASCII_STRING("indexes"), indexes);
   TRI_V8_RETURN(result);
 }
 
@@ -866,42 +866,42 @@ static void JS_GetCollectionInfoCurrentClusterInfo (const v8::FunctionCallbackIn
   // First some stuff from Plan for which Current does not make sense:
   const std::string cid = triagens::basics::StringUtils::itoa(ci->id());
   const std::string& name = ci->name();
-  result->Set(TRI_V8_SYMBOL("id"), TRI_V8_STD_STRING(cid));
-  result->Set(TRI_V8_SYMBOL("name"), TRI_V8_STD_STRING(name));
+  result->Set(TRI_V8_ASCII_STRING("id"), TRI_V8_STD_STRING(cid));
+  result->Set(TRI_V8_ASCII_STRING("name"), TRI_V8_STD_STRING(name));
 
   shared_ptr<CollectionInfoCurrent> cic
           = ClusterInfo::instance()->getCollectionCurrent(
                                      TRI_ObjectToString(args[0]), cid);
 
-  result->Set(TRI_V8_SYMBOL("type"), v8::Number::New(isolate, (int) ci->type()));
+  result->Set(TRI_V8_ASCII_STRING("type"), v8::Number::New(isolate, (int) ci->type()));
   // Now the Current information, if we actually got it:
   TRI_vocbase_col_status_e s = cic->status(shardID);
-  result->Set(TRI_V8_SYMBOL("status"), v8::Number::New(isolate, (int) cic->status(shardID)));
+  result->Set(TRI_V8_ASCII_STRING("status"), v8::Number::New(isolate, (int) cic->status(shardID)));
   if (s == TRI_VOC_COL_STATUS_CORRUPTED) {
     TRI_V8_RETURN(result);
   }
   const string statusString = TRI_GetStatusStringCollectionVocBase(s);
-  result->Set(TRI_V8_SYMBOL("statusString"),TRI_V8_STD_STRING(statusString));
-  result->Set(TRI_V8_SYMBOL("deleted"),     v8::Boolean::New(isolate, cic->deleted(shardID)));
-  result->Set(TRI_V8_SYMBOL("doCompact"),   v8::Boolean::New(isolate, cic->doCompact(shardID)));
-  result->Set(TRI_V8_SYMBOL("isSystem"),    v8::Boolean::New(isolate, cic->isSystem(shardID)));
-  result->Set(TRI_V8_SYMBOL("isVolatile"),  v8::Boolean::New(isolate, cic->isVolatile(shardID)));
-  result->Set(TRI_V8_SYMBOL("waitForSync"), v8::Boolean::New(isolate, cic->waitForSync(shardID)));
-  result->Set(TRI_V8_SYMBOL("journalSize"), v8::Number::New (isolate, cic->journalSize(shardID)));
+  result->Set(TRI_V8_ASCII_STRING("statusString"),TRI_V8_STD_STRING(statusString));
+  result->Set(TRI_V8_ASCII_STRING("deleted"),     v8::Boolean::New(isolate, cic->deleted(shardID)));
+  result->Set(TRI_V8_ASCII_STRING("doCompact"),   v8::Boolean::New(isolate, cic->doCompact(shardID)));
+  result->Set(TRI_V8_ASCII_STRING("isSystem"),    v8::Boolean::New(isolate, cic->isSystem(shardID)));
+  result->Set(TRI_V8_ASCII_STRING("isVolatile"),  v8::Boolean::New(isolate, cic->isVolatile(shardID)));
+  result->Set(TRI_V8_ASCII_STRING("waitForSync"), v8::Boolean::New(isolate, cic->waitForSync(shardID)));
+  result->Set(TRI_V8_ASCII_STRING("journalSize"), v8::Number::New (isolate, cic->journalSize(shardID)));
   const std::string serverID = cic->responsibleServer(shardID);
-  result->Set(TRI_V8_SYMBOL("DBServer"),    TRI_V8_STD_STRING(serverID));
+  result->Set(TRI_V8_ASCII_STRING("DBServer"),    TRI_V8_STD_STRING(serverID));
 
   // TODO: fill "indexes"
   v8::Handle<v8::Array> indexes = v8::Array::New(isolate);
-  result->Set(TRI_V8_SYMBOL("indexes"), indexes);
+  result->Set(TRI_V8_ASCII_STRING("indexes"), indexes);
 
   // Finally, report any possible error:
   bool error = cic->error(shardID);
-  result->Set(TRI_V8_SYMBOL("error"), v8::Boolean::New(isolate, error));
+  result->Set(TRI_V8_ASCII_STRING("error"), v8::Boolean::New(isolate, error));
   if (error) {
-    result->Set(TRI_V8_SYMBOL("errorNum"), v8::Number::New(isolate, cic->errorNum(shardID)));
+    result->Set(TRI_V8_ASCII_STRING("errorNum"), v8::Number::New(isolate, cic->errorNum(shardID)));
     const string errorMessage = cic->errorMessage(shardID);
-    result->Set(TRI_V8_SYMBOL("errorMessage"), TRI_V8_STD_STRING(errorMessage));
+    result->Set(TRI_V8_ASCII_STRING("errorMessage"), TRI_V8_STD_STRING(errorMessage));
   }
 
   TRI_V8_RETURN(result);
@@ -967,8 +967,8 @@ static void JS_GetResponsibleShardClusterInfo (const v8::FunctionCallbackInfo<v8
   }
 
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
-  result->Set(TRI_V8_SYMBOL("shardId"), TRI_V8_STD_STRING(shardId));
-  result->Set(TRI_V8_SYMBOL("usesDefaultShardingAttributes"), v8::Boolean::New(isolate, usesDefaultShardingAttributes));
+  result->Set(TRI_V8_ASCII_STRING("shardId"), TRI_V8_STD_STRING(shardId));
+  result->Set(TRI_V8_ASCII_STRING("usesDefaultShardingAttributes"), v8::Boolean::New(isolate, usesDefaultShardingAttributes));
 
   TRI_V8_RETURN(result);
 }
@@ -1510,10 +1510,10 @@ void Return_PrepareClusterCommResultForJS(const v8::FunctionCallbackInfo<v8::Val
   v8::Handle<v8::Object> r = v8::Object::New(isolate);
   if (0 == res) {
     TRI_GET_GLOBAL_STRING(ErrorMessageKey);
-    r->Set(ErrorMessageKey, TRI_V8_SYMBOL("out of memory"));
+    r->Set(ErrorMessageKey, TRI_V8_ASCII_STRING("out of memory"));
   } else if (res->dropped) {
     TRI_GET_GLOBAL_STRING(ErrorMessageKey);
-    r->Set(ErrorMessageKey, TRI_V8_SYMBOL("operation was dropped"));
+    r->Set(ErrorMessageKey, TRI_V8_ASCII_STRING("operation was dropped"));
   } else {
     TRI_GET_GLOBAL_STRING(ClientTransactionIDKey);
     r->Set(ClientTransactionIDKey,
@@ -1532,15 +1532,15 @@ void Return_PrepareClusterCommResultForJS(const v8::FunctionCallbackInfo<v8::Val
     r->Set(ShardIDKey, TRI_V8_STD_STRING(res->shardID));
     if (res->status == CL_COMM_SUBMITTED) {
       TRI_GET_GLOBAL_STRING(StatusKey);
-      r->Set(StatusKey, TRI_V8_SYMBOL("SUBMITTED"));
+      r->Set(StatusKey, TRI_V8_ASCII_STRING("SUBMITTED"));
     }
     else if (res->status == CL_COMM_SENDING) {
       TRI_GET_GLOBAL_STRING(StatusKey);
-      r->Set(StatusKey, TRI_V8_SYMBOL("SENDING"));
+      r->Set(StatusKey, TRI_V8_ASCII_STRING("SENDING"));
     }
     else if (res->status == CL_COMM_SENT) {
       TRI_GET_GLOBAL_STRING(StatusKey);
-      r->Set(StatusKey, TRI_V8_SYMBOL("SENT"));
+      r->Set(StatusKey, TRI_V8_ASCII_STRING("SENT"));
       // This might be the result of a synchronous request and thus
       // contain the actual response. If it is an asynchronous request
       // which has not yet been answered, the following information is
@@ -1552,62 +1552,62 @@ void Return_PrepareClusterCommResultForJS(const v8::FunctionCallbackInfo<v8::Val
         h->Set(TRI_V8_STD_STRING(i.first),
                TRI_V8_STD_STRING(i.second));
       }
-      r->Set(TRI_V8_SYMBOL("headers"), h);
+      r->Set(TRI_V8_ASCII_STRING("headers"), h);
 
       // The body:
       triagens::basics::StringBuffer& body = res->result->getBody();
       if (body.length() != 0) {
-        r->Set(TRI_V8_SYMBOL("body"), TRI_V8_STD_STRING(body));
+        r->Set(TRI_V8_ASCII_STRING("body"), TRI_V8_STD_STRING(body));
       }
     }
     else if (res->status == CL_COMM_TIMEOUT) {
       TRI_GET_GLOBAL_STRING(StatusKey);
-      r->Set(StatusKey, TRI_V8_SYMBOL("TIMEOUT"));
+      r->Set(StatusKey, TRI_V8_ASCII_STRING("TIMEOUT"));
       TRI_GET_GLOBAL_STRING(TimeoutKey);
       r->Set(TimeoutKey,v8::BooleanObject::New(true));
     }
     else if (res->status == CL_COMM_ERROR) {
       TRI_GET_GLOBAL_STRING(StatusKey);
-      r->Set(StatusKey, TRI_V8_SYMBOL("ERROR"));
+      r->Set(StatusKey, TRI_V8_ASCII_STRING("ERROR"));
 
       if (res->result && res->result->isComplete()) {
         v8::Handle<v8::Object> details = v8::Object::New(isolate);
-        details->Set(TRI_V8_SYMBOL("code"), v8::Number::New(isolate, res->result->getHttpReturnCode()));
-        details->Set(TRI_V8_SYMBOL("message"), TRI_V8_STD_STRING(res->result->getHttpReturnMessage()));
-        details->Set(TRI_V8_SYMBOL("body"), TRI_V8_STD_STRING(res->result->getBody()));
+        details->Set(TRI_V8_ASCII_STRING("code"), v8::Number::New(isolate, res->result->getHttpReturnCode()));
+        details->Set(TRI_V8_ASCII_STRING("message"), TRI_V8_STD_STRING(res->result->getHttpReturnMessage()));
+        details->Set(TRI_V8_ASCII_STRING("body"), TRI_V8_STD_STRING(res->result->getBody()));
 
-        r->Set(TRI_V8_SYMBOL("details"), details);
+        r->Set(TRI_V8_ASCII_STRING("details"), details);
         TRI_GET_GLOBAL_STRING(ErrorMessageKey);
-        r->Set(ErrorMessageKey, TRI_V8_SYMBOL("got bad HTTP response"));
+        r->Set(ErrorMessageKey, TRI_V8_ASCII_STRING("got bad HTTP response"));
       }
       else {
         TRI_GET_GLOBAL_STRING(ErrorMessageKey);
-        r->Set(ErrorMessageKey, TRI_V8_SYMBOL("got no HTTP response, DBserver seems gone"));
+        r->Set(ErrorMessageKey, TRI_V8_ASCII_STRING("got no HTTP response, DBserver seems gone"));
       }
     }
     else if (res->status == CL_COMM_DROPPED) {
       TRI_GET_GLOBAL_STRING(StatusKey);
-      r->Set(StatusKey, TRI_V8_SYMBOL("DROPPED"));
+      r->Set(StatusKey, TRI_V8_ASCII_STRING("DROPPED"));
       TRI_GET_GLOBAL_STRING(ErrorMessageKey);
-      r->Set(ErrorMessageKey, TRI_V8_SYMBOL("request dropped whilst waiting for answer"));
+      r->Set(ErrorMessageKey, TRI_V8_ASCII_STRING("request dropped whilst waiting for answer"));
     }
     else {   // Everything is OK
       TRI_ASSERT(res->status == CL_COMM_RECEIVED);
       // The headers:
       v8::Handle<v8::Object> h = v8::Object::New(isolate);
       TRI_GET_GLOBAL_STRING(StatusKey);
-      r->Set(StatusKey, TRI_V8_SYMBOL("RECEIVED"));
+      r->Set(StatusKey, TRI_V8_ASCII_STRING("RECEIVED"));
       map<string,string> headers = res->answer->headers();
       map<string,string>::iterator i;
       for (i = headers.begin(); i != headers.end(); ++i) {
         h->Set(TRI_V8_STD_STRING(i->first),
                TRI_V8_STD_STRING(i->second));
       }
-      r->Set(TRI_V8_SYMBOL("headers"), h);
+      r->Set(TRI_V8_ASCII_STRING("headers"), h);
 
       // The body:
       if (0 != res->answer->body()) {
-        r->Set(TRI_V8_SYMBOL("body"),
+        r->Set(TRI_V8_ASCII_STRING("body"),
                TRI_V8_PAIR_STRING(res->answer->body(), (int) res->answer->bodySize()));
       }
     }
@@ -1945,39 +1945,39 @@ void TRI_InitV8Cluster (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
   // ...........................................................................
 
   ft = v8::FunctionTemplate::New(isolate);
-  ft->SetClassName(TRI_V8_SYMBOL("ArangoAgency"));
+  ft->SetClassName(TRI_V8_ASCII_STRING("ArangoAgency"));
 
   rt = ft->InstanceTemplate();
   rt->SetInternalFieldCount(2);
 
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("cas"), JS_CasAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("createDirectory"), JS_CreateDirectoryAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("get"), JS_GetAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("isEnabled"), JS_IsEnabledAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("increaseVersion"), JS_IncreaseVersionAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("list"), JS_ListAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("lockRead"), JS_LockReadAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("lockWrite"), JS_LockWriteAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("remove"), JS_RemoveAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("set"), JS_SetAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("watch"), JS_WatchAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("endpoints"), JS_EndpointsAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("prefix"), JS_PrefixAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("setPrefix"), JS_SetPrefixAgency, true);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("uniqid"), JS_UniqidAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("unlockRead"), JS_UnlockReadAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("unlockWrite"), JS_UnlockWriteAgency);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("version"), JS_VersionAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("cas"), JS_CasAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("createDirectory"), JS_CreateDirectoryAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("get"), JS_GetAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("isEnabled"), JS_IsEnabledAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("increaseVersion"), JS_IncreaseVersionAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("list"), JS_ListAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("lockRead"), JS_LockReadAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("lockWrite"), JS_LockWriteAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("remove"), JS_RemoveAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("set"), JS_SetAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("watch"), JS_WatchAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("endpoints"), JS_EndpointsAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("prefix"), JS_PrefixAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("setPrefix"), JS_SetPrefixAgency, true);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("uniqid"), JS_UniqidAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("unlockRead"), JS_UnlockReadAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("unlockWrite"), JS_UnlockWriteAgency);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("version"), JS_VersionAgency);
 
   v8g->AgencyTempl.Reset(isolate, rt);
-  ft->SetClassName(TRI_V8_SYMBOL("ArangoAgencyCtor"));
+  ft->SetClassName(TRI_V8_ASCII_STRING("ArangoAgencyCtor"));
 
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("ArangoAgencyCtor"), ft->GetFunction(), true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoAgencyCtor"), ft->GetFunction(), true);
 
   // register the global object
   v8::Handle<v8::Object> aa = rt->NewInstance();
   if (! aa.IsEmpty()) {
-    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("ArangoAgency"), aa);
+    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoAgency"), aa);
   }
 
   // .............................................................................
@@ -1985,30 +1985,30 @@ void TRI_InitV8Cluster (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
   // .............................................................................
 
   ft = v8::FunctionTemplate::New(isolate);
-  ft->SetClassName(TRI_V8_SYMBOL("ArangoClusterInfo"));
+  ft->SetClassName(TRI_V8_ASCII_STRING("ArangoClusterInfo"));
 
   rt = ft->InstanceTemplate();
   rt->SetInternalFieldCount(2);
 
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("doesDatabaseExist"), JS_DoesDatabaseExistClusterInfo);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("listDatabases"), JS_ListDatabases);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("flush"), JS_FlushClusterInfo, true);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("getCollectionInfo"), JS_GetCollectionInfoClusterInfo);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("getCollectionInfoCurrent"), JS_GetCollectionInfoCurrentClusterInfo);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("getResponsibleServer"), JS_GetResponsibleServerClusterInfo);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("getResponsibleShard"), JS_GetResponsibleShardClusterInfo);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("getServerEndpoint"), JS_GetServerEndpointClusterInfo);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("getDBServers"), JS_GetDBServers);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("reloadDBServers"), JS_ReloadDBServers);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("uniqid"), JS_UniqidClusterInfo);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("doesDatabaseExist"), JS_DoesDatabaseExistClusterInfo);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("listDatabases"), JS_ListDatabases);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("flush"), JS_FlushClusterInfo, true);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getCollectionInfo"), JS_GetCollectionInfoClusterInfo);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getCollectionInfoCurrent"), JS_GetCollectionInfoCurrentClusterInfo);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getResponsibleServer"), JS_GetResponsibleServerClusterInfo);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getResponsibleShard"), JS_GetResponsibleShardClusterInfo);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getServerEndpoint"), JS_GetServerEndpointClusterInfo);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getDBServers"), JS_GetDBServers);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("reloadDBServers"), JS_ReloadDBServers);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("uniqid"), JS_UniqidClusterInfo);
 
   v8g->ClusterInfoTempl.Reset(isolate, rt);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("ArangoClusterInfoCtor"), ft->GetFunction(), true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoClusterInfoCtor"), ft->GetFunction(), true);
 
   // register the global object
   v8::Handle<v8::Object> ci = rt->NewInstance();
   if (! ci.IsEmpty()) {
-    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("ArangoClusterInfo"), ci);
+    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoClusterInfo"), ci);
   }
 
   // .............................................................................
@@ -2016,38 +2016,38 @@ void TRI_InitV8Cluster (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
   // ...........................................................................
 
   ft = v8::FunctionTemplate::New(isolate);
-  ft->SetClassName(TRI_V8_SYMBOL("ArangoServerState"));
+  ft->SetClassName(TRI_V8_ASCII_STRING("ArangoServerState"));
 
   rt = ft->InstanceTemplate();
   rt->SetInternalFieldCount(2);
 
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("address"), JS_AddressServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("flush"), JS_FlushServerState, true);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("id"), JS_IdServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("dataPath"), JS_DataPathServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("logPath"), JS_LogPathServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("agentPath"), JS_AgentPathServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("arangodPath"), JS_ArangodPathServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("javaScriptPath"), JS_JavaScriptPathServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("dbserverConfig"), JS_DBserverConfigServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("coordinatorConfig"), JS_CoordinatorConfigServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("disableDispatcherFrontend"), JS_DisableDipatcherFrontendServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("disableDispatcherKickstarter"), JS_DisableDipatcherKickstarterServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("initialised"), JS_InitialisedServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("isCoordinator"), JS_IsCoordinatorServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("role"), JS_RoleServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("setId"), JS_SetIdServerState, true);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("setRole"), JS_SetRoleServerState, true);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("status"), JS_StatusServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("getClusterAuthentication"), JS_GetClusterAuthentication);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("address"), JS_AddressServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("flush"), JS_FlushServerState, true);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("id"), JS_IdServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("dataPath"), JS_DataPathServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("logPath"), JS_LogPathServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("agentPath"), JS_AgentPathServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("arangodPath"), JS_ArangodPathServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("javaScriptPath"), JS_JavaScriptPathServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("dbserverConfig"), JS_DBserverConfigServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("coordinatorConfig"), JS_CoordinatorConfigServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("disableDispatcherFrontend"), JS_DisableDipatcherFrontendServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("disableDispatcherKickstarter"), JS_DisableDipatcherKickstarterServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("initialised"), JS_InitialisedServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("isCoordinator"), JS_IsCoordinatorServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("role"), JS_RoleServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("setId"), JS_SetIdServerState, true);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("setRole"), JS_SetRoleServerState, true);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("status"), JS_StatusServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getClusterAuthentication"), JS_GetClusterAuthentication);
 
   v8g->ServerStateTempl.Reset(isolate, rt);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("ArangoServerStateCtor"), ft->GetFunction(), true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoServerStateCtor"), ft->GetFunction(), true);
 
   // register the global object
   v8::Handle<v8::Object> ss = rt->NewInstance();
   if (! ss.IsEmpty()) {
-    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("ArangoServerState"), ss);
+    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoServerState"), ss);
   }
 
   // ...........................................................................
@@ -2055,24 +2055,24 @@ void TRI_InitV8Cluster (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
   // ...........................................................................
 
   ft = v8::FunctionTemplate::New(isolate);
-  ft->SetClassName(TRI_V8_SYMBOL("ArangoClusterComm"));
+  ft->SetClassName(TRI_V8_ASCII_STRING("ArangoClusterComm"));
 
   rt = ft->InstanceTemplate();
   rt->SetInternalFieldCount(2);
 
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("asyncRequest"), JS_AsyncRequest);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("syncRequest"), JS_SyncRequest);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("enquire"), JS_Enquire);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("wait"), JS_Wait);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_SYMBOL("drop"), JS_Drop);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("asyncRequest"), JS_AsyncRequest);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("syncRequest"), JS_SyncRequest);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("enquire"), JS_Enquire);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("wait"), JS_Wait);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("drop"), JS_Drop);
 
   v8g->ClusterCommTempl.Reset(isolate, rt);
-  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_SYMBOL("ArangoClusterCommCtor"), ft->GetFunction(), true);
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoClusterCommCtor"), ft->GetFunction(), true);
 
   // register the global object
   ss = rt->NewInstance();
   if (! ss.IsEmpty()) {
-    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_SYMBOL("ArangoClusterComm"), ss);
+    TRI_AddGlobalVariableVocbase(isolate, context, TRI_V8_ASCII_STRING("ArangoClusterComm"), ss);
   }
 }
 
