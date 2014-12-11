@@ -4,15 +4,16 @@ dnl ----------------------------------------------------------------------------
 dnl --SECTION--                                                               V8
 dnl ----------------------------------------------------------------------------
 
-icu_build_dir="${srcdir}/3rdParty/V8/third_party/icu/"
+icu_build_dir="${srcdir}/3rdParty/icu/BUILD"
+icu_lib_dir="${icu_build_dir}/libs"
 
 dnl --- do we need "-ffunction-sections -fdata-sections" in ICU_CPPFLAGS?
 dnl --- ICU_LIBS was: " -lpthread -ldl -lm ${icu_lib_dir}/libicui18n.a ${icu_lib_dir}/libicuuc.a ${icu_lib_dir}/libicudata.a ${icu_lib_dir}/libicuio.a ${icu_lib_dir}/libicule.a ${icu_lib_dir}/libiculx.a -lpthread -ldl -lm "
 
 ICU_CPPFLAGS="-D_REENTRANT -I${icu_build_dir}/include"
 ICU_LDFLAGS=""
-ICU_LIBS=" -ldl -lm "
-dnl ICU_BUILT="${icu_lib_dir}/libicui18n.a ${icu_lib_dir}/libicuuc.a ${icu_lib_dir}/libicudata.a"
+ICU_LIBS=" -ldl -lm  ${icu_lib_dir}/libicui18n.a ${icu_lib_dir}/libicuuc.a ${icu_lib_dir}/libicudata.a -ldl -lm  "
+ICU_BUILT="${icu_lib_dir}/libicui18n.a ${icu_lib_dir}/libicuuc.a ${icu_lib_dir}/libicudata.a"
 
 TRI_ICU_VERSION="52.1"
 
@@ -22,8 +23,8 @@ dnl ----------------------------------------------------------------------------
 
 AC_SUBST(ICU_CPPFLAGS)
 AC_SUBST(ICU_LDFLAGS)
-dnl AC_SUBST(ICU_LIBS)
-dnl AC_SUBST(ICU_BUILT)
+AC_SUBST(ICU_LIBS)
+AC_SUBST(ICU_BUILT)
 
 ICU_CPPFLAGS="${ICU_CPPFLAGS} -DTRI_ICU_VERSION='\"${TRI_ICU_VERSION}\"'"
 
@@ -36,8 +37,8 @@ LIB_INFO="$LIB_INFO|ICU: 3rdParty version"
 LIB_INFO="$LIB_INFO|ICU VERSION: ${TRI_ICU_VERSION}"
 
 LIB_INFO="$LIB_INFO|ICU_CPPFLAGS: ${ICU_CPPFLAGS}"
-dnl LIB_INFO="$LIB_INFO|ICU_LDFLAGS:  ${ICU_LDFLAGS}"
-dnl LIB_INFO="$LIB_INFO|ICU_LIBS:     ${ICU_LIBS}"
+LIB_INFO="$LIB_INFO|ICU_LDFLAGS:  ${ICU_LDFLAGS}"
+LIB_INFO="$LIB_INFO|ICU_LIBS:     ${ICU_LIBS}"
 
 dnl LIB_INFO="$LIB_INFO|."
 

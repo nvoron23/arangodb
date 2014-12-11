@@ -98,14 +98,14 @@ dnl ----------------------------------------------------------------------------
 dnl ICU
 dnl ----------------------------------------------------------------------------
 
-dnl AC_ARG_ENABLE(all-in-one-icu,
-dnl   AS_HELP_STRING([--enable-all-in-one-icu], [use supplied ICU from 3rdParty directory (default: no)]),
-dnl   [tr_ALL_IN_ONE_ICU="${enableval:-yes}"],
-dnl   [tr_ALL_IN_ONE_ICU=no]
-dnl )
+AC_ARG_ENABLE(all-in-one-icu,
+  AS_HELP_STRING([--enable-all-in-one-icu], [use supplied ICU from 3rdParty directory (default: no)]),
+  [tr_ALL_IN_ONE_ICU="${enableval:-yes}"],
+  [tr_ALL_IN_ONE_ICU=no]
+)
 
-AC_DEFINE(ENABLE_ALL_IN_ONE_ICU)
 AM_CONDITIONAL(ENABLE_ALL_IN_ONE_ICU, test "x$tr_ALL_IN_ONE_ICU" = xyes)
+
 
 dnl ----------------------------------------------------------------------------
 dnl ETCD
@@ -226,11 +226,11 @@ dnl ----------------------------------------------------------------------------
 dnl V8
 dnl ----------------------------------------------------------------------------
 
-dnl if test "x$tr_ALL_IN_ONE_V8" = xyes;  then
+if test "x$tr_ALL_IN_ONE_V8" = xyes;  then
   m4_include([m4/all-in-one.v8])
-dnl else
-dnl   m4_include([m4/external.v8])
-dnl fi
+else
+  m4_include([m4/external.v8])
+fi
 
 dnl ----------------------------------------------------------------------------
 dnl ICU
