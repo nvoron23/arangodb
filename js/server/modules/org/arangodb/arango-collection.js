@@ -192,6 +192,53 @@ ArangoCollection.prototype.index = function (id) {
 };
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                                 trigger functions
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief finds a trigger of a collection
+///
+/// @FUN{@FA{collection}.trigger(@FA{trigger-handle})}
+///
+/// Returns the trigger with @FA{trigger-handle} or null if no such trigger exists.
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoCollection.prototype.trigger = function (id) {
+  var triggers = this.getTriggers();
+  var i;
+
+  if (typeof id === "object" && id.hasOwnProperty("id")) {
+    id = id.id;
+  }
+
+  if (typeof id === "string") {
+    var pa = ArangoDatabase.triggerRegex.exec(id);
+
+    if (pa === null) {
+      id = this.name() + "/" + id;
+    }
+  }
+  else if (typeof id === "number") {
+    // stringify the id
+    id = this.name() + "/" + id;
+  }
+
+  for (i = 0;  i < triggers.length;  ++i) {
+    var trigger = triggers[i];
+
+    if (trigger.id === id) {
+      return trigger;
+    }
+  }
+
+  var err = new ArangoError();
+  err.errorNum = internal.errors.ERROR_ARANGO_TRIGGER_NOT_FOUND.code;
+  err.errorMessage = internal.errors.ERROR_ARANGO_TRIGGER_NOT_FOUND.message;
+
+  throw err;
+};
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                                    edge functions
 // -----------------------------------------------------------------------------
 

@@ -50,6 +50,7 @@
 #include "VocBase/update-policy.h"
 #include "VocBase/voc-shaper.h"
 #include "VocBase/barrier.h"
+#include "V8Server/v8-triggers.h"
 #include "Wal/DocumentOperation.h"
 #include "Wal/LogfileManager.h"
 #include "Wal/Marker.h"
@@ -108,6 +109,7 @@ void TRI_doc_mptr_copy_t::setDataPtr (void const* d) {
 
 TRI_document_collection_t::TRI_document_collection_t () 
   : _useSecondaryIndexes(true),
+    _useTriggers(true),
     _keyGenerator(nullptr),
     _uncollectedLogfileEntries(0) {
 
@@ -1810,6 +1812,38 @@ static bool OpenIndexIterator (char const* filename,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief iterator for trigger loading
+////////////////////////////////////////////////////////////////////////////////
+
+static bool OpenTriggerIterator (char const* filename,
+                                 void* data) {
+  // load json description of the trigger
+  TRI_json_t* json = TRI_JsonFile(TRI_CORE_MEM_ZONE, filename, nullptr);
+
+  // json must be a trigger description
+  if (! TRI_IsArrayJson(json)) {
+    LOG_ERROR("cannot read trigger definition from '%s'", filename);
+
+    if (json != nullptr) {
+      TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
+    }
+
+    return false;
+  }
+
+  int res = TRI_FromJsonTriggerDocumentCollection(static_cast<TRI_document_collection_t*>(data), json, nullptr);
+  TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    // error was already printed if we get here
+    return false;
+  }
+
+  return true;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief returns information about the collection
 /// note: the collection lock must be held when calling this function
 ////////////////////////////////////////////////////////////////////////////////
@@ -2001,6 +2035,8 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
     return false;
   }
 
+  TRI_InitVectorPointer(&document->_triggers, TRI_UNKNOWN_MEM_ZONE);
+
   res = TRI_InitVectorPointer2(&document->_allIndexes, TRI_UNKNOWN_MEM_ZONE, 2);
 
   if (res != TRI_ERROR_NO_ERROR) {
@@ -2015,6 +2051,7 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
 
   if (primaryIndex == nullptr) {
     TRI_DestroyVectorPointer(&document->_allIndexes);
+    TRI_DestroyVectorPointer(&document->_triggers);
     DestroyBaseDocumentCollection(document);
     TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2026,6 +2063,7 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_FreeIndex(primaryIndex);
     TRI_DestroyVectorPointer(&document->_allIndexes);
+    TRI_DestroyVectorPointer(&document->_triggers);
     DestroyBaseDocumentCollection(document);
     TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2039,6 +2077,7 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
     if (edgesIndex == nullptr) {
       TRI_FreeIndex(primaryIndex);
       TRI_DestroyVectorPointer(&document->_allIndexes);
+      TRI_DestroyVectorPointer(&document->_triggers);
       DestroyBaseDocumentCollection(document);
       TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2051,6 +2090,7 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
       TRI_FreeIndex(edgesIndex);
       TRI_FreeIndex(primaryIndex);
       TRI_DestroyVectorPointer(&document->_allIndexes);
+      TRI_DestroyVectorPointer(&document->_triggers);
       DestroyBaseDocumentCollection(document);
       TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2114,6 +2154,47 @@ static int IterateMarkersCollection (TRI_collection_t* collection) {
   OpenIteratorAbortTransaction(&openState);
 
   TRI_DestroyVector(&openState._operations);
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief restore a trigger
+////////////////////////////////////////////////////////////////////////////////
+
+static int TriggerFromJson (TRI_document_collection_t* document,
+                            TRI_trigger_type_e type,
+                            TRI_trigger_position_e position,
+                            char const* action,
+                            TRI_trigger_id_t tid,
+                            TRI_trigger_t** dst) {
+  if (dst != nullptr) {
+    *dst = nullptr;
+  }
+
+  TRI_trigger_t* trigger = nullptr;
+  try {
+    trigger = new TRI_trigger_t(tid, type, position, action);
+
+    int res = TRI_PushBackVectorPointer(&document->_triggers, trigger);
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      delete trigger;
+      return res;
+    }
+  }
+  catch (...) {
+    return TRI_ERROR_OUT_OF_MEMORY;
+  }
+
+  if (dst != nullptr) {
+    *dst = trigger;
+  }
+
+  if (trigger == nullptr) {
+    LOG_ERROR("cannot create trigger %llu", (unsigned long long) tid);
+    return TRI_errno();
+  }
 
   return TRI_ERROR_NO_ERROR;
 }
@@ -2240,6 +2321,7 @@ void TRI_DestroyDocumentCollection (TRI_document_collection_t* document) {
 
   // free index vector
   TRI_DestroyVectorPointer(&document->_allIndexes);
+  TRI_DestroyVectorPointer(&document->_triggers);
 
   if (document->_failedTransactions != nullptr) {
     delete document->_failedTransactions;
@@ -2612,6 +2694,69 @@ int TRI_FromJsonIndexDocumentCollection (TRI_document_collection_t* document,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create a trigger, based on a JSON description
+////////////////////////////////////////////////////////////////////////////////
+
+int TRI_FromJsonTriggerDocumentCollection (TRI_document_collection_t* document,
+                                           TRI_json_t const* json,
+                                           TRI_trigger_t** trigger) {
+  TRI_ASSERT(json != nullptr);
+  TRI_ASSERT(json->_type == TRI_JSON_ARRAY);
+
+  if (trigger != nullptr) {
+    *trigger = nullptr;
+  }
+
+  // extract the type
+  TRI_json_t const* value = TRI_LookupArrayJson(json, "type");
+
+  if (! TRI_IsStringJson(value)) {
+    return TRI_ERROR_INTERNAL;
+  }
+
+  TRI_trigger_type_e type = TRI_TypeTrigger(value->_value._string.data);
+
+  // extract the position
+  value = TRI_LookupArrayJson(json, "position");
+
+  if (! TRI_IsStringJson(value)) {
+    return TRI_ERROR_INTERNAL;
+  }
+
+  TRI_trigger_position_e position = TRI_PositionTrigger(value->_value._string.data);
+
+  // extract the action
+  value = TRI_LookupArrayJson(json, "action");
+
+  if (! TRI_IsStringJson(value)) {
+    return TRI_ERROR_INTERNAL;
+  }
+
+  char* action = value->_value._string.data;
+
+  // extract the trigger identifier
+  value = TRI_LookupArrayJson(json, "id");
+
+  TRI_trigger_id_t tid;
+  if (TRI_IsNumberJson(value)) {
+    tid = (TRI_trigger_id_t) value->_value._number;
+  }
+  else if (TRI_IsStringJson(value)) {
+    tid = (TRI_trigger_id_t) TRI_UInt64String2(value->_value._string.data,
+                                               value->_value._string.length - 1);
+  }
+  else {
+    LOG_ERROR("ignoring trigger, trigger identifier could not be located");
+
+    return TRI_ERROR_INTERNAL;
+  }
+
+  TRI_UpdateTickServer(tid);
+
+  return TriggerFromJson(document, type, position, action, tid, trigger);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief rolls back a document operation
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2746,7 +2891,18 @@ int TRI_FillIndexesDocumentCollection (TRI_document_collection_t* document) {
 
   // fill user-defined secondary indexes
   TRI_collection_t* collection = reinterpret_cast<TRI_collection_t*>(document);
-  TRI_IterateIndexCollection(collection, OpenIndexIterator, collection);
+  TRI_IterateIndexesCollection(collection, OpenIndexIterator, collection);
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief setup triggers
+////////////////////////////////////////////////////////////////////////////////
+
+int TRI_SetupTriggersDocumentCollection (TRI_document_collection_t* document) {
+  TRI_collection_t* collection = reinterpret_cast<TRI_collection_t*>(document);
+  TRI_IterateTriggersCollection(collection, OpenTriggerIterator, collection);
 
   return TRI_ERROR_NO_ERROR;
 }
@@ -2840,6 +2996,7 @@ TRI_document_collection_t* TRI_OpenDocumentCollection (TRI_vocbase_t* vocbase,
 
   if (! triagens::wal::LogfileManager::instance()->isInRecovery()) {
     TRI_FillIndexesDocumentCollection(document);
+    TRI_SetupTriggersDocumentCollection(document);
   }
 
   return document;
@@ -3192,6 +3349,161 @@ bool TRI_IsFullyCollectedDocumentCollection (TRI_document_collection_t* document
   TRI_READ_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
 
   return (uncollected == 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a description of all triggers
+///
+/// the caller must have read-locked the underlying collection!
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<TRI_trigger_t const*> TRI_TriggersDocumentCollection (TRI_document_collection_t* document) {
+  std::vector<TRI_trigger_t const*> triggers;
+  
+  size_t const n = document->_triggers._length;
+  triggers.reserve(n);
+  
+  for (size_t i = 0;  i < n;  ++i) {
+    auto trigger = static_cast<TRI_trigger_t const*>(document->_triggers._buffer[i]);
+
+    triggers.push_back(trigger);
+  }
+
+  return triggers;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief creates a trigger
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_trigger_t* TRI_CreateTriggerDocumentCollection (TRI_document_collection_t* document,
+                                                    TRI_trigger_id_t id,
+                                                    TRI_trigger_type_e type,
+                                                    TRI_trigger_position_e position, 
+                                                    std::string const& action,
+                                                    int& ret) {
+
+  ret = TRI_ERROR_NO_ERROR;
+
+  // .............................................................................
+  // inside write-lock
+  // .............................................................................
+
+  TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
+
+  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+
+  // check if another trigger already exists for the same type & position
+  if (TRI_LookupByTypeTrigger(document, type, position) != nullptr) {
+    TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+
+    TRI_ReadUnlockReadWriteLock(&document->_vocbase->_inventoryLock);
+
+    ret = TRI_ERROR_ARANGO_TRIGGER_EXISTS;
+    return nullptr;
+  }
+
+  TRI_trigger_t* trigger = nullptr;
+  try {
+    trigger = new TRI_trigger_t(id, type, position, action);
+
+    ret = TRI_PushBackVectorPointer(&document->_triggers, trigger);
+
+    if (ret == TRI_ERROR_NO_ERROR) {
+      ret = TRI_SaveTrigger(document, trigger, true);
+    }
+
+    if (ret != TRI_ERROR_NO_ERROR) {
+      delete trigger;
+      trigger = nullptr;
+    }
+  }
+  catch (...) {
+    ret = TRI_ERROR_OUT_OF_MEMORY;
+  }
+
+  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+
+  TRI_ReadUnlockReadWriteLock(&document->_vocbase->_inventoryLock);
+
+  return trigger;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief drops a trigger, including trigger file removal and replication
+////////////////////////////////////////////////////////////////////////////////
+
+bool TRI_DropTriggerDocumentCollection (TRI_document_collection_t* document,
+                                        TRI_trigger_id_t tid,
+                                        bool writeMarker) {
+  if (tid == 0) {
+    // invalid trigger id
+    return true;
+  }
+
+  TRI_trigger_t* found = nullptr;
+  TRI_vocbase_t* vocbase = document->_vocbase;
+
+  TRI_ReadLockReadWriteLock(&vocbase->_inventoryLock);
+
+  // .............................................................................
+  // inside write-lock
+  // .............................................................................
+
+  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+
+  size_t const n = document->_triggers._length;
+
+  for (size_t i = 0;  i < n;  ++i) {
+    auto trigger = static_cast<TRI_trigger_t*>(document->_triggers._buffer[i]);
+
+    if (trigger->_id == tid) {
+      found = static_cast<TRI_trigger_t*>(TRI_RemoveVectorPointer(&document->_triggers, i));
+      break;
+    }
+  }
+
+  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+
+  TRI_ReadUnlockReadWriteLock(&vocbase->_inventoryLock);
+
+  // .............................................................................
+  // outside write-lock
+  // .............................................................................
+
+  if (found != nullptr) {
+    bool result = TRI_RemoveTriggerFile(document, found);
+
+    delete found;
+
+    if (writeMarker) {
+      int res = TRI_ERROR_NO_ERROR;
+
+      try {
+        triagens::wal::DropTriggerMarker marker(vocbase->_id, document->_info._cid, tid);
+        triagens::wal::SlotInfoCopy slotInfo = triagens::wal::LogfileManager::instance()->allocateAndWrite(marker, false);
+
+        if (slotInfo.errorCode != TRI_ERROR_NO_ERROR) {
+          THROW_ARANGO_EXCEPTION(slotInfo.errorCode);
+        }
+
+        return true;
+      }
+      catch (triagens::arango::Exception const& ex) {
+        res = ex.code();
+      }
+      catch (...) {
+        res = TRI_ERROR_INTERNAL;
+      }
+
+      LOG_WARNING("could not save trigger drop marker in log: %s", TRI_errno_string(res));
+    }
+
+    // TODO: what to do here?
+    return result;
+  }
+
+  return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -5001,7 +5313,6 @@ int TRI_InsertShapedJsonDocumentCollection (TRI_transaction_collection_t* trxCol
 
   uint64_t const hash = TRI_HashKeyPrimaryIndex(keyString.c_str(), keyString.size());
 
-
   int res = TRI_ERROR_NO_ERROR;
 
   if (marker == nullptr) {
@@ -5018,6 +5329,19 @@ int TRI_InsertShapedJsonDocumentCollection (TRI_transaction_collection_t* trxCol
   }
 
   TRI_ASSERT(marker != nullptr);
+
+
+  // execute pre-insert trigger
+  TRI_trigger_t* trigger = TRI_LookupByTypeTrigger(document, TRI_TRIGGER_TYPE_INSERT, TRI_TRIGGER_POSITION_PRE);
+
+  if (trigger != nullptr) {
+    res = TRI_ExecutePreTrigger(trigger, document, marker);
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      return res;
+    }
+  }
+
 
   // now insert into indexes
   {

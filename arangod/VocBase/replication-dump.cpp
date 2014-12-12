@@ -828,6 +828,55 @@ static int StringifyWalMarkerDropIndex (TRI_replication_dump_t* dump,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief stringify a create trigger marker
+////////////////////////////////////////////////////////////////////////////////
+
+static int StringifyWalMarkerCreateTrigger (TRI_replication_dump_t* dump,
+                                            TRI_df_marker_t const* marker) {
+  auto m = reinterpret_cast<triagens::wal::trigger_create_marker_t const*>(marker);
+  
+  APPEND_STRING(dump->_buffer, "\"database\":\"");
+  APPEND_UINT64(dump->_buffer, m->_databaseId);
+  APPEND_STRING(dump->_buffer, "\",\"cid\":\"");
+  APPEND_UINT64(dump->_buffer, m->_collectionId);
+  char const* cname = NameFromCid(dump, m->_collectionId);
+  if (cname != nullptr) {
+    APPEND_STRING(dump->_buffer, "\",\"cname\":\"");
+    APPEND_STRING(dump->_buffer, cname);
+  }
+  APPEND_STRING(dump->_buffer, "\",\"id\":\"");
+  APPEND_UINT64(dump->_buffer, m->_triggerId);
+  APPEND_STRING(dump->_buffer, "\",\"index\":");
+  APPEND_STRING(dump->_buffer, (char const*) m + sizeof(triagens::wal::trigger_create_marker_t)); 
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief stringify a drop trigger marker
+////////////////////////////////////////////////////////////////////////////////
+
+static int StringifyWalMarkerDropTrigger (TRI_replication_dump_t* dump,
+                                          TRI_df_marker_t const* marker) {
+  auto m = reinterpret_cast<triagens::wal::trigger_drop_marker_t const*>(marker);
+  
+  APPEND_STRING(dump->_buffer, "\"database\":\"");
+  APPEND_UINT64(dump->_buffer, m->_databaseId);
+  APPEND_STRING(dump->_buffer, "\",\"cid\":\"");
+  APPEND_UINT64(dump->_buffer, m->_collectionId);
+  char const* cname = NameFromCid(dump, m->_collectionId);
+  if (cname != nullptr) {
+    APPEND_STRING(dump->_buffer, "\",\"cname\":\"");
+    APPEND_STRING(dump->_buffer, cname);
+  }
+  APPEND_STRING(dump->_buffer, "\",\"id\":\"");
+  APPEND_UINT64(dump->_buffer, m->_triggerId);
+  APPEND_STRING(dump->_buffer, "\"");
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief whether or not a marker should be replicated
 ////////////////////////////////////////////////////////////////////////////////
      
@@ -843,7 +892,9 @@ static inline bool MustReplicateWalMarkerType (TRI_df_marker_t const* marker) {
           marker->_type == TRI_WAL_MARKER_RENAME_COLLECTION ||
           marker->_type == TRI_WAL_MARKER_CHANGE_COLLECTION ||
           marker->_type == TRI_WAL_MARKER_CREATE_INDEX ||
-          marker->_type == TRI_WAL_MARKER_DROP_INDEX);
+          marker->_type == TRI_WAL_MARKER_DROP_INDEX ||
+          marker->_type == TRI_WAL_MARKER_CREATE_TRIGGER ||
+          marker->_type == TRI_WAL_MARKER_DROP_TRIGGER);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -876,6 +927,10 @@ static TRI_replication_operation_e TranslateType (TRI_df_marker_t const* marker)
       return REPLICATION_INDEX_CREATE;
     case TRI_WAL_MARKER_DROP_INDEX: 
       return REPLICATION_INDEX_DROP;
+    case TRI_WAL_MARKER_CREATE_TRIGGER: 
+      return REPLICATION_TRIGGER_CREATE;
+    case TRI_WAL_MARKER_DROP_TRIGGER: 
+      return REPLICATION_TRIGGER_DROP;
        
     default: 
       return REPLICATION_INVALID;
@@ -950,6 +1005,16 @@ static int StringifyWalMarker (TRI_replication_dump_t* dump,
       res = StringifyWalMarkerDropIndex(dump, marker);
       break;
     }
+
+    case TRI_WAL_MARKER_CREATE_TRIGGER: {
+      res = StringifyWalMarkerCreateTrigger(dump, marker);
+      break;
+    }
+
+    case TRI_WAL_MARKER_DROP_TRIGGER: {
+      res = StringifyWalMarkerDropTrigger(dump, marker);
+      break;
+    }
     
     case TRI_WAL_MARKER_BEGIN_REMOTE_TRANSACTION:
     case TRI_WAL_MARKER_COMMIT_REMOTE_TRANSACTION:
@@ -1011,6 +1076,10 @@ static TRI_voc_tick_t GetDatabaseFromWalMarker (TRI_df_marker_t const* marker) {
       return GetDatabaseId<triagens::wal::index_create_marker_t>(marker);
     case TRI_WAL_MARKER_DROP_INDEX: 
       return GetDatabaseId<triagens::wal::index_drop_marker_t>(marker);
+    case TRI_WAL_MARKER_CREATE_TRIGGER: 
+      return GetDatabaseId<triagens::wal::trigger_create_marker_t>(marker);
+    case TRI_WAL_MARKER_DROP_TRIGGER: 
+      return GetDatabaseId<triagens::wal::trigger_drop_marker_t>(marker);
     case TRI_WAL_MARKER_CREATE_DATABASE: 
       return GetDatabaseId<triagens::wal::database_create_marker_t>(marker);
     case TRI_WAL_MARKER_DROP_DATABASE: 
@@ -1059,6 +1128,10 @@ static TRI_voc_tick_t GetCollectionFromWalMarker (TRI_df_marker_t const* marker)
       return GetCollectionId<triagens::wal::index_create_marker_t>(marker);
     case TRI_WAL_MARKER_DROP_INDEX: 
       return GetCollectionId<triagens::wal::index_drop_marker_t>(marker);
+    case TRI_WAL_MARKER_CREATE_TRIGGER: 
+      return GetCollectionId<triagens::wal::trigger_create_marker_t>(marker);
+    case TRI_WAL_MARKER_DROP_TRIGGER: 
+      return GetCollectionId<triagens::wal::trigger_drop_marker_t>(marker);
     default: {
       return 0;
     }

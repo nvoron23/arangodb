@@ -199,15 +199,16 @@ struct TRI_collection_t {
   TRI_vocbase_t*       _vocbase;
   TRI_voc_tick_t       _tickMax;
 
-  TRI_col_state_e      _state;       // state of the collection
-  int                  _lastError;   // last (critical) error
+  TRI_col_state_e      _state;        // state of the collection
+  int                  _lastError;    // last (critical) error
 
-  char* _directory;                  // directory of the collection
+  char* _directory;                   // directory of the collection
 
-  TRI_vector_pointer_t _datafiles;   // all datafiles
-  TRI_vector_pointer_t _journals;    // all journals
-  TRI_vector_pointer_t _compactors;  // all compactor files
-  TRI_vector_string_t  _indexFiles;  // all index filenames
+  TRI_vector_pointer_t _datafiles;    // all datafiles
+  TRI_vector_pointer_t _journals;     // all journals
+  TRI_vector_pointer_t _compactors;   // all compactor files
+  TRI_vector_string_t  _indexFiles;   // all index filenames
+  TRI_vector_string_t  _triggerFiles; // all trigger filenames
 
   TRI_collection_t () {
   }
@@ -372,9 +373,24 @@ bool TRI_IterateCollection (TRI_collection_t*,
 /// @brief iterates over all index files of a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-void TRI_IterateIndexCollection (TRI_collection_t*,
-                                 bool (*)(char const*, void*),
-                                 void*);
+void TRI_IterateIndexesCollection (TRI_collection_t*,
+                                   bool (*)(char const*, void*),
+                                   void*);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief removes a trigger file from the triggerFiles vector
+////////////////////////////////////////////////////////////////////////////////
+
+int TRI_RemoveFileTriggerCollection (TRI_collection_t*,
+                                     TRI_trigger_id_t);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief iterates over all trigger files of a collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_IterateTriggersCollection (TRI_collection_t*,
+                                    bool (*)(char const*, void*),
+                                    void*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief opens an existing collection

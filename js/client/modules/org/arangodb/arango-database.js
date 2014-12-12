@@ -75,6 +75,12 @@ var ArangoStatement = require("org/arangodb/arango-statement").ArangoStatement;
 ArangoDatabase.indexRegex = /^([a-zA-Z0-9\-_]+)\/([0-9]+)$/;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief trigger id regex
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoDatabase.triggerRegex = /^([a-zA-Z0-9\-_]+)\/([0-9]+)$/;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief key regex
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -184,6 +190,47 @@ ArangoDatabase.prototype._indexurl = function (id, expectedName) {
   }
 
   return "/_api/index/" + encodeURIComponent(s[0]) + "/" + encodeURIComponent(s[1]);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the base url for trigger usage
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoDatabase.prototype._triggerurl = function (id, expectedName) {
+  if (typeof id === "string") {
+    var pa = ArangoDatabase.triggerRegex.exec(id);
+
+    if (pa === null && expectedName !== undefined) {
+      id = expectedName + "/" + id;
+    }
+  }
+  else if (typeof id === "number" && expectedName !== undefined) {
+    // stringify a numeric id
+    id = expectedName + "/" + id;
+  }
+
+  var s = id.split("/");
+
+  if (s.length !== 2) {
+    // invalid trigger handle
+    throw new ArangoError({
+      error: true,
+      code: internal.errors.ERROR_HTTP_BAD_PARAMETER.code,
+      errorNum: internal.errors.ERROR_ARANGO_TRIGGER_HANDLE_BAD.code,
+      errorMessage: internal.errors.ERROR_ARANGO_TRIGGER_HANDLE_BAD.message
+    });
+  }
+  else if (expectedName !== undefined && expectedName !== "" && s[0] !== expectedName) {
+    // index handle does not match collection name
+    throw new ArangoError({
+      error: true,
+      code: internal.errors.ERROR_HTTP_BAD_PARAMETER.code,
+      errorNum: internal.errors.ERROR_ARANGO_CROSS_COLLECTION_REQUEST.code,
+      errorMessage: internal.errors.ERROR_ARANGO_CROSS_COLLECTION_REQUEST.message
+    });
+  }
+
+  return "/_api/trigger/" + encodeURIComponent(s[0]) + "/" + encodeURIComponent(s[1]);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -526,6 +573,44 @@ ArangoDatabase.prototype._dropIndex = function (id) {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a trigger
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoDatabase.prototype._trigger = function (id) {
+  if (id.hasOwnProperty("id")) {
+    id = id.id;
+  }
+
+  var requestResult = this._connection.GET(this._triggerurl(id));
+
+  arangosh.checkRequestResult(requestResult);
+
+  return requestResult;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief deletes a trigger
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoDatabase.prototype._dropTrigger = function (id) {
+  if (id.hasOwnProperty("id")) {
+    id = id.id;
+  }
+
+  var requestResult = this._connection.DELETE(this._indexurl(id));
+
+  if (requestResult !== null
+      && requestResult.error === true
+      && requestResult.errorNum === internal.errors.ERROR_ARANGO_INDEX_NOT_FOUND.code) {
+    return false;
+  }
+
+  arangosh.checkRequestResult(requestResult);
+
+  return true;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief returns the database version
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -705,7 +790,8 @@ ArangoDatabase.prototype._replace = function (id, data, overwrite, waitForSync) 
     if (options.hasOwnProperty("waitForSync") ) {
      waitForSync = options.waitForSync;
     }
-  } else {
+  } 
+  else {
     if (overwrite) {
       params += "?policy=last";
     }

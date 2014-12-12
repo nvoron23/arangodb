@@ -22,36 +22,40 @@
 ///
 /// Copyright holder is ArangoDB GmbH, Cologne, Germany
 ///
-/// @author Dr. Frank Celler
+/// @author Jan Steemann
 /// @author Copyright 2014, ArangoDB GmbH, Cologne, Germany
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef ARANGODB_V8SERVER_V8__INDEX_H
-#define ARANGODB_V8SERVER_V8__INDEX_H 1
+#ifndef ARANGODB_V8SERVER_V8__TRIGGERS_H
+#define ARANGODB_V8SERVER_V8__TRIGGERS_H 1
 
 #include "Basics/Common.h"
 #include "VocBase/server.h"
 #include "V8/v8-globals.h"
-#include "VocBase/index.h"
+#include "VocBase/triggers.h"
 #include "Utils/CollectionNameResolver.h"
 #include "v8-vocbase.h"
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief looks up a index identifier
+/// @brief looks up a trigger
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupIndexByHandle (triagens::arango::CollectionNameResolver const*,
-                                      TRI_vocbase_col_t const*,
-                                      v8::Handle<v8::Value>,
-                                      bool,
-                                      v8::Handle<v8::Object>*);
+TRI_trigger_t* TRI_LookupTriggerByHandle (triagens::arango::CollectionNameResolver const*,
+                                          TRI_vocbase_col_t const*,
+                                          v8::Handle<v8::Value>,
+                                          v8::Handle<v8::Object>*);
 
-void TRI_InitV8IndexCollection (v8::Handle<v8::Context> context,
-                                TRI_server_t* server,
-                                TRI_vocbase_t* vocbase,
-                                triagens::arango::JSLoader* loader,
-                                const size_t threadNumber,
-                                TRI_v8_global_t* v8g,
-                                v8::Handle<v8::ObjectTemplate> rt);
+////////////////////////////////////////////////////////////////////////////////
+/// @brief execute a pre-trigger
+////////////////////////////////////////////////////////////////////////////////
+
+int TRI_ExecutePreTrigger (TRI_trigger_t const*,
+                           TRI_document_collection_t*,
+                           triagens::wal::Marker const*);
+
+void TRI_InitV8TriggersCollection (v8::Handle<v8::Context> context,
+                                   TRI_vocbase_t* vocbase,
+                                   TRI_v8_global_t* v8g,
+                                   v8::Handle<v8::ObjectTemplate> rt);
 #endif

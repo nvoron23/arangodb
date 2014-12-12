@@ -1823,7 +1823,7 @@ static v8::Handle<v8::Value> JS_CreateEdgeCollectionVocbase (v8::Arguments const
   return CreateVocBase(argv, TRI_COL_TYPE_EDGE);
 }
 
-void TRI_InitV8indexArangoDB (v8::Handle<v8::Context> context,
+void TRI_InitV8IndexArangoDB (v8::Handle<v8::Context> context,
                               TRI_server_t* server,
                               TRI_vocbase_t* vocbase,
                               JSLoader* loader,
@@ -1838,7 +1838,7 @@ void TRI_InitV8indexArangoDB (v8::Handle<v8::Context> context,
 }
 
 
-void TRI_InitV8indexCollection (v8::Handle<v8::Context> context,
+void TRI_InitV8IndexCollection (v8::Handle<v8::Context> context,
                                 TRI_server_t* server,
                                 TRI_vocbase_t* vocbase,
                                 JSLoader* loader,

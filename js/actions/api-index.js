@@ -112,7 +112,7 @@ function get_api_indexes (req, res) {
 ///
 /// @RESTDESCRIPTION
 ///
-/// The result is an objects describing the index. It has at least the following
+/// The result is an object describing the index. It has at least the following
 /// attributes:
 ///
 /// - *id*: The identifier of the index.

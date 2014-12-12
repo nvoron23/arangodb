@@ -122,6 +122,7 @@ add_executable(
     V8Server/v8-dispatcher.cpp
     V8Server/v8-query.cpp
     V8Server/v8-replication.cpp
+    V8Server/v8-triggers.cpp
     V8Server/v8-user-structures.cpp
     V8Server/v8-util.cpp
     V8Server/v8-vocbase.cpp
@@ -147,6 +148,7 @@ add_executable(
     VocBase/replication-master.cpp
     VocBase/server.cpp
     VocBase/transaction.cpp
+    VocBase/triggers.cpp
     VocBase/voc-shaper.cpp
     VocBase/vocbase.cpp
     VocBase/vocbase-defaults.cpp

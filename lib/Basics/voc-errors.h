@@ -170,7 +170,7 @@
 /// - 1213: @LIT{cross collection request not allowed}
 ///   Will be raised when a cross-collection is requested.
 /// - 1214: @LIT{illegal index handle}
-///   Will be raised when a index handle is corrupt.
+///   Will be raised when an index handle is corrupt.
 /// - 1215: @LIT{cap constraint already defined}
 ///   Will be raised when a cap constraint was already defined.
 /// - 1216: @LIT{document too large}
@@ -223,6 +223,17 @@
 /// - 1236: @LIT{write-throttling timeout}
 ///   Will be raised when the server is write-throttled and a write operation
 ///   has waited too long for the server to process queued operations.
+/// - 1237: @LIT{trigger not found}
+///   Will be raised when a trigger with a given identifier is unknown.
+/// - 1238: @LIT{trigger already exists}
+///   Will be raised when an attempt to create a trigger fails because another
+///   trigger is already present for the same event.
+/// - 1239: @LIT{illegal trigger handle}
+///   Will be raised when a trigger handle is corrupt.
+/// - 1240: @LIT{invalid trigger function code}
+///   Will be raised when a trigger function is executed with invalid code.
+/// - 1241: @LIT{trigger function runtime error: \%s}
+///   Will be raised when a trigger function throws a runtime exception.
 /// - 1300: @LIT{datafile full}
 ///   Will be raised when the datafile reaches its limit.
 /// - 1301: @LIT{server database directory is empty}
@@ -1346,7 +1357,7 @@ void TRI_InitialiseErrorMessages ();
 ///
 /// illegal index handle
 ///
-/// Will be raised when a index handle is corrupt.
+/// Will be raised when an index handle is corrupt.
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_ERROR_ARANGO_INDEX_HANDLE_BAD                                 (1214)
@@ -1570,6 +1581,57 @@ void TRI_InitialiseErrorMessages ();
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_ERROR_ARANGO_WRITE_THROTTLE_TIMEOUT                           (1236)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1237: ERROR_ARANGO_TRIGGER_NOT_FOUND
+///
+/// trigger not found
+///
+/// Will be raised when a trigger with a given identifier is unknown.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_ARANGO_TRIGGER_NOT_FOUND                                (1237)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1238: ERROR_ARANGO_TRIGGER_EXISTS
+///
+/// trigger already exists
+///
+/// Will be raised when an attempt to create a trigger fails because another
+/// trigger is already present for the same event.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_ARANGO_TRIGGER_EXISTS                                   (1238)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1239: ERROR_ARANGO_TRIGGER_HANDLE_BAD
+///
+/// illegal trigger handle
+///
+/// Will be raised when a trigger handle is corrupt.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_ARANGO_TRIGGER_HANDLE_BAD                               (1239)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1240: ERROR_ARANGO_TRIGGER_FUNCTION_INVALID_CODE
+///
+/// invalid trigger function code
+///
+/// Will be raised when a trigger function is executed with invalid code.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_ARANGO_TRIGGER_FUNCTION_INVALID_CODE                    (1240)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1241: ERROR_ARANGO_TRIGGER_RUNTIME_ERROR
+///
+/// trigger function runtime error: %s
+///
+/// Will be raised when a trigger function throws a runtime exception.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_ARANGO_TRIGGER_RUNTIME_ERROR                            (1241)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief 1300: ERROR_ARANGO_DATAFILE_FULL

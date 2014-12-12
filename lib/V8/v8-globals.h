@@ -241,6 +241,12 @@ typedef struct TRI_v8_global_s {
 
   std::map< void*, v8::Persistent<v8::Value> > JSCollections;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief mapping for persistent trigger functions
+////////////////////////////////////////////////////////////////////////////////
+
+  std::unordered_map<uint64_t, v8::Persistent<v8::Value>> JSTriggers;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                       JAVASCRIPT OBJECT TEMPLATES
 // -----------------------------------------------------------------------------

@@ -151,6 +151,14 @@ ArangoCollection.prototype._indexurl = function () {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return the base url for collection trigger usage
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoCollection.prototype._triggerurl = function () {
+  return this._prefixurl("/_api/trigger?collection=" + encodeURIComponent(this.name()));
+};
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief executes an edge query
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -773,6 +781,82 @@ ArangoCollection.prototype.ensureIndex = function (data) {
 
   return requestResult;
 };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 trigger functions
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief gets all triggers
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoCollection.prototype.getTriggers = function () {
+  var requestResult = this._database._connection.GET(this._triggerurl());
+
+  arangosh.checkRequestResult(requestResult);
+
+  return requestResult.triggers;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief gets one trigger
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoCollection.prototype.trigger = function (id) {
+  if (id.hasOwnProperty("id")) {
+    id = id.id;
+  }
+
+  var requestResult = this._database._connection.GET(this._database._triggerurl(id, this.name()));
+
+  arangosh.checkRequestResult(requestResult);
+
+  return requestResult;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief deletes a trigger
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoCollection.prototype.dropTrigger = function (id) {
+  if (id.hasOwnProperty("id")) {
+    id = id.id;
+  }
+
+  var requestResult = this._database._connection.DELETE(this._database._triggerurl(id, this.name()));
+
+  if (requestResult !== null
+      && requestResult.error === true
+      && requestResult.errorNum
+      === internal.errors.ERROR_ARANGO_TRIGGER_NOT_FOUND.code) {
+    return false;
+  }
+
+  arangosh.checkRequestResult(requestResult);
+
+  return true;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief creates a trigger
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoCollection.prototype.createTrigger = function (data) {
+  if (typeof data !== "object" || Array.isArray(data)) {
+    throw "usage: createTrigger(<trigger-data>)";
+  }
+
+  var requestResult = this._database._connection.POST(this._indexurl(), JSON.stringify(data));
+
+  arangosh.checkRequestResult(requestResult);
+
+  return requestResult;
+};
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                document functions
+// -----------------------------------------------------------------------------
+
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                document functions

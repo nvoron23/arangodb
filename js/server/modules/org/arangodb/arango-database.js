@@ -393,6 +393,105 @@ ArangoDatabase.prototype._dropIndex = function (id) {
 };
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                                 trigger functions
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief trigger id regex
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoDatabase.triggerRegex = /^([a-zA-Z0-9\-_]+)\/([0-9]+)$/;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief finds a trigger
+/// @startDocuBlock TriggerHandle
+/// `db._trigger(trigger-handle)`
+///
+/// Returns the trigger with *trigger-handle* or null if no such trigger exists.
+/// @endDocuBlock
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoDatabase.prototype._trigger = function(id) {
+  if (id.hasOwnProperty("id")) {
+    id = id.id;
+  }
+
+  var pa = ArangoDatabase.triggerRegex.exec(id);
+  var err;
+
+  if (pa === null) {
+    err = new ArangoError();
+    err.errorNum = internal.errors.ERROR_ARANGO_TRIGGER_HANDLE_BAD.code;
+    err.errorMessage = internal.errors.ERROR_ARANGO_TRIGGER_HANDLE_BAD.message;
+    throw err;
+  }
+
+  var col = this._collection(pa[1]);
+
+  if (col === null) {
+    err = new ArangoError();
+    err.errorNum = internal.errors.ERROR_ARANGO_COLLECTION_NOT_FOUND.code;
+    err.errorMessage = internal.errors.ERROR_ARANGO_COLLECTION_NOT_FOUND.message;
+    throw err;
+  }
+
+  var triggers = col.getTriggers();
+  var i;
+
+  for (i = 0;  i < triggers.length;  ++i) {
+    var trigger = triggers[i];
+
+    if (trigger.id === id) {
+      return trigger;
+    }
+  }
+
+  return null;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief drops a trigger
+/// @startDocuBlock dropTrigger
+/// `db._dropTrigger(trigger)`
+///
+/// Drops the *trigger*.  If the trigger does not exist, then *false* is
+/// returned. If the trigger existed and was dropped, then *true* is
+/// returned. 
+///
+/// `db._dropTrigger(trigger-handle)`
+///
+/// Drops the trigger with *trigger-handle*.
+/// @endDocuBlock
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoDatabase.prototype._dropTrigger = function (id) {
+  if (id.hasOwnProperty("id")) {
+    id = id.id;
+  }
+
+  var pa = ArangoDatabase.triggerRegex.exec(id);
+  var err;
+
+  if (pa === null) {
+    err = new ArangoError();
+    err.errorNum = internal.errors.ERROR_ARANGO_TRIGGER_HANDLE_BAD.code;
+    err.errorMessage = internal.errors.ERROR_ARANGO_TRIGGER_HANDLE_BAD.message;
+    throw err;
+  }
+
+  var col = this._collection(pa[1]);
+
+  if (col === null) {
+    err = new ArangoError();
+    err.errorNum = internal.errors.ERROR_ARANGO_COLLECTION_NOT_FOUND.code;
+    err.errorMessage = internal.errors.ERROR_ARANGO_COLLECTION_NOT_FOUND.message;
+    throw err;
+  }
+
+  return col.dropTrigger(id);
+};
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                                endpoint functions
 // -----------------------------------------------------------------------------
 

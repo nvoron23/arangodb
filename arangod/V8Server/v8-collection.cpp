@@ -52,6 +52,7 @@
 
 #include "v8-vocbase.h"
 #include "v8-vocindex.h"
+#include "v8-triggers.h"
 
 using namespace std;
 using namespace triagens::basics;
@@ -4276,7 +4277,8 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
   TRI_AddMethodVocbase(rt, "update", JS_UpdateVocbaseCol);
   TRI_AddMethodVocbase(rt, "version", JS_VersionVocbaseCol);
 
-  TRI_InitV8indexCollection(context, server, vocbase, loader, threadNumber, v8g, rt);
+  TRI_InitV8IndexCollection(context, server, vocbase, loader, threadNumber, v8g, rt);
+  TRI_InitV8TriggersCollection(context, vocbase, v8g, rt);
 
   v8g->VocbaseColTempl = v8::Persistent<v8::ObjectTemplate>::New(isolate, rt);
   TRI_AddGlobalFunctionVocbase(context, "ArangoCollection", ft->GetFunction());

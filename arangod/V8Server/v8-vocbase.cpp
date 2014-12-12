@@ -28,10 +28,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "v8-vocbaseprivate.h"
-#include "v8-wrapshapedjson.h"
-#include "v8-replication.h"
-#include "v8-voccursor.h"
 #include "v8-collection.h"
+#include "v8-replication.h"
+#include "v8-triggers.h"
+#include "v8-voccursor.h"
+#include "v8-wrapshapedjson.h"
 
 #include "VocBase/general-cursor.h"
 
@@ -2531,7 +2532,8 @@ void TRI_InitV8VocBridge (triagens::arango::ApplicationV8* applicationV8,
   TRI_AddMethodVocbase(ArangoNS, "_listDatabases", JS_ListDatabases);
   TRI_AddMethodVocbase(ArangoNS, "_useDatabase", JS_UseDatabase);
 
-  TRI_InitV8indexArangoDB(context, server, vocbase, loader, threadNumber, v8g, ArangoNS);
+  TRI_InitV8IndexArangoDB(context, server, vocbase, loader, threadNumber, v8g, ArangoNS);
+  TRI_InitV8TriggersCollection(context, vocbase, v8g, ArangoNS);
 
   TRI_InitV8collection(context, server, vocbase, loader, threadNumber, v8g, isolate, ArangoNS);
 
@@ -2540,7 +2542,7 @@ void TRI_InitV8VocBridge (triagens::arango::ApplicationV8* applicationV8,
 
   TRI_InitV8ShapedJson(context, server, vocbase, loader, threadNumber, v8g);
 
-  TRI_InitV8cursor(context, server, vocbase, loader, threadNumber, v8g);
+  TRI_InitV8Cursor(context, server, vocbase, loader, threadNumber, v8g);
 
   // .............................................................................
   // generate global functions

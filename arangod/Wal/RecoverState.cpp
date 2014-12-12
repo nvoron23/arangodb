@@ -1159,6 +1159,89 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
     // create operations
     // -----------------------------------------------------------------------------
 
+    case TRI_WAL_MARKER_CREATE_TRIGGER: {
+      trigger_create_marker_t const* m = reinterpret_cast<trigger_create_marker_t const*>(marker);
+      TRI_voc_cid_t collectionId       = m->_collectionId;
+      TRI_voc_tick_t databaseId        = m->_databaseId;
+      TRI_trigger_id_t triggerId       = m->_triggerId;
+      
+      if (state->isDropped(databaseId, collectionId)) {
+        return true;
+      }
+     
+      TRI_vocbase_t* vocbase = state->useDatabase(databaseId);
+
+      if (vocbase == nullptr) {
+        // if the underlying database is gone, we can go on
+        LOG_TRACE("cannot create trigger for collection %llu in database %llu: %s", 
+                  (unsigned long long) collectionId,
+                  (unsigned long long) databaseId,
+                  TRI_errno_string(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND));
+        return true;
+      }
+
+      TRI_document_collection_t* document = state->getCollection(databaseId, collectionId);
+
+      if (document == nullptr) {
+        // if the underlying collection is gone, we can go on
+        LOG_TRACE("cannot create trigger for collection %llu in database %llu: %s", 
+                  (unsigned long long) collectionId,
+                  (unsigned long long) databaseId,
+                  TRI_errno_string(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND));
+        return true;
+      }
+      
+      char const* properties = reinterpret_cast<char const*>(m) + sizeof(trigger_create_marker_t);
+      TRI_json_t* json = triagens::basics::JsonHelper::fromString(properties);
+      
+      if (! TRI_IsArrayJson(json)) {
+        if (json != nullptr) {
+          TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
+        }
+        LOG_WARNING("cannot unpack trigger properties for trigger %llu, collection %llu in database %llu", 
+                    (unsigned long long) triggerId, 
+                    (unsigned long long) collectionId, 
+                    (unsigned long long) databaseId);
+        return state->canContinue();
+      }
+
+      if (! TRI_IsArrayJson(json)) {
+        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
+        LOG_WARNING("cannot unpack trigger properties for trigger %llu, collection %llu in database %llu", 
+                    (unsigned long long) triggerId, 
+                    (unsigned long long) collectionId, 
+                    (unsigned long long) databaseId);
+        return state->canContinue();
+      }
+
+      // fake transaction to satisfy assertions
+      triagens::arango::TransactionBase trx(true); 
+      
+      std::string collectionDirectory = GetCollectionDirectory(vocbase, collectionId);
+      char* idString = TRI_StringUInt64(triggerId);
+      char* triggerName = TRI_Concatenate3String("trigger-", idString, ".json");
+      TRI_FreeString(TRI_CORE_MEM_ZONE, idString);
+      char* filename = TRI_Concatenate2File(collectionDirectory.c_str(), triggerName);
+      TRI_FreeString(TRI_CORE_MEM_ZONE, triggerName);
+      
+      bool ok = TRI_SaveJson(filename, json, vocbase->_settings.forceSyncProperties);
+      TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
+
+      if (! ok) {
+        TRI_FreeString(TRI_CORE_MEM_ZONE, filename);
+        LOG_WARNING("cannot create trigger %llu, collection %llu in database %llu", 
+                    (unsigned long long) triggerId, 
+                    (unsigned long long) collectionId, 
+                    (unsigned long long) databaseId);
+        return state->canContinue();
+      }
+      else {
+        TRI_PushBackVectorString(&document->_triggerFiles, filename);
+      }
+
+      break;
+    }
+
     case TRI_WAL_MARKER_CREATE_INDEX: {
       index_create_marker_t const* m = reinterpret_cast<index_create_marker_t const*>(marker);
       TRI_voc_cid_t collectionId = m->_collectionId;
@@ -1241,7 +1324,6 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
 
       break;
     }
-
 
     case TRI_WAL_MARKER_CREATE_COLLECTION: {
       collection_create_marker_t const* m = reinterpret_cast<collection_create_marker_t const*>(marker);
@@ -1410,6 +1492,50 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
     // -----------------------------------------------------------------------------
     // drop operations
     // -----------------------------------------------------------------------------
+
+    case TRI_WAL_MARKER_DROP_TRIGGER: {
+      trigger_drop_marker_t const* m = reinterpret_cast<trigger_drop_marker_t const*>(marker);
+      TRI_voc_cid_t collectionId = m->_collectionId;
+      TRI_voc_tick_t databaseId  = m->_databaseId;
+      TRI_trigger_id_t triggerId = m->_triggerId;
+
+      if (state->isDropped(databaseId, collectionId)) {
+        return true;
+      }
+      
+      TRI_vocbase_t* vocbase = state->useDatabase(databaseId);
+
+      if (vocbase == nullptr) {
+        // if the underlying database is gone, we can go on
+        LOG_TRACE("cannot open database %llu", (unsigned long long) databaseId);
+        return true;
+      }
+            
+      TRI_document_collection_t* document = state->getCollection(databaseId, collectionId);
+      if (document == nullptr) {
+        // if the underlying collection gone, we can go on
+        return true;
+      }
+      
+      // fake transaction to satisfy assertions
+      triagens::arango::TransactionBase trx(true); 
+
+      // ignore any potential error returned by this call
+      TRI_DropTriggerDocumentCollection(document, triggerId, false);
+      TRI_RemoveFileTriggerCollection(document, triggerId);
+
+      // additionally remove the trigger file
+      std::string collectionDirectory = GetCollectionDirectory(vocbase, collectionId);
+      char* idString = TRI_StringUInt64(triggerId);
+      char* triggerName = TRI_Concatenate3String("trigger-", idString, ".json");
+      TRI_FreeString(TRI_CORE_MEM_ZONE, idString);
+      char* filename = TRI_Concatenate2File(collectionDirectory.c_str(), triggerName);
+      TRI_FreeString(TRI_CORE_MEM_ZONE, triggerName);
+      
+      TRI_UnlinkFile(filename);
+      TRI_FreeString(TRI_CORE_MEM_ZONE, filename);
+      break;
+    }
     
     case TRI_WAL_MARKER_DROP_INDEX: {
       index_drop_marker_t const* m = reinterpret_cast<index_drop_marker_t const*>(marker);
@@ -1633,6 +1759,35 @@ int RecoverState::fillIndexes () {
     document->useSecondaryIndexes(true);
 
     int res = TRI_FillIndexesDocumentCollection(document);
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      return res;
+    }
+  }
+ 
+  return TRI_ERROR_NO_ERROR; 
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief setup triggers of all collections used in recovery
+////////////////////////////////////////////////////////////////////////////////
+
+int RecoverState::setupTriggers () {
+  // fake transaction to setup triggers
+  triagens::arango::TransactionBase trx(true);
+
+  // release all collections
+  for (auto it = openedCollections.begin(); it != openedCollections.end(); ++it) {
+    TRI_vocbase_col_t* collection = (*it).second;
+
+    TRI_document_collection_t* document = collection->_collection;
+
+    TRI_ASSERT(document != nullptr);
+
+    // activate triggers
+    document->useTriggers(true);
+
+    int res = TRI_SetupTriggersDocumentCollection(document);
 
     if (res != TRI_ERROR_NO_ERROR) {
       return res;

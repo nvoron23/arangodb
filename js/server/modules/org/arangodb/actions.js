@@ -1818,6 +1818,37 @@ function indexNotFound (req, res, collection, index, headers) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @startDocuBlock actionsTriggerNotFound
+///
+/// `actions.triggerNotFound(req, res, collection, trigger, headers)`
+///
+/// The function generates an error response.
+/// @endDocuBlock
+////////////////////////////////////////////////////////////////////////////////
+
+function triggerNotFound (req, res, collection, trigger, headers) {
+  'use strict';
+
+  if (collection === undefined) {
+    resultError(req, res,
+                exports.HTTP_BAD, arangodb.ERROR_HTTP_BAD_PARAMETER,
+                "expecting a collection name or identifier",
+                headers);
+  }
+  else if (trigger === undefined) {
+    resultError(req, res,
+                exports.HTTP_BAD, arangodb.ERROR_HTTP_BAD_PARAMETER,
+                "expecting a trigger identifier",
+                headers);
+  }
+  else {
+    resultError(req, res,
+                exports.HTTP_NOT_FOUND, arangodb.ERROR_ARANGO_TRIGGER_NOT_FOUND,
+                "unknown trigger '" + trigger + "'", headers);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @startDocuBlock actionsResultException
 ///
 /// `actions.resultException(req, res, err, headers, verbose)`
@@ -1873,6 +1904,7 @@ function resultException (req, res, err, headers, verbose) {
       case arangodb.ERROR_ARANGO_ENDPOINT_NOT_FOUND:
       case arangodb.ERROR_ARANGO_NO_INDEX:
       case arangodb.ERROR_ARANGO_INDEX_NOT_FOUND:
+      case arangodb.ERROR_ARANGO_TRIGGER_NOT_FOUND:
       case arangodb.ERROR_CURSOR_NOT_FOUND:
       case arangodb.ERROR_USER_NOT_FOUND:
       case arangodb.ERROR_TASK_NOT_FOUND:
@@ -1885,6 +1917,7 @@ function resultException (req, res, err, headers, verbose) {
 
       case arangodb.ERROR_ARANGO_DUPLICATE_NAME:
       case arangodb.ERROR_ARANGO_DUPLICATE_IDENTIFIER:
+      case arangodb.ERROR_ARANGO_TRIGGER_EXISTS:
         code = exports.HTTP_CONFLICT;
         break;
 
@@ -2156,6 +2189,7 @@ exports.resultUnsupported        = resultUnsupported;
 exports.resultCursor             = resultCursor;
 exports.collectionNotFound       = collectionNotFound;
 exports.indexNotFound            = indexNotFound;
+exports.triggerNotFound          = triggerNotFound;
 exports.resultException          = resultException;
 
 // standard actions

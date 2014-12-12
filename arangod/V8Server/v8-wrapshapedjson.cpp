@@ -251,6 +251,26 @@ static void WeakBarrierCallback (v8::Isolate* isolate,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief convert the marker to a V8 object
+////////////////////////////////////////////////////////////////////////////////
+    
+v8::Handle<v8::Value> TRI_CreateDocumentFromMarkerV8 (TRI_document_collection_t* document,
+                                                      triagens::wal::Marker const* marker) {
+  v8::HandleScope scope;
+
+  if (marker->type() == TRI_WAL_MARKER_DOCUMENT ||
+      marker->type() == TRI_WAL_MARKER_EDGE) {
+    // TODO: re-use resolver from transaction
+    triagens::arango::CollectionNameResolver resolver(document->_vocbase);
+
+    v8::Handle<v8::Value> doc = TRI_WrapShapedJson(&resolver, nullptr, document->_info._cid, document, marker->mem(), true);
+    return scope.Close(doc);
+  }
+
+  return scope.Close(v8::Undefined());
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief wraps a TRI_shaped_json_t
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -258,17 +278,18 @@ v8::Handle<v8::Value> TRI_WrapShapedJson (triagens::arango::CollectionNameResolv
                                           TRI_barrier_t* barrier,
                                           TRI_voc_cid_t cid,
                                           TRI_document_collection_t* collection,
-                                          void const* data) {
+                                          void const* data,
+                                          bool forceCopy) {
   v8::HandleScope scope;
   TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(data);
   TRI_ASSERT(marker != nullptr);
-  TRI_ASSERT(barrier != nullptr);
+  TRI_ASSERT(forceCopy || barrier != nullptr);
   TRI_ASSERT(collection != nullptr);
 
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
   TRI_v8_global_t* v8g = static_cast<TRI_v8_global_t*>(isolate->GetData());
 
-  bool const doCopy = TRI_IsWalDataMarkerDatafile(marker);
+  bool const doCopy = forceCopy || TRI_IsWalDataMarkerDatafile(marker);
 
   if (doCopy) {
     // we'll create a full copy of the document

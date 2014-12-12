@@ -755,6 +755,120 @@ void DropIndexMarker::dump () const {
 #endif
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                               CreateTriggerMarker
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      constructors and destructors
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create marker
+////////////////////////////////////////////////////////////////////////////////
+
+CreateTriggerMarker::CreateTriggerMarker (TRI_voc_tick_t databaseId,
+                                          TRI_voc_cid_t collectionId,
+                                          TRI_trigger_id_t triggerId,
+                                          std::string const& properties)
+  : Marker(TRI_WAL_MARKER_CREATE_TRIGGER, sizeof(trigger_create_marker_t) + alignedSize(properties.size() + 1)) {
+
+  trigger_create_marker_t* m = reinterpret_cast<trigger_create_marker_t*>(begin());
+
+  m->_databaseId   = databaseId;
+  m->_collectionId = collectionId;
+  m->_triggerId    = triggerId;
+
+  storeSizedString(sizeof(trigger_create_marker_t), properties);
+
+#ifdef DEBUG_WAL
+  dump();
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy marker
+////////////////////////////////////////////////////////////////////////////////
+
+CreateTriggerMarker::~CreateTriggerMarker () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dump marker
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_WAL
+void CreateTriggerMarker::dump () const {
+  trigger_create_marker_t* m = reinterpret_cast<trigger_create_marker_t*>(begin());
+
+  std::cout << "WAL CREATE TRIGGER MARKER FOR DB " << m->_databaseId
+            << ", COLLECTION " << m->_collectionId
+            << ", TRIGGER " << m->_triggerId
+            << ", PROPERTIES " << properties()
+            << ", SIZE: " << size()
+            << "\n";
+
+#ifdef DEBUG_WAL_DETAIL
+  dumpBinary();
+#endif
+}
+#endif
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 DropTriggerMarker
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      constructors and destructors
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create marker
+////////////////////////////////////////////////////////////////////////////////
+
+DropTriggerMarker::DropTriggerMarker (TRI_voc_tick_t databaseId,
+                                      TRI_voc_cid_t collectionId,
+                                      TRI_trigger_id_t triggerId)
+  : Marker(TRI_WAL_MARKER_DROP_TRIGGER, sizeof(trigger_drop_marker_t)) {
+
+  trigger_drop_marker_t* m = reinterpret_cast<trigger_drop_marker_t*>(begin());
+
+  m->_databaseId   = databaseId;
+  m->_collectionId = collectionId;
+  m->_triggerId    = triggerId;
+
+#ifdef DEBUG_WAL
+  dump();
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy marker
+////////////////////////////////////////////////////////////////////////////////
+
+DropTriggerMarker::~DropTriggerMarker () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dump marker
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_WAL
+void DropTriggerMarker::dump () const {
+  trigger_drop_marker_t* m = reinterpret_cast<trigger_drop_marker_t*>(begin());
+
+  std::cout << "WAL DROP TRIGGER MARKER FOR DB " << m->_databaseId
+            << ", COLLECTION " << m->_collectionId
+            << ", TRIGGER " << m->_triggerId
+            << ", SIZE: " << size()
+            << "\n";
+
+#ifdef DEBUG_WAL_DETAIL
+  dumpBinary();
+#endif
+}
+#endif
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                            BeginTransactionMarker
 // -----------------------------------------------------------------------------
 

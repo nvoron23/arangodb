@@ -39,6 +39,7 @@
 #include "VocBase/index.h"
 #include "VocBase/primary-index.h"
 #include "VocBase/transaction.h"
+#include "VocBase/triggers.h"
 #include "VocBase/update-policy.h"
 #include "VocBase/voc-types.h"
 #include "Wal/Marker.h"
@@ -336,6 +337,9 @@ private:
   // whether or not secondary indexes are filled
   bool                         _useSecondaryIndexes;
 
+  // whether or not triggers are active
+  bool                         _useTriggers;
+
 public:
   // We do some assertions with barriers and transactions in maintainer mode:
 #ifndef TRI_ENABLE_MAINTAINER_MODE
@@ -353,6 +357,14 @@ public:
   void useSecondaryIndexes (bool value) {
     _useSecondaryIndexes = value;
   }
+  
+  inline bool useTriggers () const {
+    return _useTriggers;
+  }
+
+  void useTriggers (bool value) {
+    _useTriggers = value;
+  }
 
   void setShaper (TRI_shaper_t* s) {
     _shaper = s;
@@ -367,6 +379,7 @@ public:
   struct TRI_cap_constraint_s* _capConstraint;
 
   TRI_vector_pointer_t         _allIndexes;
+  TRI_vector_pointer_t         _triggers;
   std::set<TRI_voc_tid_t>*     _failedTransactions;
 
   int64_t                      _uncollectedLogfileEntries;
@@ -710,6 +723,14 @@ int TRI_FromJsonIndexDocumentCollection (TRI_document_collection_t*,
                                          struct TRI_index_s**);
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create a trigger, based on a JSON description
+////////////////////////////////////////////////////////////////////////////////
+
+int TRI_FromJsonTriggerDocumentCollection (TRI_document_collection_t*,
+                                           struct TRI_json_t const*,
+                                           struct TRI_trigger_t**);
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief rolls back a document operation
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -742,6 +763,12 @@ bool TRI_CloseDatafileDocumentCollection (TRI_document_collection_t*,
 int TRI_FillIndexesDocumentCollection (TRI_document_collection_t*);
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief setup triggers
+////////////////////////////////////////////////////////////////////////////////
+
+int TRI_SetupTriggersDocumentCollection (TRI_document_collection_t*);
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief opens an existing collection
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -753,6 +780,41 @@ TRI_document_collection_t* TRI_OpenDocumentCollection (TRI_vocbase_t*,
 ////////////////////////////////////////////////////////////////////////////////
 
 int TRI_CloseDocumentCollection (TRI_document_collection_t*);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                          TRIGGERS
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                  public functions
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a description of all triggers
+///
+/// the caller must have read-locked the underyling collection!
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<struct TRI_trigger_t const*> TRI_TriggersDocumentCollection (TRI_document_collection_t*);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief creates a trigger
+////////////////////////////////////////////////////////////////////////////////
+
+struct TRI_trigger_t* TRI_CreateTriggerDocumentCollection (TRI_document_collection_t*,
+                                                           TRI_trigger_id_t,
+                                                           TRI_trigger_type_e,
+                                                           TRI_trigger_position_e, 
+                                                           std::string const&,
+                                                           int&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief drops a trigger, including trigger file removal and replication
+////////////////////////////////////////////////////////////////////////////////
+
+bool TRI_DropTriggerDocumentCollection (TRI_document_collection_t*,
+                                        TRI_trigger_id_t,
+                                        bool);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                           INDEXES

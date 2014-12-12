@@ -606,7 +606,7 @@ static v8::Handle<v8::Value> JS_DeleteCursor (v8::Arguments const& argv) {
   // .............................................................................
   // generate the general cursor template
   // .............................................................................
-void TRI_InitV8cursor (v8::Handle<v8::Context> context,
+void TRI_InitV8Cursor (v8::Handle<v8::Context> context,
                        TRI_server_t* server,
                        TRI_vocbase_t* vocbase,
                        JSLoader* loader,

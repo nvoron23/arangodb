@@ -1173,6 +1173,10 @@ char const* TRI_NameMarkerDatafile (TRI_df_marker_t const* marker) {
       return "create index (wal)";
     case TRI_WAL_MARKER_DROP_INDEX:
       return "drop index (wal)";
+    case TRI_WAL_MARKER_CREATE_TRIGGER:
+      return "create trigger (wal)";
+    case TRI_WAL_MARKER_DROP_TRIGGER:
+      return "drop trigger (wal)";
     case TRI_WAL_MARKER_CREATE_DATABASE:
       return "create database (wal)";
     case TRI_WAL_MARKER_DROP_DATABASE:

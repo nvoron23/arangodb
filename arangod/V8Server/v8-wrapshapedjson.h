@@ -34,6 +34,19 @@
 #include "v8-vocbase.h"
 #include "VocBase/server.h"
 
+namespace triagens {
+  namespace wal {
+    class Marker;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief convert the marker to a V8 object
+////////////////////////////////////////////////////////////////////////////////
+    
+v8::Handle<v8::Value> TRI_CreateDocumentFromMarkerV8 (TRI_document_collection_t*,
+                                                      triagens::wal::Marker const*);
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief wraps a TRI_shaped_json_t
 ////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +55,8 @@ v8::Handle<v8::Value> TRI_WrapShapedJson (triagens::arango::CollectionNameResolv
                                           TRI_barrier_t*,
                                           TRI_voc_cid_t,
                                           TRI_document_collection_t*,
-                                          void const*);
+                                          void const*,
+                                          bool = false);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief wraps a TRI_shaped_json_t

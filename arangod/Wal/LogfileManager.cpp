@@ -464,6 +464,9 @@ bool LogfileManager::open () {
   // now fill secondary indexes of all collections used in the recovery
   _recoverState->fillIndexes();
 
+  // activate all triggers
+  _recoverState->setupTriggers();
+
   // remove usage locks for databases and collections
   _recoverState->releaseResources();
 

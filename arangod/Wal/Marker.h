@@ -147,6 +147,27 @@ namespace triagens {
     };
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief wal create trigger marker
+////////////////////////////////////////////////////////////////////////////////
+
+    struct trigger_create_marker_t : TRI_df_marker_t {
+      TRI_voc_tick_t   _databaseId;
+      TRI_voc_cid_t    _collectionId;
+      TRI_trigger_id_t _triggerId;
+      // char* properties
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wal drop trigger marker
+////////////////////////////////////////////////////////////////////////////////
+
+    struct trigger_drop_marker_t : TRI_df_marker_t {
+      TRI_voc_tick_t   _databaseId;
+      TRI_voc_cid_t    _collectionId;
+      TRI_trigger_id_t _triggerId;
+    };
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief wal transaction begin marker
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -319,6 +340,10 @@ namespace triagens {
 
         inline void* mem () const {
           return static_cast<void*>(_buffer);
+        }
+
+        inline TRI_df_marker_type_e type () const {
+          return (TRI_df_marker_type_e) static_cast<TRI_df_marker_t const*>(static_cast<void const*>(_buffer))->_type;
         }
 
         inline char* begin () const {
@@ -644,6 +669,51 @@ namespace triagens {
 
         void dump () const;
     };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                              CreateTriggerMarker
+// -----------------------------------------------------------------------------
+
+    class CreateTriggerMarker : public Marker {
+
+      public:
+
+        CreateTriggerMarker (TRI_voc_tick_t,
+                             TRI_voc_cid_t,
+                             TRI_trigger_id_t,
+                             std::string const&);
+
+        ~CreateTriggerMarker ();
+
+      public:
+
+        inline char* properties () const {
+          return begin() + sizeof(trigger_create_marker_t);
+        }
+
+        void dump () const;
+    };
+
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 DropTriggerMarker
+// -----------------------------------------------------------------------------
+
+    class DropTriggerMarker : public Marker {
+
+      public:
+
+        DropTriggerMarker (TRI_voc_tick_t,
+                           TRI_voc_cid_t,
+                           TRI_trigger_id_t);
+
+        ~DropTriggerMarker ();
+
+      public:
+
+        void dump () const;
+    };
+
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                            BeginTransactionMarker

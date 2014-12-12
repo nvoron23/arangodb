@@ -245,6 +245,7 @@ static void InitCollection (TRI_vocbase_t* vocbase,
   TRI_InitVectorPointer(&collection->_journals, TRI_UNKNOWN_MEM_ZONE);
   TRI_InitVectorPointer(&collection->_compactors, TRI_UNKNOWN_MEM_ZONE);
   TRI_InitVectorString(&collection->_indexFiles, TRI_CORE_MEM_ZONE);
+  TRI_InitVectorString(&collection->_triggerFiles, TRI_CORE_MEM_ZONE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -464,9 +465,7 @@ static bool CheckCollection (TRI_collection_t* collection) {
 
       if (fourthLen > 0 || TRI_EqualString2("temp", first, firstLen)) {
         // found a temporary file. we can delete it!
-        char* filename;
-
-        filename = TRI_Concatenate2File(collection->_directory, file);
+        char* filename = TRI_Concatenate2File(collection->_directory, file);
 
         LOG_TRACE("found temporary file '%s', which is probably a left-over. deleting it", filename);
         TRI_UnlinkFile(filename);
@@ -479,10 +478,17 @@ static bool CheckCollection (TRI_collection_t* collection) {
       // .............................................................................
 
       if (TRI_EqualString2("index", first, firstLen) && TRI_EqualString2("json", third, thirdLen)) {
-        char* filename;
-
-        filename = TRI_Concatenate2File(collection->_directory, file);
+        char* filename = TRI_Concatenate2File(collection->_directory, file);
         TRI_PushBackVectorString(&collection->_indexFiles, filename);
+      }
+      
+      // .............................................................................
+      // file is a trigger, just store the filename
+      // .............................................................................
+
+      else if (TRI_EqualString2("trigger", first, firstLen) && TRI_EqualString2("json", third, thirdLen)) {
+        char* filename = TRI_Concatenate2File(collection->_directory, file);
+        TRI_PushBackVectorString(&collection->_triggerFiles, filename);
       }
 
       // .............................................................................
@@ -1109,6 +1115,8 @@ void TRI_DestroyCollection (TRI_collection_t* collection) {
   FreeDatafilesVector(&collection->_compactors);
 
   TRI_DestroyVectorString(&collection->_indexFiles);
+  TRI_DestroyVectorString(&collection->_triggerFiles);
+
   if (collection->_directory != nullptr) {
     TRI_FreeString(TRI_CORE_MEM_ZONE, collection->_directory);
     collection->_directory = nullptr;
@@ -1505,9 +1513,9 @@ int TRI_RemoveFileIndexCollection (TRI_collection_t* collection,
 /// @brief iterates over all index files of a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-void TRI_IterateIndexCollection (TRI_collection_t* collection,
-                                 bool (*iterator)(char const* filename, void*),
-                                 void* data) {
+void TRI_IterateIndexesCollection (TRI_collection_t* collection,
+                                   bool (*iterator)(char const* filename, void*),
+                                   void* data) {
   // iterate over all index files
   size_t const n = collection->_indexFiles._length;
 
@@ -1517,6 +1525,49 @@ void TRI_IterateIndexCollection (TRI_collection_t* collection,
 
     if (! ok) {
       LOG_ERROR("cannot load index '%s' for collection '%s'",
+                filename,
+                collection->_info._name);
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief removes a trigger file from the triggerFiles vector
+////////////////////////////////////////////////////////////////////////////////
+
+int TRI_RemoveFileTriggerCollection (TRI_collection_t* collection,
+                                     TRI_trigger_id_t tid) {
+  size_t const n = collection->_triggerFiles._length;
+
+  for (size_t i = 0;  i < n;  ++i) {
+    char const* filename = collection->_triggerFiles._buffer[i];
+
+    if (GetNumericFilenamePart(filename) == tid) {
+      // found
+      TRI_RemoveVectorString(&collection->_triggerFiles, i);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief iterates over all trigger files of a collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_IterateTriggersCollection (TRI_collection_t* collection,
+                                    bool (*iterator)(char const* filename, void*),
+                                    void* data) {
+  // iterate over all index files
+  size_t const n = collection->_triggerFiles._length;
+
+  for (size_t i = 0;  i < n;  ++i) {
+    char const* filename = collection->_triggerFiles._buffer[i];
+    bool ok = iterator(filename, data);
+
+    if (! ok) {
+      LOG_ERROR("cannot load trigger '%s' for collection '%s'",
                 filename,
                 collection->_info._name);
     }
