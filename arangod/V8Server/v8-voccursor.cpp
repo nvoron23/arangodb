@@ -139,7 +139,7 @@ void TRI_WrapGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& args,
   }
 
   if (result.IsEmpty()) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(result);
@@ -173,7 +173,7 @@ static void JS_CreateCursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (! args[0]->IsArray()) {
-    TRI_V8_TYPE_ERROR("<list> must be a list");
+    TRI_V8_THROW_TYPE_ERROR("<list> must be a list");
   }
 
   // extract objects
@@ -181,7 +181,7 @@ static void JS_CreateCursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_json_t* json = TRI_ObjectToJson(isolate, array);
 
   if (json == nullptr) {
-    TRI_V8_TYPE_ERROR("cannot convert <list> to JSON");
+    TRI_V8_THROW_TYPE_ERROR("cannot convert <list> to JSON");
   }
 
   // return number of total records in cursor?
@@ -216,14 +216,14 @@ static void JS_CreateCursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (cursorResult == nullptr) {
     TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
   
   TRI_general_cursor_t* cursor = TRI_CreateGeneralCursor(vocbase, cursorResult, doCount, batchSize, ttl, nullptr);
 
   if (cursor == nullptr) {
     TRI_FreeCursorResult(cursorResult);
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_WrapGeneralCursor(args, cursor);
@@ -607,7 +607,7 @@ static void JS_Cursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Value> idArg = args[0]->ToString();
 
   if (! idArg->IsString()) {
-    TRI_V8_TYPE_ERROR("expecting a string for <cursor-identifier>)");
+    TRI_V8_THROW_TYPE_ERROR("expecting a string for <cursor-identifier>)");
   }
 
   const string idString = TRI_ObjectToString(idArg);
@@ -645,7 +645,7 @@ static void JS_DeleteCursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Value> idArg = args[0]->ToString();
 
   if (! idArg->IsString()) {
-    TRI_V8_TYPE_ERROR("expecting a string for <cursor-identifier>)");
+    TRI_V8_THROW_TYPE_ERROR("expecting a string for <cursor-identifier>)");
   }
 
   const string idString = TRI_ObjectToString(idArg);

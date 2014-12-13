@@ -158,7 +158,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing an internal exception and returning
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_EXCEPTION_INTERNAL(message)                              \
+#define TRI_V8_THROW_EXCEPTION_INTERNAL(message)			\
   TRI_CreateErrorObject(isolate, TRI_ERROR_INTERNAL, message);          \
   return
 
@@ -166,7 +166,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing a parameter exception and returning
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_EXCEPTION_PARAMETER(message)                             \
+#define TRI_V8_THROW_EXCEPTION_PARAMETER(message)			\
   TRI_CreateErrorObject(isolate, TRI_ERROR_BAD_PARAMETER, message);     \
   return
 
@@ -174,7 +174,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing an out-of-memory exception and returning
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_EXCEPTION_MEMORY()                       \
+#define TRI_V8_THROW_EXCEPTION_MEMORY()			   \
   TRI_CreateErrorObject(isolate, TRI_ERROR_OUT_OF_MEMORY); \
   return
 
@@ -182,7 +182,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing an exception for an system error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_EXCEPTION_SYS(message)                               \
+#define TRI_V8_THROW_EXCEPTION_SYS(message)			    \
   do {                                                              \
     TRI_set_errno(TRI_ERROR_SYS_ERROR);                             \
     std::string msg = message;                                      \
@@ -208,7 +208,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing an error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_ERROR(message)                                           \
+#define TRI_V8_THROW_ERROR(message)					 \
   isolate->ThrowException(v8::Exception::Error(TRI_V8_STRING(message))); \
   return
 
@@ -216,7 +216,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing a range error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_RANGE_ERROR(message)                                     \
+#define TRI_V8_THROW_RANGE_ERROR(message)				      \
   isolate->ThrowException(v8::Exception::RangeError(TRI_V8_STRING(message))); \
   return
 
@@ -224,7 +224,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing a syntax error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_SYNTAX_ERROR(message)                                    \
+#define TRI_V8_THROW_SYNTAX_ERROR(message)                                     \
   isolate->ThrowException(v8::Exception::SyntaxError(TRI_V8_STRING(message))); \
   return
 
@@ -232,7 +232,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing a type error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_TYPE_ERROR(message)                                      \
+#define TRI_V8_THROW_TYPE_ERROR(message)                                     \
   isolate->ThrowException(v8::Exception::TypeError(TRI_V8_STRING(message))); \
   return
 
@@ -240,7 +240,7 @@ static const uint32_t V8DataSlot = 0;
 /// @brief "not yet implemented" handler for sharding
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection)        \
+#define TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection)  \
   if (collection != nullptr && ! collection->_isLocal) {               \
     TRI_V8_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);                       \
   }

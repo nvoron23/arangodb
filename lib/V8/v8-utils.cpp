@@ -417,7 +417,7 @@ static void JS_Parse (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (! source->IsString()) {
-    TRI_V8_TYPE_ERROR("<script> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<script> must be a string");
   }
 
   v8::TryCatch tryCatch;
@@ -428,7 +428,7 @@ static void JS_Parse (const v8::FunctionCallbackInfo<v8::Value>& args) {
     if (tryCatch.CanContinue()) {
       string err = TRI_StringifyV8Exception(isolate, &tryCatch);
 
-      TRI_V8_SYNTAX_ERROR(err.c_str());
+      TRI_V8_THROW_SYNTAX_ERROR(err.c_str());
     }
     else {
       TRI_GET_GLOBALS();
@@ -472,7 +472,7 @@ static void JS_ParseFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<filename> must be a UTF-8 string");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be a UTF-8 string");
   }
 
   size_t length;
@@ -686,7 +686,7 @@ static void JS_Download (const v8::FunctionCallbackInfo<v8::Value>& args) {
       endpoint = "ssl://" + endpoint;
     }
     else {
-      TRI_V8_SYNTAX_ERROR("unsupported URL specified");
+      TRI_V8_THROW_SYNTAX_ERROR("unsupported URL specified");
     }
 
     LOG_TRACE("downloading file. endpoint: %s, relative URL: %s",
@@ -702,7 +702,7 @@ static void JS_Download (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (connection == nullptr) {
       delete ep;
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
 
     SimpleHttpClient* client = new SimpleHttpClient(connection, timeout, false);
@@ -753,7 +753,7 @@ static void JS_Download (const v8::FunctionCallbackInfo<v8::Value>& args) {
         delete ep;
 
         if (! found) {
-          TRI_V8_EXCEPTION_INTERNAL("caught invalid redirect URL");
+          TRI_V8_THROW_EXCEPTION_INTERNAL("caught invalid redirect URL");
         }
 
         numRedirects++;
@@ -807,7 +807,7 @@ static void JS_Download (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN(result);
   }
 
-  TRI_V8_EXCEPTION_INTERNAL("too many redirects");
+  TRI_V8_THROW_EXCEPTION_INTERNAL("too many redirects");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -837,7 +837,7 @@ static void JS_Execute (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Value> filename = args[2];
 
   if (! source->IsString()) {
-    TRI_V8_TYPE_ERROR("<script> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<script> must be a string");
   }
 
   bool useSandbox = sandboxValue->IsObject();
@@ -1001,7 +1001,7 @@ static void JS_Exists (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   if (TRI_ExistsFile(*name)) {
@@ -1033,7 +1033,7 @@ static void JS_SizeFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   if (! TRI_ExistsFile(*name) || TRI_IsDirectory(*name)) {
@@ -1084,7 +1084,7 @@ static void JS_GetTempPath (const v8::FunctionCallbackInfo<v8::Value>& args) {
   char* path = TRI_GetUserTempPath();
 
   if (path == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   v8::Handle<v8::Value> result = TRI_V8_STRING(path);
@@ -1129,7 +1129,7 @@ static void JS_GetTempFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
   char* result = 0;
 
   if (TRI_GetTempName(p, &result, create) != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_INTERNAL("could not create temp file");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("could not create temp file");
   }
 
   const string tempfile(result);
@@ -1160,7 +1160,7 @@ static void JS_IsDirectory (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   // return result
@@ -1193,7 +1193,7 @@ static void JS_IsFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   // return result
@@ -1227,7 +1227,7 @@ static void JS_MakeAbsolute(const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   int err = 0;
@@ -1278,7 +1278,7 @@ static void JS_List (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   // constructed listing
@@ -1323,7 +1323,7 @@ static void JS_ListTree (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   // constructed listing
@@ -1366,7 +1366,7 @@ static void JS_MakeDirectory (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   int res = TRI_CreateDirectory(*name);
@@ -1522,7 +1522,7 @@ static void JS_Load (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<filename> must be a UTF-8 string");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be a UTF-8 string");
   }
 
   size_t length;
@@ -1573,13 +1573,13 @@ static void JS_Log (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC level(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*level == nullptr) {
-    TRI_V8_TYPE_ERROR("<level> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<level> must be a string");
   }
 
   TRI_Utf8ValueNFC message(TRI_UNKNOWN_MEM_ZONE, args[1]);
 
   if (*message == nullptr) {
-    TRI_V8_TYPE_ERROR("<message> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<message> must be a string");
   }
 
   if (TRI_CaseEqualString(*level, "fatal")) {
@@ -1789,13 +1789,13 @@ static void JS_MarkNonce (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC base64u(TRI_CORE_MEM_ZONE, args[0]);
 
   if (base64u.length() != 16) {
-    TRI_V8_TYPE_ERROR("expecting 16-Byte base64url-encoded nonce");
+    TRI_V8_THROW_TYPE_ERROR("expecting 16-Byte base64url-encoded nonce");
   }
 
   string raw = StringUtils::decodeBase64U(*base64u);
 
   if (raw.size() != 12) {
-    TRI_V8_TYPE_ERROR("expecting 12-Byte nonce");
+    TRI_V8_THROW_TYPE_ERROR("expecting 12-Byte nonce");
   }
 
   if (Nonce::checkAndMark(raw)) {
@@ -2041,7 +2041,7 @@ static void JS_Read (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<filename> must be a UTF-8 string");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be a UTF-8 string");
   }
 
   size_t length;
@@ -2078,7 +2078,7 @@ static void JS_ReadBuffer (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<filename> must be a UTF-8 string");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be a UTF-8 string");
   }
 
   size_t length;
@@ -2116,7 +2116,7 @@ static void JS_Read64 (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<filename> must be a UTF-8 string");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be a UTF-8 string");
   }
 
   string base64;
@@ -2153,7 +2153,7 @@ static void JS_Save (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<filename> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be a string");
   }
 
   if (args[1]->IsObject() && V8Buffer::hasInstance(isolate, args[1])) {
@@ -2175,7 +2175,7 @@ static void JS_Save (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_Utf8ValueNFC content(TRI_UNKNOWN_MEM_ZONE, args[1]);
 
     if (*content == nullptr) {
-      TRI_V8_TYPE_ERROR("<content> must be a string");
+      TRI_V8_THROW_TYPE_ERROR("<content> must be a string");
     }
 
     ofstream file;
@@ -2189,7 +2189,7 @@ static void JS_Save (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
 
-  TRI_V8_EXCEPTION_SYS("cannot write file");
+  TRI_V8_THROW_EXCEPTION_SYS("cannot write file");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2215,7 +2215,7 @@ static void JS_Remove (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   int res = TRI_UnlinkFile(*name);
@@ -2250,11 +2250,11 @@ static void JS_RemoveDirectory (const v8::FunctionCallbackInfo<v8::Value>& args)
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   if (! TRI_IsDirectory(*name)) {
-    TRI_V8_EXCEPTION_PARAMETER("<path> must be a valid directory name");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<path> must be a valid directory name");
   }
 
   int res = TRI_RemoveEmptyDirectory(*name);
@@ -2288,11 +2288,11 @@ static void JS_RemoveRecursiveDirectory (const v8::FunctionCallbackInfo<v8::Valu
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<path> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<path> must be a string");
   }
 
   if (! TRI_IsDirectory(*name)) {
-    TRI_V8_EXCEPTION_PARAMETER("<path> must be a valid directory name");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<path> must be a valid directory name");
   }
 
   bool force = false;
@@ -2311,7 +2311,7 @@ static void JS_RemoveRecursiveDirectory (const v8::FunctionCallbackInfo<v8::Valu
         TRI_FreeString(TRI_CORE_MEM_ZONE, tempPath);
       }
 
-      TRI_V8_EXCEPTION_PARAMETER("temporary directory name is too short. will not remove directory");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("temporary directory name is too short. will not remove directory");
     }
 
     const string path(*name);
@@ -2323,7 +2323,7 @@ static void JS_RemoveRecursiveDirectory (const v8::FunctionCallbackInfo<v8::Valu
 #endif
       TRI_FreeString(TRI_CORE_MEM_ZONE, tempPath);
 
-      TRI_V8_EXCEPTION_PARAMETER("directory to be removed is outside of temporary path");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("directory to be removed is outside of temporary path");
     }
 
     TRI_FreeString(TRI_CORE_MEM_ZONE, tempPath);
@@ -2383,7 +2383,7 @@ static void JS_SPrintF (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC format(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*format == nullptr) {
-    TRI_V8_TYPE_ERROR("<format> must be a UTF-8 string");
+    TRI_V8_THROW_TYPE_ERROR("<format> must be a UTF-8 string");
   }
 
   string result;
@@ -2443,7 +2443,7 @@ static void JS_SPrintF (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
             if (*text == nullptr) {
               string msg = StringUtils::itoa(p) + ".th argument must be a string in format '" + *format + "'";
-              TRI_V8_EXCEPTION_PARAMETER(msg.c_str());
+              TRI_V8_THROW_EXCEPTION_PARAMETER(msg.c_str());
             }
 
             ++p;
@@ -2470,7 +2470,7 @@ static void JS_SPrintF (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (*text == nullptr) {
       string msg = StringUtils::itoa(i) + ".th argument must be a string in format '" + *format + "'";
-      TRI_V8_TYPE_ERROR(msg.c_str());
+      TRI_V8_THROW_TYPE_ERROR(msg.c_str());
     }
 
     result += " ";
@@ -3032,7 +3032,7 @@ static void JS_HMAC (const v8::FunctionCallbackInfo<v8::Value>& args) {
       al = SslInterface::Algorithm::ALGORITHM_MD5;
     }
     else {
-      TRI_V8_EXCEPTION_PARAMETER("invalid value for <algorithm>");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <algorithm>");
     }
   }
 
@@ -3090,7 +3090,7 @@ static void JS_ExecuteExternal (const v8::FunctionCallbackInfo<v8::Value>& args)
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<filename> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be a string");
   }
 
   char** arguments = 0;
@@ -3146,7 +3146,7 @@ static void JS_ExecuteExternal (const v8::FunctionCallbackInfo<v8::Value>& args)
     TRI_Free(TRI_CORE_MEM_ZONE, arguments);
   }
   if (external._pid == TRI_INVALID_PROCESS_ID) {
-    TRI_V8_ERROR("Process could not be started");
+    TRI_V8_THROW_ERROR("Process could not be started");
   }
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   result->Set(TRI_V8_ASCII_STRING("pid"), v8::Number::New(isolate, external._pid));
@@ -3265,7 +3265,7 @@ static void JS_ExecuteAndWaitExternal (const v8::FunctionCallbackInfo<v8::Value>
   TRI_Utf8ValueNFC name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*name == nullptr) {
-    TRI_V8_TYPE_ERROR("<filename> must be a string");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be a string");
   }
 
   char** arguments = 0;
@@ -3321,7 +3321,7 @@ static void JS_ExecuteAndWaitExternal (const v8::FunctionCallbackInfo<v8::Value>
     TRI_Free(TRI_CORE_MEM_ZONE, arguments);
   }
   if (external._pid == TRI_INVALID_PROCESS_ID) {
-    TRI_V8_ERROR("Process could not be started");
+    TRI_V8_THROW_ERROR("Process could not be started");
   }
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
   result->Set(TRI_V8_ASCII_STRING("pid"), v8::Number::New(isolate, external._pid));

@@ -95,13 +95,13 @@ static void JS_CasAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_json_t* oldJson = TRI_ObjectToJson(isolate, args[1]);
 
   if (oldJson == 0) {
-    TRI_V8_EXCEPTION_PARAMETER("cannot convert <oldValue> to JSON");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("cannot convert <oldValue> to JSON");
   }
 
   TRI_json_t* newJson = TRI_ObjectToJson(isolate, args[2]);
   if (newJson == 0) {
     TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, oldJson);
-    TRI_V8_EXCEPTION_PARAMETER("cannot convert <newValue> to JSON");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("cannot convert <newValue> to JSON");
   }
 
   double ttl = 0.0;
@@ -510,7 +510,7 @@ static void JS_SetAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_json_t* json = TRI_ObjectToJson(isolate, args[1]);
 
   if (json == 0) {
-    TRI_V8_EXCEPTION_PARAMETER("cannot convert <value> to JSON");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("cannot convert <value> to JSON");
   }
 
   double ttl = 0.0;
@@ -684,7 +684,7 @@ static void JS_UniqidAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (count < 1 || count > 10000000) {
-    TRI_V8_EXCEPTION_PARAMETER("<count> is invalid");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<count> is invalid");
   }
 
   double timeout = 0.0;
@@ -937,11 +937,11 @@ static void JS_GetResponsibleShardClusterInfo (const v8::FunctionCallbackInfo<v8
   }
   
   if (! args[0]->IsString() && ! args[0]->IsStringObject()) {
-    TRI_V8_TYPE_ERROR("expecting a string for <collection-id>)");
+    TRI_V8_THROW_TYPE_ERROR("expecting a string for <collection-id>)");
   }
 
   if (! args[1]->IsObject()) {
-    TRI_V8_TYPE_ERROR("expecting an object for <document>)");
+    TRI_V8_THROW_TYPE_ERROR("expecting an object for <document>)");
   }
 
   bool documentIsComplete = true;
@@ -952,7 +952,7 @@ static void JS_GetResponsibleShardClusterInfo (const v8::FunctionCallbackInfo<v8
   TRI_json_t* json = TRI_ObjectToJson(isolate, args[1]);
 
   if (json == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   ShardID shardId;
@@ -1049,7 +1049,7 @@ static void JS_UniqidClusterInfo (const v8::FunctionCallbackInfo<v8::Value>& arg
   }
 
   if (count == 0) {
-    TRI_V8_EXCEPTION_PARAMETER("<count> is invalid");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<count> is invalid");
   }
 
   uint64_t value = ClusterInfo::instance()->uniqid();
@@ -1361,7 +1361,7 @@ static void JS_SetRoleServerState (const v8::FunctionCallbackInfo<v8::Value>& ar
   ServerState::RoleEnum r = ServerState::stringToRole(role);
 
   if (r == ServerState::ROLE_UNDEFINED) {
-    TRI_V8_EXCEPTION_PARAMETER("<role> is invalid");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<role> is invalid");
   }
 
   ServerState::instance()->setRole(r);
@@ -1638,7 +1638,7 @@ static void JS_AsyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
   // 31.7.2014 Max
 
   // if (ServerState::instance()->getRole() != ServerState::ROLE_COORDINATOR) {
-  //  TRI_V8_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
+  //  TRI_V8_THROW_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
   //}
 
   ClusterComm* cc = ClusterComm::instance();
@@ -1699,7 +1699,7 @@ static void JS_SyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
   // 31.7.2014 Max
 
   //if (ServerState::instance()->getRole() != ServerState::ROLE_COORDINATOR) {
-  //  TRI_V8_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
+  //  TRI_V8_THROW_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
   //}
 
   ClusterComm* cc = ClusterComm::instance();
@@ -1755,7 +1755,7 @@ static void JS_Enquire (const v8::FunctionCallbackInfo<v8::Value>& args) {
   // 31.7.2014 Max
   
   // if (ServerState::instance()->getRole() != ServerState::ROLE_COORDINATOR) {
-  //   TRI_V8_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
+  //   TRI_V8_THROW_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
   // }
 
   ClusterComm* cc = ClusterComm::instance();
@@ -1799,7 +1799,7 @@ static void JS_Wait (const v8::FunctionCallbackInfo<v8::Value>& args) {
   // 31.7.2014 Max
 
   // if (ServerState::instance()->getRole() != ServerState::ROLE_COORDINATOR) {
-  //   TRI_V8_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
+  //   TRI_V8_THROW_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
   // }
 
   ClusterComm* cc = ClusterComm::instance();
@@ -1880,7 +1880,7 @@ static void JS_Drop (const v8::FunctionCallbackInfo<v8::Value>& args) {
   // 31.7.2014 Max
 
   // if (ServerState::instance()->getRole() != ServerState::ROLE_COORDINATOR) {
-  //   TRI_V8_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
+  //   TRI_V8_THROW_EXCEPTION_INTERNAL(scope,"request works only in coordinator role");
   // }
 
   ClusterComm* cc = ClusterComm::instance();

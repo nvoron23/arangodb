@@ -218,7 +218,7 @@ static int SetupExampleObject (v8::Handle<v8::Object> const example,
 
   if (pids == 0) {
     // out of memory
-    TRI_V8_EXCEPTION_MEMORY()
+    TRI_V8_THROW_EXCEPTION_MEMORY()
       TRI_ERROR_OUT_OF_MEMORY;
   }
 
@@ -229,7 +229,7 @@ static int SetupExampleObject (v8::Handle<v8::Object> const example,
     // out of memory
     TRI_Free(TRI_UNKNOWN_MEM_ZONE, pids);
     pids = 0;
-    TRI_V8_EXCEPTION_MEMORY() TRI_ERROR_OUT_OF_MEMORY;
+    TRI_V8_THROW_EXCEPTION_MEMORY() TRI_ERROR_OUT_OF_MEMORY;
   }
 
   // convert
@@ -629,7 +629,7 @@ static void ExecuteSkiplistQuery (const v8::FunctionCallbackInfo<v8::Value>& arg
       msg = "<conditions> must be an object";
     }
 
-    TRI_V8_TYPE_ERROR(msg.c_str());
+    TRI_V8_THROW_TYPE_ERROR(msg.c_str());
   }
 
   bool reverse = false;
@@ -641,10 +641,10 @@ static void ExecuteSkiplistQuery (const v8::FunctionCallbackInfo<v8::Value>& arg
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), col->_vocbase, col->_cid);
 
@@ -766,7 +766,7 @@ static void ExecuteSkiplistQuery (const v8::FunctionCallbackInfo<v8::Value>& arg
   result->Set(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, count));
 
   if (error) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   return TRI_V8_RETURN(result);
@@ -874,10 +874,10 @@ static void EdgesQuery (TRI_edge_direction_e direction,
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   if (col->_type != TRI_COL_TYPE_EDGE) {
     TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_TYPE_INVALID);
@@ -1002,7 +1002,7 @@ static void EdgesQuery (TRI_edge_direction_e direction,
   // .............................................................................
 
   if (error) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(documents);
@@ -1029,10 +1029,10 @@ static void JS_AllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   // extract skip and limit
   TRI_voc_ssize_t skip;
@@ -1072,7 +1072,7 @@ static void JS_AllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     v8::Handle<v8::Value> doc = WRAP_SHAPED_JSON(trx, col->_cid, docs[i].getDataPtr());
 
     if (doc.IsEmpty()) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
     else {
       documents->Set(v8::Number::New(isolate, count++), doc);
@@ -1103,16 +1103,16 @@ static void JS_NthQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   uint64_t const partitionId = TRI_ObjectToUInt64(args[0], false);
   uint64_t const numberOfPartitions = TRI_ObjectToUInt64(args[1], false);
 
   if (partitionId >= numberOfPartitions || numberOfPartitions == 0) {
-    TRI_V8_EXCEPTION_PARAMETER("invalid value for <partitionId> or <numberOfPartitions>");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <partitionId> or <numberOfPartitions>");
   }
   
   uint32_t total = 0;
@@ -1148,7 +1148,7 @@ static void JS_NthQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     v8::Handle<v8::Value> doc = WRAP_SHAPED_JSON(trx, col->_cid, docs[i].getDataPtr());
 
     if (doc.IsEmpty()) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
     else {
       documents->Set(v8::Number::New(isolate, count++), doc);
@@ -1179,16 +1179,16 @@ static void JS_Nth2Query (const v8::FunctionCallbackInfo<v8::Value>& args) {
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   uint64_t const partitionId = TRI_ObjectToUInt64(args[0], false);
   uint64_t const numberOfPartitions = TRI_ObjectToUInt64(args[1], false);
 
   if (partitionId >= numberOfPartitions || numberOfPartitions == 0) {
-    TRI_V8_EXCEPTION_PARAMETER("invalid value for <partitionId> or <numberOfPartitions>");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <partitionId> or <numberOfPartitions>");
   }
   
   uint32_t total = 0;
@@ -1248,7 +1248,7 @@ static void JS_Nth3Query (const v8::FunctionCallbackInfo<v8::Value>& args) {
   uint64_t const numberOfPartitions = TRI_ObjectToUInt64(args[1], false);
 
   if (numberOfPartitions == 0) {
-    TRI_V8_EXCEPTION_PARAMETER("invalid value for <numberOfPartitions>");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <numberOfPartitions>");
   }
   
   uint64_t hash = TRI_FnvHashPointer(static_cast<void const*>(key.c_str()), key.size());
@@ -1274,10 +1274,10 @@ static void JS_OffsetQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   TRI_voc_size_t internalSkip = (TRI_voc_size_t) TRI_ObjectToDouble(args[0]);
   TRI_voc_size_t batchSize = (TRI_voc_size_t) TRI_ObjectToDouble(args[1]);
@@ -1320,7 +1320,7 @@ static void JS_OffsetQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     v8::Handle<v8::Value> document = WRAP_SHAPED_JSON(trx, col->_cid, docs[i].getDataPtr());
 
     if (document.IsEmpty()) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
     else {
       documents->Set(v8::Number::New(isolate, count++), document);
@@ -1358,7 +1358,7 @@ static void JS_AnyQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   TRI_doc_mptr_copy_t document;
@@ -1387,7 +1387,7 @@ static void JS_AnyQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Handle<v8::Value> doc = WRAP_SHAPED_JSON(trx, col->_cid, document.getDataPtr());
 
   if (doc.IsEmpty()) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(doc);
@@ -1408,7 +1408,7 @@ static void JS_ByExampleQuery (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
   // extract the example
   if (! args[0]->IsObject()) {
-    TRI_V8_TYPE_ERROR("<example> must be an object");
+    TRI_V8_THROW_TYPE_ERROR("<example> must be an object");
   }
 
 
@@ -1416,10 +1416,10 @@ static void JS_ByExampleQuery (const v8::FunctionCallbackInfo<v8::Value>& args) 
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), col->_vocbase, col->_cid);
 
@@ -1478,7 +1478,7 @@ static void JS_ByExampleQuery (const v8::FunctionCallbackInfo<v8::Value>& args) 
     filtered = TRI_SelectByExample(trx.trxCollection(), n,  pids, values);
   }
   catch (std::exception&) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   trx.finish(res);
@@ -1520,7 +1520,7 @@ static void JS_ByExampleQuery (const v8::FunctionCallbackInfo<v8::Value>& args) 
   CleanupExampleObject(shaper->_memoryZone, n, pids, values);
 
   if (error) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(result);
@@ -1545,13 +1545,13 @@ static void ByExampleHashIndexQuery (SingleCollectionReadOnlyTransaction& trx,
 
   // extract the example
   if (! args[1]->IsObject()) {
-    TRI_V8_TYPE_ERROR("<example> must be an object");
+    TRI_V8_THROW_TYPE_ERROR("<example> must be an object");
   }
 
   v8::Handle<v8::Object> example = args[1]->ToObject();
 
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   // extract skip and limit
@@ -1636,7 +1636,7 @@ static void ByExampleHashIndexQuery (SingleCollectionReadOnlyTransaction& trx,
   result->Set(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, (double) count));
 
   if (error) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(result);
@@ -1654,10 +1654,10 @@ static void JS_ByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>& ar
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), col->_vocbase, col->_cid);
 
@@ -1818,10 +1818,10 @@ static void JS_ChecksumCollection (const v8::FunctionCallbackInfo<v8::Value>& ar
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   bool withRevisions = false;
   if (args.Length() > 0) {
@@ -1972,14 +1972,14 @@ static void JS_FirstQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (count < 1) {
-    TRI_V8_EXCEPTION_PARAMETER("invalid value for <count>");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <count>");
   }
 
   TRI_vocbase_col_t const* col;
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), col->_vocbase, col->_cid);
@@ -2006,7 +2006,7 @@ static void JS_FirstQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
       if (doc.IsEmpty()) {
         // error
-        TRI_V8_EXCEPTION_MEMORY();
+        TRI_V8_THROW_EXCEPTION_MEMORY();
       }
 
       result->Set(v8::Number::New(isolate, j++), doc);
@@ -2022,7 +2022,7 @@ static void JS_FirstQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     v8::Handle<v8::Value> result = WRAP_SHAPED_JSON(trx, col->_cid, documents[0].getDataPtr());
 
     if (result.IsEmpty()) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
 
     TRI_V8_RETURN(result);
@@ -2063,7 +2063,7 @@ static void FulltextQuery (SingleCollectionReadOnlyTransaction& trx,
   TRI_fulltext_query_t* query = TRI_CreateQueryFulltextIndex(TRI_FULLTEXT_SEARCH_MAX_WORDS);
 
   if (! query) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   int res = TRI_ParseQueryFulltextIndex(query, queryString.c_str(), &isSubstringQuery);
@@ -2085,7 +2085,7 @@ static void FulltextQuery (SingleCollectionReadOnlyTransaction& trx,
   TRI_fulltext_result_t* queryResult = TRI_QueryFulltextIndex(fulltextIndex->_fulltextIndex, query);
 
   if (! queryResult) {
-    TRI_V8_EXCEPTION_INTERNAL("internal error in fulltext index query");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("internal error in fulltext index query");
   }
 
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
@@ -2114,7 +2114,7 @@ static void FulltextQuery (SingleCollectionReadOnlyTransaction& trx,
   TRI_FreeResultFulltextIndex(queryResult);
 
   if (error) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(result);
@@ -2153,10 +2153,10 @@ static void JS_FulltextQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), col->_vocbase, col->_cid);
 
@@ -2207,17 +2207,17 @@ static void JS_LastQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (count < 1) {
-    TRI_V8_EXCEPTION_PARAMETER("invalid value for <count>");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <count>");
   }
 
   TRI_vocbase_col_t const* col;
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), col->_vocbase, col->_cid);
 
@@ -2243,7 +2243,7 @@ static void JS_LastQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
       if (doc.IsEmpty()) {
         // error
-        TRI_V8_EXCEPTION_MEMORY();
+        TRI_V8_THROW_EXCEPTION_MEMORY();
       }
 
       result->Set(v8::Number::New(isolate, j++), doc);
@@ -2259,7 +2259,7 @@ static void JS_LastQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     v8::Handle<v8::Value> result = WRAP_SHAPED_JSON(trx, col->_cid, documents[0].getDataPtr());
 
     if (result.IsEmpty()) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
 
     TRI_V8_RETURN(result);
@@ -2336,10 +2336,10 @@ static void JS_NearQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), col->_vocbase, col->_cid);
 
@@ -2463,10 +2463,10 @@ static void JS_WithinQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
 
   if (col == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(col);
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), col->_vocbase, col->_cid);
 

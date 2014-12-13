@@ -131,7 +131,7 @@ static void JS_ProcessCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
   TRI_Utf8ValueNFC filename(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*filename == 0) {
-    TRI_V8_TYPE_ERROR("<filename> must be an UTF8 filename");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be an UTF8 filename");
   }
 
   // extract the callback
@@ -152,7 +152,7 @@ static void JS_ProcessCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
       separator = TRI_ObjectToString(options->Get(separatorKey));
 
       if (separator.size() != 1) {
-        TRI_V8_TYPE_ERROR("<options>.separator must be exactly one character");
+        TRI_V8_THROW_TYPE_ERROR("<options>.separator must be exactly one character");
       }
     }
 
@@ -161,7 +161,7 @@ static void JS_ProcessCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
       quote = TRI_ObjectToString(options->Get(quoteKey));
 
       if (quote.length() > 1) {
-        TRI_V8_TYPE_ERROR("<options>.quote must be at most one character");
+        TRI_V8_THROW_TYPE_ERROR("<options>.quote must be at most one character");
       }
     }
   }
@@ -170,7 +170,7 @@ static void JS_ProcessCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
   int fd = TRI_OPEN(*filename, O_RDONLY);
 
   if (fd < 0) {
-    TRI_V8_EXCEPTION_SYS("cannot open file");
+    TRI_V8_THROW_EXCEPTION_SYS("cannot open file");
   }
 
   TRI_csv_parser_t parser;
@@ -203,7 +203,7 @@ static void JS_ProcessCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
     if (n < 0) {
       TRI_DestroyCsvParser(&parser);
       TRI_CLOSE(fd);
-      TRI_V8_EXCEPTION_SYS("cannot read file");
+      TRI_V8_THROW_EXCEPTION_SYS("cannot read file");
     }
     else if (n == 0) {
       TRI_DestroyCsvParser(&parser);
@@ -248,7 +248,7 @@ static void JS_ProcessJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args)
   TRI_Utf8ValueNFC filename(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*filename == 0) {
-    TRI_V8_TYPE_ERROR("<filename> must be an UTF8 filename");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be an UTF8 filename");
   }
 
   // extract the callback
@@ -283,7 +283,7 @@ static void JS_ProcessJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args)
         if (error != 0) {
           string msg = error;
           TRI_FreeString(TRI_CORE_MEM_ZONE, error);
-          TRI_V8_SYNTAX_ERROR(msg.c_str());
+          TRI_V8_THROW_SYNTAX_ERROR(msg.c_str());
         }
         else {
           TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -304,7 +304,7 @@ static void JS_ProcessJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args)
     file.close();
   }
   else {
-    TRI_V8_EXCEPTION_SYS("cannot open file");
+    TRI_V8_THROW_EXCEPTION_SYS("cannot open file");
   }
 
   TRI_V8_RETURN_UNDEFINED();

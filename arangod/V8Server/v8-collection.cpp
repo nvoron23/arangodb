@@ -434,7 +434,7 @@ static void DocumentVocbaseCol (bool useCollection,
     col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
     if (col == nullptr) {
-      TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+      TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
     }
 
     vocbase = col->_vocbase;
@@ -478,7 +478,7 @@ static void DocumentVocbaseCol (bool useCollection,
   }
 
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   v8::Handle<v8::Value> result;
@@ -610,7 +610,7 @@ static void ExistsVocbaseCol (bool useCollection,
     col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
     if (col == nullptr) {
-      TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+      TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
     }
 
     vocbase = col->_vocbase;
@@ -656,7 +656,7 @@ static void ExistsVocbaseCol (bool useCollection,
   }
 
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_doc_mptr_copy_t document;
@@ -836,7 +836,7 @@ void ReplaceVocbaseCol (bool useCollection,
     col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
     if (col == nullptr) {
-      TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+      TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
     }
 
     vocbase = col->_vocbase;
@@ -891,7 +891,7 @@ void ReplaceVocbaseCol (bool useCollection,
   TRI_doc_mptr_copy_t mptr;
 
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   // we must lock here, because below we are
@@ -906,7 +906,7 @@ void ReplaceVocbaseCol (bool useCollection,
     TRI_json_t* json = TRI_ObjectToJson(isolate, args[1]);
 
     if (json == nullptr) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
 
     res = trx.read(&mptr, key.get());
@@ -922,7 +922,7 @@ void ReplaceVocbaseCol (bool useCollection,
 
     if (old == nullptr) {
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
 
     if (shardKeysChanged(col->_dbName, cidString, old, json, false)) {
@@ -1031,7 +1031,7 @@ static void InsertVocbaseCol (TRI_vocbase_col_t* col,
   // fetch a barrier so nobody unlinks datafiles with the shapes & attributes we might
   // need for this document
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_document_collection_t* document = trx.documentCollection();
@@ -1142,7 +1142,7 @@ static void UpdateVocbaseCol (bool useCollection,
     col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
     if (col == nullptr) {
-      TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+      TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
     }
 
     vocbase = col->_vocbase;
@@ -1218,7 +1218,7 @@ static void UpdateVocbaseCol (bool useCollection,
 
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
     TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
 
@@ -1231,7 +1231,7 @@ static void UpdateVocbaseCol (bool useCollection,
 
   if (old == nullptr) {
     TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   if (ServerState::instance()->isDBserver()) {
@@ -1251,7 +1251,7 @@ static void UpdateVocbaseCol (bool useCollection,
   TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
 
   if (patchedJson == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   res = trx.updateDocument(key.get(), &mptr, patchedJson, policy, options.waitForSync, rid, &actualRevision);
@@ -1414,7 +1414,7 @@ static void RemoveVocbaseCol (bool useCollection,
     col = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
     if (col == nullptr) {
-      TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+      TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
     }
 
     vocbase = col->_vocbase;
@@ -1590,7 +1590,7 @@ static void JS_DropVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args) 
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   PREVENT_EMBEDDED_TRANSACTION();
@@ -1789,7 +1789,7 @@ static void JS_FiguresVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& arg
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
@@ -1804,7 +1804,7 @@ static void JS_FiguresVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& arg
   }
 
   if (info == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   v8::Handle<v8::Object> alive = v8::Object::New(isolate);
@@ -1907,7 +1907,7 @@ static void JS_LoadVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args) 
     TRI_vocbase_col_t const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
     if (collection == nullptr) {
-      TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+      TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
     }
 
     string const databaseName(collection->_dbName);
@@ -1943,7 +1943,7 @@ static void JS_NameVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args) 
   TRI_vocbase_col_t const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (! collection->_isLocal) {
@@ -1973,7 +1973,7 @@ static void JS_PlanIdVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
   TRI_vocbase_col_t const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -2067,7 +2067,7 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
   TRI_vocbase_col_t const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -2101,7 +2101,7 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
             if (info._keyOptions != nullptr) {
               TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, info._keyOptions);
             }
-            TRI_V8_EXCEPTION_PARAMETER("<properties>.journalSize too small");
+            TRI_V8_THROW_EXCEPTION_PARAMETER("<properties>.journalSize too small");
           }
         }
 
@@ -2111,7 +2111,7 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
             if (info._keyOptions != nullptr) {
               TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, info._keyOptions);
             }
-            TRI_V8_EXCEPTION_PARAMETER("isVolatile option cannot be changed at runtime");
+            TRI_V8_THROW_EXCEPTION_PARAMETER("isVolatile option cannot be changed at runtime");
           }
         }
 
@@ -2119,7 +2119,7 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
           if (info._keyOptions != nullptr) {
             TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, info._keyOptions);
           }
-          TRI_V8_EXCEPTION_PARAMETER("volatile collections do not support the waitForSync option");
+          TRI_V8_THROW_EXCEPTION_PARAMETER("volatile collections do not support the waitForSync option");
         }
       }
 
@@ -2210,7 +2210,7 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
 
         if (maximalSize < TRI_JOURNAL_MINIMAL_SIZE) {
           ReleaseCollection(collection);
-          TRI_V8_EXCEPTION_PARAMETER("<properties>.journalSize too small");
+          TRI_V8_THROW_EXCEPTION_PARAMETER("<properties>.journalSize too small");
         }
       }
 
@@ -2218,14 +2218,14 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
       if (po->Has(IsVolatileKey)) {
         if (TRI_ObjectToBoolean(po->Get(IsVolatileKey)) != base->_info._isVolatile) {
           ReleaseCollection(collection);
-          TRI_V8_EXCEPTION_PARAMETER("isVolatile option cannot be changed at runtime");
+          TRI_V8_THROW_EXCEPTION_PARAMETER("isVolatile option cannot be changed at runtime");
         }
       }
 
       if (base->_info._isVolatile && waitForSync) {
         // the combination of waitForSync and isVolatile makes no sense
         ReleaseCollection(collection);
-        TRI_V8_EXCEPTION_PARAMETER("volatile collections do not support the waitForSync option");
+        TRI_V8_THROW_EXCEPTION_PARAMETER("volatile collections do not support the waitForSync option");
       }
 
       // update collection
@@ -2418,13 +2418,13 @@ static void JS_RenameVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
   }
 
   if (name.empty()) {
-    TRI_V8_EXCEPTION_PARAMETER("<name> must be non-empty");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<name> must be non-empty");
   }
 
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   PREVENT_EMBEDDED_TRANSACTION();
@@ -2586,7 +2586,7 @@ static void JS_RevisionVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& ar
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   TRI_voc_rid_t rid;
@@ -2638,7 +2638,7 @@ static void JS_RotateVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
     return;
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
 
   TRI_document_collection_t* document = collection->_collection;
 
@@ -3001,7 +3001,7 @@ static void InsertEdgeCol (TRI_vocbase_col_t* col,
   // fetch a barrier so nobody unlinks datafiles with the shapes & attributes we might
   // need for this document
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   // extract shaped data
@@ -3182,7 +3182,7 @@ static void JS_InsertVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -3216,7 +3216,7 @@ static void JS_StatusVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -3253,10 +3253,10 @@ static void JS_TruncateVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& ar
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
 
   SingleCollectionWriteTransaction<UINT64_MAX> trx(new V8TransactionContext(true), collection->_vocbase, collection->_cid);
   int res = trx.begin();
@@ -3266,7 +3266,7 @@ static void JS_TruncateVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& ar
   }
 
   if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   res = trx.truncate(forceSync);
@@ -3290,10 +3290,10 @@ static void JS_TruncateDatafileVocbaseCol (const v8::FunctionCallbackInfo<v8::Va
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
 
   if (args.Length() != 2) {
     TRI_V8_EXCEPTION_USAGE("truncateDatafile(<datafile>, <size>)");
@@ -3339,7 +3339,7 @@ static void JS_TypeVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args) 
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -3393,7 +3393,7 @@ static void JS_UnloadVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   int res;
@@ -3426,7 +3426,7 @@ static void JS_VersionVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& arg
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -3461,10 +3461,10 @@ static void JS_CheckPointersVocbaseCol (const v8::FunctionCallbackInfo<v8::Value
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
 
   SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), collection->_vocbase, collection->_cid);
 
@@ -3663,7 +3663,7 @@ static void JS_CollectionVocbase (const v8::FunctionCallbackInfo<v8::Value>& arg
   v8::Handle<v8::Value> result = WrapCollection(isolate, collection);
 
   if (result.IsEmpty()) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(result);
@@ -3728,7 +3728,7 @@ static void JS_CollectionsVocbase (const v8::FunctionCallbackInfo<v8::Value>& ar
   TRI_DestroyVectorPointer(&colls);
 
   if (error) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(result);
@@ -4114,7 +4114,7 @@ static void JS_CountVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args)
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (args.Length() != 0) {
@@ -4173,10 +4173,10 @@ static void JS_DatafilesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
-  TRI_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
 
   TRI_READ_LOCK_STATUS_VOCBASE_COL(collection);
 
@@ -4247,7 +4247,7 @@ static void JS_DatafileScanVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (args.Length() != 1) {

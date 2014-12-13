@@ -563,7 +563,7 @@ class KeySpace {
         TRI_json_t* list = TRI_CreateList2Json(TRI_UNKNOWN_MEM_ZONE, 1);
 
         if (list == nullptr) {
-          TRI_V8_EXCEPTION_MEMORY();
+          TRI_V8_THROW_EXCEPTION_MEMORY();
         }
 
         TRI_PushBack2ListJson(list, sourceItem);
@@ -577,7 +577,7 @@ class KeySpace {
           TRI_V8_RETURN(TRI_ObjectJson(isolate, sourceItem));
         }
         catch (...) {
-          TRI_V8_EXCEPTION_MEMORY();
+          TRI_V8_THROW_EXCEPTION_MEMORY();
         }
       }
 
@@ -864,7 +864,7 @@ static void JS_KeyspaceCreate (const v8::FunctionCallbackInfo<v8::Value>& args) 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -873,7 +873,7 @@ static void JS_KeyspaceCreate (const v8::FunctionCallbackInfo<v8::Value>& args) 
   if (args.Length() > 1) {
     size = TRI_ObjectToInt64(args[1]);
     if (size < 0 || size > static_cast<decltype(size)>(UINT32_MAX)) {
-      TRI_V8_EXCEPTION_PARAMETER("invalid value for <size>");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <size>");
     }
   }
 
@@ -901,7 +901,7 @@ static void JS_KeyspaceCreate (const v8::FunctionCallbackInfo<v8::Value>& args) 
       h->data.emplace(std::make_pair(name, ptr.release()));
     }
     catch (...) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
   }
 
@@ -924,7 +924,7 @@ static void JS_KeyspaceDrop (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -963,7 +963,7 @@ static void JS_KeyspaceCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1008,7 +1008,7 @@ static void JS_KeyspaceExists (const v8::FunctionCallbackInfo<v8::Value>& args) 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1042,7 +1042,7 @@ static void JS_KeyspaceKeys (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1081,7 +1081,7 @@ static void JS_KeyspaceGet (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1121,7 +1121,7 @@ static void JS_KeyspaceRemove (const v8::FunctionCallbackInfo<v8::Value>& args) 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1161,7 +1161,7 @@ static void JS_KeyGet (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1201,7 +1201,7 @@ static void JS_KeySet (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1251,7 +1251,7 @@ static void JS_KeySetCas (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1306,7 +1306,7 @@ static void JS_KeyRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
   
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1351,7 +1351,7 @@ static void JS_KeyExists (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
   
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1400,7 +1400,7 @@ static void JS_KeyIncr (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1450,7 +1450,7 @@ static void JS_KeyUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1490,7 +1490,7 @@ static void JS_KeyKeys (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1525,7 +1525,7 @@ static void JS_KeyValues (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1560,7 +1560,7 @@ static void JS_KeyPush (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1601,7 +1601,7 @@ static void JS_KeyPop (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1636,7 +1636,7 @@ static void JS_KeyTransfer (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name    = TRI_ObjectToString(args[0]);
@@ -1672,7 +1672,7 @@ static void JS_KeyGetAt (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1708,7 +1708,7 @@ static void JS_KeySetAt (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
 
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1749,7 +1749,7 @@ static void JS_KeyType (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
   
   std::string const&& name = TRI_ObjectToString(args[0]);
@@ -1789,7 +1789,7 @@ static void JS_KeyCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract vocbase");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract vocbase");
   }
   
   std::string const&& name = TRI_ObjectToString(args[0]);

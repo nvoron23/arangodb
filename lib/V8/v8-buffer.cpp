@@ -69,18 +69,18 @@ using namespace std;
 
 #define SLICE_ARGS(start_arg, end_arg)                               \
   if (!start_arg->IsInt32() || !end_arg->IsInt32()) {                \
-    TRI_V8_TYPE_ERROR("bad argument");                               \
+    TRI_V8_THROW_TYPE_ERROR("bad argument");                               \
   }                                                                  \
   int32_t start = start_arg->Int32Value();                           \
   int32_t end = end_arg->Int32Value();                               \
   if (start < 0 || end < 0) {                                        \
-    TRI_V8_TYPE_ERROR("bad argument");                               \
+    TRI_V8_THROW_TYPE_ERROR("bad argument");                               \
   }                                                                  \
   if (!(start <= end)) {                                             \
-    TRI_V8_ERROR("must have start <= end");                          \
+    TRI_V8_THROW_ERROR("must have start <= end");                          \
   }                                                                  \
   if ((size_t)end > parent->_length) {                               \
-    TRI_V8_ERROR("end cannot be longer than parent.length");         \
+    TRI_V8_THROW_ERROR("end cannot be longer than parent.length");         \
   }                                                                  \
   while (0)
 
@@ -667,13 +667,13 @@ void V8Buffer::New (v8::FunctionCallbackInfo<v8::Value> const& args) {
   }
 
   if (! args[0]->IsUint32()) {
-    TRI_V8_TYPE_ERROR("bad argument");
+    TRI_V8_THROW_TYPE_ERROR("bad argument");
   }
 
   size_t length = args[0]->Uint32Value();
 
   if (length > kMaxLength) {
-    TRI_V8_RANGE_ERROR("length > kMaxLength");
+    TRI_V8_THROW_RANGE_ERROR("length > kMaxLength");
   }
 
   new V8Buffer(isolate, args.This(), length);
@@ -1106,7 +1106,7 @@ static void JS_Copy (const v8::FunctionCallbackInfo<v8::Value>& args) {
                       : args[3]->Uint32Value();
 
   if (source_end < source_start) {
-    TRI_V8_RANGE_ERROR("sourceEnd < sourceStart");
+    TRI_V8_THROW_RANGE_ERROR("sourceEnd < sourceStart");
   }
 
   // Copy 0 bytes; we're done
@@ -1115,15 +1115,15 @@ static void JS_Copy (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (target_start >= target_length) {
-    TRI_V8_RANGE_ERROR("targetStart out of bounds");
+    TRI_V8_THROW_RANGE_ERROR("targetStart out of bounds");
   }
 
   if (source_start >= source->_length) {
-    TRI_V8_RANGE_ERROR("sourceStart out of bounds");
+    TRI_V8_THROW_RANGE_ERROR("sourceStart out of bounds");
   }
 
   if (source_end > source->_length) {
-    TRI_V8_RANGE_ERROR("sourceEnd out of bounds");
+    TRI_V8_THROW_RANGE_ERROR("sourceEnd out of bounds");
   }
 
   size_t to_copy = MIN(MIN(source_end - source_start,
@@ -1163,7 +1163,7 @@ static void JS_Utf8Write(const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (length > 0 && offset >= buffer->_length) {
-    TRI_V8_RANGE_ERROR("<offset> is out of bounds");
+    TRI_V8_THROW_RANGE_ERROR("<offset> is out of bounds");
   }
 
   size_t max_length = args[2]->IsUndefined() ? buffer->_length - offset
@@ -1202,7 +1202,7 @@ static void JS_Ucs2Write (const v8::FunctionCallbackInfo<v8::Value>& args) {
   size_t offset = args[1]->Uint32Value();
 
   if (s->Length() > 0 && offset >= buffer->_length) {
-    TRI_V8_RANGE_ERROR("<offset> is out of bounds");
+    TRI_V8_THROW_RANGE_ERROR("<offset> is out of bounds");
   }
 
   size_t max_length = args[2]->IsUndefined()
@@ -1240,7 +1240,7 @@ static void JS_HexWrite (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Local<v8::String> s = args[0].As<v8::String>();
 
   if (s->Length() % 2 != 0) {
-    TRI_V8_TYPE_ERROR("invalid hex string");
+    TRI_V8_THROW_TYPE_ERROR("invalid hex string");
   }
 
   uint32_t start = args[1]->Uint32Value();
@@ -1275,7 +1275,7 @@ static void JS_HexWrite (const v8::FunctionCallbackInfo<v8::Value>& args) {
     unsigned b = hex2bin(src[i * 2 + 1]);
 
     if (!~a || !~b) {
-      TRI_V8_TYPE_ERROR("invalid hex string");
+      TRI_V8_THROW_TYPE_ERROR("invalid hex string");
     }
 
     dst[i] = a * 16 + b;
@@ -1304,7 +1304,7 @@ static void JS_AsciiWrite (const v8::FunctionCallbackInfo<v8::Value>& args) {
   size_t offset = args[1]->Int32Value();
 
   if (length > 0 && offset >= buffer->_length) {
-    TRI_V8_TYPE_ERROR("<offset> is out of bounds");
+    TRI_V8_THROW_TYPE_ERROR("<offset> is out of bounds");
   }
 
   size_t max_length = args[2]->IsUndefined()
@@ -1348,7 +1348,7 @@ static void JS_Base64Write (const v8::FunctionCallbackInfo<v8::Value>& args) {
   max_length = MIN(length, MIN(buffer->_length - offset, max_length));
 
   if (max_length && offset >= buffer->_length) {
-    TRI_V8_TYPE_ERROR("<offset> is out of bounds");
+    TRI_V8_THROW_TYPE_ERROR("<offset> is out of bounds");
   }
 
   char a, b, c, d;
@@ -1409,7 +1409,7 @@ static void JS_BinaryWrite (const v8::FunctionCallbackInfo<v8::Value>& args) {
   size_t offset = args[1]->Int32Value();
 
   if (s->Length() > 0 && offset >= buffer->_length) {
-    TRI_V8_TYPE_ERROR("<offset> is out of bounds");
+    TRI_V8_THROW_TYPE_ERROR("<offset> is out of bounds");
   }
 
   char *p = (char*)buffer->_data + offset;
@@ -1440,14 +1440,14 @@ static void ReadFloatGeneric (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (doTRI_ASSERT) {
     if (offset_tmp != offset || offset < 0) {
-      TRI_V8_TYPE_ERROR("<offset> is not uint");
+      TRI_V8_THROW_TYPE_ERROR("<offset> is not uint");
     }
 
     size_t len = static_cast<size_t>(
       args.This()->GetIndexedPropertiesExternalArrayDataLength());
 
     if (offset + sizeof(T) > len) {
-      TRI_V8_RANGE_ERROR("trying to read beyond buffer length");
+      TRI_V8_THROW_RANGE_ERROR("trying to read beyond buffer length");
     }
   }
 
@@ -1511,11 +1511,11 @@ static void WriteFloatGeneric (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
   if (doTRI_ASSERT) {
     if (!args[0]->IsNumber()) {
-      TRI_V8_TYPE_ERROR("<value> not a number");
+      TRI_V8_THROW_TYPE_ERROR("<value> not a number");
     }
 
     if (!args[1]->IsUint32()) {
-      TRI_V8_TYPE_ERROR("<offset> is not uint");
+      TRI_V8_THROW_TYPE_ERROR("<offset> is not uint");
     }
   }
 
@@ -1530,7 +1530,7 @@ static void WriteFloatGeneric (const v8::FunctionCallbackInfo<v8::Value>& args) 
       args.This()->GetIndexedPropertiesExternalArrayDataLength());
 
     if (offset + sizeof(T) > len || offset + sizeof(T) < offset) {
-      TRI_V8_RANGE_ERROR("trying to write beyond buffer length");
+      TRI_V8_THROW_RANGE_ERROR("trying to write beyond buffer length");
     }
   }
 
@@ -1613,16 +1613,16 @@ static void JS_MakeFastBuffer (const v8::FunctionCallbackInfo<v8::Value>& args) 
   uint32_t length = args[3]->Uint32Value();
 
   if (offset > buffer->_length) {
-    TRI_V8_RANGE_ERROR("<offset> out of range");
+    TRI_V8_THROW_RANGE_ERROR("<offset> out of range");
   }
 
   if (offset + length > buffer->_length) {
-    TRI_V8_RANGE_ERROR("<length> out of range");
+    TRI_V8_THROW_RANGE_ERROR("<length> out of range");
   }
 
   // Check for wraparound. Safe because offset and length are unsigned.
   if (offset + length < offset) {
-    TRI_V8_RANGE_ERROR("<offset> or <length> out of range");
+    TRI_V8_THROW_RANGE_ERROR("<offset> or <length> out of range");
   }
 
   fast_buffer->SetIndexedPropertiesToExternalArrayData(

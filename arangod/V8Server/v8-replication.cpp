@@ -126,7 +126,7 @@ static void JS_LastLoggerReplication (const v8::FunctionCallbackInfo<v8::Value>&
   TRI_json_t* json = TRI_JsonString(TRI_UNKNOWN_MEM_ZONE, dump._buffer->_buffer);
 
   if (json == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   v8::Handle<v8::Value> result = TRI_ObjectJson(isolate, json);
@@ -206,13 +206,13 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
   }
 
   if (endpoint.empty()) {
-    TRI_V8_EXCEPTION_PARAMETER("<endpoint> must be a valid endpoint");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<endpoint> must be a valid endpoint");
   }
 
   if ((restrictType.empty() && ! restrictCollections.empty()) ||
       (! restrictType.empty() && restrictCollections.empty()) ||
       (! restrictType.empty() && restrictType != "include" && restrictType != "exclude")) {
-    TRI_V8_EXCEPTION_PARAMETER("invalid value for <restrictCollections> or <restrictType>");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <restrictCollections> or <restrictType>");
   }
 
   TRI_replication_applier_configuration_t config;
@@ -317,7 +317,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
     TRI_DestroyConfigurationReplicationApplier(&config);
 
     if (json == nullptr) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
 
     v8::Handle<v8::Value> result = TRI_ObjectJson(isolate, json);
@@ -474,7 +474,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
         (! config._restrictType.empty() && config._restrictCollections.empty()) ||
         (! config._restrictType.empty() && config._restrictType != "include" && config._restrictType != "exclude")) {
       TRI_DestroyConfigurationReplicationApplier(&config);
-      TRI_V8_EXCEPTION_PARAMETER("invalid value for <restrictCollections> or <restrictType>");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <restrictCollections> or <restrictType>");
     }
 
     int res = TRI_ConfigureReplicationApplier(vocbase->_replicationApplier, &config);
@@ -488,7 +488,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
     TRI_DestroyConfigurationReplicationApplier(&config);
 
     if (json == nullptr) {
-      TRI_V8_EXCEPTION_MEMORY();
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
 
     v8::Handle<v8::Value> result = TRI_ObjectJson(isolate, json);

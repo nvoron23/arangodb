@@ -167,13 +167,13 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
     static const string timeoutError = "<lockTimeout> must be a valid numeric value";
 
     if (! object->Get(TRI_V8_ASCII_STRING("lockTimeout"))->IsNumber()) {
-      TRI_V8_EXCEPTION_PARAMETER(timeoutError);
+      TRI_V8_THROW_EXCEPTION_PARAMETER(timeoutError);
     }
 
     lockTimeout = TRI_ObjectToDouble(object->Get(TRI_V8_ASCII_STRING("lockTimeout")));
 
     if (lockTimeout < 0.0) {
-      TRI_V8_EXCEPTION_PARAMETER(timeoutError);
+      TRI_V8_THROW_EXCEPTION_PARAMETER(timeoutError);
     }
   }
 
@@ -185,7 +185,7 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (object->Has(WaitForSyncKey)) {
     if (! object->Get(WaitForSyncKey)->IsBoolean() &&
         ! object->Get(WaitForSyncKey)->IsBooleanObject()) {
-      TRI_V8_EXCEPTION_PARAMETER("<waitForSync> must be a boolean value");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("<waitForSync> must be a boolean value");
     }
 
     waitForSync = TRI_ObjectToBoolean(WaitForSyncKey);
@@ -195,14 +195,14 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   static string const collectionError = "missing/invalid collections definition for transaction";
 
   if (! object->Has(TRI_V8_ASCII_STRING("collections")) || ! object->Get(TRI_V8_ASCII_STRING("collections"))->IsObject()) {
-    TRI_V8_EXCEPTION_PARAMETER(collectionError);
+    TRI_V8_THROW_EXCEPTION_PARAMETER(collectionError);
   }
 
   // extract collections
   v8::Handle<v8::Array> collections = v8::Handle<v8::Array>::Cast(object->Get(TRI_V8_ASCII_STRING("collections")));
 
   if (collections.IsEmpty()) {
-    TRI_V8_EXCEPTION_PARAMETER(collectionError);
+    TRI_V8_THROW_EXCEPTION_PARAMETER(collectionError);
   }
 
   bool isValid = true;
@@ -256,7 +256,7 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (! isValid) {
-    TRI_V8_EXCEPTION_PARAMETER(collectionError);
+    TRI_V8_THROW_EXCEPTION_PARAMETER(collectionError);
   }
 
   // extract the "action" property
@@ -264,7 +264,7 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   string actionError = actionErrorPrototype;
 
   if (! object->Has(TRI_V8_ASCII_STRING("action"))) {
-    TRI_V8_EXCEPTION_PARAMETER(actionError);
+    TRI_V8_THROW_EXCEPTION_PARAMETER(actionError);
   }
 
   // function parameters
@@ -319,11 +319,11 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
   else {
-    TRI_V8_EXCEPTION_PARAMETER(actionError);
+    TRI_V8_THROW_EXCEPTION_PARAMETER(actionError);
   }
 
   if (action.IsEmpty()) {
-    TRI_V8_EXCEPTION_PARAMETER(actionError);
+    TRI_V8_THROW_EXCEPTION_PARAMETER(actionError);
   }
 
   // start actual transaction
@@ -866,7 +866,7 @@ static void JS_ParseAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   // get the query string
   if (! args[0]->IsString()) {
-    TRI_V8_TYPE_ERROR("expecting string for <querystring>");
+    TRI_V8_THROW_TYPE_ERROR("expecting string for <querystring>");
   }
 
   string const&& queryString = TRI_ObjectToString(args[0]);
@@ -928,7 +928,7 @@ static void JS_WarningAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   // get the query string
   if (! args[1]->IsString()) {
-    TRI_V8_TYPE_ERROR("expecting string for <message>");
+    TRI_V8_THROW_TYPE_ERROR("expecting string for <message>");
   }
   
   TRI_GET_GLOBALS();
@@ -967,7 +967,7 @@ static void JS_ExplainAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   // get the query string
   if (! args[0]->IsString()) {
-    TRI_V8_TYPE_ERROR("expecting string for <querystring>");
+    TRI_V8_THROW_TYPE_ERROR("expecting string for <querystring>");
   }
 
   string const&& queryString = TRI_ObjectToString(args[0]);
@@ -977,7 +977,7 @@ static void JS_ExplainAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   
   if (args.Length() > 1) {
     if (! args[1]->IsUndefined() && ! args[1]->IsNull() && ! args[1]->IsObject()) {
-      TRI_V8_TYPE_ERROR("expecting object for <bindvalues>");
+      TRI_V8_THROW_TYPE_ERROR("expecting object for <bindvalues>");
     }
     if (args[1]->IsObject()) {
       parameters = TRI_ObjectToJson(isolate, args[1]);
@@ -992,7 +992,7 @@ static void JS_ExplainAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
       if (parameters != nullptr) {
         TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, parameters);
       }
-      TRI_V8_TYPE_ERROR("expecting object for <options>");
+      TRI_V8_THROW_TYPE_ERROR("expecting object for <options>");
     }
 
     options = TRI_ObjectToJson(isolate, args[2]);
@@ -1065,7 +1065,7 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
   double ttl = 0.0;
   
   if (! args[0]->IsObject()) {
-    TRI_V8_TYPE_ERROR("expecting object for <queryjson>");
+    TRI_V8_THROW_TYPE_ERROR("expecting object for <queryjson>");
   }
   TRI_json_t* queryjson = TRI_ObjectToJson(isolate, args[0]);
   TRI_json_t* options = nullptr;
@@ -1073,7 +1073,7 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
   if (args.Length() > 1) {
     // we have options! yikes!
     if (! args[1]->IsUndefined() && ! args[1]->IsObject()) {
-      TRI_V8_TYPE_ERROR("expecting object for <options>");
+      TRI_V8_THROW_TYPE_ERROR("expecting object for <options>");
     }
 
     v8::Handle<v8::Object> argValue = v8::Handle<v8::Object>::Cast(args[1]);
@@ -1082,7 +1082,7 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
     if (argValue->Has(optionName)) {
       batchSize = static_cast<decltype(batchSize)>(TRI_ObjectToInt64(argValue->Get(optionName)));
       if (batchSize == 0) {
-        TRI_V8_TYPE_ERROR("expecting non-zero value for <batchSize>");
+        TRI_V8_THROW_TYPE_ERROR("expecting non-zero value for <batchSize>");
         // well, this makes no sense
       }
     }
@@ -1133,7 +1133,7 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
   
   TRI_json_t* extra = TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE);
   if (extra == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   if (queryResult.warnings != nullptr) {
@@ -1155,7 +1155,7 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
     if (extra != nullptr) {
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, extra);
     }
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
   
   queryResult.json = nullptr;
@@ -1168,7 +1168,7 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, extra);
     }
     TRI_FreeCursorResult(cursorResult);
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
   TRI_ASSERT(cursor != nullptr);
   
@@ -1195,7 +1195,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   // get the query string
   if (! args[0]->IsString()) {
-    TRI_V8_TYPE_ERROR("expecting string for <querystring>");
+    TRI_V8_THROW_TYPE_ERROR("expecting string for <querystring>");
   }
 
   string const&& queryString = TRI_ObjectToString(args[0]);
@@ -1217,7 +1217,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (args.Length() > 1) {
     if (! args[1]->IsUndefined() && ! args[1]->IsNull() && ! args[1]->IsObject()) {
-      TRI_V8_TYPE_ERROR("expecting object for <bindvalues>");
+      TRI_V8_THROW_TYPE_ERROR("expecting object for <bindvalues>");
     }
     if (args[1]->IsObject()) {
       parameters = TRI_ObjectToJson(isolate, args[1]);
@@ -1227,7 +1227,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (args.Length() > 2) {
     // we have options! yikes!
     if (! args[2]->IsObject()) {
-      TRI_V8_TYPE_ERROR("expecting object for <options>");
+      TRI_V8_THROW_TYPE_ERROR("expecting object for <options>");
     }
 
     v8::Handle<v8::Object> argValue = v8::Handle<v8::Object>::Cast(args[2]);
@@ -1236,7 +1236,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
     if (argValue->Has(optionName)) {
       batchSize = static_cast<decltype(batchSize)>(TRI_ObjectToInt64(argValue->Get(optionName)));
       if (batchSize == 0) {
-        TRI_V8_TYPE_ERROR("expecting non-zero value for <batchSize>");
+        TRI_V8_THROW_TYPE_ERROR("expecting non-zero value for <batchSize>");
         // well, this makes no sense
       }
     }
@@ -1293,7 +1293,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   
   TRI_json_t* extra = TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE);
   if (extra == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   if (queryResult.warnings != nullptr) {
@@ -1315,7 +1315,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
     if (extra != nullptr) {
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, extra);
     }
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
   
   TRI_general_cursor_t* cursor = TRI_CreateGeneralCursor(vocbase, cursorResult, doCount,
@@ -1326,7 +1326,7 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, extra);
     }
     TRI_FreeCursorResult(cursorResult);
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_ASSERT(cursor != nullptr);
@@ -1867,7 +1867,7 @@ static void CreateDatabaseCoordinator (const v8::FunctionCallbackInfo<v8::Value>
   TRI_json_t* json = TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE);
 
   if (nullptr == json) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   uint64_t const id = ClusterInfo::instance()->uniqid();
@@ -2264,7 +2264,7 @@ static void JS_ConfigureEndpoint (const v8::FunctionCallbackInfo<v8::Value>& arg
 
   if (args.Length() > 1) {
     if (! args[1]->IsArray()) {
-      TRI_V8_EXCEPTION_PARAMETER("<databases> must be a list");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("<databases> must be a list");
     }
 
     v8::Handle<v8::Array> list = v8::Handle<v8::Array>::Cast(args[1]);
@@ -2277,13 +2277,13 @@ static void JS_ConfigureEndpoint (const v8::FunctionCallbackInfo<v8::Value>& arg
         const string dbName = TRI_ObjectToString(name);
 
         if (! TRI_IsAllowedNameVocBase(true, dbName.c_str())) {
-          TRI_V8_EXCEPTION_PARAMETER("<databases> must be a list of database names");
+          TRI_V8_THROW_EXCEPTION_PARAMETER("<databases> must be a list of database names");
         }
 
         dbNames.push_back(dbName);
       }
       else {
-        TRI_V8_EXCEPTION_PARAMETER("<databases> must be a list of database names");
+        TRI_V8_THROW_EXCEPTION_PARAMETER("<databases> must be a list of database names");
       }
     }
   }

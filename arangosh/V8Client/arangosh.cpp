@@ -282,13 +282,13 @@ static void JS_ImportCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::String::Utf8Value filename(args[0]);
 
   if (*filename == 0) {
-    TRI_V8_TYPE_ERROR("<filename> must be an UTF-8 filename");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be an UTF-8 filename");
   }
 
   v8::String::Utf8Value collection(args[1]);
 
   if (*collection == 0) {
-    TRI_V8_TYPE_ERROR("<collection> must be an UTF-8 filename");
+    TRI_V8_THROW_TYPE_ERROR("<collection> must be an UTF-8 filename");
   }
 
   // extract the options
@@ -305,7 +305,7 @@ static void JS_ImportCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
       separator = TRI_ObjectToString(options->Get(separatorKey));
 
       if (separator.length() < 1) {
-        TRI_V8_EXCEPTION_PARAMETER("<options>.separator must be at least one character");
+        TRI_V8_THROW_EXCEPTION_PARAMETER("<options>.separator must be at least one character");
       }
     }
 
@@ -314,7 +314,7 @@ static void JS_ImportCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
       quote = TRI_ObjectToString(options->Get(quoteKey));
 
       if (quote.length() > 1) {
-        TRI_V8_EXCEPTION_PARAMETER("<options>.quote must be at most one character");
+        TRI_V8_THROW_EXCEPTION_PARAMETER("<options>.quote must be at most one character");
       }
     }
   }
@@ -360,13 +360,13 @@ static void JS_ImportJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::String::Utf8Value filename(args[0]);
 
   if (*filename == 0) {
-    TRI_V8_TYPE_ERROR("<filename> must be an UTF-8 filename");
+    TRI_V8_THROW_TYPE_ERROR("<filename> must be an UTF-8 filename");
   }
 
   v8::String::Utf8Value collection(args[1]);
 
   if (*collection == 0) {
-    TRI_V8_TYPE_ERROR("<collection> must be an UTF8 filename");
+    TRI_V8_THROW_TYPE_ERROR("<collection> must be an UTF8 filename");
   }
 
 
@@ -631,7 +631,7 @@ static void ClientConnection_ConstructorCallback (const v8::FunctionCallbackInfo
 
     if (BaseClient.endpointServer() == nullptr) {
       string errorMessage = "error in '" + definition + "'";
-      TRI_V8_EXCEPTION_PARAMETER(errorMessage.c_str());
+      TRI_V8_THROW_EXCEPTION_PARAMETER(errorMessage.c_str());
     }
   }
 
@@ -669,7 +669,7 @@ static void ClientConnection_reconnect (const v8::FunctionCallbackInfo<v8::Value
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   if (args.Length() < 2) {
@@ -730,7 +730,7 @@ static void ClientConnection_reconnect (const v8::FunctionCallbackInfo<v8::Value
     BaseClient.createEndpoint();
 
     string errorMessage = "error in '" + definition + "'";
-    TRI_V8_EXCEPTION_PARAMETER(errorMessage.c_str());
+    TRI_V8_THROW_EXCEPTION_PARAMETER(errorMessage.c_str());
   }
 
   V8ClientConnection* newConnection = CreateConnection();
@@ -802,7 +802,7 @@ static void ClientConnection_httpGetAny (const v8::FunctionCallbackInfo<v8::Valu
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -850,7 +850,7 @@ static void ClientConnection_httpHeadAny (const v8::FunctionCallbackInfo<v8::Val
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -899,7 +899,7 @@ static void ClientConnection_httpDeleteAny (const v8::FunctionCallbackInfo<v8::V
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -947,7 +947,7 @@ static void ClientConnection_httpOptionsAny (const v8::FunctionCallbackInfo<v8::
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -996,7 +996,7 @@ static void ClientConnection_httpPostAny (const v8::FunctionCallbackInfo<v8::Val
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -1045,7 +1045,7 @@ static void ClientConnection_httpPutAny (const v8::FunctionCallbackInfo<v8::Valu
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -1094,7 +1094,7 @@ static void ClientConnection_httpPatchAny (const v8::FunctionCallbackInfo<v8::Va
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -1144,7 +1144,7 @@ static void ClientConnection_httpSendFile (const v8::FunctionCallbackInfo<v8::Va
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -1196,7 +1196,7 @@ static void ClientConnection_getEndpoint (const v8::FunctionCallbackInfo<v8::Val
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -1221,7 +1221,7 @@ static void ClientConnection_lastHttpReturnCode (const v8::FunctionCallbackInfo<
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -1245,7 +1245,7 @@ static void ClientConnection_lastErrorMessage (const v8::FunctionCallbackInfo<v8
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   // check params
@@ -1269,7 +1269,7 @@ static void ClientConnection_isConnected (const v8::FunctionCallbackInfo<v8::Val
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   if (args.Length() != 0) {
@@ -1297,7 +1297,7 @@ static void ClientConnection_toString (const v8::FunctionCallbackInfo<v8::Value>
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   if (args.Length() != 0) {
@@ -1331,7 +1331,7 @@ static void ClientConnection_getVersion (const v8::FunctionCallbackInfo<v8::Valu
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   if (args.Length() != 0) {
@@ -1354,7 +1354,7 @@ static void ClientConnection_getDatabaseName (const v8::FunctionCallbackInfo<v8:
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   if (args.Length() != 0) {
@@ -1376,7 +1376,7 @@ static void ClientConnection_setDatabaseName (const v8::FunctionCallbackInfo<v8:
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
   if (connection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("connection class corrupted");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("connection class corrupted");
   }
 
   if (args.Length() != 1 || ! args[0]->IsString()) {

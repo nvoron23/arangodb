@@ -500,7 +500,7 @@ static void EnsureIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& a
       TRI_V8_RETURN_NULL();
     }
 
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   v8::Handle<v8::Value> ret = IndexRep(isolate, collectionName, resultJson);
@@ -800,7 +800,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
   TRI_json_t* indexJson = idx->json(idx);
 
   if (indexJson == 0) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   v8::Handle<v8::Value> ret = IndexRep(isolate, collectionName, indexJson);
@@ -827,7 +827,7 @@ static void EnsureIndex (const v8::FunctionCallbackInfo<v8::Value>& args,
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (args.Length() != 1 ||  ! args[0]->IsObject()) {
@@ -936,7 +936,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
 
   if (2 <= args.Length()) {
     if (! args[1]->IsObject()) {
-      TRI_V8_TYPE_ERROR("<properties> must be an object");
+      TRI_V8_THROW_TYPE_ERROR("<properties> must be an object");
     }
 
     v8::Handle<v8::Object> p = args[1]->ToObject();
@@ -991,11 +991,11 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
   }
 
   if (numberOfShards == 0 || numberOfShards > 1000) {
-    TRI_V8_EXCEPTION_PARAMETER("invalid number of shards");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid number of shards");
   }
 
   if (shardKeys.empty() || shardKeys.size() > 8) {
-    TRI_V8_EXCEPTION_PARAMETER("invalid number of shard keys");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid number of shard keys");
   }
 
   ClusterInfo* ci = ClusterInfo::instance();
@@ -1298,7 +1298,7 @@ static void JS_DropIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (args.Length() != 1) {
@@ -1439,7 +1439,7 @@ static void JS_GetIndexesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_INTERNAL("cannot extract collection");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -1468,7 +1468,7 @@ static void JS_GetIndexesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
   // READ-LOCK end
 
   if (indexes == nullptr) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   v8::Handle<v8::Array> result = v8::Array::New(isolate);
@@ -1595,7 +1595,7 @@ static void CreateVocBase (const v8::FunctionCallbackInfo<v8::Value>& args,
 
   if (2 <= args.Length()) {
     if (! args[1]->IsObject()) {
-      TRI_V8_TYPE_ERROR("<properties> must be an object");
+      TRI_V8_THROW_TYPE_ERROR("<properties> must be an object");
     }
 
     v8::Handle<v8::Object> p = args[1]->ToObject();
@@ -1606,7 +1606,7 @@ static void CreateVocBase (const v8::FunctionCallbackInfo<v8::Value>& args,
       double s = TRI_ObjectToDouble(p->Get(JournalSizeKey));
 
       if (s < TRI_JOURNAL_MINIMAL_SIZE) {
-        TRI_V8_EXCEPTION_PARAMETER("<properties>.journalSize is too small");
+        TRI_V8_THROW_EXCEPTION_PARAMETER("<properties>.journalSize is too small");
       }
 
       // overwrite journal size with user-specified value
@@ -1656,14 +1656,14 @@ static void CreateVocBase (const v8::FunctionCallbackInfo<v8::Value>& args,
       parameter._isVolatile = TRI_ObjectToBoolean(p->Get(IsVolatileKey));
 #else
       TRI_FreeCollectionInfoOptions(&parameter);
-      TRI_V8_EXCEPTION_PARAMETER("volatile collections are not supported on this platform");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("volatile collections are not supported on this platform");
 #endif
     }
 
     if (parameter._isVolatile && parameter._waitForSync) {
       // the combination of waitForSync and isVolatile makes no sense
       TRI_FreeCollectionInfoOptions(&parameter);
-      TRI_V8_EXCEPTION_PARAMETER("volatile collections do not support the waitForSync option");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("volatile collections do not support the waitForSync option");
     }
     
     TRI_GET_GLOBAL_STRING(IdKey);
@@ -1699,7 +1699,7 @@ static void CreateVocBase (const v8::FunctionCallbackInfo<v8::Value>& args,
   v8::Handle<v8::Value> result = WrapCollection(isolate, collection);
 
   if (result.IsEmpty()) {
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_V8_RETURN(result);

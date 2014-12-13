@@ -158,13 +158,13 @@ static void JS_RegisterTask (const v8::FunctionCallbackInfo<v8::Value>& args) {
     period = TRI_ObjectToDouble(obj->Get(TRI_V8_ASCII_STRING("period")));
 
     if (period <= 0.0) {
-      TRI_V8_EXCEPTION_PARAMETER("task period must be specified and positive");
+      TRI_V8_THROW_EXCEPTION_PARAMETER("task period must be specified and positive");
     }
   }
 
   // extract the command
   if (! obj->HasOwnProperty(TRI_V8_ASCII_STRING("command"))) {
-    TRI_V8_EXCEPTION_PARAMETER("command must be specified");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("command must be specified");
   }
 
   string command;
@@ -228,7 +228,7 @@ static void JS_RegisterTask (const v8::FunctionCallbackInfo<v8::Value>& args) {
       delete t;
     }
 
-    TRI_V8_EXCEPTION_MEMORY();
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_ASSERT(json != nullptr);
@@ -364,7 +364,7 @@ static void JS_CreateNamedQueue (const v8::FunctionCallbackInfo<v8::Value>& args
   int nrThreads = static_cast<int>(TRI_ObjectToInt64(obj->Get(TRI_V8_ASCII_STRING("threads"))));
 
   if (nrThreads < 1) {
-    TRI_V8_EXCEPTION_PARAMETER("<options>.threads must be at least 1");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<options>.threads must be at least 1");
   }
 
   // queue size
@@ -375,7 +375,7 @@ static void JS_CreateNamedQueue (const v8::FunctionCallbackInfo<v8::Value>& args
   int size = static_cast<int>(TRI_ObjectToInt64(obj->Get(TRI_V8_ASCII_STRING("size"))));
 
   if (size < nrThreads) {
-    TRI_V8_EXCEPTION_PARAMETER("<options>.size must be at least <options>.threads");
+    TRI_V8_THROW_EXCEPTION_PARAMETER("<options>.size must be at least <options>.threads");
   }
 
   // worker for the queue

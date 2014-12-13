@@ -822,14 +822,14 @@ static void JS_DefineAction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_Utf8ValueNFC utf8name(TRI_UNKNOWN_MEM_ZONE, args[0]);
 
   if (*utf8name == 0) {
-    TRI_V8_TYPE_ERROR("<name> must be an UTF-8 string");
+    TRI_V8_THROW_TYPE_ERROR("<name> must be an UTF-8 string");
   }
 
   string name = *utf8name;
 
   // extract the action callback
   if (! args[1]->IsFunction()) {
-    TRI_V8_TYPE_ERROR("<callback> must be a function");
+    TRI_V8_THROW_TYPE_ERROR("<callback> must be a function");
   }
 
   v8::Handle<v8::Function> callback = v8::Handle<v8::Function>::Cast(args[1]);
@@ -887,7 +887,7 @@ static void JS_ExecuteGlobalContextFunction (const v8::FunctionCallbackInfo<v8::
   v8::String::Utf8Value utf8def(args[0]);
 
   if (*utf8def == 0) {
-    TRI_V8_TYPE_ERROR("<definition> must be a UTF-8 function definition");
+    TRI_V8_THROW_TYPE_ERROR("<definition> must be a UTF-8 function definition");
   }
 
   string const def = *utf8def;
@@ -991,7 +991,7 @@ static void JS_RequestParts (const v8::FunctionCallbackInfo<v8::Value>& args) {
       }
       if (ptr == beg) {
         // oops
-        TRI_V8_EXCEPTION_PARAMETER("request is no multipart request"); 
+        TRI_V8_THROW_EXCEPTION_PARAMETER("request is no multipart request"); 
       }
 
       std::string const delimiter(beg, ptr - beg);
@@ -1007,7 +1007,7 @@ static void JS_RequestParts (const v8::FunctionCallbackInfo<v8::Value>& args) {
       while (ptr < end) {
         char const* p = TRI_IsContainedMemory(ptr, end - ptr, delimiter.c_str(), delimiter.size());
         if (p == nullptr || p + delimiter.size() + 2 >= end || p - 2 <= ptr) {
-          TRI_V8_EXCEPTION_PARAMETER("bad request data"); 
+          TRI_V8_THROW_EXCEPTION_PARAMETER("bad request data"); 
         }
 
         char const* q = p;
@@ -1064,11 +1064,11 @@ static void JS_RequestParts (const v8::FunctionCallbackInfo<v8::Value>& args) {
             eol = TRI_IsContainedMemory(ptr, end - ptr, "\n", 1);
           }
           if (eol == nullptr) {
-            TRI_V8_EXCEPTION_PARAMETER("bad request data"); 
+            TRI_V8_THROW_EXCEPTION_PARAMETER("bad request data"); 
           }
           char const* colon = TRI_IsContainedMemory(ptr, end - ptr, ":", 1);
           if (colon == nullptr) {
-            TRI_V8_EXCEPTION_PARAMETER("bad request data"); 
+            TRI_V8_THROW_EXCEPTION_PARAMETER("bad request data"); 
           }
           char const* p = colon; 
           while (p > ptr && *(p - 1) == ' ') {
@@ -1095,7 +1095,7 @@ static void JS_RequestParts (const v8::FunctionCallbackInfo<v8::Value>& args) {
         }
 
         if (data == nullptr) {
-          TRI_V8_EXCEPTION_PARAMETER("bad request data"); 
+          TRI_V8_THROW_EXCEPTION_PARAMETER("bad request data"); 
         }
 
         v8::Handle<v8::Object> partObject = v8::Object::New(isolate);
@@ -1166,7 +1166,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (ServerState::instance()->getRole() != ServerState::ROLE_COORDINATOR) {
-    TRI_V8_EXCEPTION_INTERNAL("request works only in coordinator role");
+    TRI_V8_THROW_EXCEPTION_INTERNAL("request works only in coordinator role");
   }
 
   ClusterComm* cc = ClusterComm::instance();
