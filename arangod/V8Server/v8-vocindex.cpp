@@ -491,7 +491,7 @@ static void EnsureIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& a
                                                             360.0);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_MESSAGE(res, errorMsg);
+    TRI_V8_THROW_EXCEPTION_MESSAGE(res, errorMsg);
   }
 
   if (resultJson == 0) {
@@ -527,7 +527,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
   // extract type
   TRI_json_t* value = TRI_LookupArrayJson(json, "type");
   if (! TRI_IsStringJson(value)) {
-    TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_idx_type_e type = TRI_TypeIndex(value->_value._string.data);
@@ -568,7 +568,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
 
     // check if copying was successful
     if (value->_value._objects._length != TRI_LengthVectorPointer(&attributes)) {
-      TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
   }
 
@@ -579,7 +579,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_DestroyVectorPointer(&values);
     TRI_DestroyVectorPointer(&attributes);
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
 
@@ -590,7 +590,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
   if (! TRI_IsSystemNameCollection(collectionName.c_str()) 
       && create
       && TRI_GetOperationModeServer() == TRI_VOCBASE_MODE_NO_CREATE) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_READ_ONLY);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_READ_ONLY);
   }
 
   bool created = false;
@@ -603,12 +603,12 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     case TRI_IDX_TYPE_PRIORITY_QUEUE_INDEX: 
     case TRI_IDX_TYPE_BITARRAY_INDEX: {
       // these indexes cannot be created directly
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     case TRI_IDX_TYPE_GEO1_INDEX: {
       if (attributes._length != 1) {
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
       TRI_ASSERT(attributes._length == 1);
@@ -646,7 +646,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
 
     case TRI_IDX_TYPE_GEO2_INDEX: {
       if (attributes._length != 2) {
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
       }
       
       TRI_ASSERT(attributes._length == 2);
@@ -678,7 +678,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
 
     case TRI_IDX_TYPE_HASH_INDEX: {
       if (attributes._length == 0) {
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
       TRI_ASSERT(attributes._length > 0);
@@ -701,7 +701,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
 
     case TRI_IDX_TYPE_SKIPLIST_INDEX: {
       if (attributes._length == 0) {
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
       TRI_ASSERT(attributes._length > 0);
@@ -723,7 +723,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
 
     case TRI_IDX_TYPE_FULLTEXT_INDEX: {
       if (attributes._length != 1) {
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
       TRI_ASSERT(attributes._length == 1);
@@ -784,7 +784,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     TRI_DestroyVectorPointer(&values);
     TRI_DestroyVectorPointer(&attributes);
 
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_DestroyVectorPointer(&values);
@@ -833,7 +833,7 @@ static void EnsureIndex (const v8::FunctionCallbackInfo<v8::Value>& args,
   if (args.Length() != 1 ||  ! args[0]->IsObject()) {
     string name(functionName);
     name.append("(<description>)");
-    TRI_V8_EXCEPTION_USAGE(name.c_str());
+    TRI_V8_THROW_EXCEPTION_USAGE(name.c_str());
   }
 
   TRI_json_t* json = nullptr;
@@ -848,7 +848,7 @@ static void EnsureIndex (const v8::FunctionCallbackInfo<v8::Value>& args,
     shared_ptr<CollectionInfo> const& c = ClusterInfo::instance()->getCollection(dbname, collname);
 
     if (c->empty()) {
-      TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
     }
 
     // check if there is an attempt to create a unique index on non-shard keys
@@ -891,7 +891,7 @@ static void EnsureIndex (const v8::FunctionCallbackInfo<v8::Value>& args,
     if (json != nullptr) {
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
     }
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_ASSERT(json != nullptr);
@@ -922,7 +922,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
   string const name = TRI_ObjectToString(args[0]);
 
   if (! TRI_IsAllowedNameCollection(parameter._isSystem, name.c_str())) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_ILLEGAL_NAME);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_ILLEGAL_NAME);
   }
 
   bool allowUserKeys = true;
@@ -949,7 +949,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
 
         if (type != "" && type != "traditional") {
           // invalid key generator
-          TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_CLUSTER_UNSUPPORTED,
+          TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_CLUSTER_UNSUPPORTED,
                                    "non-traditional key generators are not supported for sharded collections");
         }
       }
@@ -1013,7 +1013,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
     dbServers = ci->getCurrentDBServers();
 
     if (dbServers.empty()) {
-      TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no database servers found in cluster");
+      TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no database servers found in cluster");
     }
 
     random_shuffle(dbServers.begin(), dbServers.end());
@@ -1047,7 +1047,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
   TRI_json_t* json = TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE);
 
   if (json == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_Insert3ArrayJson(TRI_UNKNOWN_MEM_ZONE, json, "id",          TRI_CreateString2CopyJson(TRI_UNKNOWN_MEM_ZONE, cid.c_str(), cid.size()));
@@ -1076,7 +1076,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
 
   if (indexes == 0) {
     TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-    TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   // create a dummy primary index
@@ -1085,7 +1085,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
   if (idx == 0) {
     TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, indexes);
     TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-    TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   TRI_json_t* idxJson = idx->json(idx);
@@ -1101,7 +1101,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
     if (idx == 0) {
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, indexes);
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-      TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+      TRI_V8_THROW_EXCEPTION_MEMORY();
     }
 
     idxJson = idx->json(idx);
@@ -1124,7 +1124,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
   TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
 
   if (myerrno != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_MESSAGE(myerrno, errorMsg);
+    TRI_V8_THROW_EXCEPTION_MESSAGE(myerrno, errorMsg);
   }
   ci->loadPlannedCollections();
 
@@ -1209,7 +1209,7 @@ static void DropIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& arg
   // extract the index identifier from a string
   if (val->IsString() || val->IsStringObject() || val->IsNumber()) {
     if (! IsIndexHandle(val, collectionName, iid)) {
-      TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_INDEX_HANDLE_BAD);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_INDEX_HANDLE_BAD);
     }
   }
 
@@ -1222,7 +1222,7 @@ static void DropIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& arg
     v8::Handle<v8::Value> iidVal = obj->Get(IdKey);
 
     if (! IsIndexHandle(iidVal, collectionName, iid)) {
-      TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_INDEX_HANDLE_BAD);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_INDEX_HANDLE_BAD);
     }
   }
 
@@ -1230,7 +1230,7 @@ static void DropIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& arg
     CollectionNameResolver resolver(collection->_vocbase);
 
     if (! EqualCollection(&resolver, collectionName, collection)) {
-      TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_CROSS_COLLECTION_REQUEST);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_CROSS_COLLECTION_REQUEST);
     }
   }
 
@@ -1302,7 +1302,7 @@ static void JS_DropIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
   }
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("dropIndex(<index-handle>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("dropIndex(<index-handle>)");
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -1315,7 +1315,7 @@ static void JS_DropIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
   int res = trx.begin();
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_document_collection_t* document = trx.documentCollection();
@@ -1332,7 +1332,7 @@ static void JS_DropIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
 
   if (idx->_type == TRI_IDX_TYPE_PRIMARY_INDEX ||
       idx->_type == TRI_IDX_TYPE_EDGE_INDEX) {
-    TRI_V8_EXCEPTION(TRI_ERROR_FORBIDDEN);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_FORBIDDEN);
   }
 
   // .............................................................................
@@ -1370,7 +1370,7 @@ static void GetIndexesCoordinator (const v8::FunctionCallbackInfo<v8::Value>& ar
   shared_ptr<CollectionInfo> c = ClusterInfo::instance()->getCollection(databaseName, cid);
 
   if ((*c).empty()) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
   }
 
   v8::Handle<v8::Array> ret = v8::Array::New(isolate);
@@ -1452,7 +1452,7 @@ static void JS_GetIndexesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
   int res = trx.begin();
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   // READ-LOCK start
@@ -1510,8 +1510,8 @@ TRI_index_t* TRI_LookupIndexByHandle (v8::Isolate* isolate,
   // extract the index identifier from a string
   if (val->IsString() || val->IsStringObject() || val->IsNumber()) {
     if (! IsIndexHandle(val, collectionName, iid)) {
-      TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_INDEX_HANDLE_BAD)
-        nullptr;
+      TRI_V8_SET_EXCEPTION(TRI_ERROR_ARANGO_INDEX_HANDLE_BAD);
+      return nullptr;
     }
   }
 
@@ -1524,8 +1524,8 @@ TRI_index_t* TRI_LookupIndexByHandle (v8::Isolate* isolate,
     v8::Handle<v8::Value> iidVal = obj->Get(IdKey);
 
     if (! IsIndexHandle(iidVal, collectionName, iid)) {
-      TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_INDEX_HANDLE_BAD)
-        nullptr;
+      TRI_V8_SET_EXCEPTION(TRI_ERROR_ARANGO_INDEX_HANDLE_BAD);
+      return nullptr;
     }
   }
 
@@ -1533,8 +1533,8 @@ TRI_index_t* TRI_LookupIndexByHandle (v8::Isolate* isolate,
     if (! EqualCollection(resolver, collectionName, collection)) {
       // I wish this error provided me with more information!
       // e.g. 'cannot access index outside the collection it was defined in'
-      TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_CROSS_COLLECTION_REQUEST)
-        nullptr;
+      TRI_V8_SET_EXCEPTION(TRI_ERROR_ARANGO_CROSS_COLLECTION_REQUEST);
+      return nullptr;
     }
   }
 
@@ -1542,8 +1542,8 @@ TRI_index_t* TRI_LookupIndexByHandle (v8::Isolate* isolate,
 
   if (idx == nullptr) {
     if (! ignoreNotFound) {
-      TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_INDEX_NOT_FOUND)
-        nullptr;
+      TRI_V8_SET_EXCEPTION(TRI_ERROR_ARANGO_INDEX_NOT_FOUND);
+      return nullptr;
     }
   }
 
@@ -1564,7 +1564,7 @@ static void CreateVocBase (const v8::FunctionCallbackInfo<v8::Value>& args,
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   // ...........................................................................
@@ -1572,11 +1572,11 @@ static void CreateVocBase (const v8::FunctionCallbackInfo<v8::Value>& args,
   // ...........................................................................
 
   if (args.Length() < 1 || args.Length() > 2) {
-    TRI_V8_EXCEPTION_USAGE("_create(<name>, <properties>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("_create(<name>, <properties>)");
   }
 
   if (TRI_GetOperationModeServer() == TRI_VOCBASE_MODE_NO_CREATE) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_READ_ONLY);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_READ_ONLY);
   }
 
 
@@ -1693,7 +1693,7 @@ static void CreateVocBase (const v8::FunctionCallbackInfo<v8::Value>& args,
   TRI_FreeCollectionInfoOptions(&parameter);
 
   if (collection == nullptr) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_errno(), "cannot create collection");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_errno(), "cannot create collection");
   }
 
   v8::Handle<v8::Value> result = WrapCollection(isolate, collection);

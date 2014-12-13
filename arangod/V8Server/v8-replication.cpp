@@ -106,11 +106,11 @@ static void JS_LastLoggerReplication (const v8::FunctionCallbackInfo<v8::Value>&
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (args.Length() != 2) {
-    TRI_V8_EXCEPTION_USAGE("REPLICATION_LOGGER_LAST(<fromTick>, <toTick>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("REPLICATION_LOGGER_LAST(<fromTick>, <toTick>)");
   }
 
   TRI_replication_dump_t dump(vocbase, 0, true); 
@@ -120,7 +120,7 @@ static void JS_LastLoggerReplication (const v8::FunctionCallbackInfo<v8::Value>&
   int res = TRI_DumpLogReplication(&dump, tickStart, tickEnd, true);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_json_t* json = TRI_JsonString(TRI_UNKNOWN_MEM_ZONE, dump._buffer->_buffer);
@@ -145,13 +145,13 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("REPLICATION_SYNCHRONISE(<config>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("REPLICATION_SYNCHRONISE(<config>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   // treat the argument as an object from now on
@@ -267,7 +267,7 @@ static void JS_SynchroniseReplication (const v8::FunctionCallbackInfo<v8::Value>
   }
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_MESSAGE(res, "cannot sync from remote endpoint: " + errorMsg);
+    TRI_V8_THROW_EXCEPTION_MESSAGE(res, "cannot sync from remote endpoint: " + errorMsg);
   }
 
   TRI_V8_RETURN(result);
@@ -296,11 +296,11 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (vocbase->_replicationApplier == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   if (args.Length() == 0) {
@@ -330,7 +330,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
     // set the configuration
 
     if (args.Length() != 1 || ! args[0]->IsObject()) {
-      TRI_V8_EXCEPTION_USAGE("REPLICATION_APPLIER_CONFIGURE(<configuration>)");
+      TRI_V8_THROW_EXCEPTION_USAGE("REPLICATION_APPLIER_CONFIGURE(<configuration>)");
     }
 
     TRI_replication_applier_configuration_t config;
@@ -481,7 +481,7 @@ static void JS_ConfigureApplierReplication (const v8::FunctionCallbackInfo<v8::V
 
     if (res != TRI_ERROR_NO_ERROR) {
       TRI_DestroyConfigurationReplicationApplier(&config);
-      TRI_V8_EXCEPTION(res);
+      TRI_V8_THROW_EXCEPTION(res);
     }
 
     TRI_json_t* json = TRI_JsonConfigurationReplicationApplier(&config);
@@ -509,15 +509,15 @@ static void JS_StartApplierReplication (const v8::FunctionCallbackInfo<v8::Value
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (vocbase->_replicationApplier == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   if (args.Length() > 1) {
-    TRI_V8_EXCEPTION_USAGE("REPLICATION_APPLIER_START(<from>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("REPLICATION_APPLIER_START(<from>)");
   }
 
   TRI_voc_tick_t initialTick = 0;
@@ -533,7 +533,7 @@ static void JS_StartApplierReplication (const v8::FunctionCallbackInfo<v8::Value
                                         useTick);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_MESSAGE(res, "cannot start replication applier");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(res, "cannot start replication applier");
   }
 
   TRI_V8_RETURN_TRUE();
@@ -548,23 +548,23 @@ static void JS_ShutdownApplierReplication (const v8::FunctionCallbackInfo<v8::Va
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("REPLICATION_APPLIER_SHUTDOWN()");
+    TRI_V8_THROW_EXCEPTION_USAGE("REPLICATION_APPLIER_SHUTDOWN()");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (vocbase->_replicationApplier == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   int res = TRI_ShutdownReplicationApplier(vocbase->_replicationApplier);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_MESSAGE(res, "cannot shut down replication applier");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(res, "cannot shut down replication applier");
   }
 
   TRI_V8_RETURN_TRUE();
@@ -579,23 +579,23 @@ static void JS_StateApplierReplication (const v8::FunctionCallbackInfo<v8::Value
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("REPLICATION_APPLIER_STATE()");
+    TRI_V8_THROW_EXCEPTION_USAGE("REPLICATION_APPLIER_STATE()");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (vocbase->_replicationApplier == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   TRI_json_t* json = TRI_JsonReplicationApplier(vocbase->_replicationApplier);
 
   if (json == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
   v8::Handle<v8::Value> result = TRI_ObjectJson(isolate, json);
@@ -613,23 +613,23 @@ static void JS_ForgetApplierReplication (const v8::FunctionCallbackInfo<v8::Valu
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("REPLICATION_APPLIER_FORGET()");
+    TRI_V8_THROW_EXCEPTION_USAGE("REPLICATION_APPLIER_FORGET()");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (vocbase->_replicationApplier == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   int res = TRI_ForgetReplicationApplier(vocbase->_replicationApplier);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_V8_RETURN_TRUE();

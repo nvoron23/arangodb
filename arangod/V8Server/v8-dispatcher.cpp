@@ -112,11 +112,11 @@ static void JS_RegisterTask (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (GlobalScheduler == nullptr || GlobalDispatcher == nullptr) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no scheduler found");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no scheduler found");
   }
 
   if (args.Length() != 1 || ! args[0]->IsObject()) {
-    TRI_V8_EXCEPTION_USAGE("register(<task>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("register(<task>)");
   }
 
   v8::Handle<v8::Object> obj = args[0].As<v8::Object>();
@@ -246,7 +246,7 @@ static void JS_RegisterTask (const v8::FunctionCallbackInfo<v8::Value>& args) {
       delete t;
     }
 
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   v8::Handle<v8::Value> result = TRI_ObjectJson(isolate, json);
@@ -266,19 +266,19 @@ static void JS_UnregisterTask (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("unregister(<id>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("unregister(<id>)");
   }
 
   string const id = GetTaskId(isolate, args[0]);
 
   if (GlobalScheduler == nullptr || GlobalDispatcher == nullptr) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no scheduler found");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no scheduler found");
   }
 
   int res = GlobalScheduler->unregisterUserTask(id);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_V8_RETURN_TRUE();
@@ -295,11 +295,11 @@ static void JS_GetTask (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() > 1) {
-    TRI_V8_EXCEPTION_USAGE("get(<id>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("get(<id>)");
   }
 
   if (GlobalScheduler == nullptr || GlobalDispatcher == nullptr) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no scheduler found");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no scheduler found");
   }
 
   TRI_json_t* json;
@@ -315,7 +315,7 @@ static void JS_GetTask (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (json == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_TASK_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_TASK_NOT_FOUND);
   }
 
   v8::Handle<v8::Value> result = TRI_ObjectJson(isolate, json);
@@ -340,25 +340,25 @@ static void JS_CreateNamedQueue (const v8::FunctionCallbackInfo<v8::Value>& args
   v8::HandleScope scope(isolate);
 
   if (GlobalDispatcher == nullptr) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no dispatcher found");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no dispatcher found");
   }
 
   if (args.Length() != 1 || ! args[0]->IsObject()) {
-    TRI_V8_EXCEPTION_USAGE("createNamedQueue(<options>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("createNamedQueue(<options>)");
   }
 
   v8::Handle<v8::Object> obj = args[0].As<v8::Object>();
 
   // name of the queue
   if (! obj->HasOwnProperty(TRI_V8_ASCII_STRING("name"))) {
-    TRI_V8_EXCEPTION_USAGE("<options>.name is missing");
+    TRI_V8_THROW_EXCEPTION_USAGE("<options>.name is missing");
   }
 
   string name = TRI_ObjectToString(obj->Get(TRI_V8_ASCII_STRING("name")));
 
   // number of threads
   if (! obj->HasOwnProperty(TRI_V8_ASCII_STRING("threads"))) {
-    TRI_V8_EXCEPTION_USAGE("<options>.threads is missing");
+    TRI_V8_THROW_EXCEPTION_USAGE("<options>.threads is missing");
   }
 
   int nrThreads = static_cast<int>(TRI_ObjectToInt64(obj->Get(TRI_V8_ASCII_STRING("threads"))));
@@ -369,7 +369,7 @@ static void JS_CreateNamedQueue (const v8::FunctionCallbackInfo<v8::Value>& args
 
   // queue size
   if (! obj->HasOwnProperty(TRI_V8_ASCII_STRING("size"))) {
-    TRI_V8_EXCEPTION_USAGE("<options>.size is missing");
+    TRI_V8_THROW_EXCEPTION_USAGE("<options>.size is missing");
   }
 
   int size = static_cast<int>(TRI_ObjectToInt64(obj->Get(TRI_V8_ASCII_STRING("size"))));
@@ -380,7 +380,7 @@ static void JS_CreateNamedQueue (const v8::FunctionCallbackInfo<v8::Value>& args
 
   // worker for the queue
   if (! obj->HasOwnProperty(TRI_V8_ASCII_STRING("worker"))) {
-    TRI_V8_EXCEPTION_USAGE("<options>.worker is missing");
+    TRI_V8_THROW_EXCEPTION_USAGE("<options>.worker is missing");
   }
 
   string worker = TRI_ObjectToString(obj->Get(TRI_V8_ASCII_STRING("worker")));
@@ -389,7 +389,7 @@ static void JS_CreateNamedQueue (const v8::FunctionCallbackInfo<v8::Value>& args
   bool ok = GlobalV8Dealer->prepareNamedContexts(name, nrThreads, worker);
 
   if (! ok) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "cannot create V8 queue engines");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "cannot create V8 queue engines");
   }
 
   // create a new queue
@@ -401,11 +401,11 @@ static void JS_CreateNamedQueue (const v8::FunctionCallbackInfo<v8::Value>& args
     size);
 
   if (result == TRI_ERROR_QUEUE_ALREADY_EXISTS) {
-    TRI_V8_EXCEPTION_MESSAGE(result, "named queue already exists");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(result, "named queue already exists");
   }
 
   if (result != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "cannot create queue");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "cannot create queue");
   }
 
   TRI_V8_RETURN_UNDEFINED();
@@ -422,7 +422,7 @@ static void JS_AddJob (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
   
   if (args.Length() != 2 || ! args[1]->IsObject()) {
-    TRI_V8_EXCEPTION_USAGE("addJob(<queue>, <options>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("addJob(<queue>, <options>)");
   }
 
   string name = TRI_ObjectToString(args[0]);
@@ -444,7 +444,7 @@ static void JS_AddJob (const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (result != TRI_ERROR_NO_ERROR) {
     delete job;
 
-    TRI_V8_EXCEPTION_MESSAGE(result, "cannot add job");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(result, "cannot add job");
   }
 
   TRI_V8_RETURN_TRUE();

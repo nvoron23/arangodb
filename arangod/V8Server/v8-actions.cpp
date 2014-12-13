@@ -815,7 +815,7 @@ static void JS_DefineAction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_GET_GLOBALS();
 
   if (args.Length() != 3) {
-    TRI_V8_EXCEPTION_USAGE("defineAction(<name>, <callback>, <parameter>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("defineAction(<name>, <callback>, <parameter>)");
   }
 
   // extract the action name
@@ -880,7 +880,7 @@ static void JS_ExecuteGlobalContextFunction (const v8::FunctionCallbackInfo<v8::
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("executeGlobalContextFunction(<function-type>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("executeGlobalContextFunction(<function-type>)");
   }
 
   // extract the action name
@@ -894,7 +894,7 @@ static void JS_ExecuteGlobalContextFunction (const v8::FunctionCallbackInfo<v8::
 
   // and pass it to the V8 contexts
   if (! GlobalV8Dealer->addGlobalContextMethod(def)) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid action definition");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid action definition");
   }
 
   TRI_V8_RETURN_UNDEFINED();
@@ -912,7 +912,7 @@ static void JS_GetCurrentRequest (const v8::FunctionCallbackInfo<v8::Value>& arg
   TRI_GET_GLOBALS();
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("getCurrentRequest()");
+    TRI_V8_THROW_EXCEPTION_USAGE("getCurrentRequest()");
   }
 
   TRI_V8_RETURN(v8g->_currentRequest);
@@ -929,7 +929,7 @@ static void JS_RawRequestBody (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("rawRequestBody(req)");
+    TRI_V8_THROW_EXCEPTION_USAGE("rawRequestBody(req)");
   }
 
   v8::Handle<v8::Value> current = args[0];
@@ -962,7 +962,7 @@ static void JS_RequestParts (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("requestParts(req)");
+    TRI_V8_THROW_EXCEPTION_USAGE("requestParts(req)");
   }
 
   v8::Handle<v8::Value> current = args[0];
@@ -1128,7 +1128,7 @@ static void JS_GetCurrentResponse (const v8::FunctionCallbackInfo<v8::Value>& ar
   TRI_GET_GLOBALS();
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("getCurrentResponse()");
+    TRI_V8_THROW_EXCEPTION_USAGE("getCurrentResponse()");
   }
 
   TRI_V8_RETURN(v8g->_currentResponse);
@@ -1160,7 +1160,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_GET_GLOBALS();
 
   if (args.Length() != 9) {
-    TRI_V8_EXCEPTION_USAGE(
+    TRI_V8_THROW_EXCEPTION_USAGE(
       "SYS_CLUSTER_TEST(<req>, <res>, <dest>, <path>, <clientTransactionID>, "
       "<headers>, <body>, <timeout>, <asyncMode>)");
   }
@@ -1172,7 +1172,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
   ClusterComm* cc = ClusterComm::instance();
 
   if (cc == nullptr) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                              "clustercomm object not found");
   }
 
@@ -1239,7 +1239,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
                          new CallbackTest("Hello Callback"), timeout);
 
     if (res == nullptr) {
-      TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+      TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                                "couldn't queue async request");
     }
 
@@ -1254,7 +1254,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
     while (true) {
       res = cc->enquire(opID);
       if (res == 0) {
-        TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+        TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                                  "couldn't enquire operation");
       }
       status = res->status;

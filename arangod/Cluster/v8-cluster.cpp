@@ -87,7 +87,7 @@ static void JS_CasAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 3) {
-    TRI_V8_EXCEPTION_USAGE("cas(<key>, <oldValue>, <newValue>, <ttl>, <timeout>, <throw>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("cas(<key>, <oldValue>, <newValue>, <ttl>, <timeout>, <throw>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
@@ -146,7 +146,7 @@ static void JS_CreateDirectoryAgency (const v8::FunctionCallbackInfo<v8::Value>&
 
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("createDirectory(<key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("createDirectory(<key>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
@@ -170,7 +170,7 @@ static void JS_IsEnabledAgency (const v8::FunctionCallbackInfo<v8::Value>& args)
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("isEnabled()");
+    TRI_V8_THROW_EXCEPTION_USAGE("isEnabled()");
   }
 
   const std::string prefix = AgencyComm::prefix();
@@ -193,14 +193,14 @@ static void JS_IncreaseVersionAgency (const v8::FunctionCallbackInfo<v8::Value>&
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("increaseVersion(<key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("increaseVersion(<key>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
 
   AgencyComm comm;
   if (! comm.increaseVersion(key)) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to increase version");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to increase version");
   }
 
   TRI_V8_RETURN_TRUE();
@@ -215,7 +215,7 @@ static void JS_GetAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1) {
-    TRI_V8_EXCEPTION_USAGE("get(<key>, <recursive>, <withIndexes>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("get(<key>, <recursive>, <withIndexes>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
@@ -288,7 +288,7 @@ static void JS_ListAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1) {
-    TRI_V8_EXCEPTION_USAGE("list(<key>, <recursive>, <flat>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("list(<key>, <recursive>, <flat>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
@@ -355,7 +355,7 @@ static void JS_LockReadAgency (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1) {
-    TRI_V8_EXCEPTION_USAGE("lockRead(<part>, <ttl>, <timeout>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("lockRead(<part>, <ttl>, <timeout>)");
   }
 
   const std::string part = TRI_ObjectToString(args[0]);
@@ -372,7 +372,7 @@ static void JS_LockReadAgency (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
   AgencyComm comm;
   if (! comm.lockRead(part, ttl, timeout)) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to acquire lock");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to acquire lock");
   }
 
   TRI_V8_RETURN_TRUE();
@@ -387,7 +387,7 @@ static void JS_LockWriteAgency (const v8::FunctionCallbackInfo<v8::Value>& args)
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1) {
-    TRI_V8_EXCEPTION_USAGE("lockWrite(<part>, <ttl>, <timeout>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("lockWrite(<part>, <ttl>, <timeout>)");
   }
 
   const std::string part = TRI_ObjectToString(args[0]);
@@ -404,7 +404,7 @@ static void JS_LockWriteAgency (const v8::FunctionCallbackInfo<v8::Value>& args)
 
   AgencyComm comm;
   if (! comm.lockWrite(part, ttl, timeout)) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to acquire lock");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to acquire lock");
   }
 
   TRI_V8_RETURN_TRUE();
@@ -419,7 +419,7 @@ static void JS_UnlockReadAgency (const v8::FunctionCallbackInfo<v8::Value>& args
   v8::HandleScope scope(isolate);
 
   if (args.Length() > 2) {
-    TRI_V8_EXCEPTION_USAGE("unlockRead(<part>, <timeout>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("unlockRead(<part>, <timeout>)");
   }
 
   const std::string part = TRI_ObjectToString(args[0]);
@@ -431,7 +431,7 @@ static void JS_UnlockReadAgency (const v8::FunctionCallbackInfo<v8::Value>& args
 
   AgencyComm comm;
   if (! comm.unlockRead(part, timeout)) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to release lock");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to release lock");
   }
 
   TRI_V8_RETURN_TRUE();
@@ -446,7 +446,7 @@ static void JS_UnlockWriteAgency (const v8::FunctionCallbackInfo<v8::Value>& arg
   v8::HandleScope scope(isolate);
 
   if (args.Length() > 2) {
-    TRI_V8_EXCEPTION_USAGE("unlockWrite(<part>, <timeout>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("unlockWrite(<part>, <timeout>)");
   }
 
   const std::string part = TRI_ObjectToString(args[0]);
@@ -458,7 +458,7 @@ static void JS_UnlockWriteAgency (const v8::FunctionCallbackInfo<v8::Value>& arg
 
   AgencyComm comm;
   if (! comm.unlockWrite(part, timeout)) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to release lock");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to release lock");
   }
 
   TRI_V8_RETURN_TRUE();
@@ -473,7 +473,7 @@ static void JS_RemoveAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1) {
-    TRI_V8_EXCEPTION_USAGE("remove(<key>, <recursive>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("remove(<key>, <recursive>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
@@ -502,7 +502,7 @@ static void JS_SetAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 2) {
-    TRI_V8_EXCEPTION_USAGE("set(<key>, <value>, <ttl>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("set(<key>, <value>, <ttl>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
@@ -539,7 +539,7 @@ static void JS_WatchAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1) {
-    TRI_V8_EXCEPTION_USAGE("watch(<key>, <waitIndex>, <timeout>, <recursive>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("watch(<key>, <waitIndex>, <timeout>, <recursive>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
@@ -597,7 +597,7 @@ static void JS_EndpointsAgency (const v8::FunctionCallbackInfo<v8::Value>& args)
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("endpoints()");
+    TRI_V8_THROW_EXCEPTION_USAGE("endpoints()");
   }
 
   std::vector<std::string> endpoints = AgencyComm::getEndpoints();
@@ -625,7 +625,7 @@ static void JS_PrefixAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() > 1) {
-    TRI_V8_EXCEPTION_USAGE("prefix(<strip>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("prefix(<strip>)");
   }
 
   bool strip = false;
@@ -651,7 +651,7 @@ static void JS_SetPrefixAgency (const v8::FunctionCallbackInfo<v8::Value>& args)
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("setPrefix(<prefix>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("setPrefix(<prefix>)");
   }
 
   const bool result = AgencyComm::setPrefix(TRI_ObjectToString(args[0]));
@@ -673,7 +673,7 @@ static void JS_UniqidAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1 || args.Length() > 3) {
-    TRI_V8_EXCEPTION_USAGE("uniqid(<key>, <count>, <timeout>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("uniqid(<key>, <count>, <timeout>)");
   }
 
   const std::string key = TRI_ObjectToString(args[0]);
@@ -713,7 +713,7 @@ static void JS_VersionAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("version()");
+    TRI_V8_THROW_EXCEPTION_USAGE("version()");
   }
 
   AgencyComm comm;
@@ -735,7 +735,7 @@ static void JS_DoesDatabaseExistClusterInfo (const v8::FunctionCallbackInfo<v8::
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("doesDatabaseExist(<database-id>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("doesDatabaseExist(<database-id>)");
   }
 
   const bool result = ClusterInfo::instance()->doesDatabaseExist(TRI_ObjectToString(args[0]), true);
@@ -757,7 +757,7 @@ static void JS_ListDatabases (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("listDatabases()");
+    TRI_V8_THROW_EXCEPTION_USAGE("listDatabases()");
   }
 
   vector<DatabaseID> res = ClusterInfo::instance()->listDatabases(true);
@@ -779,7 +779,7 @@ static void JS_FlushClusterInfo (const v8::FunctionCallbackInfo<v8::Value>& args
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("flush()");
+    TRI_V8_THROW_EXCEPTION_USAGE("flush()");
   }
 
   ClusterInfo::instance()->flush();
@@ -796,7 +796,7 @@ static void JS_GetCollectionInfoClusterInfo (const v8::FunctionCallbackInfo<v8::
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 2) {
-    TRI_V8_EXCEPTION_USAGE("getCollectionInfo(<database-id>, <collection-id>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("getCollectionInfo(<database-id>, <collection-id>)");
   }
 
   shared_ptr<CollectionInfo> ci
@@ -853,7 +853,7 @@ static void JS_GetCollectionInfoCurrentClusterInfo (const v8::FunctionCallbackIn
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 3) {
-    TRI_V8_EXCEPTION_USAGE("getCollectionInfoCurrent(<database-id>, <collection-id>, <shardID>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("getCollectionInfoCurrent(<database-id>, <collection-id>, <shardID>)");
   }
 
   ShardID shardID = TRI_ObjectToString(args[2]);
@@ -916,7 +916,7 @@ static void JS_GetResponsibleServerClusterInfo (const v8::FunctionCallbackInfo<v
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("getResponsibleServer(<shard-id>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("getResponsibleServer(<shard-id>)");
   }
 
   std::string const result = ClusterInfo::instance()->getResponsibleServer(TRI_ObjectToString(args[0]));
@@ -933,7 +933,7 @@ static void JS_GetResponsibleShardClusterInfo (const v8::FunctionCallbackInfo<v8
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 2 || args.Length() > 3) {
-    TRI_V8_EXCEPTION_USAGE("getResponsibleShard(<collection-id>, <document>, <documentIsComplete>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("getResponsibleShard(<collection-id>, <document>, <documentIsComplete>)");
   }
   
   if (! args[0]->IsString() && ! args[0]->IsStringObject()) {
@@ -963,7 +963,7 @@ static void JS_GetResponsibleShardClusterInfo (const v8::FunctionCallbackInfo<v8
   TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
@@ -982,7 +982,7 @@ static void JS_GetServerEndpointClusterInfo (const v8::FunctionCallbackInfo<v8::
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("getServerEndpoint(<server-id>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("getServerEndpoint(<server-id>)");
   }
 
   const std::string result = ClusterInfo::instance()->getServerEndpoint(TRI_ObjectToString(args[0]));
@@ -999,7 +999,7 @@ static void JS_GetDBServers (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("DBServers()");
+    TRI_V8_THROW_EXCEPTION_USAGE("DBServers()");
   }
 
   std::vector<std::string> DBServers = ClusterInfo::instance()->getCurrentDBServers();
@@ -1024,7 +1024,7 @@ static void JS_ReloadDBServers (const v8::FunctionCallbackInfo<v8::Value>& args)
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("reloadDBServers()");
+    TRI_V8_THROW_EXCEPTION_USAGE("reloadDBServers()");
   }
 
   ClusterInfo::instance()->loadCurrentDBServers();
@@ -1040,7 +1040,7 @@ static void JS_UniqidClusterInfo (const v8::FunctionCallbackInfo<v8::Value>& arg
   v8::HandleScope scope(isolate);
 
   if (args.Length() > 1) {
-    TRI_V8_EXCEPTION_USAGE("uniqid(<count>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("uniqid(<count>)");
   }
 
   uint64_t count = 1;
@@ -1055,7 +1055,7 @@ static void JS_UniqidClusterInfo (const v8::FunctionCallbackInfo<v8::Value>& arg
   uint64_t value = ClusterInfo::instance()->uniqid();
 
   if (value == 0) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to generate unique id");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unable to generate unique id");
   }
 
   const std::string id = StringUtils::itoa(value);
@@ -1076,7 +1076,7 @@ static void JS_AddressServerState (const v8::FunctionCallbackInfo<v8::Value>& ar
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("address()");
+    TRI_V8_THROW_EXCEPTION_USAGE("address()");
   }
 
   const std::string address = ServerState::instance()->getAddress();
@@ -1092,7 +1092,7 @@ static void JS_FlushServerState (const v8::FunctionCallbackInfo<v8::Value>& args
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("flush()");
+    TRI_V8_THROW_EXCEPTION_USAGE("flush()");
   }
 
   ServerState::instance()->flush();
@@ -1109,7 +1109,7 @@ static void JS_IdServerState (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("id()");
+    TRI_V8_THROW_EXCEPTION_USAGE("id()");
   }
 
   const std::string id = ServerState::instance()->getId();
@@ -1125,7 +1125,7 @@ static void JS_DataPathServerState (const v8::FunctionCallbackInfo<v8::Value>& a
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("dataPath()");
+    TRI_V8_THROW_EXCEPTION_USAGE("dataPath()");
   }
 
   const std::string path = ServerState::instance()->getDataPath();
@@ -1141,7 +1141,7 @@ static void JS_LogPathServerState (const v8::FunctionCallbackInfo<v8::Value>& ar
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("logPath()");
+    TRI_V8_THROW_EXCEPTION_USAGE("logPath()");
   }
 
   const std::string path = ServerState::instance()->getLogPath();
@@ -1157,7 +1157,7 @@ static void JS_AgentPathServerState (const v8::FunctionCallbackInfo<v8::Value>& 
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("agentPath()");
+    TRI_V8_THROW_EXCEPTION_USAGE("agentPath()");
   }
 
   const std::string path = ServerState::instance()->getAgentPath();
@@ -1173,7 +1173,7 @@ static void JS_ArangodPathServerState (const v8::FunctionCallbackInfo<v8::Value>
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("arangodPath()");
+    TRI_V8_THROW_EXCEPTION_USAGE("arangodPath()");
   }
 
   const std::string path = ServerState::instance()->getArangodPath();
@@ -1189,7 +1189,7 @@ static void JS_JavaScriptPathServerState (const v8::FunctionCallbackInfo<v8::Val
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("javaScriptPath()");
+    TRI_V8_THROW_EXCEPTION_USAGE("javaScriptPath()");
   }
 
   const std::string path = ServerState::instance()->getJavaScriptPath();
@@ -1205,7 +1205,7 @@ static void JS_DBserverConfigServerState (const v8::FunctionCallbackInfo<v8::Val
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("dbserverConfig()");
+    TRI_V8_THROW_EXCEPTION_USAGE("dbserverConfig()");
   }
 
   const std::string path = ServerState::instance()->getDBserverConfig();
@@ -1221,7 +1221,7 @@ static void JS_CoordinatorConfigServerState (const v8::FunctionCallbackInfo<v8::
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("coordinatorConfig()");
+    TRI_V8_THROW_EXCEPTION_USAGE("coordinatorConfig()");
   }
 
   const std::string path = ServerState::instance()->getCoordinatorConfig();
@@ -1237,7 +1237,7 @@ static void JS_DisableDipatcherFrontendServerState (const v8::FunctionCallbackIn
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("disableDispatcherFrontend()");
+    TRI_V8_THROW_EXCEPTION_USAGE("disableDispatcherFrontend()");
   }
 
   if (ServerState::instance()->getDisableDispatcherFrontend()) {
@@ -1257,7 +1257,7 @@ static void JS_DisableDipatcherKickstarterServerState (const v8::FunctionCallbac
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("disableDispatcherKickstarter()");
+    TRI_V8_THROW_EXCEPTION_USAGE("disableDispatcherKickstarter()");
   }
 
   if (ServerState::instance()->getDisableDispatcherKickstarter()) {
@@ -1277,7 +1277,7 @@ static void JS_InitialisedServerState (const v8::FunctionCallbackInfo<v8::Value>
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("initialised()");
+    TRI_V8_THROW_EXCEPTION_USAGE("initialised()");
   }
 
   if (ServerState::instance()->initialised()) {
@@ -1297,7 +1297,7 @@ static void JS_IsCoordinatorServerState (const v8::FunctionCallbackInfo<v8::Valu
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("isCoordinator()");
+    TRI_V8_THROW_EXCEPTION_USAGE("isCoordinator()");
   }
 
   if (ServerState::instance()->getRole() == ServerState::ROLE_COORDINATOR) {
@@ -1317,7 +1317,7 @@ static void JS_RoleServerState (const v8::FunctionCallbackInfo<v8::Value>& args)
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("role()");
+    TRI_V8_THROW_EXCEPTION_USAGE("role()");
   }
 
   const std::string role = ServerState::roleToString(ServerState::instance()->getRole());
@@ -1336,7 +1336,7 @@ static void JS_SetIdServerState (const v8::FunctionCallbackInfo<v8::Value>& args
 
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("setId(<id>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("setId(<id>)");
   }
 
   const std::string id = TRI_ObjectToString(args[0]);
@@ -1354,7 +1354,7 @@ static void JS_SetRoleServerState (const v8::FunctionCallbackInfo<v8::Value>& ar
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("setRole(<role>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("setRole(<role>)");
   }
 
   const std::string role = TRI_ObjectToString(args[0]);
@@ -1378,7 +1378,7 @@ static void JS_StatusServerState (const v8::FunctionCallbackInfo<v8::Value>& arg
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("status()");
+    TRI_V8_THROW_EXCEPTION_USAGE("status()");
   }
 
   const std::string state = ServerState::stateToString(ServerState::instance()->getState());
@@ -1395,7 +1395,7 @@ static void JS_GetClusterAuthentication (const v8::FunctionCallbackInfo<v8::Valu
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("getClusterAuthentication()");
+    TRI_V8_THROW_EXCEPTION_USAGE("getClusterAuthentication()");
   }
 
   std::string auth;
@@ -1626,7 +1626,7 @@ static void JS_AsyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 4 || args.Length() > 7) {
-    TRI_V8_EXCEPTION_USAGE("asyncRequest("
+    TRI_V8_THROW_EXCEPTION_USAGE("asyncRequest("
       "reqType, destination, dbname, path, body, headers, options)");
   }
   // Possible options:
@@ -1644,7 +1644,7 @@ static void JS_AsyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
   ClusterComm* cc = ClusterComm::instance();
 
   if (cc == 0) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                              "clustercomm object not found");
   }
 
@@ -1666,7 +1666,7 @@ static void JS_AsyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
                          reqType, path, body, true, headerFields, 0, timeout);
 
   if (res == 0) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                              "couldn't queue async request");
   }
 
@@ -1687,7 +1687,7 @@ static void JS_SyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 4 || args.Length() > 7) {
-    TRI_V8_EXCEPTION_USAGE("syncRequest("
+    TRI_V8_THROW_EXCEPTION_USAGE("syncRequest("
       "reqType, destination, dbname, path, body, headers, options)");
   }
   // Possible options:
@@ -1705,7 +1705,7 @@ static void JS_SyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
   ClusterComm* cc = ClusterComm::instance();
 
   if (cc == 0) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                              "clustercomm object not found");
   }
 
@@ -1729,7 +1729,7 @@ static void JS_SyncRequest (const v8::FunctionCallbackInfo<v8::Value>& args) {
   delete headerFields;
 
   if (res == 0) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                              "couldn't do sync request");
   }
 
@@ -1748,7 +1748,7 @@ static void JS_Enquire (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("enquire(operationID)");
+    TRI_V8_THROW_EXCEPTION_USAGE("enquire(operationID)");
   }
 
   // Disabled to allow communication originating in a DBserver:
@@ -1761,7 +1761,7 @@ static void JS_Enquire (const v8::FunctionCallbackInfo<v8::Value>& args) {
   ClusterComm* cc = ClusterComm::instance();
 
   if (cc == 0) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                              "clustercomm object not found");
   }
 
@@ -1786,7 +1786,7 @@ static void JS_Wait (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_V8_CURRENT_GLOBALS_AND_SCOPE;
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("wait(obj)");
+    TRI_V8_THROW_EXCEPTION_USAGE("wait(obj)");
   }
   // Possible options:
   //   - clientTransactionID  (string)
@@ -1805,7 +1805,7 @@ static void JS_Wait (const v8::FunctionCallbackInfo<v8::Value>& args) {
   ClusterComm* cc = ClusterComm::instance();
 
   if (cc == 0) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                              "clustercomm object not found");
   }
 
@@ -1868,7 +1868,7 @@ static void JS_Drop (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_V8_CURRENT_GLOBALS_AND_SCOPE;
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("wait(obj)");
+    TRI_V8_THROW_EXCEPTION_USAGE("wait(obj)");
   }
   // Possible options:
   //   - clientTransactionID  (string)
@@ -1886,7 +1886,7 @@ static void JS_Drop (const v8::FunctionCallbackInfo<v8::Value>& args) {
   ClusterComm* cc = ClusterComm::instance();
 
   if (cc == 0) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL,
                              "clustercomm object not found");
   }
 

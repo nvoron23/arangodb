@@ -165,11 +165,11 @@ static void JS_CreateCursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (args.Length() < 1) {
-    TRI_V8_EXCEPTION_USAGE("CREATE_CURSOR(<list>, <doCount>, <batchSize>, <ttl>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("CREATE_CURSOR(<list>, <doCount>, <batchSize>, <ttl>)");
   }
 
   if (! args[0]->IsArray()) {
@@ -239,7 +239,7 @@ static void JS_DisposeGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& 
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("dispose()");
+    TRI_V8_THROW_EXCEPTION_USAGE("dispose()");
   }
 
   bool found = TRI_DropGeneralCursor(UnwrapGeneralCursor(args.Holder()));
@@ -262,7 +262,7 @@ static void JS_IdGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& args)
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("id()");
+    TRI_V8_THROW_EXCEPTION_USAGE("id()");
   }
 
   TRI_voc_tick_t id = TRI_IdGeneralCursor(UnwrapGeneralCursor(args.Holder()));
@@ -271,7 +271,7 @@ static void JS_IdGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& args)
     TRI_V8_RETURN(V8TickId(isolate, id));
   }
 
-  TRI_V8_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
+  TRI_V8_THROW_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -284,7 +284,7 @@ static void JS_CountGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& ar
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("count()");
+    TRI_V8_THROW_EXCEPTION_USAGE("count()");
   }
 
   size_t length = TRI_CountGeneralCursor(UnwrapGeneralCursor(args.Holder()));
@@ -302,7 +302,7 @@ static void JS_NextGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& arg
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("next()");
+    TRI_V8_THROW_EXCEPTION_USAGE("next()");
   }
 
   v8::Handle<v8::Value> value;
@@ -360,7 +360,7 @@ static void JS_NextGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& arg
     }
   }
 
-  TRI_V8_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
+  TRI_V8_THROW_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -373,7 +373,7 @@ static void JS_PersistGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& 
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("persist()");
+    TRI_V8_THROW_EXCEPTION_USAGE("persist()");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -396,7 +396,7 @@ static void JS_ToArrayGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& 
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("toArray()");
+    TRI_V8_THROW_EXCEPTION_USAGE("toArray()");
   }
 
   v8::Handle<v8::Array> rows = v8::Array::New(isolate);
@@ -446,7 +446,7 @@ static void JS_ToArrayGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& 
     }
   }
 
-  TRI_V8_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
+  TRI_V8_THROW_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -468,7 +468,7 @@ static void JS_GetBatchSizeGeneralCursor (const v8::FunctionCallbackInfo<v8::Val
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("getBatchSize()");
+    TRI_V8_THROW_EXCEPTION_USAGE("getBatchSize()");
   }
 
   TRI_general_cursor_t* cursor = TRI_UseGeneralCursor(UnwrapGeneralCursor(args.Holder()));
@@ -482,7 +482,7 @@ static void JS_GetBatchSizeGeneralCursor (const v8::FunctionCallbackInfo<v8::Val
     TRI_V8_RETURN(v8::Number::New(isolate, (double) max));
   }
 
-  TRI_V8_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
+  TRI_V8_THROW_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -495,7 +495,7 @@ static void JS_GetExtraGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>&
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("getExtra()");
+    TRI_V8_THROW_EXCEPTION_USAGE("getExtra()");
   }
 
   TRI_general_cursor_t* cursor = TRI_UseGeneralCursor(UnwrapGeneralCursor(args.Holder()));
@@ -517,7 +517,7 @@ static void JS_GetExtraGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>&
     TRI_V8_RETURN_UNDEFINED();
   }
 
-  TRI_V8_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
+  TRI_V8_THROW_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -530,7 +530,7 @@ static void JS_HasCountGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>&
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("hasCount()");
+    TRI_V8_THROW_EXCEPTION_USAGE("hasCount()");
   }
 
   TRI_general_cursor_t* cursor = TRI_UseGeneralCursor(UnwrapGeneralCursor(args.Holder()));
@@ -549,7 +549,7 @@ static void JS_HasCountGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>&
     }
   }
 
-  TRI_V8_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
+  TRI_V8_THROW_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -562,7 +562,7 @@ static void JS_HasNextGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& 
 
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("hasNext()");
+    TRI_V8_THROW_EXCEPTION_USAGE("hasNext()");
   }
 
   TRI_general_cursor_t* cursor = TRI_UseGeneralCursor(UnwrapGeneralCursor(args.Holder()));
@@ -581,7 +581,7 @@ static void JS_HasNextGeneralCursor (const v8::FunctionCallbackInfo<v8::Value>& 
     }
   }
 
-  TRI_V8_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
+  TRI_V8_THROW_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -594,13 +594,13 @@ static void JS_Cursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("CURSOR(<cursor-identifier>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("CURSOR(<cursor-identifier>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   // get the id
@@ -616,7 +616,7 @@ static void JS_Cursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_general_cursor_t* cursor = TRI_FindGeneralCursor(vocbase, (TRI_voc_tick_t) id);
 
   if (cursor == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_CURSOR_NOT_FOUND);
   }
 
   TRI_WrapGeneralCursor(args, cursor);
@@ -632,13 +632,13 @@ static void JS_DeleteCursor (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("DELETE_CURSOR(<cursor-identifier>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("DELETE_CURSOR(<cursor-identifier>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   // get the id

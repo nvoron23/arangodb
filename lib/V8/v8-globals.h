@@ -107,9 +107,9 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for current v8 globals and scope
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_CURRENT_GLOBALS_AND_SCOPE                                \
+#define TRI_V8_CURRENT_GLOBALS_AND_SCOPE                                              \
   TRI_v8_global_t* v8g = static_cast<TRI_v8_global_t*>(isolate->GetData(V8DataSlot)); \
-  v8::HandleScope scope(isolate);                                       \
+  v8::HandleScope scope(isolate);                                                     \
   while (0)
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -117,72 +117,100 @@ static const uint32_t V8DataSlot = 0;
 /// Implicitely demands *args* to be function arguments.
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_EXCEPTION(code)                                          \
-  TRI_CreateErrorObject(isolate, code);                                 \
-  return
+#define TRI_V8_SET_EXCEPTION(code)                                      \
+  do {                                                                  \
+    TRI_CreateErrorObject(isolate, code);                               \
+  } while (0)
+
+#define TRI_V8_THROW_EXCEPTION(code)                                    \
+  do {                                                                  \
+    TRI_V8_SET_EXCEPTION(code);                                         \
+    return;                                                             \
+  } while (0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing an exception and returning
 /// Implicitely demands *args* to be function arguments.
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_EXCEPTION_MESSAGE(code, message)         \
-  TRI_CreateErrorObject(isolate, code, message, true);  \
-  return
+#define TRI_V8_SET_EXCEPTION_MESSAGE(code, message)                     \
+  do {                                                                  \
+    TRI_CreateErrorObject(isolate, code, message, true);                \
+  } while (0)
+
+#define TRI_V8_THROW_EXCEPTION_MESSAGE(code, message)                   \
+  do {                                                                  \
+    TRI_V8_SET_EXCEPTION_MESSAGE(code, message);                        \
+    return;                                                             \
+  } while (0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing an exception and returning
 /// Implicitely demands *args* to be function arguments.
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_EXCEPTION_FULL(code, message)                      \
-  TRI_CreateErrorObject(isolate, code, message, false);           \
-  return
+#define TRI_V8_THROW_EXCEPTION_FULL(code, message)                      \
+  do {                                                                  \
+    TRI_CreateErrorObject(isolate, code, message, false);               \
+    return;                                                             \
+ } while (0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing a usage exception and returning
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_EXCEPTION_USAGE(usage)                                   \
+#define TRI_V8_THROW_EXCEPTION_USAGE(usage)                             \
   do {                                                                  \
     std::string msg = "usage: ";                                        \
     msg += usage;                                                       \
     TRI_CreateErrorObject(isolate,                                      \
                           TRI_ERROR_BAD_PARAMETER,                      \
                           msg.c_str());                                 \
-  }                                                                     \
-  while (0); return
+    return;                                                             \
+  } while (0)
 
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing an internal exception and returning
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_EXCEPTION_INTERNAL(message)			\
-  TRI_CreateErrorObject(isolate, TRI_ERROR_INTERNAL, message);          \
-  return
+#define TRI_V8_THROW_EXCEPTION_INTERNAL(message)                        \
+  do {                                                                  \
+    TRI_CreateErrorObject(isolate, TRI_ERROR_INTERNAL, message);        \
+    return;                                                             \
+  } while(0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing a parameter exception and returning
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_EXCEPTION_PARAMETER(message)			\
-  TRI_CreateErrorObject(isolate, TRI_ERROR_BAD_PARAMETER, message);     \
-  return
+#define TRI_V8_THROW_EXCEPTION_PARAMETER(message)                       \
+  do {                                                                  \
+    TRI_CreateErrorObject(isolate, TRI_ERROR_BAD_PARAMETER, message);   \
+    return;                                                             \
+  } while(0)
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing an out-of-memory exception and returning
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_EXCEPTION_MEMORY()			   \
-  TRI_CreateErrorObject(isolate, TRI_ERROR_OUT_OF_MEMORY); \
-  return
+#define TRI_V8_SET_EXCEPTION_MEMORY()                                   \
+  do {                                                                  \
+    TRI_CreateErrorObject(isolate, TRI_ERROR_OUT_OF_MEMORY);            \
+  } while (0)
+
+#define TRI_V8_THROW_EXCEPTION_MEMORY()                                 \
+  do {                                                                  \
+    TRI_V8_SET_EXCEPTION_MEMORY();                                      \
+    return;                                                             \
+ } while (0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing an exception for an system error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_EXCEPTION_SYS(message)			    \
+#define TRI_V8_THROW_EXCEPTION_SYS(message)                         \
   do {                                                              \
     TRI_set_errno(TRI_ERROR_SYS_ERROR);                             \
     std::string msg = message;                                      \
@@ -192,57 +220,66 @@ static const uint32_t V8DataSlot = 0;
                           TRI_errno(),                              \
                           msg.c_str());                             \
     return;                                                         \
-  }                                                                 \
-  while (0)
+  } while (0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for logging and forward throwing an error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_LOG_THROW_EXCEPTION(TRYCATCH)                    \
-  TRI_LogV8Exception(isolate, &TRYCATCH);                       \
-  TRYCATCH.ReThrow();                                           \
-  return
+#define TRI_V8_LOG_THROW_EXCEPTION(TRYCATCH)                      \
+  do {                                                            \
+    TRI_LogV8Exception(isolate, &TRYCATCH);                       \
+    TRYCATCH.ReThrow();                                           \
+    return;                                                       \
+  } while(0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing an error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_ERROR(message)					 \
-  isolate->ThrowException(v8::Exception::Error(TRI_V8_STRING(message))); \
-  return
+#define TRI_V8_THROW_ERROR(message)                                        \
+  do {                                                                     \
+    isolate->ThrowException(v8::Exception::Error(TRI_V8_STRING(message))); \
+    return;                                                                \
+  } while(0);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing a range error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_RANGE_ERROR(message)				      \
-  isolate->ThrowException(v8::Exception::RangeError(TRI_V8_STRING(message))); \
-  return
+#define TRI_V8_THROW_RANGE_ERROR(message)                                       \
+  do {                                                                          \
+    isolate->ThrowException(v8::Exception::RangeError(TRI_V8_STRING(message))); \
+    return;                                                                     \
+} while(0);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing a syntax error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_SYNTAX_ERROR(message)                                     \
-  isolate->ThrowException(v8::Exception::SyntaxError(TRI_V8_STRING(message))); \
-  return
+#define TRI_V8_THROW_SYNTAX_ERROR(message)                                       \
+  do {                                                                           \
+    isolate->ThrowException(v8::Exception::SyntaxError(TRI_V8_STRING(message))); \
+    return;                                                                      \
+  } while (0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing a type error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_TYPE_ERROR(message)                                     \
-  isolate->ThrowException(v8::Exception::TypeError(TRI_V8_STRING(message))); \
-  return
+#define TRI_V8_THROW_TYPE_ERROR(message)                                       \
+  do {                                                                         \
+    isolate->ThrowException(v8::Exception::TypeError(TRI_V8_STRING(message))); \
+    return;                                                                    \
+  } while (0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief "not yet implemented" handler for sharding
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection)  \
-  if (collection != nullptr && ! collection->_isLocal) {               \
-    TRI_V8_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);                       \
+#define TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection)        \
+  if (collection != nullptr && ! collection->_isLocal) {                     \
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);                       \
   }
 
 

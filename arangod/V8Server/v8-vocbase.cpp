@@ -146,13 +146,13 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1 || ! args[0]->IsObject()) {
-    TRI_V8_EXCEPTION_USAGE("TRANSACTION(<object>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("TRANSACTION(<object>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   // treat the argument as an object from now on
@@ -278,7 +278,7 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   if (params.IsEmpty()) {
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   bool embed = false;  
@@ -337,7 +337,7 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   int res = trx.begin();
   
   if (res != TRI_ERROR_NO_ERROR) {
-      TRI_V8_EXCEPTION(res);
+      TRI_V8_THROW_EXCEPTION(res);
   }
 
   v8::Handle<v8::Value> result;
@@ -363,7 +363,7 @@ static void JS_Transaction (const v8::FunctionCallbackInfo<v8::Value>& args) {
   res = trx.commit();
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
   
   TRI_V8_RETURN(result);
@@ -433,7 +433,7 @@ static void JS_PropertiesWal (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() > 1 || (args.Length() == 1 && ! args[0]->IsObject())) {
-    TRI_V8_EXCEPTION_USAGE("properties(<object>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("properties(<object>)");
   }
   
   auto l = triagens::wal::LogfileManager::instance();
@@ -532,7 +532,7 @@ static void JS_FlushWal (const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (ServerState::instance()->isCoordinator()) {
     res = flushWalOnAllDBServers( waitForSync, waitForCollector );
     if (res != TRI_ERROR_NO_ERROR) {
-      TRI_V8_EXCEPTION(res);
+      TRI_V8_THROW_EXCEPTION(res);
     }
     TRI_V8_RETURN_TRUE();
   }
@@ -540,7 +540,7 @@ static void JS_FlushWal (const v8::FunctionCallbackInfo<v8::Value>& args) {
   res = triagens::wal::LogfileManager::instance()->flush(waitForSync, waitForCollector, false);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_V8_RETURN_TRUE();
@@ -555,7 +555,7 @@ static void JS_normalize_string (const v8::FunctionCallbackInfo<v8::Value>& args
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("NORMALIZE_STRING(<string>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("NORMALIZE_STRING(<string>)");
   }
 
   TRI_normalize_V8_Obj(args, args[0]);
@@ -570,7 +570,7 @@ static void JS_EnableNativeBacktraces (const v8::FunctionCallbackInfo<v8::Value>
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("ENABLE_NATIVE_BACKTRACES(<value>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("ENABLE_NATIVE_BACKTRACES(<value>)");
   }
 
   triagens::arango::Exception::SetVerbose(TRI_ObjectToBoolean(args[0]));
@@ -587,7 +587,7 @@ static void JS_compare_string (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 2) {
-    TRI_V8_EXCEPTION_USAGE("COMPARE_STRING(<left string>, <right string>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("COMPARE_STRING(<left string>, <right string>)");
   }
 
   v8::String::Value left(args[0]);
@@ -612,7 +612,7 @@ static void JS_getIcuTimezones (const v8::FunctionCallbackInfo<v8::Value>& args)
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("TIMEZONES()");
+    TRI_V8_THROW_EXCEPTION_USAGE("TIMEZONES()");
   }
 
   v8::Handle<v8::Array> result = v8::Array::New(isolate);
@@ -644,7 +644,7 @@ static void JS_getIcuLocales (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("LOCALES()");
+    TRI_V8_THROW_EXCEPTION_USAGE("LOCALES()");
   }
 
   v8::Handle<v8::Array> result = v8::Array::New(isolate);
@@ -673,7 +673,7 @@ static void JS_formatDatetime (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 2) {
-    TRI_V8_EXCEPTION_USAGE("FORMAT_DATETIME(<datetime in sec>, <pattern>, [<timezone>, [<locale>]])");
+    TRI_V8_THROW_EXCEPTION_USAGE("FORMAT_DATETIME(<datetime in sec>, <pattern>, [<timezone>, [<locale>]])");
   }
 
   int64_t datetime = TRI_ObjectToInt64(args[0]);
@@ -732,7 +732,7 @@ static void JS_parseDatetime (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 2) {
-    TRI_V8_EXCEPTION_USAGE("PARSE_DATETIME(<datetime string>, <pattern>, [<timezone>, [<locale>]])");
+    TRI_V8_THROW_EXCEPTION_USAGE("PARSE_DATETIME(<datetime string>, <pattern>, [<timezone>, [<locale>]])");
   }
 
   v8::String::Value datetimeString(args[0]);
@@ -819,11 +819,11 @@ static void JS_ReloadAuth (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == 0) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("RELOAD_AUTH()");
+    TRI_V8_THROW_EXCEPTION_USAGE("RELOAD_AUTH()");
   }
 
   bool result;
@@ -857,11 +857,11 @@ static void JS_ParseAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
   
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("AQL_PARSE(<querystring>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("AQL_PARSE(<querystring>)");
   }
 
   // get the query string
@@ -877,7 +877,7 @@ static void JS_ParseAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   auto parseResult = query.parse();
 
   if (parseResult.code != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_FULL(parseResult.code, parseResult.details);
+    TRI_V8_THROW_EXCEPTION_FULL(parseResult.code, parseResult.details);
   }
 
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
@@ -923,7 +923,7 @@ static void JS_WarningAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 2) {
-    TRI_V8_EXCEPTION_USAGE("AQL_WARNING(<code>, <message>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("AQL_WARNING(<code>, <message>)");
   }
 
   // get the query string
@@ -958,11 +958,11 @@ static void JS_ExplainAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
   
   if (args.Length() < 1 || args.Length() > 3) {
-    TRI_V8_EXCEPTION_USAGE("AQL_EXPLAIN(<querystring>, <bindvalues>, <options>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("AQL_EXPLAIN(<querystring>, <bindvalues>, <options>)");
   }
 
   // get the query string
@@ -1005,7 +1005,7 @@ static void JS_ExplainAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   auto queryResult = query.explain();
   
   if (queryResult.code != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_FULL(queryResult.code, queryResult.details);
+    TRI_V8_THROW_EXCEPTION_FULL(queryResult.code, queryResult.details);
   }
   
   v8::Handle<v8::Object> result = v8::Object::New(isolate);
@@ -1048,11 +1048,11 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
   
   if (args.Length() < 1 || args.Length() > 2) {
-    TRI_V8_EXCEPTION_USAGE("AQL_EXECUTEJSON(<queryjson>, <options>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("AQL_EXECUTEJSON(<queryjson>, <options>)");
   }
   
   // return number of total records in cursor?
@@ -1107,7 +1107,7 @@ static void JS_ExecuteAqlJson (const v8::FunctionCallbackInfo<v8::Value>& args) 
   auto queryResult = query.execute(static_cast<triagens::aql::QueryRegistry*>(v8g->_queryRegistry));
   
   if (queryResult.code != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_FULL(queryResult.code, queryResult.details);
+    TRI_V8_THROW_EXCEPTION_FULL(queryResult.code, queryResult.details);
   }
   
   if (TRI_LengthListJson(queryResult.json) <= batchSize) {
@@ -1186,11 +1186,11 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
   
   if (args.Length() < 1 || args.Length() > 3) {
-    TRI_V8_EXCEPTION_USAGE("AQL_EXECUTE(<querystring>, <bindvalues>, <options>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("AQL_EXECUTE(<querystring>, <bindvalues>, <options>)");
   }
 
   // get the query string
@@ -1264,10 +1264,10 @@ static void JS_ExecuteAql (const v8::FunctionCallbackInfo<v8::Value>& args) {
     if (queryResult.code == TRI_ERROR_REQUEST_CANCELED) {
       TRI_GET_GLOBALS();
       v8g->_canceled = true;
-      TRI_V8_EXCEPTION(TRI_ERROR_REQUEST_CANCELED);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_REQUEST_CANCELED);
     }
 
-    TRI_V8_EXCEPTION_FULL(queryResult.code, queryResult.details);
+    TRI_V8_THROW_EXCEPTION_FULL(queryResult.code, queryResult.details);
   }
   
   if (queryResult.result->Length() <= batchSize) {
@@ -1386,7 +1386,7 @@ static void MapGetVocBase (v8::Local<v8::String> const name,
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   // convert the JavaScript string to a string
@@ -1554,7 +1554,7 @@ static void JS_PathDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   TRI_V8_RETURN_STRING(vocbase->_path);
@@ -1576,7 +1576,7 @@ static void JS_IdDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   TRI_V8_RETURN(V8TickId(isolate, vocbase->_id));
@@ -1598,7 +1598,7 @@ static void JS_NameDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   TRI_V8_RETURN_STRING(vocbase->_name);
@@ -1624,7 +1624,7 @@ static void JS_IsSystemDatabase (const v8::FunctionCallbackInfo<v8::Value>& args
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   TRI_V8_RETURN(v8::Boolean::New(isolate, TRI_IsSystemVocBase(vocbase)));
@@ -1656,13 +1656,13 @@ static void JS_UseDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("db._useDatabase(<name>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("db._useDatabase(<name>)");
   }
 
   TRI_GET_GLOBALS();
 
   if (! v8g->_allowUseDatabase) {
-    TRI_V8_EXCEPTION(TRI_ERROR_FORBIDDEN);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_FORBIDDEN);
   }
 
   string const name = TRI_ObjectToString(args[0]);
@@ -1670,7 +1670,7 @@ static void JS_UseDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   if (TRI_EqualString(name.c_str(), vocbase->_name)) {
@@ -1700,7 +1700,7 @@ static void JS_UseDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN(WrapVocBase(isolate, vocbase));
   }
 
-  TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+  TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1789,18 +1789,18 @@ static void JS_ListDatabases (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   const uint32_t argc = args.Length();
   if (argc != 0 && argc != 3) {
-    TRI_V8_EXCEPTION_USAGE("db._listDatabases()");
+    TRI_V8_THROW_EXCEPTION_USAGE("db._listDatabases()");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (argc == 0 &&
       ! TRI_IsSystemVocBase(vocbase)) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
   }
 
   // If we are a coordinator in a cluster, we have to behave differently:
@@ -1829,7 +1829,7 @@ static void JS_ListDatabases (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_DestroyVectorString(&names);
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   v8::Handle<v8::Array> result = v8::Array::New(isolate);
@@ -1861,7 +1861,7 @@ static void CreateDatabaseCoordinator (const v8::FunctionCallbackInfo<v8::Value>
   string const name = TRI_ObjectToString(args[0]);
 
   if (! TRI_IsAllowedNameVocBase(false, name.c_str())) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NAME_INVALID);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NAME_INVALID);
   }
 
   TRI_json_t* json = TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE);
@@ -1893,7 +1893,7 @@ static void CreateDatabaseCoordinator (const v8::FunctionCallbackInfo<v8::Value>
   TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_MESSAGE(res, errorMsg);
+    TRI_V8_THROW_EXCEPTION_MESSAGE(res, errorMsg);
   }
 
   // database was created successfully in agency
@@ -1916,7 +1916,7 @@ static void CreateDatabaseCoordinator (const v8::FunctionCallbackInfo<v8::Value>
   }
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   // now run upgrade and copy users into context
@@ -2005,21 +2005,21 @@ static void JS_CreateDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1 || args.Length() > 3) {
-    TRI_V8_EXCEPTION_USAGE("db._createDatabase(<name>, <options>, <users>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("db._createDatabase(<name>, <options>, <users>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (TRI_GetOperationModeServer() == TRI_VOCBASE_MODE_NO_CREATE) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_READ_ONLY);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_READ_ONLY);
   }
 
   if (! TRI_IsSystemVocBase(vocbase)) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
   }
 
   if (ServerState::instance()->isCoordinator()) {
@@ -2083,7 +2083,7 @@ static void JS_CreateDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) 
   int res = TRI_CreateDatabaseServer(static_cast<TRI_server_t*>(v8g->_server), id, name.c_str(), &defaults, &database, true);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_ASSERT(database != nullptr);
@@ -2136,7 +2136,7 @@ static void DropDatabaseCoordinator (const v8::FunctionCallbackInfo<v8::Value>& 
 
   if (vocbase == nullptr) {
     // no such database
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   TRI_voc_tick_t const id = vocbase->_id;
@@ -2149,7 +2149,7 @@ static void DropDatabaseCoordinator (const v8::FunctionCallbackInfo<v8::Value>& 
   int res = ci->dropDatabaseCoordinator(name, errorMsg, 120.0);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION_MESSAGE(res, errorMsg);
+    TRI_V8_THROW_EXCEPTION_MESSAGE(res, errorMsg);
   }
 
   // now wait for heartbeat thread to drop the database object
@@ -2191,17 +2191,17 @@ static void JS_DropDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("db._dropDatabase(<name>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("db._dropDatabase(<name>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (! TRI_IsSystemVocBase(vocbase)) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
   }
 
   // If we are a coordinator in a cluster, we have to behave differently:
@@ -2216,7 +2216,7 @@ static void JS_DropDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   int res = TRI_DropDatabaseServer(static_cast<TRI_server_t*>(v8g->_server), name.c_str(), true, true);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_V8ReloadRouting(isolate);
@@ -2235,7 +2235,7 @@ static void JS_ConfigureEndpoint (const v8::FunctionCallbackInfo<v8::Value>& arg
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1 || args.Length() > 2) {
-    TRI_V8_EXCEPTION_USAGE("db._configureEndpoint(<endpoint>, <databases>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("db._configureEndpoint(<endpoint>, <databases>)");
   }
 
   TRI_GET_GLOBALS();
@@ -2244,17 +2244,17 @@ static void JS_ConfigureEndpoint (const v8::FunctionCallbackInfo<v8::Value>& arg
 
   if (s == 0) {
     // not implemented in console mode
-    TRI_V8_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == 0) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (! TRI_IsSystemVocBase(vocbase)) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
   }
 
   const string endpoint = TRI_ObjectToString(args[0]);
@@ -2291,7 +2291,7 @@ static void JS_ConfigureEndpoint (const v8::FunctionCallbackInfo<v8::Value>& arg
   bool result = s->addEndpoint(endpoint, dbNames, true);
 
   if (! result) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_BAD_PARAMETER, "unable to bind to endpoint");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_BAD_PARAMETER, "unable to bind to endpoint");
   }
 
   TRI_V8_RETURN_TRUE();
@@ -2308,7 +2308,7 @@ static void JS_RemoveEndpoint (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 1 || args.Length() > 2) {
-    TRI_V8_EXCEPTION_USAGE("db._removeEndpoint(<endpoint>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("db._removeEndpoint(<endpoint>)");
   }
 
   TRI_GET_GLOBALS();
@@ -2317,23 +2317,23 @@ static void JS_RemoveEndpoint (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
   if (s == nullptr) {
     // not implemented in console mode
-    TRI_V8_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (! TRI_IsSystemVocBase(vocbase)) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
   }
 
   bool result = s->removeEndpoint(TRI_ObjectToString(args[0]));
 
   if (! result) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_ENDPOINT_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_ENDPOINT_NOT_FOUND);
   }
 
   TRI_V8_RETURN_TRUE();
@@ -2350,7 +2350,7 @@ static void JS_ListEndpoints (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::HandleScope scope(isolate);
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("db._listEndpoints()");
+    TRI_V8_THROW_EXCEPTION_USAGE("db._listEndpoints()");
   }
 
   TRI_GET_GLOBALS();
@@ -2359,17 +2359,17 @@ static void JS_ListEndpoints (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (s == nullptr) {
     // not implemented in console mode
-    TRI_V8_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
   }
 
   if (! TRI_IsSystemVocBase(vocbase)) {
-    TRI_V8_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_USE_SYSTEM_DATABASE);
   }
 
   auto const& endpoints = s->getEndpoints();

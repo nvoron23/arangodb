@@ -124,7 +124,7 @@ static void JS_ProcessCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 2) {
-    TRI_V8_EXCEPTION_USAGE("processCsvFile(<filename>, <callback>[, <options>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("processCsvFile(<filename>, <callback>[, <options>])");
   }
 
   // extract the filename
@@ -241,7 +241,7 @@ static void JS_ProcessJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args)
   v8::HandleScope scope(isolate);
 
   if (args.Length() < 2) {
-    TRI_V8_EXCEPTION_USAGE("processJsonFile(<filename>, <callback>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("processJsonFile(<filename>, <callback>)");
   }
 
   // extract the filename
@@ -286,7 +286,7 @@ static void JS_ProcessJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args)
           TRI_V8_THROW_SYNTAX_ERROR(msg.c_str());
         }
         else {
-          TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+          TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
         }
       }
 

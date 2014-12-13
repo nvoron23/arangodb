@@ -502,14 +502,14 @@ class KeySpace {
 
       if (found == nullptr) {
         // TODO: change error code
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL); 
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL); 
       }
         
       TRI_json_t* current = found->json;
 
       if (! TRI_IsListJson(current)) {
         // TODO: change error code
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL); 
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL); 
       }
 
       size_t const n = TRI_LengthVector(&current->_value._objects);
@@ -546,7 +546,7 @@ class KeySpace {
 
       if (! TRI_IsListJson(current)) {
         // TODO: change error code
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL); 
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL); 
       }
 
       size_t const n = TRI_LengthVector(&source->json->_value._objects);
@@ -583,7 +583,7 @@ class KeySpace {
 
       if (! TRI_IsListJson(dest->json)) {
         // TODO: change error code
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL); 
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL); 
       }
 
       TRI_PushBack2ListJson(dest->json, sourceItem);
@@ -650,7 +650,7 @@ class KeySpace {
         else {
           if (! TRI_IsListJson(found->json)) {
             // TODO: change error code
-            TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL); 
+            TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL); 
           }
 
           size_t const n = found->json->_value._objects._length;
@@ -761,7 +761,7 @@ class KeySpace {
 
       if (! value->IsObject() || value->IsArray()) {
         // TODO: change error code
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
       WRITE_LOCKER(_lock);
@@ -777,20 +777,20 @@ class KeySpace {
 
       if (! TRI_IsArrayJson(found->json)) {
         // TODO: change error code
-        TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
       TRI_json_t* other = TRI_ObjectToJson(isolate, value);
 
       if (other == nullptr) {
-        TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+        TRI_V8_THROW_EXCEPTION_MEMORY();
       }
 
       TRI_json_t* merged = TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, found->json, other, nullMeansRemove, false); 
       TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, other);
 
       if (merged == nullptr) {
-        TRI_V8_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+        TRI_V8_THROW_EXCEPTION_MEMORY();
       }
 
       found->setValue(merged);
@@ -858,7 +858,7 @@ static void JS_KeyspaceCreate (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
 
   if (args.Length() < 1 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEYSPACE_CREATE(<name>, <size>, <ignoreExisting>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEYSPACE_CREATE(<name>, <size>, <ignoreExisting>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -893,7 +893,7 @@ static void JS_KeyspaceCreate (const v8::FunctionCallbackInfo<v8::Value>& args) 
     if (hash != nullptr) {
       if (! ignoreExisting) {
         // TODO: change error code
-        TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "hash already exists");
+        TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "hash already exists");
       }
     }
    
@@ -918,7 +918,7 @@ static void JS_KeyspaceDrop (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() != 1 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEYSPACE_DROP(<name>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEYSPACE_DROP(<name>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -937,7 +937,7 @@ static void JS_KeyspaceDrop (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (it == h->data.end()) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     delete (*it).second;
@@ -957,7 +957,7 @@ static void JS_KeyspaceCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 1 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEYSPACE_COUNT(<name>, <prefix>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEYSPACE_COUNT(<name>, <prefix>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -977,7 +977,7 @@ static void JS_KeyspaceCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
   
     if (args.Length() > 1) {
@@ -1002,7 +1002,7 @@ static void JS_KeyspaceExists (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
 
   if (args.Length() != 1 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEYSPACE_EXISTS(<name>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEYSPACE_EXISTS(<name>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1036,7 +1036,7 @@ static void JS_KeyspaceKeys (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 1 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEYSPACE_KEYS(<name>, <prefix>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEYSPACE_KEYS(<name>, <prefix>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1054,7 +1054,7 @@ static void JS_KeyspaceKeys (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   if (args.Length() > 1) {
@@ -1075,7 +1075,7 @@ static void JS_KeyspaceGet (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 1 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEYSPACE_GET(<name>, <prefix>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEYSPACE_GET(<name>, <prefix>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1093,7 +1093,7 @@ static void JS_KeyspaceGet (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   if (args.Length() > 1) {
@@ -1115,7 +1115,7 @@ static void JS_KeyspaceRemove (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
 
   if (args.Length() < 1 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEYSPACE_REMOVE(<name>, <prefix>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEYSPACE_REMOVE(<name>, <prefix>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1133,7 +1133,7 @@ static void JS_KeyspaceRemove (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   if (args.Length() > 1) {
@@ -1155,7 +1155,7 @@ static void JS_KeyGet (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_GET(<name>, <key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_GET(<name>, <key>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1176,7 +1176,7 @@ static void JS_KeyGet (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     result = hash->keyGet(isolate, key);
@@ -1195,7 +1195,7 @@ static void JS_KeySet (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_SET(<name>, <key>, <value>, <replace>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_SET(<name>, <key>, <value>, <replace>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1221,7 +1221,7 @@ static void JS_KeySet (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     result = hash->keySet(isolate, key, args[2], replace);
@@ -1245,7 +1245,7 @@ static void JS_KeySetCas (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 4 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_SET_CAS(<name>, <key>, <value>, <compare>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_SET_CAS(<name>, <key>, <value>, <compare>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1259,7 +1259,7 @@ static void JS_KeySetCas (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (args[2]->IsUndefined()) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   auto h = &(static_cast<UserStructures*>(vocbase->_userStructures)->hashes);
@@ -1272,14 +1272,14 @@ static void JS_KeySetCas (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     res = hash->keyCas(isolate, key, args[2], args[3], match);
   }
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   if (match) {
@@ -1300,7 +1300,7 @@ static void JS_KeyRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_REMOVE(<name>, <key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_REMOVE(<name>, <key>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1321,7 +1321,7 @@ static void JS_KeyRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     result = hash->keyRemove(key);
@@ -1345,7 +1345,7 @@ static void JS_KeyExists (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_EXISTS(<name>, <key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_EXISTS(<name>, <key>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1366,7 +1366,7 @@ static void JS_KeyExists (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     result = hash->keyExists(key);
@@ -1390,11 +1390,11 @@ static void JS_KeyIncr (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_INCR(<name>, <key>, <value>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_INCR(<name>, <key>, <value>)");
   }
 
   if (args.Length() >= 3 && ! args[2]->IsNumber()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_INCR(<name>, <key>, <value>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_INCR(<name>, <key>, <value>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1421,13 +1421,13 @@ static void JS_KeyIncr (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     int res = hash->keyIncr(key, incr, result);
 
     if (res != TRI_ERROR_NO_ERROR) {
-      TRI_V8_EXCEPTION(res);
+      TRI_V8_THROW_EXCEPTION(res);
     }
   }
 
@@ -1444,7 +1444,7 @@ static void JS_KeyUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_UPDATE(<name>, <key>, <object>, <nullMeansRemove>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_UPDATE(<name>, <key>, <object>, <nullMeansRemove>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1468,7 +1468,7 @@ static void JS_KeyUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   hash->keyMerge(args, key, args[2], nullMeansRemove);
@@ -1484,7 +1484,7 @@ static void JS_KeyKeys (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_KEYS(<name>, <key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_KEYS(<name>, <key>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1503,7 +1503,7 @@ static void JS_KeyKeys (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   TRI_V8_RETURN(hash->keyKeys(isolate, key));
@@ -1519,7 +1519,7 @@ static void JS_KeyValues (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_VALUES(<name>, <key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_VALUES(<name>, <key>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1538,7 +1538,7 @@ static void JS_KeyValues (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   TRI_V8_RETURN(hash->keyValues(isolate, key));
@@ -1554,7 +1554,7 @@ static void JS_KeyPush (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_PUSH(<name>, <key>, <value>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_PUSH(<name>, <key>, <value>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1573,13 +1573,13 @@ static void JS_KeyPush (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   int res = hash->keyPush(isolate, key, args[2]);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_V8_RETURN_TRUE();
@@ -1595,7 +1595,7 @@ static void JS_KeyPop (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_POP(<name>, <key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_POP(<name>, <key>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1614,7 +1614,7 @@ static void JS_KeyPop (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   hash->keyPop(args, key);
@@ -1630,7 +1630,7 @@ static void JS_KeyTransfer (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_TRANSFER(<name>, <key-from>, <key-to>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_TRANSFER(<name>, <key-from>, <key-to>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1650,7 +1650,7 @@ static void JS_KeyTransfer (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   hash->keyTransfer(args, keyFrom, keyTo);
@@ -1666,7 +1666,7 @@ static void JS_KeyGetAt (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_GET_AT(<name>, <key>, <index>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_GET_AT(<name>, <key>, <index>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1686,7 +1686,7 @@ static void JS_KeyGetAt (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   hash->keyGetAt(args, key, offset);
@@ -1702,7 +1702,7 @@ static void JS_KeySetAt (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 4 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_SET_AT(<name>, <key>, <index>, <value>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_SET_AT(<name>, <key>, <index>, <value>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1722,12 +1722,12 @@ static void JS_KeySetAt (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   if (hash == nullptr) {
     // TODO: change error code
-    TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 
   int res = hash->keySetAt(isolate, key, offset, args[3]);
   if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_EXCEPTION(res);
+    TRI_V8_THROW_EXCEPTION(res);
   }
 
   TRI_V8_RETURN_TRUE();
@@ -1743,7 +1743,7 @@ static void JS_KeyType (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_TYPE(<name>, <key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_TYPE(<name>, <key>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1764,7 +1764,7 @@ static void JS_KeyType (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     result = hash->keyType(key);
@@ -1783,7 +1783,7 @@ static void JS_KeyCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("KEY_COUNT(<name>, <key>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("KEY_COUNT(<name>, <key>)");
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -1805,7 +1805,7 @@ static void JS_KeyCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     if (hash == nullptr) {
       // TODO: change error code
-      TRI_V8_EXCEPTION(TRI_ERROR_INTERNAL);
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
     }
 
     valid = hash->keyCount(key, result);

@@ -275,7 +275,7 @@ static void JS_ImportCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (args.Length() < 2) {
-    TRI_V8_EXCEPTION_USAGE("importCsvFile(<filename>, <collection>[, <options>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("importCsvFile(<filename>, <collection>[, <options>])");
   }
 
   // extract the filename
@@ -335,7 +335,7 @@ static void JS_ImportCsvFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN(result);
   }
 
-  TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_FAILED, ih.getErrorMessage().c_str());
+  TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_FAILED, ih.getErrorMessage().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -353,7 +353,7 @@ static void JS_ImportJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
 
   if (args.Length() < 2) {
-    TRI_V8_EXCEPTION_USAGE("importJsonFile(<filename>, <collection>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("importJsonFile(<filename>, <collection>)");
   }
 
   // extract the filename
@@ -383,7 +383,7 @@ static void JS_ImportJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args) 
     TRI_V8_RETURN(result);
   }
 
-  TRI_V8_EXCEPTION_MESSAGE(TRI_ERROR_FAILED, ih.getErrorMessage().c_str());
+  TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_FAILED, ih.getErrorMessage().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -396,7 +396,7 @@ static void JS_normalize_string (const v8::FunctionCallbackInfo<v8::Value>& args
 
 
   if (args.Length() != 1) {
-    TRI_V8_EXCEPTION_USAGE("NORMALIZE_STRING(<string>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("NORMALIZE_STRING(<string>)");
   }
 
   TRI_normalize_V8_Obj(args, args[0]);
@@ -412,7 +412,7 @@ static void JS_compare_string (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
 
   if (args.Length() != 2) {
-    TRI_V8_EXCEPTION_USAGE("COMPARE_STRING(<left string>, <right string>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("COMPARE_STRING(<left string>, <right string>)");
   }
 
   v8::String::Value left(args[0]);
@@ -651,7 +651,7 @@ static void ClientConnection_ConstructorCallback (const v8::FunctionCallbackInfo
   else {
     string errorMessage = "Could not connect. Error message: " + connection->getErrorMessage();
     delete connection;
-    TRI_V8_EXCEPTION_MESSAGE(TRI_SIMPLE_CLIENT_COULD_NOT_CONNECT, errorMessage.c_str());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_SIMPLE_CLIENT_COULD_NOT_CONNECT, errorMessage.c_str());
   }
 
   TRI_V8_RETURN(wrapV8ClientConnection(isolate, connection));
@@ -673,7 +673,7 @@ static void ClientConnection_reconnect (const v8::FunctionCallbackInfo<v8::Value
   }
 
   if (args.Length() < 2) {
-    TRI_V8_EXCEPTION_USAGE("reconnect(<endpoint>, <database>, [, <username>, <password>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("reconnect(<endpoint>, <database>, [, <username>, <password>])");
   }
 
   string const definition = TRI_ObjectToString(args[0]);
@@ -785,7 +785,7 @@ static void ClientConnection_reconnect (const v8::FunctionCallbackInfo<v8::Value
     ClientConnection = CreateConnection();
     args.Holder()->SetInternalField(SLOT_CLASS, v8::External::New(isolate, ClientConnection));
 
-    TRI_V8_EXCEPTION_MESSAGE(TRI_SIMPLE_CLIENT_COULD_NOT_CONNECT, errorMsg.c_str());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_SIMPLE_CLIENT_COULD_NOT_CONNECT, errorMsg.c_str());
   }
 }
 
@@ -807,7 +807,7 @@ static void ClientConnection_httpGetAny (const v8::FunctionCallbackInfo<v8::Valu
 
   // check params
   if (args.Length() < 1 || args.Length() > 2 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("get(<url>[, <headers>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("get(<url>[, <headers>])");
   }
 
   TRI_Utf8ValueNFC url(TRI_UNKNOWN_MEM_ZONE, args[0]);
@@ -855,7 +855,7 @@ static void ClientConnection_httpHeadAny (const v8::FunctionCallbackInfo<v8::Val
 
   // check params
   if (args.Length() < 1 || args.Length() > 2 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("head(<url>[, <headers>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("head(<url>[, <headers>])");
   }
 
   TRI_Utf8ValueNFC url(TRI_UNKNOWN_MEM_ZONE, args[0]);
@@ -904,7 +904,7 @@ static void ClientConnection_httpDeleteAny (const v8::FunctionCallbackInfo<v8::V
 
   // check params
   if (args.Length() < 1 || args.Length() > 2 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("delete(<url>[, <headers>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("delete(<url>[, <headers>])");
   }
 
   TRI_Utf8ValueNFC url(TRI_UNKNOWN_MEM_ZONE, args[0]);
@@ -952,7 +952,7 @@ static void ClientConnection_httpOptionsAny (const v8::FunctionCallbackInfo<v8::
 
   // check params
   if (args.Length() < 2 || args.Length() > 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("options(<url>, <body>[, <headers>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("options(<url>, <body>[, <headers>])");
   }
 
   TRI_Utf8ValueNFC url(TRI_UNKNOWN_MEM_ZONE, args[0]);
@@ -1001,7 +1001,7 @@ static void ClientConnection_httpPostAny (const v8::FunctionCallbackInfo<v8::Val
 
   // check params
   if (args.Length() < 2 || args.Length() > 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("post(<url>, <body>[, <headers>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("post(<url>, <body>[, <headers>])");
   }
 
   TRI_Utf8ValueNFC url(TRI_UNKNOWN_MEM_ZONE, args[0]);
@@ -1050,7 +1050,7 @@ static void ClientConnection_httpPutAny (const v8::FunctionCallbackInfo<v8::Valu
 
   // check params
   if (args.Length() < 2 || args.Length() > 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("put(<url>, <body>[, <headers>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("put(<url>, <body>[, <headers>])");
   }
 
   TRI_Utf8ValueNFC url(TRI_UNKNOWN_MEM_ZONE, args[0]);
@@ -1099,7 +1099,7 @@ static void ClientConnection_httpPatchAny (const v8::FunctionCallbackInfo<v8::Va
 
   // check params
   if (args.Length() < 2 || args.Length() > 3 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("patch(<url>, <body>[, <headers>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("patch(<url>, <body>[, <headers>])");
   }
 
   TRI_Utf8ValueNFC url(TRI_UNKNOWN_MEM_ZONE, args[0]);
@@ -1149,7 +1149,7 @@ static void ClientConnection_httpSendFile (const v8::FunctionCallbackInfo<v8::Va
 
   // check params
   if (args.Length() != 2 || ! args[0]->IsString() || ! args[1]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("sendFile(<url>, <file>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("sendFile(<url>, <file>)");
   }
 
   TRI_Utf8ValueNFC url(TRI_UNKNOWN_MEM_ZONE, args[0]);
@@ -1157,14 +1157,14 @@ static void ClientConnection_httpSendFile (const v8::FunctionCallbackInfo<v8::Va
   const string infile = TRI_ObjectToString(args[1]);
 
   if (! TRI_ExistsFile(infile.c_str())) {
-    TRI_V8_EXCEPTION(TRI_ERROR_FILE_NOT_FOUND);
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_FILE_NOT_FOUND);
   }
 
   size_t bodySize;
   char* body = TRI_SlurpFile(TRI_UNKNOWN_MEM_ZONE, infile.c_str(), &bodySize);
 
   if (body == nullptr) {
-    TRI_V8_EXCEPTION_MESSAGE(TRI_errno(), "could not read file");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_errno(), "could not read file");
   }
 
 
@@ -1201,7 +1201,7 @@ static void ClientConnection_getEndpoint (const v8::FunctionCallbackInfo<v8::Val
 
   // check params
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("getEndpoint()");
+    TRI_V8_THROW_EXCEPTION_USAGE("getEndpoint()");
   }
 
   const string endpoint = BaseClient.endpointString();
@@ -1226,7 +1226,7 @@ static void ClientConnection_lastHttpReturnCode (const v8::FunctionCallbackInfo<
 
   // check params
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("lastHttpReturnCode()");
+    TRI_V8_THROW_EXCEPTION_USAGE("lastHttpReturnCode()");
   }
 
   TRI_V8_RETURN(v8::Integer::New(isolate, connection->getLastHttpReturnCode()));
@@ -1250,7 +1250,7 @@ static void ClientConnection_lastErrorMessage (const v8::FunctionCallbackInfo<v8
 
   // check params
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("lastErrorMessage()");
+    TRI_V8_THROW_EXCEPTION_USAGE("lastErrorMessage()");
   }
 
   TRI_V8_RETURN_STD_STRING(connection->getErrorMessage());
@@ -1273,7 +1273,7 @@ static void ClientConnection_isConnected (const v8::FunctionCallbackInfo<v8::Val
   }
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("isConnected()");
+    TRI_V8_THROW_EXCEPTION_USAGE("isConnected()");
   }
 
   if (connection->isConnected()) {
@@ -1301,7 +1301,7 @@ static void ClientConnection_toString (const v8::FunctionCallbackInfo<v8::Value>
   }
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("toString()");
+    TRI_V8_THROW_EXCEPTION_USAGE("toString()");
   }
 
   string result = "[object ArangoConnection:" + BaseClient.endpointServer()->getSpecification();
@@ -1335,7 +1335,7 @@ static void ClientConnection_getVersion (const v8::FunctionCallbackInfo<v8::Valu
   }
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("getVersion()");
+    TRI_V8_THROW_EXCEPTION_USAGE("getVersion()");
   }
 
   TRI_V8_RETURN_STD_STRING(connection->getVersion());
@@ -1358,7 +1358,7 @@ static void ClientConnection_getDatabaseName (const v8::FunctionCallbackInfo<v8:
   }
 
   if (args.Length() != 0) {
-    TRI_V8_EXCEPTION_USAGE("getDatabaseName()");
+    TRI_V8_THROW_EXCEPTION_USAGE("getDatabaseName()");
   }
 
   TRI_V8_RETURN_STD_STRING(connection->getDatabaseName());
@@ -1380,7 +1380,7 @@ static void ClientConnection_setDatabaseName (const v8::FunctionCallbackInfo<v8:
   }
 
   if (args.Length() != 1 || ! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("setDatabaseName(<name>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("setDatabaseName(<name>)");
   }
 
   string const dbName = TRI_ObjectToString(args[0]);

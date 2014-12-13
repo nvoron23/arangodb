@@ -1067,7 +1067,7 @@ static void JS_Fill (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (!args[0]->IsInt32()) {
-    TRI_V8_EXCEPTION_USAGE("fill(<char>, <start>, <end>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("fill(<char>, <start>, <end>)");
   }
 
   int value = (char)args[0]->Int32Value();
@@ -1093,7 +1093,7 @@ static void JS_Copy (const v8::FunctionCallbackInfo<v8::Value>& args) {
   V8Buffer* source = V8Buffer::unwrap(args.This());
 
   if (! V8Buffer::hasInstance(isolate, args[0])) {
-    TRI_V8_EXCEPTION_USAGE("copy(<buffer>, [<start>], [<end>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("copy(<buffer>, [<start>], [<end>])");
   }
 
   v8::Local<v8::Value> target = args[0];
@@ -1150,7 +1150,7 @@ static void JS_Utf8Write(const v8::FunctionCallbackInfo<v8::Value>& args) {
   V8Buffer* buffer = V8Buffer::unwrap(args.This());
 
   if (!args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("utf8Write(<string>, <offset>, [<maxLength>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("utf8Write(<string>, <offset>, [<maxLength>])");
   }
 
   v8::Local<v8::String> s = args[0]->ToString();
@@ -1195,7 +1195,7 @@ static void JS_Ucs2Write (const v8::FunctionCallbackInfo<v8::Value>& args) {
   V8Buffer *buffer = V8Buffer::unwrap(args.This());
 
   if (! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("ucs2Write(string, offset, [maxLength])");
+    TRI_V8_THROW_EXCEPTION_USAGE("ucs2Write(string, offset, [maxLength])");
   }
 
   v8::Local<v8::String> s = args[0]->ToString();
@@ -1234,7 +1234,7 @@ static void JS_HexWrite (const v8::FunctionCallbackInfo<v8::Value>& args) {
   V8Buffer* parent = V8Buffer::unwrap(args.This());
 
   if (! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("hexWrite(string, offset, [maxLength])");
+    TRI_V8_THROW_EXCEPTION_USAGE("hexWrite(string, offset, [maxLength])");
   }
 
   v8::Local<v8::String> s = args[0].As<v8::String>();
@@ -1296,7 +1296,7 @@ static void JS_AsciiWrite (const v8::FunctionCallbackInfo<v8::Value>& args) {
   V8Buffer* buffer = V8Buffer::unwrap(args.This());
 
   if (! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("asciiWrite(<string>, <offset>, [<maxLength>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("asciiWrite(<string>, <offset>, [<maxLength>])");
   }
 
   v8::Local<v8::String> s = args[0]->ToString();
@@ -1335,7 +1335,7 @@ static void JS_Base64Write (const v8::FunctionCallbackInfo<v8::Value>& args) {
   V8Buffer* buffer = V8Buffer::unwrap(args.This());
 
   if (! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("base64Write(<string>, <offset>, [<maxLength>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("base64Write(<string>, <offset>, [<maxLength>])");
   }
 
   v8::String::Utf8Value s(args[0]);
@@ -1401,7 +1401,7 @@ static void JS_BinaryWrite (const v8::FunctionCallbackInfo<v8::Value>& args) {
   V8Buffer *buffer = V8Buffer::unwrap(args.This());
 
   if (! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("binaryWrite(<string>, <offset>, [<maxLength>])");
+    TRI_V8_THROW_EXCEPTION_USAGE("binaryWrite(<string>, <offset>, [<maxLength>])");
   }
 
   v8::Local<v8::String> s = args[0]->ToString();
@@ -1585,7 +1585,7 @@ static void JS_ByteLength (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
   if (! args[0]->IsString()) {
-    TRI_V8_EXCEPTION_USAGE("byteLength(<string>, <utf8>)");
+    TRI_V8_THROW_EXCEPTION_USAGE("byteLength(<string>, <utf8>)");
   }
 
   v8::Local<v8::String> s = args[0]->ToString();
@@ -1604,7 +1604,7 @@ static void JS_MakeFastBuffer (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
 
   if (! V8Buffer::hasInstance(isolate, args[0])) {
-    TRI_V8_EXCEPTION_USAGE("makeFastBuffer(<buffer>, <fastBuffer>, <offset>, <length>");
+    TRI_V8_THROW_EXCEPTION_USAGE("makeFastBuffer(<buffer>, <fastBuffer>, <offset>, <length>");
   }
 
   V8Buffer *buffer = V8Buffer::unwrap(args[0]->ToObject());
