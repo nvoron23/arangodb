@@ -431,7 +431,9 @@ static void JS_Parse (const v8::FunctionCallbackInfo<v8::Value>& args) {
       TRI_V8_SYNTAX_ERROR(err.c_str());
     }
     else {
-      TRI_V8_CANCEL_FUNCTION();
+      TRI_GET_GLOBALS();
+      v8g->_canceled = true;
+      TRI_V8_RETURN_UNDEFINED();
     }
   }
 
@@ -893,7 +895,9 @@ static void JS_Execute (const v8::FunctionCallbackInfo<v8::Value>& args) {
       }
       else {
         tryCatch.ReThrow();
-        TRI_V8_CANCEL_FUNCTION();
+	TRI_GET_GLOBALS();
+	v8g->_canceled = true;
+	TRI_V8_RETURN_UNDEFINED();
       }
     }
 
@@ -911,7 +915,9 @@ static void JS_Execute (const v8::FunctionCallbackInfo<v8::Value>& args) {
       }
       else {
         tryCatch.ReThrow();
-        TRI_V8_CANCEL_FUNCTION();
+	TRI_GET_GLOBALS();
+	v8g->_canceled = true;
+	TRI_V8_RETURN_UNDEFINED();
       }
     }
   }

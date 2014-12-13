@@ -324,17 +324,6 @@ static const uint32_t V8DataSlot = 0;
   return
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief abort a function, marking it 'canceled' in the global.
-///   implicitely requires 'args and 'isolate' to be available
-////////////////////////////////////////////////////////////////////////////////
-
-#define TRI_V8_CANCEL_FUNCTION()                           \
-  TRI_GET_GLOBALS();                                       \
-  v8g->_canceled = true;                                   \
-  args.GetReturnValue().Set(v8::Undefined(isolate));       \
-  return
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief retrieve the instance of the TRI_v8_global of the current thread
 ///   implicitely creates a variable 'v8g' with a pointer to it.
 ///   implicitely requires 'isolate' to be available
