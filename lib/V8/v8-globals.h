@@ -237,9 +237,14 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing an error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_ERROR(message)                                        \
+#define TRI_V8_SET_ERROR(message)                                          \
   do {                                                                     \
     isolate->ThrowException(v8::Exception::Error(TRI_V8_STRING(message))); \
+  } while(0);
+
+#define TRI_V8_THROW_ERROR(message)                                        \
+  do {                                                                     \
+    TRI_V8_SET_ERROR(message);                                             \
     return;                                                                \
   } while(0);
 
@@ -267,9 +272,14 @@ static const uint32_t V8DataSlot = 0;
 /// @brief shortcut for throwing a type error
 ////////////////////////////////////////////////////////////////////////////////
 
-#define TRI_V8_THROW_TYPE_ERROR(message)                                       \
+#define TRI_V8_SET_TYPE_ERROR(message)                                         \
   do {                                                                         \
     isolate->ThrowException(v8::Exception::TypeError(TRI_V8_STRING(message))); \
+  } while (0)
+
+#define TRI_V8_THROW_TYPE_ERROR(message)                                       \
+  do {                                                                         \
+    TRI_V8_SET_TYPE_ERROR(message);                                            \
     return;                                                                    \
   } while (0)
 

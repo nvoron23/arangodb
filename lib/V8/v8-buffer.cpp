@@ -64,25 +64,35 @@ using namespace std;
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief SLICE_ARGS
+/// @brief sliceArgs
 ////////////////////////////////////////////////////////////////////////////////
 
-#define SLICE_ARGS(start_arg, end_arg)                               \
-  if (!start_arg->IsInt32() || !end_arg->IsInt32()) {                \
-    TRI_V8_THROW_TYPE_ERROR("bad argument");                               \
-  }                                                                  \
-  int32_t start = start_arg->Int32Value();                           \
-  int32_t end = end_arg->Int32Value();                               \
-  if (start < 0 || end < 0) {                                        \
-    TRI_V8_THROW_TYPE_ERROR("bad argument");                               \
-  }                                                                  \
-  if (!(start <= end)) {                                             \
-    TRI_V8_THROW_ERROR("must have start <= end");                          \
-  }                                                                  \
-  if ((size_t)end > parent->_length) {                               \
-    TRI_V8_THROW_ERROR("end cannot be longer than parent.length");         \
-  }                                                                  \
-  while (0)
+static inline bool sliceArgs(v8::Isolate *isolate,
+                             v8::Local<v8::Value> const& start_arg,
+                             v8::Local<v8::Value> const& end_arg,
+                             V8Buffer* parent,
+                             int32_t &start,
+                             int32_t &end) {
+  if (!start_arg->IsInt32() || !end_arg->IsInt32()) {
+    TRI_V8_SET_TYPE_ERROR("bad argument");
+    return false;
+  }
+  start = start_arg->Int32Value();
+  end = end_arg->Int32Value();
+  if (start < 0 || end < 0) {
+    TRI_V8_SET_TYPE_ERROR("bad argument");
+    return false;
+  }
+  if (!(start <= end)) {
+    TRI_V8_SET_ERROR("must have start <= end");
+    return false;
+  }
+  if ((size_t)end > parent->_length) {
+    TRI_V8_SET_ERROR("end cannot be longer than parent.length");
+    return false;
+  }
+  return true;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief MIN
@@ -885,10 +895,14 @@ void V8Buffer::replace (v8::Isolate* isolate,
 static void JS_BinarySlice (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
+  int32_t start;
+  int32_t end;
 
   V8Buffer* parent = V8Buffer::unwrap(args.This());
-  SLICE_ARGS(args[0], args[1]);
+
+  if (!sliceArgs(isolate, args[0], args[1], parent, start, end)) {
+    return;
+  }
 
   char* data = parent->_data + start;
   Encode(args, data, end - start, BINARY);
@@ -901,9 +915,13 @@ static void JS_BinarySlice (const v8::FunctionCallbackInfo<v8::Value>& args) {
 static void JS_AsciiSlice (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
+  int32_t start;
+  int32_t end;
 
   V8Buffer* parent = V8Buffer::unwrap(args.This());
-  SLICE_ARGS(args[0], args[1]);
+  if (!sliceArgs(isolate, args[0], args[1], parent, start, end)) {
+    return;
+  }
 
   char* data = parent->_data + start;
   size_t len = end - start;
@@ -926,10 +944,13 @@ static void JS_AsciiSlice (const v8::FunctionCallbackInfo<v8::Value>& args) {
 static void JS_Utf8Slice (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
+  int32_t start;
+  int32_t end;
 
   V8Buffer* parent = V8Buffer::unwrap(args.This());
-  SLICE_ARGS(args[0], args[1]);
+  if (!sliceArgs(isolate, args[0], args[1], parent, start, end)) {
+    return;
+  }
 
   char* data = parent->_data + start;
   TRI_V8_RETURN(TRI_V8_PAIR_STRING(data, end - start));
@@ -942,10 +963,13 @@ static void JS_Utf8Slice (const v8::FunctionCallbackInfo<v8::Value>& args) {
 static void JS_Ucs2Slice (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
+  int32_t start;
+  int32_t end;
 
   V8Buffer* parent = V8Buffer::unwrap(args.This());
-  SLICE_ARGS(args[0], args[1]);
+  if (!sliceArgs(isolate, args[0], args[1], parent, start, end)) {
+    return;
+  }
 
   uint16_t* data = (uint16_t*)(parent->_data + start);
   TRI_V8_RETURN(TRI_V8_STRING_UTF16(data, (end - start) / 2));
@@ -958,10 +982,13 @@ static void JS_Ucs2Slice (const v8::FunctionCallbackInfo<v8::Value>& args) {
 static void JS_HexSlice (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
+  int32_t start;
+  int32_t end;
 
   V8Buffer* parent = V8Buffer::unwrap(args.This());
-  SLICE_ARGS(args[0], args[1]);
+  if (!sliceArgs(isolate, args[0], args[1], parent, start, end)) {
+    return;
+  }
 
   char* src = parent->_data + start;
   uint32_t dstlen = (end - start) * 2;
@@ -991,10 +1018,13 @@ static void JS_HexSlice (const v8::FunctionCallbackInfo<v8::Value>& args) {
 static void JS_Base64Slice (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
+  int32_t start;
+  int32_t end;
 
   V8Buffer* parent = V8Buffer::unwrap(args.This());
-  SLICE_ARGS(args[0], args[1]);
+  if (!sliceArgs(isolate, args[0], args[1], parent, start, end)) {
+    return;
+  }
 
   unsigned slen = end - start;
   const char* src = parent->_data + start;
@@ -1064,7 +1094,8 @@ static void JS_Base64Slice (const v8::FunctionCallbackInfo<v8::Value>& args) {
 static void JS_Fill (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
+  int32_t start;
+  int32_t end;
 
   if (!args[0]->IsInt32()) {
     TRI_V8_THROW_EXCEPTION_USAGE("fill(<char>, <start>, <end>)");
@@ -1073,7 +1104,9 @@ static void JS_Fill (const v8::FunctionCallbackInfo<v8::Value>& args) {
   int value = (char)args[0]->Int32Value();
 
   V8Buffer* parent = V8Buffer::unwrap(args.This());
-  SLICE_ARGS(args[1], args[2]);
+  if (!sliceArgs(isolate, args[1], args[2], parent, start, end)) {
+    return;
+  }
 
   memset( (void*)(parent->_data + start),
           value,
