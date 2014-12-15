@@ -518,7 +518,7 @@ static v8::Handle<v8::Object> RequestCppToV8 (v8::Isolate* isolate,
     v8::Handle<v8::Array> list = v8::Array::New(isolate);
 
     for (size_t i = 0; i < v->size(); ++i) {
-      list->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_ASCII_STRING(v->at(i)));
+      list->Set((uint32_t) i, TRI_V8_ASCII_STRING(v->at(i)));
     }
 
     valuesObject->Set(TRI_V8_STD_STRING(k), list);
@@ -686,7 +686,7 @@ static HttpResponse* ResponseV8ToCpp (v8::Isolate* isolate,
       v8::Handle<v8::Array> v8Array = v8Cookies.As<v8::Array>();
 
       for (uint32_t i = 0; i < v8Array->Length(); i++) {
-        v8::Handle<v8::Value> v8Cookie = v8Array->Get(v8::Number::New(isolate, i));
+        v8::Handle<v8::Value> v8Cookie = v8Array->Get(i);
         if (v8Cookie->IsObject()) {
           AddCookie(isolate, v8g, response, v8Cookie.As<v8::Object>());
         }
@@ -728,7 +728,7 @@ static TRI_action_result_t ExecuteActionVocbase (TRI_vocbase_t* vocbase,
   char const* sep = "";
 
   for (size_t s = action->_urlParts;  s < suffix.size();  ++s) {
-    suffixArray->Set(v8::Number::New(isolate, index++), TRI_V8_STD_STRING(suffix[s]));
+    suffixArray->Set(index++, TRI_V8_STD_STRING(suffix[s]));
 
     path += sep + suffix[s];
     sep = "/";
@@ -1106,7 +1106,7 @@ static void JS_RequestParts (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
         partObject->Set(TRI_V8_ASCII_STRING("data"), localHandle); 
         
-        result->Set(v8::Number::New(isolate, j++), partObject);
+        result->Set(j++, partObject);
       }
 
       TRI_V8_RETURN(result);
@@ -1210,7 +1210,7 @@ static void JS_ClusterTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
     v8::Handle<v8::Array> props = obj->GetOwnPropertyNames();
     uint32_t i;
     for (i = 0; i < props->Length(); ++i) {
-      v8::Handle<v8::Value> prop = props->Get(v8::Number::New(isolate, i));
+      v8::Handle<v8::Value> prop = props->Get(i);
       v8::Handle<v8::Value> val = obj->Get(prop);
       string propstring = TRI_ObjectToString(prop);
       string valstring = TRI_ObjectToString(val);

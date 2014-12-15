@@ -71,7 +71,7 @@ static void ProcessCsvAdd (TRI_csv_parser_t* parser, const char* field, size_t, 
   v8::Isolate* isolate = (v8::Isolate*) parser->_data;
   v8::Handle<v8::Array>* array = reinterpret_cast<v8::Handle<v8::Array>*>(parser->_dataBegin);
 
-  (*array)->Set(v8::Number::New(isolate, (uint32_t) column), TRI_V8_STRING(field));
+  (*array)->Set((uint32_t) column, TRI_V8_STRING(field));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +82,7 @@ static void ProcessCsvEnd (TRI_csv_parser_t* parser, const char* field, size_t, 
   v8::Isolate* isolate = (v8::Isolate*) parser->_data;
   v8::Handle<v8::Array>* array = reinterpret_cast<v8::Handle<v8::Array>*>(parser->_dataBegin);
 
-  (*array)->Set(v8::Number::New(isolate, (uint32_t) column), TRI_V8_STRING(field));
+  (*array)->Set((uint32_t) column, TRI_V8_STRING(field));
 
   v8::Handle<v8::Function>* cb = reinterpret_cast<v8::Handle<v8::Function>*>(parser->_dataEnd);
   v8::Handle<v8::Number> r = v8::Integer::New(isolate, (int) row);

@@ -625,7 +625,7 @@ static int FillShapeValueArray (v8::Isolate* isolate,
   size_t v = 0;
 
   for (uint32_t i = 0;  i < n;  ++i, ++p) {
-    v8::Handle<v8::Value> key = names->Get(v8::Number::New(isolate, i));
+    v8::Handle<v8::Value> key = names->Get(i);
 
     // first find an identifier for the name
     TRI_Utf8ValueNFC keyStr(TRI_UNKNOWN_MEM_ZONE, key);
@@ -1286,7 +1286,7 @@ static v8::Handle<v8::Value> JsonShapeDataList (v8::Isolate* isolate,
 
     const TRI_shape_size_t offset = *offsets;
     v8::Handle<v8::Value> element = JsonShapeData(isolate, shaper, subshape, data + offset, offsets[1] - offset);
-    list->Set(v8::Number::New(isolate, i), element);
+    list->Set((uint32_t) i, element);
   }
 
   return scope.Escape<v8::Value>(list);
@@ -1332,7 +1332,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousList (v8::Isolate* isolate,
     TRI_shape_size_t offset = *offsets;
     v8::Handle<v8::Value> element = JsonShapeData(isolate, shaper, subshape, data + offset, offsets[1] - offset);
 
-    list->Set(v8::Number::New(isolate, i), element);
+    list->Set((uint32_t) i, element);
   }
 
   return scope.Escape<v8::Value>(list);
@@ -1381,7 +1381,7 @@ static v8::Handle<v8::Value> JsonShapeDataHomogeneousSizedList (v8::Isolate* iso
 
   for (i = 0;  i < l;  ++i, offset += length) {
     v8::Handle<v8::Value> element = JsonShapeData(isolate, shaper, subshape, data + offset, length);
-    list->Set(v8::Number::New(isolate, i), element);
+    list->Set((uint32_t) i, element);
   }
 
   return scope.Escape<v8::Value>(list);
@@ -1528,7 +1528,7 @@ static v8::Handle<v8::Value> ObjectJsonList (v8::Isolate* isolate, TRI_json_t co
     TRI_json_t const* j = static_cast<TRI_json_t const*>(TRI_AtVector(&json->_value._objects, i));
     v8::Handle<v8::Value> val = TRI_ObjectJson(isolate, j);
 
-    object->Set(v8::Number::New(isolate, i), val);
+    object->Set(i, val);
   }
 
   return scope.Escape<v8::Value>(object);
@@ -1555,7 +1555,7 @@ static v8::Handle<v8::Value> ExtractArray (v8::Isolate* isolate,
     TRI_json_t const* value = static_cast<TRI_json_t const*>(TRI_AtVector(&json->_value._objects, i));
 
     if (value != nullptr) {
-      result->Set(v8::Number::New(isolate, count++), TRI_ObjectJson(isolate, value));
+      result->Set(count++, TRI_ObjectJson(isolate, value));
     }
   }
 
@@ -1585,7 +1585,7 @@ v8::Handle<v8::Array> TRI_ArrayAssociativePointer (v8::Isolate* isolate,
       continue;
     }
 
-    result->Set(v8::Number::New(isolate, j++), v8::String::NewFromUtf8(isolate, value));/// TODO: strlen...
+    result->Set(j++, v8::String::NewFromUtf8(isolate, value));/// TODO: strlen...
   }
 
   return scope.Escape<v8::Array>(result);
@@ -1805,7 +1805,7 @@ static bool ShapedJsonToJson (v8::Isolate *isolate,
         if (! ShapedJsonToJson(isolate,
                                &listElement,
                                converter,
-                               arrayParameter->Get(v8::Number::New(isolate, j)))) {
+                               arrayParameter->Get(j))) {
           return false;
         }
         TRI_PushBack2ListJson(dst, &listElement);
@@ -1830,7 +1830,7 @@ static bool ShapedJsonToJson (v8::Isolate *isolate,
       TRI_json_t valueElement;
 
       for (uint32_t j = 0; j < n; ++j) {
-        v8::Handle<v8::Value> key = names->Get(v8::Number::New(isolate, j));
+        v8::Handle<v8::Value> key = names->Get(j);
         if (! ShapedJsonToJson(isolate,
                                &valueElement,
                                converter,
@@ -1913,7 +1913,7 @@ static TRI_json_t* ObjectToJson (v8::Isolate* isolate,
     if (listJson != nullptr) {
       for (uint32_t j = 0; j < n; ++j) {
         TRI_json_t* result = ObjectToJson(isolate,
-                                          arrayParameter->Get(v8::Number::New(isolate, j)),
+                                          arrayParameter->Get(j),
                                           seenHashes,
                                           seenObjects);
 
@@ -1990,7 +1990,7 @@ static TRI_json_t* ObjectToJson (v8::Isolate* isolate,
 
     if (arrayJson != nullptr && n > 0) {
       for (uint32_t j = 0; j < n; ++j) {
-        v8::Handle<v8::Value> key  = names->Get(v8::Number::New(isolate, j));
+        v8::Handle<v8::Value> key  = names->Get(j);
         TRI_json_t* result = ObjectToJson(isolate,
                                           arrayParameter->Get(key),
                                           seenHashes,

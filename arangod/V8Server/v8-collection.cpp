@@ -2152,7 +2152,7 @@ static void JS_PropertiesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
     v8::Handle<v8::Array> shardKeys = v8::Array::New(isolate);
     vector<string> const sks = (*c).shardKeys();
     for (size_t i = 0; i < sks.size(); ++i) {
-      shardKeys->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STD_STRING(sks[i]));
+      shardKeys->Set((uint32_t) i, TRI_V8_STD_STRING(sks[i]));
     }
     result->Set(TRI_V8_ASCII_STRING("shardKeys"), shardKeys);
     result->Set(TRI_V8_ASCII_STRING("numberOfShards"), v8::Number::New(isolate, (*c).numberOfShards()));
@@ -3722,7 +3722,7 @@ static void JS_CollectionsVocbase (const v8::FunctionCallbackInfo<v8::Value>& ar
       break;
     }
 
-    result->Set(v8::Number::New(isolate, i), c);
+    result->Set(i, c);
   }
 
   TRI_DestroyVectorPointer(&colls);
@@ -3770,7 +3770,7 @@ static void JS_CompletionsVocbase (const v8::FunctionCallbackInfo<v8::Value>& ar
     char const* name = TRI_AtVectorString(&names, i);
 
     if (name != nullptr) {
-      result->Set(v8::Number::New(isolate, j++), TRI_V8_STRING(name));
+      result->Set(j++, TRI_V8_STRING(name));
     }
   }
 
@@ -4199,7 +4199,7 @@ static void JS_DatafilesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
   result->Set(TRI_V8_ASCII_STRING("journals"), journals);
 
   for (size_t i = 0;  i < structure._journals._length;  ++i) {
-    journals->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STRING(structure._journals._buffer[i]));
+    journals->Set((uint32_t) i, TRI_V8_STRING(structure._journals._buffer[i]));
   }
 
   // compactors
@@ -4207,7 +4207,7 @@ static void JS_DatafilesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
   result->Set(TRI_V8_ASCII_STRING("compactors"), compactors);
 
   for (size_t i = 0;  i < structure._compactors._length;  ++i) {
-    compactors->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STRING(structure._compactors._buffer[i]));
+    compactors->Set((uint32_t) i, TRI_V8_STRING(structure._compactors._buffer[i]));
   }
 
   // datafiles
@@ -4215,7 +4215,7 @@ static void JS_DatafilesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
   result->Set(TRI_V8_ASCII_STRING("datafiles"), datafiles);
 
   for (size_t i = 0;  i < structure._datafiles._length;  ++i) {
-    datafiles->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STRING(structure._datafiles._buffer[i]));
+    datafiles->Set((uint32_t) i, TRI_V8_STRING(structure._datafiles._buffer[i]));
   }
 
   // free result
@@ -4291,7 +4291,7 @@ static void JS_DatafileScanVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>
     o->Set(TRI_V8_ASCII_STRING("type"),     v8::Number::New(isolate, (int) entry->_type));
     o->Set(TRI_V8_ASCII_STRING("status"),   v8::Number::New(isolate, (int) entry->_status));
 
-    entries->Set(v8::Number::New(isolate, (uint32_t) i), o);
+    entries->Set((uint32_t) i, o);
   }
 
   TRI_DestroyDatafileScan(&scan);

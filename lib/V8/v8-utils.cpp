@@ -295,7 +295,7 @@ static v8::Handle<v8::Array> DistributionList (v8::Isolate* isolate,
   v8::Handle<v8::Array> result = v8::Array::New(isolate);
 
   for (uint32_t i = 0;  i < (uint32_t) dist._value.size();  ++i) {
-    result->Set(v8::Number::New(isolate, i), v8::Number::New(isolate, dist._value[i]));
+    result->Set(i, v8::Number::New(isolate, dist._value[i]));
   }
 
   return scope.Escape<v8::Array>(result);
@@ -318,7 +318,7 @@ static void FillDistribution (v8::Isolate* isolate,
   uint32_t pos = 0;
 
   for (vector<uint64_t>::const_iterator i = dist._counts.begin();  i != dist._counts.end();  ++i, ++pos) {
-    counts->Set(v8::Number::New(isolate, pos), v8::Number::New(isolate, (double) *i));
+    counts->Set(pos, v8::Number::New(isolate, (double) *i));
   }
 
   result->Set(TRI_V8_ASCII_STRING("counts"), counts);
@@ -1289,7 +1289,7 @@ static void JS_List (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   for (size_t i = 0;  i < list._length;  ++i) {
     const char* f = list._buffer[i];
-    result->Set(v8::Number::New(isolate, j++), TRI_V8_STRING(f));
+    result->Set(j++, TRI_V8_STRING(f));
   }
 
   TRI_DestroyVectorString(&list);
@@ -1334,7 +1334,7 @@ static void JS_ListTree (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   for (size_t i = 0;  i < list._length;  ++i) {
     const char* f = list._buffer[i];
-    result->Set(v8::Number::New(isolate,j++), TRI_V8_STRING(f));
+    result->Set(j++, TRI_V8_STRING(f));
   }
 
   TRI_DestroyVectorString(&list);
@@ -1468,7 +1468,7 @@ static void JS_ZipFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_InitVectorString(&filenames, TRI_UNKNOWN_MEM_ZONE);
 
   for (uint32_t i = 0 ; i < files->Length(); ++i) {
-    v8::Handle<v8::Value> file = files->Get(v8::Number::New(isolate, i));
+    v8::Handle<v8::Value> file = files->Get(i);
     if (file->IsString()) {
       string fname = TRI_ObjectToString(file);
       TRI_PushBackVectorString(&filenames, TRI_DuplicateStringZ(TRI_UNKNOWN_MEM_ZONE, fname.c_str()));
@@ -3106,7 +3106,7 @@ static void JS_ExecuteExternal (const v8::FunctionCallbackInfo<v8::Value>& args)
       arguments = (char**) TRI_Allocate(TRI_CORE_MEM_ZONE, n * sizeof(char*), false);
 
       for (uint32_t i = 0;  i < n;  ++i) {
-        TRI_Utf8ValueNFC arg(TRI_UNKNOWN_MEM_ZONE, arr->Get(v8::Number::New(isolate, i)));
+        TRI_Utf8ValueNFC arg(TRI_UNKNOWN_MEM_ZONE, arr->Get(i));
 
         if (*arg == nullptr) {
           arguments[i] = TRI_DuplicateString("");
@@ -3281,7 +3281,7 @@ static void JS_ExecuteAndWaitExternal (const v8::FunctionCallbackInfo<v8::Value>
       arguments = (char**) TRI_Allocate(TRI_CORE_MEM_ZONE, n * sizeof(char*), false);
 
       for (uint32_t i = 0;  i < n;  ++i) {
-        TRI_Utf8ValueNFC arg(TRI_UNKNOWN_MEM_ZONE, arr->Get(v8::Number::New(isolate, i)));
+        TRI_Utf8ValueNFC arg(TRI_UNKNOWN_MEM_ZONE, arr->Get(i));
 
         if (*arg == nullptr) {
           arguments[i] = TRI_DuplicateString("");
