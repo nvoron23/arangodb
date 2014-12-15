@@ -126,7 +126,8 @@ void ConsoleThread::inner () {
   v8::Local<v8::String> name(TRI_V8_ASCII_STRING("(arango)"));
 
   auto localContext = v8::Local<v8::Context>::New(isolate, _context->_context);
-  ///  v8::Context::Scope contextScope(localContext);
+  localContext->Enter();
+  v8::Context::Scope contextScope(localContext);
 
   // .............................................................................
   // run console
