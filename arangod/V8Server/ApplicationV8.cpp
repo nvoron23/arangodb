@@ -643,9 +643,9 @@ void ApplicationV8::collectGarbage () {
         v8::HandleScope scope(isolate);
 
         auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-      /// TODO: do we need this? v8::Context::Scope contextScope(localContext);
 
         localContext->Enter();
+        v8::Context::Scope contextScope(localContext);
       
         TRI_ASSERT(context->_locker->IsLocked(isolate));
         TRI_ASSERT(v8::Locker::IsLocked(isolate));
@@ -655,7 +655,6 @@ void ApplicationV8::collectGarbage () {
         while(! isolate->IdleNotification(1000)) {
         }
 
-        localContext->Exit();
       }
       isolate->Exit();
       delete context->_locker;
