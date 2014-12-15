@@ -178,7 +178,8 @@ namespace triagens {
           v8::Persistent<v8::Context> _context;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief V8 isolate
+/// @brief V8 isolate, do not put an underscore in front, because then a lot
+/// of macros stop working!
 ////////////////////////////////////////////////////////////////////////////////
 
           v8::Isolate* isolate;

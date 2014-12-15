@@ -895,9 +895,9 @@ static void JS_Execute (const v8::FunctionCallbackInfo<v8::Value>& args) {
       }
       else {
         tryCatch.ReThrow();
-	TRI_GET_GLOBALS();
-	v8g->_canceled = true;
-	TRI_V8_RETURN_UNDEFINED();
+        TRI_GET_GLOBALS();
+        v8g->_canceled = true;
+        TRI_V8_RETURN_UNDEFINED();
       }
     }
 
@@ -915,9 +915,9 @@ static void JS_Execute (const v8::FunctionCallbackInfo<v8::Value>& args) {
       }
       else {
         tryCatch.ReThrow();
-	TRI_GET_GLOBALS();
-	v8g->_canceled = true;
-	TRI_V8_RETURN_UNDEFINED();
+        TRI_GET_GLOBALS();
+        v8g->_canceled = true;
+        TRI_V8_RETURN_UNDEFINED();
       }
     }
   }
