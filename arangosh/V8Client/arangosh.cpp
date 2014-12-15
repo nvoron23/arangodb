@@ -1177,7 +1177,7 @@ static void ClientConnection_httpSendFile (const v8::FunctionCallbackInfo<v8::Va
   if (tryCatch.HasCaught()) {
       string exception = TRI_StringifyV8Exception(isolate, &tryCatch);
       isolate->ThrowException(tryCatch.Exception());
-	  return;
+    return;
   }
 
   TRI_V8_RETURN(result);
