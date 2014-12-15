@@ -2112,7 +2112,7 @@ static v8::Handle<v8::Value> ParseList (v8::Isolate* isolate,
       return scope.Escape<v8::Value>(v8::Undefined(isolate));
     }
 
-    list->Set(v8::Number::New(isolate, pos++), sub);
+    list->Set(pos++, sub);
 
     c = tri_v8_lex(scanner);
   }

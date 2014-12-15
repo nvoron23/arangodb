@@ -249,7 +249,7 @@ void V8Completer::getAlternatives(char const * text, vector<string> & result) {
     const uint32_t n = properties->Length();
 
     for (uint32_t i = 0;  i < n;  ++i) {
-      v8::Handle<v8::Value> v = properties->Get(v8::Number::New(isolate, i));
+      v8::Handle<v8::Value> v = properties->Get(i);
 
       TRI_Utf8ValueNFC str(TRI_UNKNOWN_MEM_ZONE, v);
       char const* s = *str;

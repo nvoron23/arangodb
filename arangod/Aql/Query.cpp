@@ -673,7 +673,7 @@ QueryResultV8 Query::executeV8 (v8::Isolate* isolate, QueryRegistry* registry) {
         AqlValue val = value->getValue(i, 0);
 
         if (! val.isEmpty()) {
-          result.result->Set(v8::Number::New(isolate, j++), val.toV8(isolate, _trx, doc)); 
+          result.result->Set(j++, val.toV8(isolate, _trx, doc)); 
         }
       }
       delete value;

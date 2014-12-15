@@ -143,7 +143,7 @@ int ProcessIndexFields (v8::Isolate* isolate,
     uint32_t const n = fieldList->Length();
 
     for (uint32_t i = 0; i < n; ++i) {
-      if (! fieldList->Get(v8::Number::New(isolate, i))->IsString()) {
+      if (! fieldList->Get(i)->IsString()) {
         return TRI_ERROR_BAD_PARAMETER;
       }
 
@@ -970,7 +970,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
         v8::Handle<v8::Array> k = v8::Handle<v8::Array>::Cast(p->Get(TRI_V8_ASCII_STRING("shardKeys")));
 
         for (uint32_t i = 0 ; i < k->Length(); ++i) {
-          v8::Handle<v8::Value> v = k->Get(v8::Number::New(isolate, i));
+          v8::Handle<v8::Value> v = k->Get(i);
           if (v->IsString()) {
             string const key = TRI_ObjectToString(v);
 
@@ -1383,7 +1383,7 @@ static void GetIndexesCoordinator (const v8::FunctionCallbackInfo<v8::Value>& ar
       TRI_json_t const* v = TRI_LookupListJson(json, i);
 
       if (v != nullptr) {
-        ret->Set(v8::Number::New(isolate, j++), IndexRep(isolate, collectionName, v));
+        ret->Set(j++, IndexRep(isolate, collectionName, v));
       }
     }
   }
@@ -1479,7 +1479,7 @@ static void JS_GetIndexesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
     TRI_json_t* idx = static_cast<TRI_json_t*>(indexes->_buffer[i]);
 
     if (idx != nullptr) {
-      result->Set(v8::Number::New(isolate, j++), IndexRep(isolate, collectionName, idx));
+      result->Set(j++, IndexRep(isolate, collectionName, idx));
       TRI_FreeJson(TRI_CORE_MEM_ZONE, idx);
     }
   }
