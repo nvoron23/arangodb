@@ -4274,7 +4274,7 @@ static void JS_DatafileScanVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>
   result->Set(TRI_V8_ASCII_STRING("endPosition"),   v8::Number::New(isolate, scan._endPosition));
   result->Set(TRI_V8_ASCII_STRING("numberMarkers"), v8::Number::New(isolate, scan._numberMarkers));
   result->Set(TRI_V8_ASCII_STRING("status"),        v8::Number::New(isolate, scan._status));
-  result->Set(TRI_V8_ASCII_STRING("isSealed"),     v8::Boolean::New(isolate, scan._isSealed));
+  result->Set(TRI_V8_ASCII_STRING("isSealed"),      v8::Boolean::New(isolate, scan._isSealed));
 
   v8::Handle<v8::Array> entries = v8::Array::New(isolate);
   result->Set(TRI_V8_ASCII_STRING("entries"), entries);
