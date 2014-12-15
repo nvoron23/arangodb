@@ -116,7 +116,6 @@ Job::status_t V8Job::work () {
   // now execute the function within this context
   {
     auto isolate = context->isolate;
-    v8::TryCatch tryCatch;
     v8::HandleScope scope(isolate);
 
     // get built-in Function constructor (see ECMA-262 5th edition 15.3.2)
@@ -143,6 +142,7 @@ Job::status_t V8Job::work () {
       fArgs = v8::Undefined(isolate);
     }
 
+    v8::TryCatch tryCatch;
     // call the function
     action->Call(current, 1, &fArgs);
 

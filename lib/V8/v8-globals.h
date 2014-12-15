@@ -240,13 +240,13 @@ static const uint32_t V8DataSlot = 0;
 #define TRI_V8_SET_ERROR(message)                                          \
   do {                                                                     \
     isolate->ThrowException(v8::Exception::Error(TRI_V8_STRING(message))); \
-  } while(0);
+  } while(0)
 
 #define TRI_V8_THROW_ERROR(message)                                        \
   do {                                                                     \
     TRI_V8_SET_ERROR(message);                                             \
     return;                                                                \
-  } while(0);
+  } while(0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing a range error
@@ -256,7 +256,7 @@ static const uint32_t V8DataSlot = 0;
   do {                                                                          \
     isolate->ThrowException(v8::Exception::RangeError(TRI_V8_STRING(message))); \
     return;                                                                     \
-} while(0);
+} while(0)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief shortcut for throwing a syntax error
@@ -300,7 +300,7 @@ static const uint32_t V8DataSlot = 0;
 
 #define TRI_V8_RETURN_UNDEFINED()                                      \
   args.GetReturnValue().Set(v8::Undefined(isolate));                   \
-  return;
+  return
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Return 'true'
@@ -309,7 +309,7 @@ static const uint32_t V8DataSlot = 0;
 
 #define TRI_V8_RETURN_TRUE()                            \
   args.GetReturnValue().Set(v8::True(isolate));         \
-  return;
+  return
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Return 'false'
@@ -319,7 +319,7 @@ static const uint32_t V8DataSlot = 0;
 #define TRI_V8_RETURN_FALSE()                           \
   args.GetReturnValue().Set(v8::False(isolate));        \
   return
-  
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return 'null'
 ///   implicitely requires 'args and 'isolate' to be available
@@ -358,7 +358,7 @@ static const uint32_t V8DataSlot = 0;
 #define TRI_V8_RETURN_STD_STRING(WHAT)                                  \
   args.GetReturnValue().Set(v8::String::NewFromUtf8(isolate, WHAT.c_str(), v8::String::kNormalString, (int) WHAT.length())); \
   return
-  
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return a string which you know the length of
 ///   implicitely requires 'args and 'isolate' to be available
@@ -387,7 +387,7 @@ static const uint32_t V8DataSlot = 0;
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_GET_GLOBAL_STRING(WHICH)                            \
-  auto WHICH = v8::Local<v8::String>::New(isolate, v8g->WHICH);
+  auto WHICH = v8::Local<v8::String>::New(isolate, v8g->WHICH)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief fetch a member from the globel into the local scope of the function
@@ -398,7 +398,7 @@ static const uint32_t V8DataSlot = 0;
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_GET_GLOBAL(WHICH, TYPE)                             \
-  auto WHICH = v8::Local<TYPE>::New(isolate, v8g->WHICH);
+  auto WHICH = v8::Local<TYPE>::New(isolate, v8g->WHICH)
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                      public types

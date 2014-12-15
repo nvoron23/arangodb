@@ -573,6 +573,7 @@ static void objectToMap (v8::Isolate* isolate, map<string, string>& myMap, v8::H
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns a new client connection instance
 ////////////////////////////////////////////////////////////////////////////////
+std::map< void*, v8::Persistent<v8::External> > Connections;
 
 static V8ClientConnection* CreateConnection () {
   return new V8ClientConnection(BaseClient.endpointServer(),
@@ -594,6 +595,8 @@ static void ClientConnection_DestructorCallback (const v8::WeakCallbackData<v8::
     auto persistent = data.GetParameter();
     auto myConnection = v8::Local<v8::External>::New(data.GetIsolate(), *persistent);
     auto connection = static_cast<V8ClientConnection*>(myConnection->Value());
+
+    Connections[connection].Reset();
     delete connection;
 }
 
@@ -605,12 +608,12 @@ static v8::Handle<v8::Value> wrapV8ClientConnection (v8::Isolate* isolate, V8Cli
   v8::EscapableHandleScope scope(isolate);
   auto localConnectionTempl = v8::Local<v8::ObjectTemplate>::New(isolate, ConnectionTempl);
   v8::Handle<v8::Object> result = localConnectionTempl->NewInstance();
-  v8::Persistent<v8::External> persistent;
+
   auto myConnection = v8::External::New(isolate, connection);
-  persistent.Reset(isolate, myConnection);
   result->SetInternalField(SLOT_CLASS_TYPE, v8::Integer::New(isolate, WRAP_TYPE_CONNECTION));
   result->SetInternalField(SLOT_CLASS, myConnection);
-  persistent.SetWeak(&persistent, ClientConnection_DestructorCallback);
+  Connections[connection].Reset(isolate, myConnection);
+  Connections[connection].SetWeak(&Connections[connection], ClientConnection_DestructorCallback);
 
   return scope.Escape<v8::Value>(result);
 }
@@ -1136,7 +1139,6 @@ static void ClientConnection_httpPatchRaw (const v8::FunctionCallbackInfo<v8::Va
 
 static void ClientConnection_httpSendFile (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
-  v8::TryCatch tryCatch;
   v8::HandleScope scope(isolate);
 
 
@@ -1167,6 +1169,7 @@ static void ClientConnection_httpSendFile (const v8::FunctionCallbackInfo<v8::Va
     TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_errno(), "could not read file");
   }
 
+  v8::TryCatch tryCatch;
 
   // check header fields
   map<string, string> headerFields;
@@ -2329,7 +2332,6 @@ int main (int argc, char* args[]) {
       }
 
       localContext->Enter();
-
 
       InitCallbacks(isolate, useServer, runMode);
 

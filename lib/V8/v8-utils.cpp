@@ -234,7 +234,6 @@ static bool LoadJavaScriptDirectory (v8::Isolate* isolate,
                                      char const* path,
                                      bool execute,
                                      bool useGlobalContext) {
-  v8::TryCatch tryCatch;
   v8::HandleScope scope(isolate);
   TRI_vector_string_t files;
   bool result;
@@ -250,6 +249,7 @@ static bool LoadJavaScriptDirectory (v8::Isolate* isolate,
   result = true;
 
   for (i = 0;  i < files._length;  ++i) {
+    v8::TryCatch tryCatch;
     bool ok;
     char const* filename;
     char* full;

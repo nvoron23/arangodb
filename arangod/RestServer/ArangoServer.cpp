@@ -1042,7 +1042,6 @@ int ArangoServer::runUnitTests (TRI_vocbase_t* vocbase) {
   ApplicationV8::V8Context* context = _applicationV8->enterContext("STANDARD", vocbase, true, true);
 
   auto isolate = context->isolate;
-  /// todo: do we need this? v8::Context::Scope contextScope(localContext);
 
   bool ok = false;
   {
@@ -1050,7 +1049,9 @@ int ArangoServer::runUnitTests (TRI_vocbase_t* vocbase) {
     v8::HandleScope scope(isolate);
   
     auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
+    localContext->Enter();
 
+    v8::Context::Scope contextScope(localContext);
     // set-up unit tests array
     v8::Handle<v8::Array> sysTestFiles = v8::Array::New(isolate);
 
@@ -1091,6 +1092,7 @@ int ArangoServer::runUnitTests (TRI_vocbase_t* vocbase) {
 ////////////////////////////////////////////////////////////////////////////////
 
 int ArangoServer::runScript (TRI_vocbase_t* vocbase) {
+  bool ok = false;
   ApplicationV8::V8Context* context = _applicationV8->enterContext("STANDARD", vocbase, true, true);
   auto isolate = context->isolate;
 
@@ -1098,8 +1100,8 @@ int ArangoServer::runScript (TRI_vocbase_t* vocbase) {
   v8::HandleScope globalScope(isolate);
 
   auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
-  /// TODO: do we need this? v8::Context::Scope contextScope(localContext);
-
+  localContext->Enter();
+  v8::Context::Scope contextScope(localContext);
   for (size_t i = 0;  i < _scriptFile.size();  ++i) {
     bool r = TRI_ExecuteGlobalJavaScriptFile(isolate, _scriptFile[i].c_str());
 
@@ -1115,7 +1117,7 @@ int ArangoServer::runScript (TRI_vocbase_t* vocbase) {
   // parameter array
   v8::Handle<v8::Array> params = v8::Array::New(isolate);
 
-  params->Set(0, TRI_V8_STD_STRING(_scriptFile[_scriptFile.size() - 1]));
+  params->Set(v8::Number::New(isolate, 0), TRI_V8_STD_STRING(_scriptFile[_scriptFile.size() - 1]));
 
   for (size_t i = 0;  i < _scriptParameters.size();  ++i) {
     params->Set(v8::Number::New(isolate,(uint32_t) (i + 1)), TRI_V8_STD_STRING(_scriptParameters[i]));
@@ -1124,8 +1126,6 @@ int ArangoServer::runScript (TRI_vocbase_t* vocbase) {
   // call main
   v8::Handle<v8::String> mainFuncName = TRI_V8_ASCII_STRING("main");
   v8::Handle<v8::Function> main = v8::Handle<v8::Function>::Cast(localContext->Global()->Get(mainFuncName));
-
-  bool ok = false;
 
   if (main.IsEmpty() || main->IsUndefined()) {
     LOG_FATAL_AND_EXIT("no main function defined, giving up");
@@ -1147,9 +1147,7 @@ int ArangoServer::runScript (TRI_vocbase_t* vocbase) {
       ok = TRI_ObjectToDouble(result) == 0;
     }
   }
-
   _applicationV8->exitContext(context);
-
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
