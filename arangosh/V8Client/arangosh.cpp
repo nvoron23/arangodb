@@ -592,12 +592,14 @@ static V8ClientConnection* CreateConnection () {
 ////////////////////////////////////////////////////////////////////////////////
 
 static void ClientConnection_DestructorCallback (const v8::WeakCallbackData<v8::External, v8::Persistent<v8::External>>& data) {
-    auto persistent = data.GetParameter();
-    auto myConnection = v8::Local<v8::External>::New(data.GetIsolate(), *persistent);
-    auto connection = static_cast<V8ClientConnection*>(myConnection->Value());
+  auto persistent = data.GetParameter();
+  auto myConnection = v8::Local<v8::External>::New(data.GetIsolate(), *persistent);
+  auto connection = static_cast<V8ClientConnection*>(myConnection->Value());
 
-    Connections[connection].Reset();
+  Connections[connection].Reset();
+  if (ClientConnection != connection) {
     delete connection;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -614,7 +616,6 @@ static v8::Handle<v8::Value> wrapV8ClientConnection (v8::Isolate* isolate, V8Cli
   result->SetInternalField(SLOT_CLASS, myConnection);
   Connections[connection].Reset(isolate, myConnection);
   Connections[connection].SetWeak(&Connections[connection], ClientConnection_DestructorCallback);
-
   return scope.Escape<v8::Value>(result);
 }
 
@@ -2349,7 +2350,6 @@ int main (int argc, char* args[]) {
       // todo 1000 was the old V8-default, is this really good?
       while (! isolate->IdleNotification(1000)) {
       }
-
       localContext->Exit();
       context.Reset();
     }
