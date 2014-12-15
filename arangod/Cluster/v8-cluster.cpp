@@ -326,7 +326,7 @@ static void JS_ListAgency (const v8::FunctionCallbackInfo<v8::Value>& args) {
     while (it != result._values.end()) {
       const std::string key = (*it).first;
 
-      l->Set(v8::Number::New(isolate, i++), TRI_V8_STD_STRING(key));
+      l->Set(i++, TRI_V8_STD_STRING(key));
       ++it;
     }
     TRI_V8_RETURN(l);
@@ -610,7 +610,7 @@ static void JS_EndpointsAgency (const v8::FunctionCallbackInfo<v8::Value>& args)
   for (size_t i = 0; i < endpoints.size(); ++i) {
     const std::string endpoint = endpoints[i];
 
-    l->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STD_STRING(endpoint));
+    l->Set((uint32_t) i, TRI_V8_STD_STRING(endpoint));
   }
 
   TRI_V8_RETURN(l);
@@ -765,7 +765,7 @@ static void JS_ListDatabases (const v8::FunctionCallbackInfo<v8::Value>& args) {
   vector<DatabaseID>::iterator it;
   int count = 0;
   for (it = res.begin(); it != res.end(); ++it) {
-    a->Set(v8::Number::New(isolate, count++), TRI_V8_STD_STRING((*it)));
+    a->Set((uint32_t) count++, TRI_V8_STD_STRING((*it)));
   }
   TRI_V8_RETURN(a);
 }
@@ -824,7 +824,7 @@ static void JS_GetCollectionInfoClusterInfo (const v8::FunctionCallbackInfo<v8::
   const std::vector<std::string>& sks = ci->shardKeys();
   v8::Handle<v8::Array> shardKeys = v8::Array::New(isolate, (int) sks.size());
   for (uint32_t i = 0, n = (uint32_t) sks.size(); i < n; ++i) {
-    shardKeys->Set(v8::Number::New(isolate, i), TRI_V8_STD_STRING(sks[i]));
+    shardKeys->Set(i, TRI_V8_STD_STRING(sks[i]));
   }
   result->Set(TRI_V8_ASCII_STRING("shardKeys"), shardKeys);
 
@@ -1009,7 +1009,7 @@ static void JS_GetDBServers (const v8::FunctionCallbackInfo<v8::Value>& args) {
   for (size_t i = 0; i < DBServers.size(); ++i) {
     ServerID const sid = DBServers[i];
 
-    l->Set(v8::Number::New(isolate, (uint32_t) i), TRI_V8_STD_STRING(sid));
+    l->Set((uint32_t) i, TRI_V8_STD_STRING(sid));
   }
 
   TRI_V8_RETURN(l);
@@ -1455,7 +1455,7 @@ static void PrepareClusterCommRequest (
     v8::Handle<v8::Array> props = obj->GetOwnPropertyNames();
     uint32_t i;
     for (i = 0; i < props->Length(); ++i) {
-      v8::Handle<v8::Value> prop = props->Get(v8::Number::New(isolate, i));
+      v8::Handle<v8::Value> prop = props->Get(i);
       v8::Handle<v8::Value> val = obj->Get(prop);
       string propstring = TRI_ObjectToString(prop);
       string valstring = TRI_ObjectToString(val);

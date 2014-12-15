@@ -210,7 +210,7 @@ class KeySpace {
           auto element = static_cast<KeySpaceElement*>(_hash._table[i]);
 
           if (element != nullptr) {
-            result->Set(v8::Number::New(isolate, count++), TRI_V8_STRING(element->key));
+            result->Set(count++, TRI_V8_STRING(element->key));
           }
         }
       }
@@ -233,7 +233,7 @@ class KeySpace {
 
           if (element != nullptr) {
             if (TRI_IsPrefixString(element->key, prefix.c_str())) {
-              result->Set(v8::Number::New(isolate, count++), TRI_V8_STRING(element->key));
+              result->Set(count++, TRI_V8_STRING(element->key));
             }
           }
         }

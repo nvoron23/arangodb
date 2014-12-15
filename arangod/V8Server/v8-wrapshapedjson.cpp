@@ -419,7 +419,7 @@ static void KeysOfShapedJson (const v8::PropertyCallbackInfo<v8::Array>& args) {
     char const* att = shaper->lookupAttributeId(shaper, *aids);
 
     if (att != nullptr) {
-      result->Set(v8::Number::New(isolate, count++), TRI_V8_STRING(att));
+      result->Set(count++, TRI_V8_STRING(att));
     }
   }
 
