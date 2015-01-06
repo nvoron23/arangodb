@@ -76,7 +76,7 @@ Transaction* DistributedTransactionManager::createTransaction (TRI_vocbase_t* vo
 /// @brief unregister a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void DistributedTransactionManager::unregisterTransaction (Transaction const* transaction) {
+void DistributedTransactionManager::unregisterTransaction (Transaction* transaction) {
   // TODO
   TRI_ASSERT(! transaction->isOngoing());
   TRI_ASSERT(false);

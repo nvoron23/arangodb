@@ -28,6 +28,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Transaction.h"
+#include "Basics/logging.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
 #include "VocBase/vocbase.h"
@@ -53,7 +54,8 @@ Transaction::Transaction (TransactionManager* transactionManager,
   : _transactionManager(transactionManager),
     _id(id),
     _vocbase(vocbase),
-    _status(Transaction::StatusType::ONGOING) {
+    _status(Transaction::StatusType::ONGOING),
+    _registeredOnStack(false) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -73,6 +75,8 @@ Transaction::~Transaction () {
 ////////////////////////////////////////////////////////////////////////////////
 
 int Transaction::commit () {
+  LOG_INFO("committing transaction %s", toString().c_str());
+
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
   }
@@ -88,6 +92,8 @@ int Transaction::commit () {
 ////////////////////////////////////////////////////////////////////////////////
 
 int Transaction::rollback () {
+  LOG_INFO("rolling back transaction %s", toString().c_str());
+
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
   }
@@ -106,10 +112,16 @@ int Transaction::rollback () {
 /// @brief append the transaction to an output stream
 ////////////////////////////////////////////////////////////////////////////////
 
-std::ostream& operator<< (std::ostream& stream,
-                          Transaction const* transaction) {
-  stream << transaction->toString();
-  return stream;
+namespace triagens {
+  namespace mvcc {
+
+     std::ostream& operator<< (std::ostream& stream,
+                               Transaction const* transaction) {
+       stream << transaction->toString();
+       return stream;
+     }
+
+  }
 }
 
 // -----------------------------------------------------------------------------

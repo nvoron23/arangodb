@@ -28,6 +28,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "TransactionManager.h"
+#include "Basics/logging.h"
 #include "Mvcc/DistributedTransactionManager.h"
 #include "Mvcc/LocalTransactionManager.h"
 #include "Cluster/ServerState.h"
@@ -38,7 +39,7 @@ using namespace triagens::mvcc;
 /// @brief the global transaction manager instance
 ////////////////////////////////////////////////////////////////////////////////
 
-TransactionManager* Instance = nullptr;
+TransactionManager* TransactionManager::Instance = nullptr;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -64,6 +65,8 @@ TransactionManager::~TransactionManager () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TransactionManager::initialize () {
+  LOG_INFO("initializing transaction manager");
+
   TRI_ASSERT(Instance == nullptr);
   if (triagens::arango::ServerState::instance()->isCoordinator()) {
     // TODO
@@ -80,6 +83,8 @@ void TransactionManager::initialize () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TransactionManager::shutdown () {
+  LOG_INFO("shutting down transaction manager");
+
   delete instance();
 }
 
@@ -88,7 +93,7 @@ void TransactionManager::shutdown () {
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionManager* TransactionManager::instance () {
-  TRI_ASSERT(Instance != nullptr);
+  TRI_ASSERT_EXPENSIVE(Instance != nullptr);
   return Instance;
 }
 

@@ -28,6 +28,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "SubTransaction.h"
+#include "Basics/logging.h"
+#include "Mvcc/TopLevelTransaction.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
@@ -47,8 +49,11 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 SubTransaction::SubTransaction (Transaction* parent)
-  : Transaction(parent->transactionManager(), parent->id(), parent->vocbase()),
+  : Transaction(parent->transactionManager(), parent->topLevelTransaction()->nextSubId(), parent->vocbase()),
+    _topLevelTransaction(parent->topLevelTransaction()),
     _parentTransaction(parent) {
+  
+  LOG_INFO("creating %s", toString().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -59,6 +64,8 @@ SubTransaction::~SubTransaction () {
   if (_status == Transaction::StatusType::ONGOING) {
     rollback();
   }
+  
+  LOG_INFO("destroying transaction %s", toString().c_str());
 }
 
 // -----------------------------------------------------------------------------
@@ -71,7 +78,7 @@ SubTransaction::~SubTransaction () {
 
 std::string SubTransaction::toString () const {
   std::string result("SubTransaction ");
-  result += _id.toString();
+  result += std::to_string(_id.mainPart()) + "." + std::to_string(_id.sequencePart());
   return result;
 }
 

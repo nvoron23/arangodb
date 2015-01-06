@@ -66,7 +66,9 @@ LocalTransactionManager::~LocalTransactionManager () {
 ////////////////////////////////////////////////////////////////////////////////
 
 TopLevelTransaction* LocalTransactionManager::createTopLevelTransaction (TRI_vocbase_t* vocbase) {
-  return new TopLevelTransaction(this, Transaction::TransactionId(nextId()), vocbase);
+  // TODO
+  TRI_ASSERT(false); 
+  return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -74,18 +76,13 @@ TopLevelTransaction* LocalTransactionManager::createTopLevelTransaction (TRI_voc
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
-  // make room for one more element
-  // this may throw an exception if we are out of memory
-  _threadTransactions.reserve(_threadTransactions.size() + 1);
-
-
   Transaction* transaction = nullptr;
 
   if (_threadTransactions.empty()) {
     // no other transactions present in thread
 
     // now create a new top-level transaction
-    transaction = createTopLevelTransaction(vocbase);
+    transaction = new TopLevelTransaction(this, Transaction::TransactionId(nextId(), 0), vocbase);
   }
   else {
     // there is already a transaction present in our thread
@@ -96,7 +93,7 @@ Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase)
 
     // check if the database is still the same
     if (vocbase != parent->vocbase()) {
-      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "cannot change database for sub transaction");
+      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot change database for sub transaction");
     }
 
     transaction = new SubTransaction(parent);
@@ -105,8 +102,17 @@ Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase)
   // we must have a transaction now
   TRI_ASSERT(transaction != nullptr);
 
-  // this should never fail because we had already reserved the required space above
-  _threadTransactions.push_back(transaction);
+  try {
+    _threadTransactions.push_back(transaction);
+  }
+  catch (...) {
+    // if we got here, we have run out of memory
+    // prevent a mem-leak
+    delete transaction;
+    throw;
+  }
+
+  transaction->registeredOnStack(true);
 
   return transaction;
 }
@@ -115,16 +121,20 @@ Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase)
 /// @brief unregister a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::unregisterTransaction (Transaction const* transaction) {
+void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
   // transaction must have already finished
   TRI_ASSERT(! transaction->isOngoing());
 
-  // remove the transaction from the stack
-  TRI_ASSERT(! _threadTransactions.empty());
+  if (transaction->registeredOnStack()) {
+    // remove the transaction from the stack
+    TRI_ASSERT(! _threadTransactions.empty());
 
-  // the transaction that is unregistered must be at the top of the stack
-  TRI_ASSERT(_threadTransactions.back() == transaction);
-  _threadTransactions.pop_back();
+    // the transaction that is unregistered must be at the top of the stack
+    TRI_ASSERT(_threadTransactions.back() == transaction);
+    _threadTransactions.pop_back();
+  
+    transaction->registeredOnStack(false);
+  }
 }
 
 // -----------------------------------------------------------------------------

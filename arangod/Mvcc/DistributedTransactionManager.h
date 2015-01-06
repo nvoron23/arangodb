@@ -85,7 +85,7 @@ namespace triagens {
 /// @brief unregister a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void unregisterTransaction (Transaction const*) override final;
+        void unregisterTransaction (Transaction*) override final;
 
     };
 

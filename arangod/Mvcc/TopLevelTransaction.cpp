@@ -28,6 +28,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "TopLevelTransaction.h"
+#include "Basics/logging.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
 #include "VocBase/vocbase.h"
@@ -49,7 +50,10 @@ using namespace triagens::mvcc;
 TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager,
                                           Transaction::TransactionId const& id,
                                           TRI_vocbase_t* vocbase)
-  : Transaction(transactionManager, id, vocbase) {
+  : Transaction(transactionManager, id, vocbase),
+    _lastUsedId(0) {
+
+  LOG_INFO("creating transaction %s", toString().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +64,8 @@ TopLevelTransaction::~TopLevelTransaction () {
   if (_status == Transaction::StatusType::ONGOING) {
     rollback();
   }
+  
+  LOG_INFO("destroying transaction %s", toString().c_str());
 }
 
 // -----------------------------------------------------------------------------
@@ -67,12 +73,20 @@ TopLevelTransaction::~TopLevelTransaction () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief provide the next id for a sub-transaction
+////////////////////////////////////////////////////////////////////////////////
+
+Transaction::TransactionId TopLevelTransaction::nextSubId () {
+  return Transaction::TransactionId(_id.mainPart(), ++_lastUsedId);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief get a string representation of the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 std::string TopLevelTransaction::toString () const {
   std::string result("TopLevelTransaction ");
-  result += _id.toString();
+  result += std::to_string(_id.mainPart());
   return result;
 }
 

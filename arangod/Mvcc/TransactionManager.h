@@ -86,7 +86,7 @@ namespace triagens {
 /// @brief unregister a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual void unregisterTransaction (Transaction const*) = 0;
+        virtual void unregisterTransaction (Transaction*) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initialize the transaction manager

@@ -37,6 +37,7 @@ struct TRI_vocbase_s;
 namespace triagens {
   namespace mvcc {
 
+    class TopLevelTransaction;
     class TransactionManager;
 
 // -----------------------------------------------------------------------------
@@ -62,27 +63,33 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         struct TransactionId {
-          explicit TransactionId (IdType id) 
-            : _id(id) {
+          TransactionId (IdType mainPart, IdType sequencePart) 
+            : _id((mainPart << 20) | sequencePart) {
+
+            TRI_ASSERT_EXPENSIVE(mainPart < MaxMainValue());
+            TRI_ASSERT_EXPENSIVE(sequencePart < MaxSequenceValue());
+          }
+
+          static IdType MaxMainValue () {
+            return 0xfffffffffffULL;
+          }
+          
+          static IdType MaxSequenceValue () {
+            return 0x00000000000fffffULL;
           }
 
           inline IdType id () const {
             return _id; // return the full id
           }
 
-          inline IdType idPart () const {
-            return _id & (0xfffffffffff00000ULL); // return only the upper 44 bits
+          inline IdType mainPart () const {
+            return (_id & 0xfffffffffff00000ULL) >> 20; // return only the upper 44 bits
           }
           
           inline IdType sequencePart () const {
-            return _id & (0x00000000000fffffULL); // return only the lower 20 bits
+            return _id & 0x00000000000fffffULL; // return only the lower 20 bits
           }
 
-          std::string toString () const {
-            std::string result(std::to_string(id()));
-            return result;
-          }
-        
           private:
 
             IdType const _id;
@@ -92,7 +99,7 @@ namespace triagens {
 /// @brief statuses that a transaction can have
 ////////////////////////////////////////////////////////////////////////////////
 
-        enum class StatusType {
+        enum class StatusType : uint16_t {
           ONGOING      = 1,
           COMMITTED    = 2,
           ROLLED_BACK  = 3
@@ -139,6 +146,22 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return the transaction id
+////////////////////////////////////////////////////////////////////////////////
+
+        inline TransactionId const& id () const {
+          return _id;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the database used by the transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        inline struct TRI_vocbase_s* vocbase () const {
+          return _vocbase;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief return the transaction status
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -171,19 +194,20 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief return the transaction id
+/// @brief whether or not the transaction was registered on a thread-local stack
 ////////////////////////////////////////////////////////////////////////////////
 
-        inline TransactionId const& id () const {
-          return _id;
+        inline bool registeredOnStack () const {
+          return _registeredOnStack;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief return the database used by the transaction
+/// @brief mark set transaction as being registered or unregistered
 ////////////////////////////////////////////////////////////////////////////////
 
-        inline struct TRI_vocbase_s* vocbase () const {
-          return _vocbase;
+        inline void registeredOnStack (bool shouldRegister) {
+          TRI_ASSERT(shouldRegister == ! _registeredOnStack);
+          _registeredOnStack = shouldRegister;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -199,7 +223,13 @@ namespace triagens {
         int rollback ();
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief get the transaction's parent transaction
+/// @brief get the transaction's top-level transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        virtual TopLevelTransaction* topLevelTransaction () = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief get the transaction's direct parent transaction
 ////////////////////////////////////////////////////////////////////////////////
 
         virtual Transaction* parentTransaction () = 0;
@@ -251,6 +281,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         StatusType _status;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the transaction was registered on a thread-local stack
+////////////////////////////////////////////////////////////////////////////////
+
+        bool _registeredOnStack;
     };
 
   }
