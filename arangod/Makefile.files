@@ -70,6 +70,12 @@ arangod_libarangod_a_SOURCES = \
 	arangod/HashIndex/hash-array-multi.cpp \
 	arangod/HashIndex/hash-index.cpp \
 	arangod/IndexOperators/index-operator.cpp \
+	arangod/Mvcc/DistributedTransactionManager.cpp \
+	arangod/Mvcc/LocalTransactionManager.cpp \
+	arangod/Mvcc/SubTransaction.cpp \
+	arangod/Mvcc/TopLevelTransaction.cpp \
+	arangod/Mvcc/Transaction.cpp \
+	arangod/Mvcc/TransactionManager.cpp \
 	arangod/Replication/ContinuousSyncer.cpp \
 	arangod/Replication/InitialSyncer.cpp \
 	arangod/Replication/Syncer.cpp \
