@@ -53,7 +53,7 @@ SubTransaction::SubTransaction (Transaction* parent)
     _topLevelTransaction(parent->topLevelTransaction()),
     _parentTransaction(parent) {
   
-  LOG_INFO("creating %s", toString().c_str());
+  LOG_TRACE("creating %s", toString().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +65,7 @@ SubTransaction::~SubTransaction () {
     rollback();
   }
   
-  LOG_INFO("destroying transaction %s", toString().c_str());
+  LOG_TRACE("destroying transaction %s", toString().c_str());
 }
 
 // -----------------------------------------------------------------------------

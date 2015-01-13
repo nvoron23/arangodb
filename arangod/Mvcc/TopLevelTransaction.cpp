@@ -53,7 +53,7 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
   : Transaction(transactionManager, id, vocbase),
     _lastUsedId(0) {
 
-  LOG_INFO("creating transaction %s", toString().c_str());
+  LOG_TRACE("creating transaction %s", toString().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +65,7 @@ TopLevelTransaction::~TopLevelTransaction () {
     rollback();
   }
   
-  LOG_INFO("destroying transaction %s", toString().c_str());
+  LOG_TRACE("destroying transaction %s", toString().c_str());
 }
 
 // -----------------------------------------------------------------------------
@@ -77,6 +77,7 @@ TopLevelTransaction::~TopLevelTransaction () {
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction::TransactionId TopLevelTransaction::nextSubId () {
+  // TODO: use TRI_NewTickServer() instead
   return Transaction::TransactionId(_id.mainPart(), ++_lastUsedId);
 }
 

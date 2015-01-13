@@ -65,7 +65,7 @@ TransactionManager::~TransactionManager () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TransactionManager::initialize () {
-  LOG_INFO("initializing transaction manager");
+  LOG_TRACE("initializing transaction manager");
 
   TRI_ASSERT(Instance == nullptr);
   if (triagens::arango::ServerState::instance()->isCoordinator()) {
@@ -83,7 +83,7 @@ void TransactionManager::initialize () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TransactionManager::shutdown () {
-  LOG_INFO("shutting down transaction manager");
+  LOG_TRACE("shutting down transaction manager");
 
   delete instance();
 }

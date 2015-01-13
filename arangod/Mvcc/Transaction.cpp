@@ -63,19 +63,28 @@ Transaction::Transaction (TransactionManager* transactionManager,
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction::~Transaction () {
-  // note: rollback() is called in the derived classes' destructors
+  // note: destructor rollback() is called in the derived classes
 }
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the transaction status
+////////////////////////////////////////////////////////////////////////////////
+
+Transaction::StatusType Transaction::status () const {
+  // TODO: implement locking here in case multiple threads access the same transaction
+  return _status;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief commit the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 int Transaction::commit () {
-  LOG_INFO("committing transaction %s", toString().c_str());
+  // TODO: implement locking here in case multiple threads access the same transaction
+  LOG_TRACE("committing transaction %s", toString().c_str());
 
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
@@ -92,7 +101,8 @@ int Transaction::commit () {
 ////////////////////////////////////////////////////////////////////////////////
 
 int Transaction::rollback () {
-  LOG_INFO("rolling back transaction %s", toString().c_str());
+  // TODO: implement locking here in case multiple threads access the same transaction
+  LOG_TRACE("rolling back transaction %s", toString().c_str());
 
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
