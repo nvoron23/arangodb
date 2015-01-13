@@ -72,7 +72,10 @@ Parser::~Parser () {
 
 bool Parser::configureWriteQuery (QueryType type,
                                   AstNode const* collectionNode,
-                                  AstNode* optionNode) {
+                                  AstNode* optionNode,
+                                  char const* newOld,
+                                  char const* varInto,
+                                  char const* varReturn) {
   TRI_ASSERT(type != AQL_QUERY_READ);
 
   // check if we currently are in a subquery
@@ -98,6 +101,46 @@ bool Parser::configureWriteQuery (QueryType type,
 
   // register query type 
   _type = type;
+
+  switch(_type) {
+    case AQL_QUERY_READ:
+      break;
+
+    case AQL_QUERY_REMOVE:
+      if (newOld != nullptr) {
+        if (! TRI_CaseEqualString(newOld, "OLD")) {
+          _query->registerError(TRI_ERROR_QUERY_PARSE, "remove operations can only refer to 'OLD' value");
+          return false;
+        }
+      }
+      break;
+
+    case AQL_QUERY_INSERT:
+      if (newOld != nullptr) {
+        if (! TRI_CaseEqualString(newOld, "NEW")) {
+          _query->registerError(TRI_ERROR_QUERY_PARSE, "insert operations can only refer to 'NEW' value");
+          return false;
+        }
+      }
+      break;
+
+    case AQL_QUERY_UPDATE:
+    case AQL_QUERY_REPLACE:
+      if (newOld != nullptr) {
+        if (! TRI_CaseEqualString(newOld, "OLD") && ! TRI_CaseEqualString(newOld, "NEW")) {
+          _query->registerError(TRI_ERROR_QUERY_PARSE, "update/replace operations can only refer to 'NEW' or 'OLD' values");
+          return false;
+        }
+      }
+      break;
+  }
+
+  if (varInto != nullptr && varReturn != nullptr) {
+    if (! TRI_CaseEqualString(varInto, varReturn)) {
+      _query->registerError(TRI_ERROR_QUERY_PARSE, "invalid variable used in data-modification operation return value");
+      return false;
+    }
+  }
 
   return true;
 }
@@ -236,25 +279,25 @@ void Parser::registerWarning (int errorCode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief push an AstNode into the list element on top of the stack
-////////////////////////////////////////////////////////////////////////////////
-
-void Parser::pushList (AstNode* node) {
-  auto list = static_cast<AstNode*>(peekStack());
-  TRI_ASSERT(list->type == NODE_TYPE_ARRAY);
-  list->addMember(node);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief push an AstNode into the array element on top of the stack
 ////////////////////////////////////////////////////////////////////////////////
 
-void Parser::pushArray (char const* attributeName,
-                        AstNode* node) {
+void Parser::pushArray (AstNode* node) {
   auto array = static_cast<AstNode*>(peekStack());
-  TRI_ASSERT(array->type == NODE_TYPE_OBJECT);
-  auto element = _ast->createNodeArrayElement(attributeName, node);
-  array->addMember(element);
+  TRI_ASSERT(array->type == NODE_TYPE_ARRAY);
+  array->addMember(node);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief push an AstNode into the object element on top of the stack
+////////////////////////////////////////////////////////////////////////////////
+
+void Parser::pushObject (char const* attributeName,
+                         AstNode* node) {
+  auto object = static_cast<AstNode*>(peekStack());
+  TRI_ASSERT(object->type == NODE_TYPE_OBJECT);
+  auto element = _ast->createNodeObjectElement(attributeName, node);
+  object->addMember(element);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -201,7 +201,6 @@ bool ApplicationV8::V8Context::addGlobalContextMethod (string const& method) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void ApplicationV8::V8Context::handleGlobalContextMethods () {
-
   vector<GlobalContextMethods::MethodType> copy;
 
   {
@@ -375,30 +374,31 @@ ApplicationV8::V8Context* ApplicationV8::enterContext (std::string const& name,
   v8::HandleScope scope(isolate);
   auto localContext = v8::Local<v8::Context>::New(isolate, context->_context);
   localContext->Enter();
-  v8::Context::Scope contextScope(localContext);
+  {
+    v8::Context::Scope contextScope(localContext);
 
-  TRI_ASSERT(context->_locker->IsLocked(isolate));
-  TRI_ASSERT(v8::Locker::IsLocked(isolate));
-  TRI_GET_GLOBALS();
+    TRI_ASSERT(context->_locker->IsLocked(isolate));
+    TRI_ASSERT(v8::Locker::IsLocked(isolate));
+    TRI_GET_GLOBALS();
 
-  // set the current database
+    // set the current database
   
-  v8g->_vocbase = vocbase;
-  v8g->_allowUseDatabase = allowUseDatabase;
+    v8g->_vocbase = vocbase;
+    v8g->_allowUseDatabase = allowUseDatabase;
 
-  LOG_TRACE("entering V8 context %d", (int) context->_id);
-  context->handleGlobalContextMethods();
+    LOG_TRACE("entering V8 context %d", (int) context->_id);
+    context->handleGlobalContextMethods();
 
-  if (_developmentMode && ! initialise) {
-    v8::HandleScope scope(isolate);
+    if (_developmentMode && ! initialise) {
+      v8::HandleScope scope(isolate);
 
-    TRI_ExecuteJavaScriptString(isolate,
-                                localContext,
-                                TRI_V8_ASCII_STRING("require(\"internal\").resetEngine()"),
-                                TRI_V8_ASCII_STRING("global context method"),
-                                false);
+      TRI_ExecuteJavaScriptString(isolate,
+                                  localContext,
+                                  TRI_V8_ASCII_STRING("require(\"internal\").resetEngine()"),
+                                  TRI_V8_ASCII_STRING("global context method"),
+                                  false);
+    }
   }
-
   return context;
 }
 
@@ -505,6 +505,8 @@ void ApplicationV8::exitContext (V8Context* context) {
     _busyContexts[name].erase(context);
 
     delete context->_locker;
+    context->_locker = nullptr;
+
     TRI_ASSERT(! v8::Locker::IsLocked(isolate));
 
     guard.broadcast();
@@ -546,6 +548,7 @@ void ApplicationV8::exitContext (V8Context* context) {
     }
 
     delete context->_locker;
+    context->_locker = nullptr;
     _freeContexts[name].push_back(context);
   }
 
@@ -635,6 +638,7 @@ void ApplicationV8::collectGarbage () {
     if (context != nullptr) {
       LOG_TRACE("collecting V8 garbage");
       auto isolate = context->isolate;
+      TRI_ASSERT(context->_locker == nullptr);
       context->_locker = new v8::Locker(isolate);
       isolate->Enter();
       {
@@ -653,9 +657,12 @@ void ApplicationV8::collectGarbage () {
         while(! isolate->IdleNotification(1000)) {
         }
 
+        localContext->Exit();
       }
+
       isolate->Exit();
       delete context->_locker;
+      context->_locker = nullptr;
 
       // update garbage collection statistics
       context->_hasDeadObjects = false;
@@ -702,6 +709,7 @@ void ApplicationV8::upgradeDatabase (bool skip,
   // enter context and isolate
   V8Context* context = _contexts[name][0];
 
+  TRI_ASSERT(context->_locker == nullptr);
   context->_locker = new v8::Locker(context->isolate);
   auto isolate = context->isolate;
   isolate->Enter();
@@ -734,6 +742,7 @@ void ApplicationV8::upgradeDatabase (bool skip,
 
           if (! ok) {
             if (localContext->Global()->Has(TRI_V8_ASCII_STRING("UPGRADE_STARTED"))) {
+              localContext->Exit();
               if (perform) {
                 LOG_FATAL_AND_EXIT(
                                    "Database '%s' upgrade failed. Please inspect the logs from the upgrade procedure",
@@ -754,12 +763,19 @@ void ApplicationV8::upgradeDatabase (bool skip,
         }
       }
     }
-  }
-  if (perform) {
 
+    // finally leave the context. otherwise v8 will crash with assertion failure when we delete
+    // the context locker below
+    localContext->Exit();
+  }
+
+  isolate->Exit();
+  delete context->_locker;
+  context->_locker = nullptr;
+
+  if (perform) {
     // issue #391: when invoked with --upgrade, the server will not always shut down
     LOG_INFO("database upgrade passed");
-    delete context->_locker;
 
     // regular shutdown... wait for all threads to finish
 
@@ -787,11 +803,8 @@ void ApplicationV8::upgradeDatabase (bool skip,
   }
   else {
     // and return from the context
-    delete context->_locker;
-    
     LOG_TRACE("finished database init/upgrade");
   }
-  isolate->Exit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -806,6 +819,7 @@ void ApplicationV8::versionCheck () {
   // enter context and isolate
   V8Context* context = _contexts[name][0];
 
+  TRI_ASSERT(context->_locker == nullptr);
   context->_locker = new v8::Locker(context->isolate);
   auto isolate = context->isolate;
   isolate->Enter();
@@ -848,6 +862,7 @@ void ApplicationV8::versionCheck () {
   }
   isolate->Exit();
   delete context->_locker;
+  context->_locker = nullptr;
 
   // regular shutdown... wait for all threads to finish
 
@@ -918,6 +933,7 @@ bool ApplicationV8::prepareNamedContexts (const string& name,
     // and generate MAIN
     V8Context* context = _contexts[name][i];
 
+    TRI_ASSERT(context->_locker == nullptr);
     context->_locker = new v8::Locker(context->isolate);
     auto isolate = context->isolate;
     isolate->Enter();
@@ -954,6 +970,7 @@ bool ApplicationV8::prepareNamedContexts (const string& name,
     }
     isolate->Exit();
     delete context->_locker;
+    context->_locker = nullptr;
   }
 
   return result;
@@ -1267,16 +1284,19 @@ bool ApplicationV8::prepareV8Instance (const string& name, size_t i, bool useAct
 
   v8::Isolate* isolate = v8::Isolate::New();
   
-  V8Context* context = _contexts[name][i] =new V8Context();
+  V8Context* context = _contexts[name][i] = new V8Context();
 
   if (context == nullptr) {
     LOG_FATAL_AND_EXIT("cannot initialize V8 context #%d", (int) i);
   }
+  
+  TRI_ASSERT(context->_locker == nullptr);
 
   // enter a new isolate
   context->_name = name;
   context->_id = i;
   context->isolate = isolate;
+  TRI_ASSERT(context->_locker == nullptr);
   context->_locker = new v8::Locker(isolate);
   context->isolate->Enter();
 
@@ -1360,6 +1380,7 @@ bool ApplicationV8::prepareV8Instance (const string& name, size_t i, bool useAct
   }
   isolate->Exit();
   delete context->_locker;
+  context->_locker = nullptr;
 
   // initialise garbage collection for context
   context->_numExecutions  = 0;
@@ -1383,6 +1404,7 @@ void ApplicationV8::prepareV8Server (const string& name, const size_t i, const s
   V8Context* context = _contexts[name][i];
 
   auto isolate = context->isolate;
+  TRI_ASSERT(context->_locker == nullptr);
   context->_locker = new v8::Locker(isolate);
   v8::HandleScope scope(isolate);
   isolate->Enter();
@@ -1404,6 +1426,7 @@ void ApplicationV8::prepareV8Server (const string& name, const size_t i, const s
   }
   isolate->Exit();
   delete context->_locker;
+  context->_locker = nullptr;
 
   // initialise garbage collection for context
   LOG_TRACE("initialised V8 server #%d", (int) i);
@@ -1420,6 +1443,7 @@ void ApplicationV8::shutdownV8Instance (const string& name, size_t i) {
 
   auto isolate = context->isolate;
   isolate->Enter();
+  TRI_ASSERT(context->_locker == nullptr);
   context->_locker = new v8::Locker(isolate);
   {
     v8::HandleScope scope(isolate);
@@ -1447,6 +1471,7 @@ void ApplicationV8::shutdownV8Instance (const string& name, size_t i) {
 
   isolate->Exit();
   delete context->_locker;
+  context->_locker = nullptr;
 
   isolate->Dispose();
 

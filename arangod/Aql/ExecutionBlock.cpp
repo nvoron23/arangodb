@@ -208,10 +208,12 @@ int ExecutionBlock::initializeCursor (AqlItemBlock* items, size_t pos) {
       return res;
     }
   }
-  for (auto x : _buffer) {
-    delete x;
+
+  for (auto it : _buffer) {
+    delete it;
   }
   _buffer.clear();
+
   _done = false;
   return TRI_ERROR_NO_ERROR;
 }
@@ -1251,7 +1253,7 @@ bool IndexRangeBlock::initRanges () {
           for (size_t u = 0; u < _condition->at(s).size(); u++) {
             auto ri = _condition->at(s)[u];
             if (en->_index->fields[t].compare(ri._attr) == 0) {
-              prefix.at(s).insert(prefix.at(s).begin()+t, u);
+              prefix.at(s).insert(prefix.at(s).begin() + t, u);
               break;
             }
           }
@@ -1362,7 +1364,7 @@ IndexOrCondition* IndexRangeBlock::cartesian (
   std::vector<size_t> indexes;
   indexes.reserve(collector.size());
   for (size_t i = 0; i < collector.size(); i++) {
-    indexes[i] = 0;
+    indexes.push_back(0);
   }
   
   auto out = new IndexOrCondition();
@@ -1909,7 +1911,7 @@ void IndexRangeBlock::getSkiplistIterator (IndexAndCondition const& ranges) {
   Json parameters(Json::Array); 
   size_t i = 0;
   for (; i < ranges.size(); i++) {
-    auto range = ranges[i];
+    auto const& range = ranges[i];
     TRI_ASSERT(range.isConstant());
     if (range.is1ValueRangeInfo()) {   // it's an equality . . . 
       parameters(range._lowConst.bound().copy());
@@ -3399,7 +3401,17 @@ AqlItemBlock* ReturnBlock::getSome (size_t atLeast,
 ModificationBlock::ModificationBlock (ExecutionEngine* engine,
                                       ModificationNode const* ep)
   : ExecutionBlock(engine, ep),
+    _outReg(ExecutionNode::MaxRegisterId),
     _collection(ep->_collection) {
+  if (ep->_outVariable != nullptr) {
+    /*
+    auto const& registerPlan = ep->getRegisterPlan()->varInfo;
+    auto it = registerPlan.find(ep->_outVariable->id);
+    TRI_ASSERT(it != registerPlan.end());
+    _outReg = (*it).second.registerId;
+    */
+    _outReg = 0;
+  }
 }
 
 ModificationBlock::~ModificationBlock () {
@@ -3412,6 +3424,7 @@ ModificationBlock::~ModificationBlock () {
 AqlItemBlock* ModificationBlock::getSome (size_t atLeast,
                                           size_t atMost) {
   std::vector<AqlItemBlock*> blocks;
+  AqlItemBlock* replyBlocks = nullptr;
 
   auto freeBlocks = [](std::vector<AqlItemBlock*>& blocks) {
     for (auto it = blocks.begin(); it != blocks.end(); ++it) {
@@ -3433,15 +3446,15 @@ AqlItemBlock* ModificationBlock::getSome (size_t atLeast,
       blocks.push_back(res);
     }
 
-    work(blocks);
+    replyBlocks = work(blocks);
     freeBlocks(blocks);
-
-    return nullptr;
   }
   catch (...) {
     freeBlocks(blocks);
+    delete replyBlocks;
     throw;
   }
+  return replyBlocks;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3474,7 +3487,7 @@ int ModificationBlock::extractKey (AqlValue const& value,
 
 void ModificationBlock::handleResult (int code,
                                       bool ignoreErrors,
-                                      std::string const *errorMessage) {
+                                      std::string const* errorMessage) {
   if (code == TRI_ERROR_NO_ERROR) {
     // update the success counter
     ++_engine->_stats.writesExecuted;
@@ -3486,7 +3499,7 @@ void ModificationBlock::handleResult (int code,
     }
     else {
       // bubble up the error
-      if (errorMessage != nullptr) {
+      if (errorMessage != nullptr && ! errorMessage->empty()) {
         THROW_ARANGO_EXCEPTION_MESSAGE(code, *errorMessage);
       }
       else {
@@ -3512,73 +3525,101 @@ RemoveBlock::~RemoveBlock () {
 /// @brief the actual work horse for removing data
 ////////////////////////////////////////////////////////////////////////////////
 
-void RemoveBlock::work (std::vector<AqlItemBlock*>& blocks) {
+AqlItemBlock* RemoveBlock::work (std::vector<AqlItemBlock*>& blocks) {
+  std::unique_ptr<AqlItemBlock> result;
   auto ep = static_cast<RemoveNode const*>(getPlanNode());
   auto it = ep->getRegisterPlan()->varInfo.find(ep->_inVariable->id);
   TRI_ASSERT(it != ep->getRegisterPlan()->varInfo.end());
   RegisterId const registerId = it->second.registerId;
+  size_t removeCount = 0;
 
+  TRI_doc_mptr_copy_t nptr;
   auto trxCollection = _trx->trxCollection(_collection->cid());
-      
-  if (ep->_outVariable == nullptr) {
-    // don't return anything
 
-    // loop over all blocks
+  if (ep->_outVariable != nullptr) {
+    size_t count = 0;
+
     for (auto it = blocks.begin(); it != blocks.end(); ++it) {
-      auto res = (*it);
-      auto document = res->getDocumentCollection(registerId);
-      
-      size_t const n = res->size();
-    
-      // loop over the complete block
-      for (size_t i = 0; i < n; ++i) {
-        AqlValue a = res->getValue(i, registerId);
+      count += (*it)->size();
+    }
 
-        std::string key;
-        int errorCode = TRI_ERROR_NO_ERROR;
-
-        if (a.isObject()) {
-          // value is an array. now extract the _key attribute
-          errorCode = extractKey(a, document, key);
-        }
-        else if (a.isString()) {
-          // value is a string
-          key = a.toChar();
-        }
-        else {
-          errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
-        }
-
-        if (errorCode == TRI_ERROR_NO_ERROR) {
-          // no error. we expect to have a key
-                  
-          // all exceptions are caught in _trx->remove()
-          errorCode = _trx->remove(trxCollection, 
-                                   key,
-                                   0,
-                                   TRI_DOC_UPDATE_LAST_WRITE,
-                                   0, 
-                                   nullptr,
-                                   ep->_options.waitForSync);
-          if (ExecutionEngine::isDBServer() &&
-              errorCode == TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND) {
-            auto* node = static_cast<RemoveNode const*>(getPlanNode());
-            if (node->getOptions().ignoreDocumentNotFound) {
-              // Ignore document not found on the DBserver:
-              errorCode = TRI_ERROR_NO_ERROR;
-            }
-          }
-        }
-        
-        handleResult(errorCode, ep->_options.ignoreErrors); 
-      }
-      // done with a block
-
-      // now free it already
-      (*it) = nullptr;  
-      delete res;
+    if (count > 0) {
+      result.reset(new AqlItemBlock(count,
+                                    getPlanNode()->getRegisterPlan()->nrRegs[getPlanNode()->getDepth()]));
+      result->setDocumentCollection(_outReg, trxCollection->_collection->_collection);
     }
   }
+
+  // loop over all blocks
+  for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+    auto res = (*it);
+    auto document = res->getDocumentCollection(registerId);
+      
+    size_t const n = res->size();
+    
+    // loop over the complete block
+    for (size_t i = 0; i < n; ++i) {
+      AqlValue a = res->getValue(i, registerId);
+
+      std::string key;
+      int errorCode = TRI_ERROR_NO_ERROR;
+
+      if (a.isObject()) {
+        // value is an array. now extract the _key attribute
+        errorCode = extractKey(a, document, key);
+      }
+      else if (a.isString()) {
+        // value is a string
+        key = a.toChar();
+      }
+      else {
+        errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
+      }
+
+      if (errorCode == TRI_ERROR_NO_ERROR && 
+          result.get() != nullptr) {
+        errorCode = _trx->readSingle(trxCollection, &nptr, key);
+      }
+
+      if (errorCode == TRI_ERROR_NO_ERROR) {
+        // no error. we expect to have a key
+                  
+        // all exceptions are caught in _trx->remove()
+        errorCode = _trx->remove(trxCollection, 
+                                 key,
+                                 0,
+                                 TRI_DOC_UPDATE_LAST_WRITE,
+                                 0, 
+                                 nullptr,
+                                 ep->_options.waitForSync);
+        if (errorCode == TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND && 
+            ExecutionEngine::isDBServer()) {
+          auto* node = static_cast<RemoveNode const*>(getPlanNode());
+          if (node->getOptions().ignoreDocumentNotFound) {
+            // Ignore document not found on the DBserver:
+            errorCode = TRI_ERROR_NO_ERROR;
+          }
+        }
+
+        if (result.get() != nullptr &&
+            errorCode == TRI_ERROR_NO_ERROR) {
+          
+          result->setValue(removeCount++, 
+                           _outReg,
+                           AqlValue(reinterpret_cast<TRI_df_marker_t const*>(nptr.getDataPtr())));
+        }
+      }
+        
+      handleResult(errorCode, ep->_options.ignoreErrors); 
+    }
+    // done with a block
+
+    // now free it already
+    (*it) = nullptr;  
+    delete res;
+  }
+
+  return result.release();
 }
 
 // -----------------------------------------------------------------------------
@@ -3597,7 +3638,8 @@ InsertBlock::~InsertBlock () {
 /// @brief the actual work horse for inserting data
 ////////////////////////////////////////////////////////////////////////////////
 
-void InsertBlock::work (std::vector<AqlItemBlock*>& blocks) {
+AqlItemBlock* InsertBlock::work (std::vector<AqlItemBlock*>& blocks) {
+  std::unique_ptr<AqlItemBlock> result;
   auto ep = static_cast<InsertNode const*>(getPlanNode());
   auto it = ep->getRegisterPlan()->varInfo.find(ep->_inVariable->id);
   TRI_ASSERT(it != ep->getRegisterPlan()->varInfo.end());
@@ -3605,92 +3647,118 @@ void InsertBlock::work (std::vector<AqlItemBlock*>& blocks) {
 
   auto trxCollection = _trx->trxCollection(_collection->cid());
 
+  TRI_doc_mptr_copy_t nptr;
   bool const isEdgeCollection = _collection->isEdgeCollection();
+  size_t insertCount = 0;
 
-  if (ep->_outVariable == nullptr) {
-    // don't return anything
+  // don't return anything
          
-    // initialize an empty edge container
-    TRI_document_edge_t edge;
-    edge._fromCid = 0;
-    edge._toCid   = 0;
-    edge._fromKey = nullptr;
-    edge._toKey   = nullptr;
+  // initialize an empty edge container
+  TRI_document_edge_t edge;
+  edge._fromCid = 0;
+  edge._toCid   = 0;
+  edge._fromKey = nullptr;
+  edge._toKey   = nullptr;
 
-    std::string from;
-    std::string to;
+  std::string from;
+  std::string to;
 
-    // loop over all blocks
+  if (ep->_outVariable != nullptr) {
+    size_t count = 0;
+
     for (auto it = blocks.begin(); it != blocks.end(); ++it) {
-      auto res = (*it);
-      auto document = res->getDocumentCollection(registerId);
-      
-      size_t const n = res->size();
+      count += (*it)->size();
+    }
+
+    if (count > 0) {
+      result.reset(new AqlItemBlock(count, 
+                                getPlanNode()->getRegisterPlan()->nrRegs[getPlanNode()->getDepth()]));
+      result->setDocumentCollection(_outReg, trxCollection->_collection->_collection);
+    }
+  }
+
+  // loop over all blocks
+  for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+    auto res = (*it);
+    auto document = res->getDocumentCollection(registerId);
+    size_t const n = res->size();
     
-      // loop over the complete block
-      for (size_t i = 0; i < n; ++i) {
-        AqlValue a = res->getValue(i, registerId);
+    // loop over the complete block
+    for (size_t i = 0; i < n; ++i) {
+      AqlValue a = res->getValue(i, registerId);
 
-        int errorCode = TRI_ERROR_NO_ERROR;
+      int errorCode = TRI_ERROR_NO_ERROR;
 
-        if (a.isObject()) {
-          // value is an array
+      if (a.isObject()) {
+        // value is an array
         
-          if (isEdgeCollection) {
-            // array must have _from and _to attributes
-            TRI_json_t const* json;
+        if (isEdgeCollection) {
+          // array must have _from and _to attributes
+          TRI_json_t const* json;
 
-            Json member(a.extractArrayMember(_trx, document, TRI_VOC_ATTRIBUTE_FROM));
+          Json member(a.extractArrayMember(_trx, document, TRI_VOC_ATTRIBUTE_FROM));
+          json = member.json();
+
+          if (TRI_IsStringJson(json)) {
+            errorCode = resolve(json->_value._string.data, edge._fromCid, from);
+          }
+          else {
+            errorCode = TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD;
+          }
+         
+          if (errorCode == TRI_ERROR_NO_ERROR) { 
+            Json member(a.extractArrayMember(_trx, document, TRI_VOC_ATTRIBUTE_TO));
             json = member.json();
-
             if (TRI_IsStringJson(json)) {
-              errorCode = resolve(json->_value._string.data, edge._fromCid, from);
+              errorCode = resolve(json->_value._string.data, edge._toCid, to);
             }
             else {
               errorCode = TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD;
             }
-         
-            if (errorCode == TRI_ERROR_NO_ERROR) { 
-              Json member(a.extractArrayMember(_trx, document, TRI_VOC_ATTRIBUTE_TO));
-              json = member.json();
-              if (TRI_IsStringJson(json)) {
-                errorCode = resolve(json->_value._string.data, edge._toCid, to);
-              }
-              else {
-                errorCode = TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD;
-              }
-            }
           }
+        }
+      }
+      else {
+        errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
+      }
+
+      if (errorCode == TRI_ERROR_NO_ERROR) {
+        TRI_doc_mptr_copy_t mptr;
+        auto json = a.toJson(_trx, document);
+
+        if (isEdgeCollection) {
+          // edge
+          edge._fromKey = (TRI_voc_key_t) from.c_str();
+          edge._toKey = (TRI_voc_key_t) to.c_str();
+          errorCode = _trx->create(trxCollection, &mptr, json.json(), &edge, ep->_options.waitForSync);
         }
         else {
-          errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
+          // document
+          errorCode = _trx->create(trxCollection, &mptr, json.json(), nullptr, ep->_options.waitForSync);
         }
 
-        if (errorCode == TRI_ERROR_NO_ERROR) {
-          TRI_doc_mptr_copy_t mptr;
-          auto json = a.toJson(_trx, document);
+        if (errorCode == TRI_ERROR_NO_ERROR &&
+            result.get() != nullptr) {
+          errorCode = _trx->readSingle(trxCollection, &nptr, TRI_EXTRACT_MARKER_KEY(&mptr));
 
-          if (isEdgeCollection) {
-            // edge
-            edge._fromKey = (TRI_voc_key_t) from.c_str();
-            edge._toKey = (TRI_voc_key_t) to.c_str();
-            errorCode = _trx->create(trxCollection, &mptr, json.json(), &edge, ep->_options.waitForSync);
-          }
-          else {
-            // document
-            errorCode = _trx->create(trxCollection, &mptr, json.json(), nullptr, ep->_options.waitForSync);
+          if (errorCode == TRI_ERROR_NO_ERROR) {
+            result->setValue(insertCount++,
+                             _outReg,
+                             AqlValue(reinterpret_cast<TRI_df_marker_t const*>(nptr.getDataPtr())));
           }
         }
-
-        handleResult(errorCode, ep->_options.ignoreErrors); 
       }
-      // done with a block
 
-      // now free it already
-      (*it) = nullptr;  
-      delete res;
+      handleResult(errorCode, ep->_options.ignoreErrors); 
     }
+    // done with a block
+
+    // now free it already
+    (*it) = nullptr;  
+    delete res;
   }
+
+  return result.release();
 }
 
 // -----------------------------------------------------------------------------
@@ -3709,119 +3777,159 @@ UpdateBlock::~UpdateBlock () {
 /// @brief the actual work horse for inserting data
 ////////////////////////////////////////////////////////////////////////////////
 
-void UpdateBlock::work (std::vector<AqlItemBlock*>& blocks) {
+AqlItemBlock* UpdateBlock::work (std::vector<AqlItemBlock*>& blocks) {
+  std::unique_ptr<AqlItemBlock> result;
   auto ep = static_cast<UpdateNode const*>(getPlanNode());
   auto it = ep->getRegisterPlan()->varInfo.find(ep->_inDocVariable->id);
   TRI_ASSERT(it != ep->getRegisterPlan()->varInfo.end());
   RegisterId const docRegisterId = it->second.registerId;
   RegisterId keyRegisterId = 0; // default initialization
 
+  TRI_doc_mptr_copy_t nptr;
   bool const hasKeyVariable = (ep->_inKeyVariable != nullptr);
   std::string errorMessage;
-  
+  size_t updateCount = 0;
+
   if (hasKeyVariable) {
     it = ep->getRegisterPlan()->varInfo.find(ep->_inKeyVariable->id);
     TRI_ASSERT(it != ep->getRegisterPlan()->varInfo.end());
     keyRegisterId = it->second.registerId;
   }
   
-  auto* trxCollection = _trx->trxCollection(_collection->cid());
+  auto trxCollection = _trx->trxCollection(_collection->cid());
 
-  if (ep->_outVariable == nullptr) {
-    // don't return anything
+  if (ep->_outVariable != nullptr) {
+    size_t count = 0;
+
+    for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+      count += (*it)->size();
+    }
+    if (count > 0) {
+      result.reset(new AqlItemBlock(count,
+                                getPlanNode()->getRegisterPlan()->nrRegs[getPlanNode()->getDepth()]));
+      result->setDocumentCollection(_outReg, trxCollection->_collection->_collection);
+    }
+  }
          
-    // loop over all blocks
-    for (auto& b : blocks) {
-      auto* res = b;   // This is intentionally a copy!
-      auto document = res->getDocumentCollection(docRegisterId);
-      decltype(document) keyDocument = nullptr;
+  // loop over all blocks
+  for (auto& b : blocks) {
+    auto* res = b;   // This is intentionally a copy!
+    auto document = res->getDocumentCollection(docRegisterId);
+    decltype(document) keyDocument = nullptr;
 
-      if (hasKeyVariable) {
-        keyDocument = res->getDocumentCollection(keyRegisterId);
-      }
+    if (hasKeyVariable) {
+      keyDocument = res->getDocumentCollection(keyRegisterId);
+    }
 
-      size_t const n = res->size();
+    size_t const n = res->size();
     
-      // loop over the complete block
-      for (size_t i = 0; i < n; ++i) {
-        AqlValue a = res->getValue(i, docRegisterId);
+    // loop over the complete block
+    for (size_t i = 0; i < n; ++i) {
+      AqlValue a = res->getValue(i, docRegisterId);
 
-        int errorCode = TRI_ERROR_NO_ERROR;
-        std::string key;
+      int errorCode = TRI_ERROR_NO_ERROR;
+      std::string key;
 
-        if (a.isObject()) {
-          // value is an array
-          if (hasKeyVariable) {
-            // seperate key specification
-            AqlValue k = res->getValue(i, keyRegisterId);
-            errorCode = extractKey(k, keyDocument, key);
-          }
-          else {
-            errorCode = extractKey(a, document, key);
-          }
+      if (a.isObject()) {
+        // value is an array
+        if (hasKeyVariable) {
+          // seperate key specification
+          AqlValue k = res->getValue(i, keyRegisterId);
+          errorCode = extractKey(k, keyDocument, key);
         }
         else {
-          errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
-          errorMessage += std::string("expecting 'array', got: ") +
-            a.getTypeString() + 
-            std::string(" while handling: ") + 
-            _exeNode->getTypeString();
+          errorCode = extractKey(a, document, key);
         }
+      }
+      else {
+        errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
+        errorMessage += std::string("expecting 'object', got: ") +
+          a.getTypeString() + 
+          std::string(" while handling: ") + 
+          _exeNode->getTypeString();
+      }
+
+      if (errorCode == TRI_ERROR_NO_ERROR) {
+        TRI_doc_mptr_copy_t mptr;
+        auto json = a.toJson(_trx, document);
+
+        // read old document
+        TRI_doc_mptr_copy_t oldDocument;
+        errorCode = _trx->readSingle(trxCollection, &oldDocument, key);
 
         if (errorCode == TRI_ERROR_NO_ERROR) {
-          TRI_doc_mptr_copy_t mptr;
-          auto json = a.toJson(_trx, document);
+          if (oldDocument.getDataPtr() != nullptr) {
+            TRI_shaped_json_t shapedJson;
+            TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, oldDocument.getDataPtr()); // PROTECTED by trx here
+            TRI_json_t* old = TRI_JsonShapedJson(_collection->documentCollection()->getShaper(), &shapedJson);
 
-          // read old document
-          TRI_doc_mptr_copy_t oldDocument;
-          errorCode = _trx->readSingle(trxCollection, &oldDocument, key);
+            if (old != nullptr) {
+              TRI_json_t* patchedJson = TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, old, json.json(), ep->_options.nullMeansRemove, ep->_options.mergeObjects);
+              TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, old); 
 
-          if (errorCode == TRI_ERROR_NO_ERROR) {
-            if (oldDocument.getDataPtr() != nullptr) {
-              TRI_shaped_json_t shapedJson;
-              TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, oldDocument.getDataPtr()); // PROTECTED by trx here
-              TRI_json_t* old = TRI_JsonShapedJson(_collection->documentCollection()->getShaper(), &shapedJson);
-
-              if (old != nullptr) {
-                TRI_json_t* patchedJson = TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, old, json.json(), ep->_options.nullMeansRemove, ep->_options.mergeObjects);
-                TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, old); 
-
-                if (patchedJson != nullptr) {
-                  // all exceptions are caught in _trx->update()
-                  errorCode = _trx->update(trxCollection, key, 0, &mptr, patchedJson, TRI_DOC_UPDATE_LAST_WRITE, 0, nullptr, ep->_options.waitForSync);
-                  TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, patchedJson);
-                }
-                else {
-                  errorCode = TRI_ERROR_OUT_OF_MEMORY;
-                }
+              if (patchedJson != nullptr) {
+                // all exceptions are caught in _trx->update()
+                errorCode = _trx->update(trxCollection, key, 0, &mptr, patchedJson, TRI_DOC_UPDATE_LAST_WRITE, 0, nullptr, ep->_options.waitForSync);
+                TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, patchedJson);
               }
               else {
                 errorCode = TRI_ERROR_OUT_OF_MEMORY;
               }
             }
             else {
-              errorCode = TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND;
+              errorCode = TRI_ERROR_OUT_OF_MEMORY;
             }
           }
-          if (ExecutionEngine::isDBServer() &&
-              errorCode == TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND) {
-            auto* node = static_cast<UpdateNode const*>(getPlanNode());
-            if (node->getOptions().ignoreDocumentNotFound) {
-              // Ignore document not found on the DBserver:
-              errorCode = TRI_ERROR_NO_ERROR;
-            }
+          else {
+            errorCode = TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND;
           }
         }
 
-        handleResult(errorCode, ep->_options.ignoreErrors, &errorMessage); 
-      }
-      // done with a block
+        if (errorCode == TRI_ERROR_NO_ERROR &&
+            result.get() != nullptr) {
+          TRI_doc_mptr_copy_t const* ptr = nullptr;
 
-      // now free it already
-      b = nullptr;  
-      delete res;
+          if (ep->_returnNewValues) {
+            errorCode = _trx->readSingle(trxCollection, &nptr, TRI_EXTRACT_MARKER_KEY(&mptr));
+
+            if (errorCode == TRI_ERROR_NO_ERROR) {
+              ptr = &nptr;
+            }
+          }
+          else {
+            ptr = &oldDocument;
+          }
+
+          if (errorCode == TRI_ERROR_NO_ERROR) {
+            TRI_ASSERT(ptr != nullptr);
+
+            result->setValue(updateCount++, 
+                             _outReg,
+                             AqlValue(reinterpret_cast<TRI_df_marker_t const*>(ptr->getDataPtr())));
+          }
+        }
+
+        if (errorCode == TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND &&
+            ExecutionEngine::isDBServer()) {
+          auto* node = static_cast<UpdateNode const*>(getPlanNode());
+          if (node->getOptions().ignoreDocumentNotFound) {
+            // Ignore document not found on the DBserver:
+            errorCode = TRI_ERROR_NO_ERROR;
+          }
+        }
+
+      }
+
+      handleResult(errorCode, ep->_options.ignoreErrors, &errorMessage); 
     }
+    // done with a block
+
+    // now free it already
+    b = nullptr;  
+    delete res;
   }
+
+  return result.release();
 }
 
 // -----------------------------------------------------------------------------
@@ -3840,14 +3948,17 @@ ReplaceBlock::~ReplaceBlock () {
 /// @brief the actual work horse for replacing data
 ////////////////////////////////////////////////////////////////////////////////
 
-void ReplaceBlock::work (std::vector<AqlItemBlock*>& blocks) {
+AqlItemBlock* ReplaceBlock::work (std::vector<AqlItemBlock*>& blocks) {
+  std::unique_ptr<AqlItemBlock> result;
   auto ep = static_cast<ReplaceNode const*>(getPlanNode());
   auto it = ep->getRegisterPlan()->varInfo.find(ep->_inDocVariable->id);
   TRI_ASSERT(it != ep->getRegisterPlan()->varInfo.end());
   RegisterId const registerId = it->second.registerId;
   RegisterId keyRegisterId = 0; // default initialization
 
+  TRI_doc_mptr_copy_t nptr;
   bool const hasKeyVariable = (ep->_inKeyVariable != nullptr);
+  size_t replaceCounter = 0;
   
   if (hasKeyVariable) {
     it = ep->getRegisterPlan()->varInfo.find(ep->_inKeyVariable->id);
@@ -3857,70 +3968,105 @@ void ReplaceBlock::work (std::vector<AqlItemBlock*>& blocks) {
 
   auto trxCollection = _trx->trxCollection(_collection->cid());
 
-  if (ep->_outVariable == nullptr) {
-    // don't return anything
-         
-    // loop over all blocks
-    for (auto& b : blocks) {
-      auto* res = b;  // This is intentionally a copy
-      auto document = res->getDocumentCollection(registerId);
-      decltype(document) keyDocument = nullptr;
+  if (ep->_outVariable != nullptr) {
+    size_t count = 0;
 
-      if (hasKeyVariable) {
-        keyDocument = res->getDocumentCollection(keyRegisterId);
-      }
-      
-      size_t const n = res->size();
-    
-      // loop over the complete block
-      for (size_t i = 0; i < n; ++i) {
-        AqlValue a = res->getValue(i, registerId);
-
-        int errorCode = TRI_ERROR_NO_ERROR;
-        std::string key;
-
-        if (a.isObject()) {
-          // value is an array
-          if (hasKeyVariable) {
-            // seperate key specification
-            AqlValue k = res->getValue(i, keyRegisterId);
-            errorCode = extractKey(k, keyDocument, key);
-          }
-          else {
-            errorCode = extractKey(a, document, key);
-          }
-        }
-        else {
-          errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
-        }
-
-        if (errorCode == TRI_ERROR_NO_ERROR) {
-          TRI_doc_mptr_copy_t mptr;
-          auto json = a.toJson(_trx, document);
-          
-          // all exceptions are caught in _trx->update()
-          errorCode = _trx->update(trxCollection, key, 0, &mptr, json.json(), TRI_DOC_UPDATE_LAST_WRITE, 0, nullptr, ep->_options.waitForSync);
-          if (ExecutionEngine::isDBServer() &&
-              errorCode == TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND) {
-            auto* node = static_cast<ReplaceNode const*>(getPlanNode());
-            if (node->getOptions().ignoreDocumentNotFound) {
-              errorCode = TRI_ERROR_NO_ERROR;
-            }
-            else {
-              errorCode = TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND_OR_SHARDING_ATTRIBUTES_CHANGED;
-            }
-          }
-        }
-
-        handleResult(errorCode, ep->_options.ignoreErrors); 
-      }
-      // done with a block
-
-      // now free it already
-      b = nullptr;  
-      delete res;
+    for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+      count += (*it)->size();
+    }
+    if (count > 0) {
+      result.reset(new AqlItemBlock(count, 
+                                getPlanNode()->getRegisterPlan()->nrRegs[getPlanNode()->getDepth()]));
+      result->setDocumentCollection(_outReg, trxCollection->_collection->_collection);
     }
   }
+
+  // loop over all blocks
+  for (auto& b : blocks) {
+    auto* res = b;  // This is intentionally a copy
+    auto document = res->getDocumentCollection(registerId);
+    decltype(document) keyDocument = nullptr;
+
+    if (hasKeyVariable) {
+      keyDocument = res->getDocumentCollection(keyRegisterId);
+    }
+      
+    size_t const n = res->size();
+    
+    // loop over the complete block
+    for (size_t i = 0; i < n; ++i) {
+      AqlValue a = res->getValue(i, registerId);
+
+      int errorCode = TRI_ERROR_NO_ERROR;
+      int readErrorCode = TRI_ERROR_NO_ERROR;
+      std::string key;
+
+      if (a.isObject()) {
+        // value is an array
+        if (hasKeyVariable) {
+          // seperate key specification
+          AqlValue k = res->getValue(i, keyRegisterId);
+          errorCode = extractKey(k, keyDocument, key);
+        }
+        else {
+          errorCode = extractKey(a, document, key);
+        }
+      }
+      else {
+        errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
+      }
+
+      if (result.get() != nullptr && ! ep->_returnNewValues) {
+        readErrorCode = _trx->readSingle(trxCollection, &nptr, key);
+      }
+
+      if (errorCode == TRI_ERROR_NO_ERROR) {
+        TRI_doc_mptr_copy_t mptr;
+        auto json = a.toJson(_trx, document);
+          
+        // all exceptions are caught in _trx->update()
+        errorCode = _trx->update(trxCollection, key, 0, &mptr, json.json(), TRI_DOC_UPDATE_LAST_WRITE, 0, nullptr, ep->_options.waitForSync);
+        if (errorCode == TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND && 
+            ExecutionEngine::isDBServer()) {
+          auto* node = static_cast<ReplaceNode const*>(getPlanNode());
+          if (! node->getOptions().ignoreDocumentNotFound) {
+            errorCode = TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND_OR_SHARDING_ATTRIBUTES_CHANGED;
+          }
+          else {
+            // Note that this is coded here for the sake of completeness, 
+            // but it will intentionally never happen, since this flag is
+            // not set in the REPLACE case, because we will always use
+            // a DistributeNode rather than a ScatterNode:
+            errorCode = TRI_ERROR_NO_ERROR;
+          }
+        }
+
+        if (result.get() != nullptr &&
+            errorCode == TRI_ERROR_NO_ERROR &&
+            readErrorCode == TRI_ERROR_NO_ERROR) {
+
+          if (ep->_returnNewValues) {
+            readErrorCode = _trx->readSingle(trxCollection, &nptr, key);
+          }
+
+          if (readErrorCode == TRI_ERROR_NO_ERROR) {
+            result->setValue(replaceCounter++,
+                             _outReg,
+                             AqlValue(reinterpret_cast<TRI_df_marker_t const*>(nptr.getDataPtr())));
+          }
+        }
+      }
+
+      handleResult(errorCode, ep->_options.ignoreErrors); 
+    }
+    // done with a block
+
+    // now free it already
+    b = nullptr;  
+    delete res;
+  }
+
+  return result.release();
 }
 
 // -----------------------------------------------------------------------------
@@ -4482,10 +4628,17 @@ AqlItemBlock* BlockWithClients::getSomeForShard (size_t atLeast,
   _ignoreShutdown = false;
   size_t skipped = 0;
   AqlItemBlock* result = nullptr;
+
   int out = getOrSkipSomeForShard(atLeast, atMost, false, result, skipped, shardId);
+
   if (out != TRI_ERROR_NO_ERROR) {
+    if (result != nullptr) {
+      delete result;
+    }
+
     THROW_ARANGO_EXCEPTION(out);
   }
+
   return result;
   LEAVE_BLOCK
 }
@@ -4718,7 +4871,7 @@ int ScatterBlock::getOrSkipSomeForShard (size_t atLeast,
       }
     }
     if (popit) {
-      delete(_buffer.front());
+      delete _buffer.front();
       _buffer.pop_front();
       // update the values in first coord of _posForClient
       for (size_t i = 0; i < _nrClients; i++) {
@@ -4750,6 +4903,8 @@ DistributeBlock::DistributeBlock (ExecutionEngine* engine,
   auto it = ep->getRegisterPlan()->varInfo.find(varId);
   TRI_ASSERT(it != ep->getRegisterPlan()->varInfo.end());
   _regId = (*it).second.registerId;
+
+  _usesDefaultSharding = collection->usesDefaultSharding();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4879,12 +5034,18 @@ int DistributeBlock::getOrSkipSomeForShard (size_t atLeast,
     size_t i = 0;
     while (i < skipped) {
       std::vector<size_t> chosen;
-      size_t n = buf.front().first;
+      size_t const n = buf.front().first;
       while (buf.front().first == n && i < skipped) { 
         chosen.push_back(buf.front().second);
         buf.pop_front();
         i++;
+        
+        // make sure we are not overreaching over the end of the buffer
+        if (buf.empty()) {
+          break;
+        }
       }
+
       unique_ptr<AqlItemBlock> more(_buffer.at(n)->slice(chosen, 0, chosen.size()));
       collector.push_back(more.get());
       more.release(); // do not delete it!
@@ -4953,10 +5114,12 @@ bool DistributeBlock::getBlockForClient (size_t atLeast,
     AqlItemBlock* cur = _buffer.at(_index);
       
     while (_pos < cur->size() && buf.at(clientId).size() < atLeast) {
-      // inspect cur in row _pos and check to which shard it should be sent . .
-      size_t id = sendToClient(cur->getValue(_pos, _regId));
-      buf.at(id).push_back(make_pair(_index, _pos++));
+      // this may modify the input item buffer in place
+      size_t id = sendToClient(cur);
+
+      buf.at(id).emplace_back(make_pair(_index, _pos++));
     }
+
     if (_pos == cur->size()) {
       _pos = 0;
       _index++;
@@ -4976,24 +5139,102 @@ bool DistributeBlock::getBlockForClient (size_t atLeast,
 /// the row should be sent and return its clientId
 ////////////////////////////////////////////////////////////////////////////////
 
-size_t DistributeBlock::sendToClient (AqlValue val) {
+size_t DistributeBlock::sendToClient (AqlItemBlock* cur) {
   ENTER_BLOCK
-  TRI_json_t const* json;
-  if (val._type == AqlValue::JSON) {
-    json = val._json->json();
-  } 
-  else {
+      
+  // inspect cur in row _pos and check to which shard it should be sent . .
+  auto const& val = cur->getValueReference(_pos, _regId);
+
+  if (val._type != AqlValue::JSON) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_FAILED, 
-        "DistributeBlock: can only send JSON or SHAPED");
+        "DistributeBlock: can only send JSON");
+  }
+
+  bool hasCreatedKeyAttribute = false;
+  TRI_json_t const* json = val._json->json();
+  
+  if (json == nullptr) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "json is a nullptr");
   }
   
-  bool mustFreeJson = false;
-  TRI_json_t* obj = nullptr;
   if (TRI_IsStringJson(json)) {
-    obj = TRI_CreateObject2Json(TRI_UNKNOWN_MEM_ZONE, 1);
-    TRI_InsertObjectJson(TRI_UNKNOWN_MEM_ZONE, obj, "_key", json);
-    mustFreeJson = true;
+    TRI_json_t* obj = TRI_CreateObjectJson(TRI_UNKNOWN_MEM_ZONE, 1);
+
+    if (obj == nullptr) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    }
+
+    TRI_InsertObjectJson(TRI_UNKNOWN_MEM_ZONE, obj, TRI_VOC_ATTRIBUTE_KEY, json);
+    // clear the previous value
+    cur->destroyValue(_pos, _regId);
+
+    // overwrite with new value
+    cur->setValue(_pos, _regId, AqlValue(new triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, obj)));
+
+    json = obj;
+    hasCreatedKeyAttribute = true;
   }
+  else if (! TRI_IsObjectJson(json)) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
+  }
+
+  TRI_ASSERT(TRI_IsObjectJson(json));
+
+  if (static_cast<DistributeNode const*>(_exeNode)->_createKeys) {
+    // we are responsible for creating keys if none present
+
+    if (_usesDefaultSharding) {
+      // the collection is sharded by _key...
+
+      if (! hasCreatedKeyAttribute && TRI_LookupObjectJson(json, TRI_VOC_ATTRIBUTE_KEY) == nullptr) {
+        // there is no _key attribute present, so we are responsible for creating one
+        std::string const&& keyString(createKey());
+
+        TRI_json_t* obj = TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, json);
+      
+        if (obj == nullptr) {
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+        }
+
+        TRI_Insert3ObjectJson(TRI_UNKNOWN_MEM_ZONE, obj, TRI_VOC_ATTRIBUTE_KEY, TRI_CreateStringCopyJson(TRI_UNKNOWN_MEM_ZONE, keyString.c_str(), keyString.size()));
+    
+        // clear the previous value
+        cur->destroyValue(_pos, _regId);
+
+        // overwrite with new value
+        cur->setValue(_pos, _regId, AqlValue(new triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, obj)));
+        json = obj;
+      } 
+    }
+    else {
+      // the collection is not sharded by _key
+
+      if (hasCreatedKeyAttribute || TRI_LookupObjectJson(json, TRI_VOC_ATTRIBUTE_KEY) != nullptr) {
+        // a _key was given, but user is not allowed to specify _key
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_CLUSTER_MUST_NOT_SPECIFY_KEY);
+      }
+
+      // no _key given. now create one
+      std::string const&& keyString(createKey());
+
+      TRI_json_t* obj = TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, json);
+
+      if (obj == nullptr) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+      }
+
+      TRI_Insert3ObjectJson(TRI_UNKNOWN_MEM_ZONE, obj, TRI_VOC_ATTRIBUTE_KEY, TRI_CreateStringCopyJson(TRI_UNKNOWN_MEM_ZONE, keyString.c_str(), keyString.size()));
+        
+      // clear the previous value
+      cur->destroyValue(_pos, _regId);
+
+      // overwrite with new value
+      cur->setValue(_pos, _regId, AqlValue(new triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, obj)));
+      json = obj;
+    }
+  }
+
+  // std::cout << "JSON: " << triagens::basics::JsonHelper::toString(json) << "\n";
 
   std::string shardId;
   bool usesDefaultShardingAttributes;  
@@ -5001,23 +5242,31 @@ size_t DistributeBlock::sendToClient (AqlValue val) {
   auto const planId = triagens::basics::StringUtils::itoa(_collection->getPlanId());
 
   int res = clusterInfo->getResponsibleShard(planId,
-                                             mustFreeJson ? obj : json,
+                                             json,
                                              true,
                                              shardId,
                                              usesDefaultShardingAttributes);
   
-  if (mustFreeJson) {
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, obj);
-  }
-
+  // std::cout << "SHARDID: " << shardId << "\n";
+  
   if (res != TRI_ERROR_NO_ERROR) {
     THROW_ARANGO_EXCEPTION(res);
   }
 
-  TRI_ASSERT(!shardId.empty());
+  TRI_ASSERT(! shardId.empty());
 
   return getClientId(shardId); 
   LEAVE_BLOCK
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a new document key
+////////////////////////////////////////////////////////////////////////////////
+
+std::string DistributeBlock::createKey () const {
+  ClusterInfo* ci = ClusterInfo::instance();
+  uint64_t uid = ci->uniqid();
+  return std::to_string(uid);
 }
 
 // -----------------------------------------------------------------------------

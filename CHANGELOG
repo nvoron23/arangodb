@@ -1,11 +1,74 @@
 v2.4.0 (XXXX-XX-XX)
 -------------------
 
+* fixed V8 integration-related crashes
+
+* make `fs.move(src, dest)` also fail when both `src` and `dest` are
+  existing directories. This ensures the same behavior of the move operation 
+  on different platforms.
+
+* fixed AQL insert operation for multi-shard collections in cluster
+
+* added optional return value for AQL data-modification queries.
+  This allows returning the documents inserted, removed or updated with the query, e.g.
+
+      FOR doc IN docs REMOVE doc._key IN docs LET removed = OLD RETURN removed
+      FOR doc IN docs INSERT { } IN docs LET inserted = NEW RETURN inserted
+      FOR doc IN docs UPDATE doc._key WITH { } IN docs LET previous = OLD RETURN previous
+      FOR doc IN docs UPDATE doc._key WITH { } IN docs LET updated = NEW RETURN updated
+
+  The variables `OLD` and `NEW` are automatically available when a `REMOVE`, `INSERT`,
+  `UPDATE` or `REPLACE` statement is immediately followed by a `LET` statement.
+  Note that the `LET` and `RETURN` statements in data-modification queries are not as
+  flexible as the general versions of `LET` and `RETURN`. When returning documents from
+  data-modification operations, only a single variable can be assigned using `LET`, and
+  the assignment can only be either `OLD` or `NEW`, but not an arbitrary expression. The
+  `RETURN` statement also allows using the just-created variable only, and no arbitrary
+  expressions.
+
+
+v2.4.0-beta1 (2014-12-26)
+--------------------------
+
+* fixed superstates in FoxxGenerator
+
 * fixed issue #1065: Aardvark: added creation of documents and edges with _key property
 
-* fixed issue #1198: Aardvark: current aql editor query is now cached
+* fixed issue #1198: Aardvark: current AQL editor query is now cached
 
 * Upgraded V8 version from 3.16.14 to 3.29.59
+
+  The built-in version of V8 has been upgraded from 3.16.14 to 3.29.59.
+  This activates several ES6 (also dubbed *Harmony* or *ES.next*) features in
+  ArangoDB, both in the ArangoShell and the ArangoDB server. They can be
+  used for scripting and in server-side actions such as Foxx routes, traversals
+  etc.
+
+  The following ES6 features are available in ArangoDB 2.4 by default:
+
+  * iterators
+  * the `of` operator
+  * symbols
+  * predefined collections types (Map, Set etc.)
+  * typed arrays
+
+  Many other ES6 features are disabled by default, but can be made available by
+  starting arangod or arangosh with the appropriate options:
+
+  * arrow functions
+  * proxies
+  * generators
+  * String, Array, and Number enhancements
+  * constants
+  * enhanced object and numeric literals
+
+  To activate all these ES6 features in arangod or arangosh, start it with 
+  the following options:
+
+      arangosh --javascript.v8-options="--harmony --harmony_generators"
+
+  More details on the available ES6 features can be found in 
+  [this blog](https://jsteemann.github.io/blog/2014/12/19/using-es6-features-in-arangodb/).
 
 * Added Foxx generator for building Hypermedia APIs
 

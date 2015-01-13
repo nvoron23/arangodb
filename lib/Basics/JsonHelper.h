@@ -359,13 +359,13 @@ namespace triagens {
               _json = TRI_CreateNumberJson(_zone, 0.0);
               break;
             case String:
-              _json = TRI_CreateString2CopyJson(_zone, "", 0);
+              _json = TRI_CreateStringCopyJson(_zone, "", 0);
               break;
             case Array:
-              _json = TRI_CreateArray2Json(_zone, size_hint);
+              _json = TRI_CreateArrayJson(_zone, size_hint);
               break;
             case Object:
-              _json = TRI_CreateObject2Json(_zone, 2 * size_hint);
+              _json = TRI_CreateObjectJson(_zone, 2 * size_hint);
               break;
           }
           if (_json == nullptr) {
@@ -508,7 +508,7 @@ namespace triagens {
 
         explicit Json (char const* x, autofree_e autofree = AUTOFREE) 
           : _zone(TRI_UNKNOWN_MEM_ZONE), _json(nullptr), _autofree(autofree) {
-          _json = TRI_CreateStringCopyJson(_zone, x);
+          _json = TRI_CreateStringCopyJson(_zone, x, strlen(x));
 
           if (_json == nullptr) {
             throw JsonException("Json: out of memory");
@@ -521,7 +521,7 @@ namespace triagens {
 
         explicit Json (TRI_memory_zone_t* z, char const* x, autofree_e autofree = AUTOFREE) 
           : _zone(z), _json(nullptr), _autofree(autofree) {
-          _json = TRI_CreateStringCopyJson(_zone, x);
+          _json = TRI_CreateStringCopyJson(_zone, x, strlen(x));
 
           if (_json == nullptr) {
             throw JsonException("Json: out of memory");
@@ -534,7 +534,7 @@ namespace triagens {
 
         explicit Json (std::string const x, autofree_e autofree = AUTOFREE) 
           : _zone(TRI_UNKNOWN_MEM_ZONE), _json(nullptr), _autofree(autofree) {
-          _json = TRI_CreateString2CopyJson(_zone, x.c_str(), x.size());
+          _json = TRI_CreateStringCopyJson(_zone, x.c_str(), x.size());
 
           if (_json == nullptr) {
             throw JsonException("Json: out of memory");
@@ -547,7 +547,7 @@ namespace triagens {
 
         explicit Json (TRI_memory_zone_t* z, std::string const& x, autofree_e autofree = AUTOFREE) 
           : _zone(z), _json(nullptr), _autofree(autofree) {
-          _json = TRI_CreateString2CopyJson(_zone, x.c_str(), x.size());
+          _json = TRI_CreateStringCopyJson(_zone, x.c_str(), x.size());
 
           if (_json == nullptr) {
             throw JsonException("Json: out of memory");
@@ -689,7 +689,7 @@ namespace triagens {
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief set an attribute value in an array, an exception is thrown
-/// if *this is not a Json array. The pointer managed by sub is
+/// if *this is not a Json object. The pointer managed by sub is
 /// stolen. The purpose of this method is that you can do
 ///   Json(Json::Object).set("a",Json(12)).set("b",Json(true))
 /// and that this is both legal and efficient.
@@ -697,7 +697,7 @@ namespace triagens {
 
         Json& set (char const* name, Json sub) {
           if (! TRI_IsObjectJson(_json)) {
-            throw JsonException("Json is no array");
+            throw JsonException("Json is no object");
           }
           TRI_Insert3ObjectJson(_zone, _json, name, sub.steal());
           return *this;
@@ -705,24 +705,16 @@ namespace triagens {
         
         Json& set (std::string const& name, Json sub) {
           if (! TRI_IsObjectJson(_json)) {
-            throw JsonException("Json is no array");
+            throw JsonException("Json is no object");
           }
           TRI_Insert3ObjectJson(_zone, _json, name.c_str(), sub.steal());
           return *this;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief this is a syntactic shortcut for the set method using operator()
-////////////////////////////////////////////////////////////////////////////////
-
-        Json& operator() (char const* name, Json sub) {
-          return set(name, sub);
-        }
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief set an attribute value in an array, an exception is thrown if
-/// *this is not a Json array. The pointer sub is integrated into the
-/// array and will be freed if and only if the main thing is freed.
+/// @brief set an attribute value in an object, an exception is thrown if
+/// *this is not a Json object. The pointer sub is integrated into the
+/// object and will be freed if and only if the main thing is freed.
 ////////////////////////////////////////////////////////////////////////////////
 
         Json& set (char const* name, TRI_json_t* sub) {
@@ -731,6 +723,30 @@ namespace triagens {
           }
           TRI_Insert3ObjectJson(_zone, _json, name, sub);
           return *this;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief this gets an attribute value of a Json object. An exception is
+/// thrown if *this is not a Json object. The resulting TRI_json_t* is
+/// wrapped in a NOFREE Json to allow things like
+///   j.get("a").get("b")
+/// to access j.a.b. The ownership of the whole structure remains with
+/// *this.
+////////////////////////////////////////////////////////////////////////////////
+
+        Json get (char const* name) const {
+          if (! TRI_IsObjectJson(_json)) {
+            throw JsonException("Json is no object");
+          }
+          return Json(_zone, TRI_LookupObjectJson(_json, name), NOFREE);
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief this is a syntactic shortcut for the set method using operator()
+////////////////////////////////////////////////////////////////////////////////
+
+        Json& operator() (char const* name, Json sub) {
+          return set(name, sub);
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -745,13 +761,13 @@ namespace triagens {
 /// @brief append a Json value to the end of a Json array, an exception
 /// is thrown if *this is not a Json array. The pointer managed by sub is
 /// stolen. The purpose of this method is that you can do
-///   Json(Json::Object).add(Json(12)).add(Json(13))
+///   Json(Json::Array).add(Json(12)).add(Json(13))
 /// and that this is both legal and efficient.
 ////////////////////////////////////////////////////////////////////////////////
 
         Json& add (Json sub) {
           if (! TRI_IsArrayJson(_json)) {
-            throw JsonException("Json is no object");
+            throw JsonException("Json is no array");
           }
           TRI_PushBack3ArrayJson(_zone, _json, sub.steal());
           return *this;
@@ -803,22 +819,6 @@ namespace triagens {
           return add(sub);
         }
  
-////////////////////////////////////////////////////////////////////////////////
-/// @brief this gets an attribute value of a Json object. An exception is
-/// thrown if *this is not a Json object. The resulting TRI_json_t* is
-/// wrapped in a NOFREE Json to allow things like
-///   j.get("a").get("b")
-/// to access j.a.b. The ownership of the whole structure remains with
-/// *this.
-////////////////////////////////////////////////////////////////////////////////
-
-        Json get (char const* name) const {
-          if (! TRI_IsObjectJson(_json)) {
-            throw JsonException("Json is no object");
-          }
-          return Json(_zone, TRI_LookupObjectJson(_json, name), NOFREE);
-        }
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief this gets an array entry of a Json array. An exception is
 /// thrown if *this is not a Json array. The resulting TRI_json_t* is
