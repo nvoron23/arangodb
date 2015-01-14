@@ -48,12 +48,15 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager,
-                                          Transaction::TransactionId const& id,
+                                          TransactionId const& id,
                                           TRI_vocbase_t* vocbase)
   : Transaction(transactionManager, id, vocbase),
-    _lastUsedId(0) {
+    _runningTransactions(nullptr),
+    _lastUsedSubId(0) {
 
-  LOG_TRACE("creating transaction %s", toString().c_str());
+  TRI_ASSERT_EXPENSIVE(id.mainPart() == id());
+  TRI_ASSERT_EXPENSIVE(id.sequencePart() == 0);
+  LOG_TRACE("creating %s", toString().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -61,11 +64,15 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
 ////////////////////////////////////////////////////////////////////////////////
 
 TopLevelTransaction::~TopLevelTransaction () {
+  LOG_TRACE("destroying %s", toString().c_str());
+
   if (_status == Transaction::StatusType::ONGOING) {
     rollback();
   }
-  
-  LOG_TRACE("destroying transaction %s", toString().c_str());
+
+  if (_runningTransactions != nullptr) {
+    delete _runningTransactions;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -73,22 +80,38 @@ TopLevelTransaction::~TopLevelTransaction () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief provide the next id for a sub-transaction
-////////////////////////////////////////////////////////////////////////////////
-
-Transaction::TransactionId TopLevelTransaction::nextSubId () {
-  // TODO: use TRI_NewTickServer() instead
-  return Transaction::TransactionId(_id.mainPart(), ++_lastUsedId);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief get a string representation of the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 std::string TopLevelTransaction::toString () const {
   std::string result("TopLevelTransaction ");
-  result += std::to_string(_id.mainPart());
+  result += std::to_string(_id());
+
   return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief provide the next id for a sub-transaction
+////////////////////////////////////////////////////////////////////////////////
+
+TransactionId TopLevelTransaction::nextSubId () {
+  return TransactionId(_id(), ++_lastUsedSubId);
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief sets the start state (e.g. list of running transactions
+////////////////////////////////////////////////////////////////////////////////
+
+void TopLevelTransaction::setStartState (std::unordered_set<TransactionId> const& transactions) {
+  TRI_ASSERT(_runningTransactions == nullptr);
+
+  if (! transactions.empty()) {
+    _runningTransactions = new std::unordered_set<TransactionId>(transactions.begin(), transactions.end());
+  }
 }
 
 // -----------------------------------------------------------------------------

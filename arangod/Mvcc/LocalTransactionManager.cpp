@@ -28,9 +28,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "LocalTransactionManager.h"
+#include "Basics/ReadLocker.h"
+#include "Basics/WriteLocker.h"
 #include "Mvcc/SubTransaction.h"
 #include "Mvcc/TopLevelTransaction.h"
 #include "Utils/Exception.h"
+#include "VocBase/server.h"
 #include "VocBase/vocbase.h"
 
 using namespace triagens::mvcc;
@@ -45,9 +48,10 @@ thread_local std::vector<Transaction*> LocalTransactionManager::_threadTransacti
 /// @brief create the transaction manager
 ////////////////////////////////////////////////////////////////////////////////
 
-LocalTransactionManager::LocalTransactionManager (Transaction::IdType lastUsedId) 
+LocalTransactionManager::LocalTransactionManager () 
   : TransactionManager(),
-    _lastUsedId(lastUsedId) {
+    _lock(),
+    _runningTransactions() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,27 +66,18 @@ LocalTransactionManager::~LocalTransactionManager () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a top-level transaction
-////////////////////////////////////////////////////////////////////////////////
-
-TopLevelTransaction* LocalTransactionManager::createTopLevelTransaction (TRI_vocbase_t* vocbase) {
-  // TODO
-  TRI_ASSERT(false); 
-  return nullptr;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief create a (potentially nested) transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
-  Transaction* transaction = nullptr;
+Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase,
+                                                         bool forceTopLevel) {
+  std::unique_ptr<Transaction> transaction;
 
-  if (_threadTransactions.empty()) {
+  if (forceTopLevel || _threadTransactions.empty()) {
     // no other transactions present in thread
 
     // now create a new top-level transaction
-    transaction = new TopLevelTransaction(this, Transaction::TransactionId(nextId(), 0), vocbase);
+    transaction.reset(new TopLevelTransaction(this, nextId(), vocbase));
   }
   else {
     // there is already a transaction present in our thread
@@ -96,25 +91,31 @@ Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase)
       THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot change database for sub transaction");
     }
 
-    transaction = new SubTransaction(parent);
+    transaction.reset(new SubTransaction(parent));
   }
 
-  // we must have a transaction now
-  TRI_ASSERT(transaction != nullptr);
+  // we do have a transaction now
+  TRI_ASSERT(transaction.get() != nullptr);
 
-  try {
-    _threadTransactions.push_back(transaction);
+  // insert into list of currently running transactions  
+  insertRunningTransaction(transaction.get());
+
+
+  // only push onto thread-local stack if the caller has not explicitly 
+  // requested a top-level transaction
+  if (! forceTopLevel) {
+    try {
+      // insert into thread-local list of transactions
+      pushOnThreadStack(transaction.get());
+    }
+    catch (...) {
+      // if we got here, we have run out of memory
+      removeRunningTransaction(transaction.get());
+      throw;
+    }
   }
-  catch (...) {
-    // if we got here, we have run out of memory
-    // prevent a mem-leak
-    delete transaction;
-    throw;
-  }
 
-  transaction->registeredOnStack(true);
-
-  return transaction;
+  return transaction.release();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,16 +126,28 @@ void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
   // transaction must have already finished
   TRI_ASSERT(! transaction->isOngoing());
 
-  if (transaction->registeredOnStack()) {
+  if (transaction->_flags.pushedOnThreadStack()) {
     // remove the transaction from the stack
-    TRI_ASSERT(! _threadTransactions.empty());
-
-    // the transaction that is unregistered must be at the top of the stack
-    TRI_ASSERT(_threadTransactions.back() == transaction);
-    _threadTransactions.pop_back();
-  
-    transaction->registeredOnStack(false);
+    popFromThreadStack(transaction);
   }
+
+  removeRunningTransaction(transaction);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initializes a transaction with state
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
+  TRI_ASSERT(transaction->isOngoing());
+
+  if (transaction->isTopLevel()) {
+    // copy the list of currently running transactions into the transaction
+    READ_LOCKER(_lock);
+    static_cast<TopLevelTransaction*>(transaction)->setStartState(_runningTransactions);
+  }
+
+  transaction->_flags.initialized();
 }
 
 // -----------------------------------------------------------------------------
@@ -142,11 +155,54 @@ void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief increment the id counter and return the new id
+/// @brief increment the transaction id counter and return it
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction::IdType LocalTransactionManager::nextId () {
-  return ++_lastUsedId;
+TransactionId LocalTransactionManager::nextId () {
+  // TODO: top-level transactions must have the lowest 8 bits of their id
+  // set to 0. FIXME
+  return TransactionId(TransactionId::MainPart(TRI_NewTickServer()));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief insert the transaction into the list of running transactions
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::insertRunningTransaction (Transaction const* transaction) {
+  WRITE_LOCKER(_lock); 
+  _runningTransactions.emplace(transaction->id());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove the transaction from the list of running transactions
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::removeRunningTransaction (Transaction const* transaction) {
+  WRITE_LOCKER(_lock); 
+  _runningTransactions.erase(transaction->id());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief push the transaction onto the thread-local stack
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::pushOnThreadStack (Transaction* transaction) {
+  _threadTransactions.push_back(transaction);
+  transaction->_flags.pushedOnThreadStack(true);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief pop the transaction from the thread-local stack
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::popFromThreadStack (Transaction* transaction) {
+  TRI_ASSERT(! _threadTransactions.empty());
+
+  // the transaction that is popped must be at the top of the stack
+  TRI_ASSERT(_threadTransactions.back() == transaction);
+  _threadTransactions.pop_back();
+  
+  transaction->_flags.pushedOnThreadStack(false);
 }
 
 // -----------------------------------------------------------------------------

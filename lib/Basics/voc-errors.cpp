@@ -188,6 +188,7 @@ void TRI_InitialiseErrorMessages () {
   REG_ERROR(ERROR_TRANSACTION_UNREGISTERED_COLLECTION, "unregistered collection used in transaction");
   REG_ERROR(ERROR_TRANSACTION_DISALLOWED_OPERATION, "disallowed operation inside transaction");
   REG_ERROR(ERROR_TRANSACTION_ABORTED, "transaction aborted");
+  REG_ERROR(ERROR_TRANSACTION_ID_OVERFLOW, "transaction id overflow");
   REG_ERROR(ERROR_USER_INVALID_NAME, "invalid user name");
   REG_ERROR(ERROR_USER_INVALID_PASSWORD, "invalid password");
   REG_ERROR(ERROR_USER_DUPLICATE, "duplicate user");

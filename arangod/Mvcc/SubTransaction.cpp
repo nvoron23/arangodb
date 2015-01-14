@@ -52,7 +52,7 @@ SubTransaction::SubTransaction (Transaction* parent)
   : Transaction(parent->transactionManager(), parent->topLevelTransaction()->nextSubId(), parent->vocbase()),
     _topLevelTransaction(parent->topLevelTransaction()),
     _parentTransaction(parent) {
-  
+ 
   LOG_TRACE("creating %s", toString().c_str());
 }
 
@@ -65,7 +65,7 @@ SubTransaction::~SubTransaction () {
     rollback();
   }
   
-  LOG_TRACE("destroying transaction %s", toString().c_str());
+  LOG_TRACE("destroying %s", toString().c_str());
 }
 
 // -----------------------------------------------------------------------------
@@ -78,7 +78,10 @@ SubTransaction::~SubTransaction () {
 
 std::string SubTransaction::toString () const {
   std::string result("SubTransaction ");
-  result += std::to_string(_id.mainPart()) + "." + std::to_string(_id.sequencePart());
+  result += std::to_string(_id());
+  result += ", parent: ";
+  result += _topLevelTransaction->toString();
+
   return result;
 }
 

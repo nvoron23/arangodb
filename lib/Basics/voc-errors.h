@@ -465,6 +465,9 @@
 ///   transaction.
 /// - 1654: @LIT{transaction aborted}
 ///   Will be raised when a transaction was aborted.
+/// - 1655: @LIT{transaction id overflow}
+///   Will be raised when the transaction id overflows due to too many
+///   subtransactions.
 /// - 1700: @LIT{invalid user name}
 ///   Will be raised when an invalid user name is used.
 /// - 1701: @LIT{invalid password}
@@ -2515,6 +2518,17 @@ void TRI_InitialiseErrorMessages ();
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_ERROR_TRANSACTION_ABORTED                                     (1654)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1655: ERROR_TRANSACTION_ID_OVERFLOW
+///
+/// transaction id overflow
+///
+/// Will be raised when the transaction id overflows due to too many
+/// subtransactions.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_TRANSACTION_ID_OVERFLOW                                 (1655)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief 1700: ERROR_USER_INVALID_NAME

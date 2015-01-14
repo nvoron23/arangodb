@@ -70,11 +70,11 @@ void TransactionManager::initialize () {
   TRI_ASSERT(Instance == nullptr);
   if (triagens::arango::ServerState::instance()->isCoordinator()) {
     // TODO
-    Instance = new DistributedTransactionManager(0);
+    Instance = new DistributedTransactionManager();
   }
   else {
     // TODO
-    Instance = new LocalTransactionManager(0);
+    Instance = new LocalTransactionManager();
   }
 }
 

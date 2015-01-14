@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC transaction manager
+/// @brief flags base class
 ///
 /// @file
 ///
@@ -23,90 +23,77 @@
 /// Copyright holder is ArangoDB GmbH, Cologne, Germany
 ///
 /// @author Jan Steemann
-/// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
-/// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
+/// @author Copyright 2014, ArangoDB GmbH, Cologne, Germany
+/// @author Copyright 2012-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef ARANGODB_MVCC_TRANSACTION_MANAGER_H
-#define ARANGODB_MVCC_TRANSACTION_MANAGER_H 1
+#ifndef ARANGODB_BASICS_FLAGS_TYPE_H
+#define ARANGODB_BASICS_FLAGS_TYPE_H 1
 
 #include "Basics/Common.h"
-#include "Mvcc/Transaction.h"
-#include "Mvcc/TransactionId.h"
-
-struct TRI_vocbase_s;
 
 namespace triagens {
-  namespace mvcc {
-
-    class TopLevelTransaction;
-    class Transaction;
+  namespace basics {
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                          class TransactionManager
+// --SECTION--                                                   class FlagsType
 // -----------------------------------------------------------------------------
 
-    class TransactionManager {
+    template<typename T>
+    class FlagsType {
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
 
-      public:
+      protected:
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief create the transaction manager
-////////////////////////////////////////////////////////////////////////////////
-
-        TransactionManager ();
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief destroy the transaction manager
-////////////////////////////////////////////////////////////////////////////////
-
-        virtual ~TransactionManager ();
+        FlagsType () 
+          : _flags(0) {
+        }
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                                    public methods
+// --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
 
-      public:
+      protected:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a (potentially nested) transaction
+/// @brief test a flag
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual Transaction* createTransaction (struct TRI_vocbase_s*, bool = false) = 0;
+        bool hasFlag (T flag) const {
+          return (_flags & flag) != 0;
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unregister a transaction
+/// @brief set a flag
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual void unregisterTransaction (Transaction*) = 0;
+        void setFlag (T flag) {
+          _flags |= flag;
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief initializes a transaction with state
+/// @brief set or clear a flag
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual void initializeTransaction (Transaction*) = 0;
+        void setFlag (T flag, bool value) {
+          if (value) {
+            _flags |= flag;
+          }
+          else {
+            _flags &= ~flag;
+          }
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief initialize the transaction manager
+/// @brief clear a flag
 ////////////////////////////////////////////////////////////////////////////////
 
-        static void initialize ();
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief shutdown the transaction manager
-////////////////////////////////////////////////////////////////////////////////
-
-        static void shutdown ();
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return the global transaction manager instance
-////////////////////////////////////////////////////////////////////////////////
-
-        static TransactionManager* instance ();
+        void clearFlag (T value) {
+          _flags &= ~value;
+        }
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
@@ -115,10 +102,11 @@ namespace triagens {
       private:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief the global transaction manager instance
+/// @brief the integer storing the flags
 ////////////////////////////////////////////////////////////////////////////////
+      
+        T _flags;
 
-        static TransactionManager* Instance;
     };
 
   }

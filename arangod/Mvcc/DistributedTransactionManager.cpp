@@ -41,7 +41,7 @@ using namespace triagens::mvcc;
 /// @brief create the transaction manager
 ////////////////////////////////////////////////////////////////////////////////
 
-DistributedTransactionManager::DistributedTransactionManager (Transaction::IdType lastUsedId) 
+DistributedTransactionManager::DistributedTransactionManager () 
   : TransactionManager() {
 }
 
@@ -53,20 +53,11 @@ DistributedTransactionManager::~DistributedTransactionManager () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a top-level transaction
-////////////////////////////////////////////////////////////////////////////////
-
-TopLevelTransaction* DistributedTransactionManager::createTopLevelTransaction (TRI_vocbase_t* vocbase) {
-  // TODO
-  TRI_ASSERT(false);
-  return nullptr;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief create a (potentially nested) transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* DistributedTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
+Transaction* DistributedTransactionManager::createTransaction (TRI_vocbase_t* vocbase,
+                                                               bool forceTopLevel) {
   // TODO
   TRI_ASSERT(false);
   return nullptr;
@@ -79,6 +70,16 @@ Transaction* DistributedTransactionManager::createTransaction (TRI_vocbase_t* vo
 void DistributedTransactionManager::unregisterTransaction (Transaction* transaction) {
   // TODO
   TRI_ASSERT(! transaction->isOngoing());
+  TRI_ASSERT(false);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initializes a transaction with state
+////////////////////////////////////////////////////////////////////////////////
+
+void DistributedTransactionManager::initializeTransaction (Transaction* transaction) {
+  // TODO
+  TRI_ASSERT(transaction->isOngoing());
   TRI_ASSERT(false);
 }
 

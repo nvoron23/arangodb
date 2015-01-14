@@ -55,7 +55,10 @@ Transaction::Transaction (TransactionManager* transactionManager,
     _id(id),
     _vocbase(vocbase),
     _status(Transaction::StatusType::ONGOING),
-    _registeredOnStack(false) {
+    _flags() {
+
+  TRI_ASSERT(_transactionManager != nullptr);
+  TRI_ASSERT(_vocbase != nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -63,12 +66,13 @@ Transaction::Transaction (TransactionManager* transactionManager,
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction::~Transaction () {
-  // note: destructor rollback() is called in the derived classes
+  // note: automatic rollback is called from the destructors of the derived classes
 }
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the transaction status
 ////////////////////////////////////////////////////////////////////////////////
@@ -112,6 +116,18 @@ int Transaction::rollback () {
   _transactionManager->unregisterTransaction(this);
 
   return TRI_ERROR_NO_ERROR;
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 protected methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initialize and fetch the current state from the transaction manager
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::initializeState () {
+  _transactionManager->initializeTransaction(this);
 }
 
 // -----------------------------------------------------------------------------

@@ -47,7 +47,8 @@ namespace triagens {
 
     class TopLevelTransaction final : public Transaction {
 
-      public:
+      friend class TransactionManager;
+      friend class LocalTransactionManager;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -60,7 +61,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         TopLevelTransaction (TransactionManager*,
-                             Transaction::TransactionId const&,
+                             TransactionId const&,
                              struct TRI_vocbase_s*);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -100,28 +101,46 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief provide the next id for a sub-transaction
-////////////////////////////////////////////////////////////////////////////////
-
-        Transaction::TransactionId nextSubId ();
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief get a string representation of the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
         std::string toString () const override final;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the next sub-transaction id
+////////////////////////////////////////////////////////////////////////////////
+
+        TransactionId nextSubId ();
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 protected methods
+// -----------------------------------------------------------------------------
+
+      protected:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief sets the start state (e.g. list of running transactions
+////////////////////////////////////////////////////////////////////////////////
+
+        void setStartState (std::unordered_set<TransactionId> const&);
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
 // -----------------------------------------------------------------------------
-        
+
       private:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief last used sub-transaction id
+/// @brief transactions active at start
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction::IdType _lastUsedId;
+        std::unordered_set<TransactionId>* _runningTransactions;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief last assigned sub-transaction id
+////////////////////////////////////////////////////////////////////////////////
+
+        TransactionId::IdType _lastUsedSubId;
 
     };
 

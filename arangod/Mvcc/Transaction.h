@@ -31,6 +31,8 @@
 #define ARANGODB_MVCC_TRANSACTION_H 1
 
 #include "Basics/Common.h"
+#include "Basics/FlagsType.h"
+#include "Mvcc/TransactionId.h"
 
 struct TRI_vocbase_s;
 
@@ -46,54 +48,14 @@ namespace triagens {
 
     class Transaction {
 
+      friend class TransactionManager;
+      friend class LocalTransactionManager;
+
       public:
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                      public types
 // -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief transaction id data type
-////////////////////////////////////////////////////////////////////////////////
-
-        typedef uint64_t IdType;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief transaction id
-////////////////////////////////////////////////////////////////////////////////
-
-        struct TransactionId {
-          TransactionId (IdType mainPart, IdType sequencePart) 
-            : _id((mainPart << 20) | sequencePart) {
-
-            TRI_ASSERT_EXPENSIVE(mainPart < MaxMainValue());
-            TRI_ASSERT_EXPENSIVE(sequencePart < MaxSequenceValue());
-          }
-
-          static IdType MaxMainValue () {
-            return 0xfffffffffffULL;
-          }
-          
-          static IdType MaxSequenceValue () {
-            return 0x00000000000fffffULL;
-          }
-
-          inline IdType id () const {
-            return _id; // return the full id
-          }
-
-          inline IdType mainPart () const {
-            return (_id & 0xfffffffffff00000ULL) >> 20; // return only the upper 44 bits
-          }
-          
-          inline IdType sequencePart () const {
-            return _id & 0x00000000000fffffULL; // return only the lower 20 bits
-          }
-
-          private:
-
-            IdType const _id;
-        };
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief statuses that a transaction can have
@@ -106,13 +68,67 @@ namespace triagens {
         };
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the transaction has written markers
+/// @brief transaction flags
 ////////////////////////////////////////////////////////////////////////////////
 
-        struct WriteStatus {
-          bool _beginWritten; // begin marker written
-          bool _dataWritten;  // data marker(s) written
-          bool _endWritten;   // commit/rollback marker written
+        struct TransactionFlags : triagens::basics::FlagsType<uint32_t> {
+          TransactionFlags ()
+            : FlagsType() {
+          }
+          
+          inline bool initialized () const {
+            return hasFlag(Initialized);
+          }
+
+          inline bool beginMarkerWritten () const {
+            return hasFlag(BeginMarkerWritten);
+          }
+
+          inline bool dataMarkerWritten () const {
+            return hasFlag(DataMarkerWritten);
+          }
+          
+          inline bool endMarkerWritten () const {
+            return hasFlag(EndMarkerWritten);
+          }
+
+          inline bool pushedOnThreadStack () const {
+            return hasFlag(PushedOnThreadStack);
+          }
+          
+          void initialized (bool value) {
+            TRI_ASSERT(! hasFlag(Initialized));
+            setFlag(Initialized);
+          }
+
+          void beginMarkerWritten (bool value) {
+            TRI_ASSERT(! hasFlag(BeginMarkerWritten));
+            TRI_ASSERT(! hasFlag(DataMarkerWritten));
+            TRI_ASSERT(! hasFlag(EndMarkerWritten));
+
+            setFlag(BeginMarkerWritten);
+          }
+          
+          void dataMarkerWritten (bool value) {
+            setFlag(DataMarkerWritten);
+          }
+          
+          void endMarkerWritten (bool value) {
+            TRI_ASSERT(hasFlag(BeginMarkerWritten));
+            TRI_ASSERT(! hasFlag(EndMarkerWritten));
+
+            setFlag(EndMarkerWritten);
+          }
+          
+          void pushedOnThreadStack (bool value) {
+            setFlag(PushedOnThreadStack, value);
+          }
+
+          static uint32_t const Initialized          = 0x01;
+          static uint32_t const BeginMarkerWritten   = 0x02;
+          static uint32_t const DataMarkerWritten    = 0x04;
+          static uint32_t const EndMarkerWritten     = 0x08;
+          static uint32_t const PushedOnThreadStack  = 0x10;
         };
 
 // -----------------------------------------------------------------------------
@@ -196,23 +212,6 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the transaction was registered on a thread-local stack
-////////////////////////////////////////////////////////////////////////////////
-
-        inline bool registeredOnStack () const {
-          return _registeredOnStack;
-        }
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief mark set transaction as being registered or unregistered
-////////////////////////////////////////////////////////////////////////////////
-
-        inline void registeredOnStack (bool shouldRegister) {
-          TRI_ASSERT(shouldRegister == ! _registeredOnStack);
-          _registeredOnStack = shouldRegister;
-        }
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief return the transaction status
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -261,6 +260,18 @@ namespace triagens {
         friend std::ostream& operator<< (std::ostream&, Transaction const*);
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                                 protected methods
+// -----------------------------------------------------------------------------
+
+      protected:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initialize and fetch the current state from the transaction manager
+////////////////////////////////////////////////////////////////////////////////
+
+        void initializeState ();
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                               protected variables
 // -----------------------------------------------------------------------------
 
@@ -285,24 +296,18 @@ namespace triagens {
         struct TRI_vocbase_s* const _vocbase;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the transaction has written markers
-////////////////////////////////////////////////////////////////////////////////
-
-        WriteStatus _writeStatus;
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief the transaction's status
 ////////////////////////////////////////////////////////////////////////////////
 
         StatusType _status;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the transaction was registered on a thread-local stack
+/// @brief various flags
 ////////////////////////////////////////////////////////////////////////////////
 
-        bool _registeredOnStack;
-    };
+        TransactionFlags _flags;
 
+    };
   }
 }
 
