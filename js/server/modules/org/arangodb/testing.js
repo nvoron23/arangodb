@@ -1129,8 +1129,13 @@ var impTodo = [
 testFuncs.importing = function (options) {
   if (options.cluster) {
     print("Skipped because of cluster.");
-    return {"importing": {"status":true, "skipped":true, 
-                          "message": "skipped because of cluster"}};
+    return {"importing": 
+            {
+              "status" : true,
+              "message": "skipped because of cluster",
+              "skipped": true
+            }
+           };
   }
 
   var instanceInfo = startInstance("tcp", options, [ ], "importing");
@@ -1488,8 +1493,8 @@ function unitTestPrettyPrintResults(r) {
   var oneTest;
   var testFail = 0;
   var testSuiteFail = 0;
-  var success = ""
-  var fail = ""
+  var success = "";
+  var fail = "";
 
   try {
     for (testrun in r) {    
