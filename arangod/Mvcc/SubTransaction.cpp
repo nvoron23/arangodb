@@ -31,6 +31,7 @@
 #include "Basics/logging.h"
 #include "Mvcc/TopLevelTransaction.h"
 #include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
 
@@ -62,7 +63,12 @@ SubTransaction::SubTransaction (Transaction* parent)
 
 SubTransaction::~SubTransaction () {
   if (_status == Transaction::StatusType::ONGOING) {
-    rollback();
+    try {
+      rollback();
+    }
+    catch (...) {
+      // destructors better not throw
+    }
   }
   
   LOG_TRACE("destroying %s", toString().c_str());
@@ -71,6 +77,24 @@ SubTransaction::~SubTransaction () {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a collection used in the transaction
+/// this registers the collection in the transaction if not yet present
+////////////////////////////////////////////////////////////////////////////////
+        
+TransactionCollection* SubTransaction::collection (std::string const& name) {
+  return _topLevelTransaction->collection(name);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a collection used in the transaction
+/// this registers the collection in the transaction if not yet present
+////////////////////////////////////////////////////////////////////////////////
+        
+TransactionCollection* SubTransaction::collection (TRI_voc_cid_t cid) {
+  return _topLevelTransaction->collection(cid);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief get a string representation of the transaction

@@ -85,7 +85,10 @@ void TransactionManager::initialize () {
 void TransactionManager::shutdown () {
   LOG_TRACE("shutting down transaction manager");
 
-  delete instance();
+  if (Instance != nullptr) {
+    delete Instance;
+    Instance = nullptr;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

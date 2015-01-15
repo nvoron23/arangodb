@@ -40,19 +40,21 @@ namespace triagens {
   namespace mvcc {
 
     class TopLevelTransaction;
-    class Transaction;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                          class TransactionManager
 // -----------------------------------------------------------------------------
 
     class TransactionManager {
-
+      
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
 
       public:
+      
+        TransactionManager (TransactionManager const&) = delete;
+        TransactionManager& operator= (TransactionManager const&) = delete;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create the transaction manager
@@ -83,6 +85,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         virtual void unregisterTransaction (Transaction*) = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief aborts a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        virtual void abortTransaction (TransactionId const&) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state

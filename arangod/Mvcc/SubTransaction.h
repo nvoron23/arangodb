@@ -37,6 +37,7 @@ namespace triagens {
   namespace mvcc {
 
     class TopLevelTransaction;
+    class TransactionCollection;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                              class SubTransaction
@@ -69,6 +70,20 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
       public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a collection used in the transaction
+/// this registers the collection in the transaction if not yet present
+////////////////////////////////////////////////////////////////////////////////
+        
+        TransactionCollection* collection (std::string const&) override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a collection used in the transaction
+/// this registers the collection in the transaction if not yet present
+////////////////////////////////////////////////////////////////////////////////
+        
+        TransactionCollection* collection (TRI_voc_cid_t) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief get the transaction's top-level transaction

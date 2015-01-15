@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC transaction class
+/// @brief MVCC transaction collection object
 ///
 /// @file
 ///
@@ -27,18 +27,17 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Transaction.h"
-#include "Basics/logging.h"
-#include "Basics/ReadLocker.h"
-#include "Basics/WriteLocker.h"
-#include "Mvcc/TransactionManager.h"
+#include "TransactionCollection.h"
+#include "ShapedJson/json-shaper.h"
 #include "Utils/Exception.h"
+#include "VocBase/document-collection.h"
+#include "VocBase/key-generator.h"
 #include "VocBase/vocbase.h"
 
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                                 class Transaction
+// --SECTION--                                       class TransactionCollection
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -46,31 +45,49 @@ using namespace triagens::mvcc;
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a new transaction, with id provided by the transaction
-/// manager
+/// @brief create the collection, using a collection id
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction::Transaction (TransactionManager* transactionManager,
-                          TransactionId const& id,
-                          TRI_vocbase_t* vocbase)
-  : _transactionManager(transactionManager),
-    _id(id),
-    _vocbase(vocbase),
-    _status(Transaction::StatusType::ONGOING),
-    _flags(),
-    _lock(),
-    _aborted(false) {
+TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
+                                              TRI_voc_cid_t cid)
+  : _vocbase(vocbase),
+    _collection(nullptr) {
 
-  TRI_ASSERT(_transactionManager != nullptr);
-  TRI_ASSERT(_vocbase != nullptr);
+  _collection = TRI_UseCollectionByIdVocBase(_vocbase, cid);
+
+  if (_collection == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
+  }
+
+  TRI_ASSERT(_collection->_collection != nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief destroy the transaction
+/// @brief create the collection, using a collection name
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction::~Transaction () {
-  // note: automatic rollback is called from the destructors of the derived classes
+TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
+                                              std::string const& name)
+  : _vocbase(vocbase),
+    _collection(nullptr) {
+
+  _collection = TRI_UseCollectionByNameVocBase(_vocbase, name.c_str());
+
+  if (_collection == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
+  }
+
+  TRI_ASSERT(_collection->_collection != nullptr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy the collection
+////////////////////////////////////////////////////////////////////////////////
+
+TransactionCollection::~TransactionCollection () {
+  if (_collection != nullptr) {
+    TRI_ReleaseCollectionVocBase(_vocbase, _collection);
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -78,78 +95,46 @@ Transaction::~Transaction () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief return the transaction status
+/// @brief return the collection shaper
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction::StatusType Transaction::status () const {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  return _status;
+TRI_shaper_t* TransactionCollection::shaper () const {
+  return _collection->_collection->getShaper();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief commit the transaction
+/// @brief generate a key
 ////////////////////////////////////////////////////////////////////////////////
 
-int Transaction::commit () {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  LOG_TRACE("committing transaction %s", toString().c_str());
+std::string TransactionCollection::generateKey (TRI_voc_tick_t tick) {
+  return _collection->_collection->_keyGenerator->generate(tick);
+}
 
-  if (_status != Transaction::StatusType::ONGOING) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
+////////////////////////////////////////////////////////////////////////////////
+/// @brief validate a key
+/// this will throw if the key is invalid
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::validateKey (char const* key) const {
+  // TODO: handle case isRestore
+  int res = _collection->_collection->_keyGenerator->validate(key, false);
+
+std::cout << "KEY: '" << key << "'\n";
+  if (res != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(res);
   }
-
-  _status = StatusType::COMMITTED;
-  _transactionManager->unregisterTransaction(this);
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief roll back the transaction
+/// @brief get a string representation of the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-int Transaction::rollback () {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  LOG_TRACE("rolling back transaction %s", toString().c_str());
+std::string TransactionCollection::toString () const {
+  std::string result("TransactionCollection '");
+  result.append(name());
+  result.append("'");
 
-  if (_status != Transaction::StatusType::ONGOING) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
-  }
-
-  _status = StatusType::ROLLED_BACK;
-  _transactionManager->unregisterTransaction(this);
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                 protected methods
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief initialize and fetch the current state from the transaction manager
-////////////////////////////////////////////////////////////////////////////////
-
-void Transaction::initializeState () {
-  _transactionManager->initializeTransaction(this);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief set the aborted flag
-////////////////////////////////////////////////////////////////////////////////
-
-void Transaction::setAborted () {
-  WRITE_LOCKER(_lock);
-  _aborted = true;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief check the aborted flag
-////////////////////////////////////////////////////////////////////////////////
-
-bool Transaction::isAborted () {
-  READ_LOCKER(_lock);
-  return _aborted;
+  return result;
 }
 
 // -----------------------------------------------------------------------------
@@ -164,17 +149,16 @@ namespace triagens {
   namespace mvcc {
 
      std::ostream& operator<< (std::ostream& stream,
-                               Transaction const* transaction) {
-       stream << transaction->toString();
-       return stream;
-     }
-     
-     std::ostream& operator<< (std::ostream& stream,
-                               Transaction const& transaction) {
-       stream << transaction.toString();
+                               TransactionCollection const* collection) {
+       stream << collection->toString();
        return stream;
      }
 
+     std::ostream& operator<< (std::ostream& stream,
+                               TransactionCollection const& collection) {
+       stream << collection.toString();
+       return stream;
+     }
   }
 }
 

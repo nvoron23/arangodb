@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC top-level transaction class
+/// @brief MVCC transaction collection object
 ///
 /// @file
 ///
@@ -27,28 +27,25 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef ARANGODB_MVCC_TOP_LEVEL_TRANSACTION_H
-#define ARANGODB_MVCC_TOP_LEVEL_TRANSACTION_H 1
+#ifndef ARANGODB_MVCC_TRANSACTION_COLLECTION_H
+#define ARANGODB_MVCC_TRANSACTION_COLLECTION_H 1
 
 #include "Basics/Common.h"
-#include "Mvcc/Transaction.h"
+#include "VocBase/voc-types.h"
+#include "VocBase/vocbase.h"
 
+struct TRI_shaper_s;
 struct TRI_vocbase_s;
+struct TRI_vocbase_col_s;
 
 namespace triagens {
   namespace mvcc {
-
-    class TransactionCollection;
-    class TransactionManager;
-
+    
 // -----------------------------------------------------------------------------
-// --SECTION--                                         class TopLevelTransaction
+// --SECTION--                                       class TransactionCollection
 // -----------------------------------------------------------------------------
 
-    class TopLevelTransaction final : public Transaction {
-
-      friend class TransactionManager;
-      friend class LocalTransactionManager;
+    class TransactionCollection {
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -57,18 +54,24 @@ namespace triagens {
       public:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a new top-level transaction
+/// @brief create the collection, using a collection id
 ////////////////////////////////////////////////////////////////////////////////
 
-        TopLevelTransaction (TransactionManager*,
-                             TransactionId const&,
-                             struct TRI_vocbase_s*);
+        TransactionCollection (struct TRI_vocbase_s*,
+                               TRI_voc_cid_t);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief destroy the transaction
+/// @brief create the collection, using a collection name
 ////////////////////////////////////////////////////////////////////////////////
 
-        ~TopLevelTransaction ();
+        TransactionCollection (struct TRI_vocbase_s*,
+                               std::string const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy the collection
+////////////////////////////////////////////////////////////////////////////////
+
+        ~TransactionCollection ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
@@ -77,75 +80,53 @@ namespace triagens {
       public:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief returns a collection used in the transaction
-/// this registers the collection in the transaction if not yet present
-////////////////////////////////////////////////////////////////////////////////
-        
-        TransactionCollection* collection (std::string const&) override final;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief returns a collection used in the transaction
-/// this registers the collection in the transaction if not yet present
-////////////////////////////////////////////////////////////////////////////////
-        
-        TransactionCollection* collection (TRI_voc_cid_t) override final;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief get the transaction's top-level transaction (i.e. ourselves)
+/// @brief return the collection id
 ////////////////////////////////////////////////////////////////////////////////
 
-        TopLevelTransaction* topLevelTransaction () override final {
-          return this;
+        inline TRI_voc_cid_t id () const {
+          return _collection->_cid;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief get the transaction's direct parent transaction (i.e. ourselves)
+/// @brief return the collection name
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* parentTransaction () override final {
-          return this;
+        inline std::string name () const {
+          return std::string(_collection->_name);
         }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the transaction is a top-level transaction
+/// @brief return the collection shaper
 ////////////////////////////////////////////////////////////////////////////////
 
-        bool isTopLevel () const override final {
-          return true;
-        }
+        struct TRI_shaper_s* shaper () const;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief get a string representation of the transaction
+/// @brief generate a key
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::string toString () const override final;
+        std::string generateKey (TRI_voc_tick_t);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief return the next sub-transaction id
+/// @brief validate a key
+/// this will throw if the key is invalid
 ////////////////////////////////////////////////////////////////////////////////
 
-        TransactionId nextSubId ();
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                 protected methods
-// -----------------------------------------------------------------------------
-
-      protected:
+        void validateKey (char const*) const;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief sets the start state (e.g. list of running transactions
+/// @brief get a string representation of the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-        void setStartState (std::unordered_map<TransactionId, Transaction*> const&);
+        std::string toString () const;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief registers a collection inside the transaction
-/// if this throws, then the collection object will be deleted by the method!
-/// if this succeeds, the _collectionIds map has the ownership for the 
-/// collection object
+/// @brief append the transaction to an output stream
 ////////////////////////////////////////////////////////////////////////////////
+    
+        friend std::ostream& operator<< (std::ostream&, TransactionCollection const*);
 
-        TransactionCollection* registerCollection (TransactionCollection*);
+        friend std::ostream& operator<< (std::ostream&, TransactionCollection const&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
@@ -154,35 +135,18 @@ namespace triagens {
       private:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief transactions active at start
+/// @brief pointer to the vocbase
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::unordered_set<TransactionId>* _runningTransactions;
+        struct TRI_vocbase_s* _vocbase; 
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief last assigned sub-transaction id
+/// @brief pointer to the vocbase collection
 ////////////////////////////////////////////////////////////////////////////////
 
-        TransactionId::IdType _lastUsedSubId;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief lookup cache for collection names
-/// note: this map is NOT responsible for deleting the contained collections
-/// at the end of the transaction
-////////////////////////////////////////////////////////////////////////////////
-
-        std::unordered_map<std::string, TransactionCollection*> _collectionNames;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief lookup cache for collection ids
-/// note: this map is responsible for deleting the contained collections
-/// at the end of the transaction
-////////////////////////////////////////////////////////////////////////////////
-
-        std::unordered_map<TRI_voc_cid_t, TransactionCollection*> _collectionIds;
-
+        struct TRI_vocbase_col_s* _collection; 
+      
     };
-
   }
 }
 

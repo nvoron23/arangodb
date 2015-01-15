@@ -2281,6 +2281,16 @@ TRI_vocbase_col_t* TRI_UseCollectionByIdVocBase (TRI_vocbase_t* vocbase,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief locks a (document) collection for usage by id
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_vocbase_col_t* TRI_UseCollectionByIdVocBase (TRI_vocbase_t* vocbase,
+                                                 TRI_voc_cid_t cid) {
+  TRI_vocbase_col_status_e status;
+  return TRI_UseCollectionByIdVocBase(vocbase, cid, status);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief locks a (document) collection for usage by name
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2309,6 +2319,16 @@ TRI_vocbase_col_t* TRI_UseCollectionByNameVocBase (TRI_vocbase_t* vocbase,
   int res = LoadCollectionVocBase(vocbase, const_cast<TRI_vocbase_col_t*>(collection), status);
 
   return res == TRI_ERROR_NO_ERROR ? const_cast<TRI_vocbase_col_t*>(collection) : nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief locks a (document) collection for usage by name
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_vocbase_col_t* TRI_UseCollectionByNameVocBase (TRI_vocbase_t* vocbase,
+                                                   char const* name) {
+  TRI_vocbase_col_status_e status;
+  return TRI_UseCollectionByNameVocBase(vocbase, name, status);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

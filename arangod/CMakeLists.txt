@@ -89,11 +89,13 @@ add_executable(
     HashIndex/hash-array-multi.cpp
     HashIndex/hash-index.cpp
     IndexOperators/index-operator.cpp
+    Mvcc/CollectionOperations.cpp
     Mvcc/DistributedTransactionManager.cpp
     Mvcc/LocalTransactionManager.cpp
     Mvcc/SubTransaction.cpp
     Mvcc/TopLevelTransaction.cpp
     Mvcc/Transaction.cpp
+    Mvcc/TransactionCollection.cpp
     Mvcc/TransactionManager.cpp
     Replication/ContinuousSyncer.cpp
     Replication/InitialSyncer.cpp

@@ -135,6 +135,24 @@ void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief aborts a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::abortTransaction (TransactionId const& id) {
+  WRITE_LOCKER(_lock);
+  auto it = _runningTransactions.find(id);
+  if (it == _runningTransactions.end()) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "transaction not found"); // TODO: fix code and message
+  }
+
+  auto transaction = (*it).second;
+  // still hold the write-lock while calling setAborted()
+  // this ensures that the transaction object cannot be invalidated by other threads
+  // while we are using it
+  transaction->setAborted();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -168,16 +186,16 @@ TransactionId LocalTransactionManager::nextId () {
 /// @brief insert the transaction into the list of running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::insertRunningTransaction (Transaction const* transaction) {
+void LocalTransactionManager::insertRunningTransaction (Transaction* transaction) {
   WRITE_LOCKER(_lock); 
-  _runningTransactions.emplace(transaction->id());
+  _runningTransactions.emplace(std::make_pair(transaction->id(), transaction));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove the transaction from the list of running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::removeRunningTransaction (Transaction const* transaction) {
+void LocalTransactionManager::removeRunningTransaction (Transaction* transaction) {
   WRITE_LOCKER(_lock); 
   _runningTransactions.erase(transaction->id());
 }
