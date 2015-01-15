@@ -115,11 +115,10 @@ std::string TransactionCollection::generateKey (TRI_voc_tick_t tick) {
 /// this will throw if the key is invalid
 ////////////////////////////////////////////////////////////////////////////////
 
-void TransactionCollection::validateKey (char const* key) const {
+void TransactionCollection::validateKey (std::string const& key) const {
   // TODO: handle case isRestore
-  int res = _collection->_collection->_keyGenerator->validate(key, false);
+  int res = _collection->_collection->_keyGenerator->validate(key.c_str(), false);
 
-std::cout << "KEY: '" << key << "'\n";
   if (res != TRI_ERROR_NO_ERROR) {
     THROW_ARANGO_EXCEPTION(res);
   }

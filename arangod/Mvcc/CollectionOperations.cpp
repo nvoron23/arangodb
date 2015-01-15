@@ -30,10 +30,10 @@
 #include "CollectionOperations.h"
 #include "Basics/json.h"
 #include "ShapedJson/shaped-json.h"
-#include "Utils/DocumentHelper.h"
 #include "Utils/Exception.h"
 #include "VocBase/server.h"
 #include "VocBase/vocbase.h"
+#include "Wal/Marker.h"
 
 using namespace triagens::mvcc;
 
@@ -47,16 +47,19 @@ using namespace triagens::mvcc;
 
 Document::Document (TRI_shaper_t* shaper,
                     TRI_shaped_json_t const* shaped,
-                    char const* key,
+                    std::string const& key,
+                    TRI_voc_rid_t revision,
+                    bool keySpecified,
                     bool freeShape) 
   : shaper(shaper),
     shaped(shaped),
     key(key),
+    revision(revision),
+    keySpecified(keySpecified),
     freeShape(freeShape) {
 
   TRI_ASSERT(shaper != nullptr);
   TRI_ASSERT(shaped != nullptr);
-  // key may be a nullptr
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -67,11 +70,12 @@ Document::Document (Document&& other)
   : shaper(other.shaper),
     shaped(other.shaped),
     key(other.key),
+    revision(other.revision),
+    keySpecified(other.keySpecified),
     freeShape(other.freeShape) {
 
   // do not double-free
   other.shaped    = nullptr;
-  other.key       = nullptr;
   other.freeShape = false;
 }
 
@@ -91,13 +95,19 @@ Document::~Document () {
 
 Document Document::createFromJson (TRI_shaper_t* shaper,
                                    TRI_json_t const* json) {
-          
-  // extract document key from JSON
-  TRI_voc_key_t documentKey = nullptr;
-  int res = triagens::arango::DocumentHelper::getKey(json, &documentKey);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    THROW_ARANGO_EXCEPTION(res);
+         
+  if (! TRI_IsObjectJson(json)) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
+  }
+  
+  // check if _key is there
+  TRI_json_t const* key = TRI_LookupObjectJson(json, TRI_VOC_ATTRIBUTE_KEY);
+  
+  if (key != nullptr) {
+    if (! TRI_IsStringJson(key)) {
+      // _key is there but not a string
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_KEY_BAD);
+    }
   }
   
   auto* shaped = TRI_ShapedJsonJson(shaper, json, true);
@@ -106,7 +116,13 @@ Document Document::createFromJson (TRI_shaper_t* shaper,
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_SHAPER_FAILED);
   }
 
-  return Document(shaper, shaped, static_cast<char const*>(documentKey), true);
+  if (key != nullptr) {
+    // user has specified a key
+    return Document(shaper, shaped, std::string(key->_value._string.data, key->_value._string.length - 1), 0, CollectionOperations::KeySpecified, true);
+  }
+
+  // user has not specified a key
+  return Document(shaper, shaped, std::string(), 0, CollectionOperations::NoKeySpecified, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -116,8 +132,14 @@ Document Document::createFromJson (TRI_shaper_t* shaper,
 Document Document::createFromShapedJson (TRI_shaper_t* shaper,
                                          TRI_shaped_json_t const* shaped,
                                          char const* key) {
-          
-  return Document(shaper, shaped, key, false);
+
+  if (key != nullptr) {         
+    // user has specified a key
+    return Document(shaper, shaped, std::string(key), 0, CollectionOperations::KeySpecified, false);
+  }
+     
+  // user has not specified a key
+  return Document(shaper, shaped, std::string(), 0, CollectionOperations::NoKeySpecified, false);
 }
 
 // -----------------------------------------------------------------------------
@@ -133,9 +155,19 @@ OperationResult CollectionOperations::insertDocument (Transaction& transaction,
                                                       Document& document,
                                                       OperationOptions& options) {
 
-  std::string const&& key = createOrValidateKey(collection, document);
+  createOrValidateKey(collection, document);
+
+  std::unique_ptr<triagens::wal::DocumentMarker> marker;
+  marker.reset(new triagens::wal::DocumentMarker(transaction.vocbase()->_id,
+                                                 collection.id(),
+                                                 document.revision,
+                                                 transaction.id()(),
+                                                 document.key,
+                                                 8, /* legendSize */
+                                                 document.shaped));
   
-  std::cout << "KEY: " << key << "\n";
+  std::cout << "KEY: " << document.key << "\n";
+
   OperationResult result;
   std::cout << "INSERT DOCUMENT\n";
   return result;
@@ -156,26 +188,25 @@ OperationResult CollectionOperations::removeDocument (Transaction& transaction,
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief creates a key if not specified, or validates it if specified
-/// returns the key
+/// will throw if the key is invalid
 ////////////////////////////////////////////////////////////////////////////////
   
-std::string CollectionOperations::createOrValidateKey (TransactionCollection& collection,
-                                                       Document& document) {                   
-  if (document.key == nullptr) {
-    // no key specified. now let the collection create one
-    std::string key(collection.generateKey(TRI_NewTickServer()));
+void CollectionOperations::createOrValidateKey (TransactionCollection& collection,
+                                                Document& document) {                   
+  if (! document.keySpecified) {
+    TRI_ASSERT(document.key.empty());
 
-    if (key.empty()) {
+    // no key specified. now let the collection create one
+    document.key.assign(collection.generateKey(TRI_NewTickServer()));
+
+    if (document.key.empty()) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_OUT_OF_KEYS);
     }
-
-    return key;
   }
-    
-  // key was specified, now validate it
-  collection.validateKey(document.key); // TODO: handle case isRestore
-
-  return std::string(document.key);
+  else {
+    // key was specified, now validate it
+    collection.validateKey(document.key); // TODO: handle case isRestore
+  }
 }
 
 // -----------------------------------------------------------------------------

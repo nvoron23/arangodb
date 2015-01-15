@@ -112,7 +112,7 @@ namespace triagens {
 /// this will throw if the key is invalid
 ////////////////////////////////////////////////////////////////////////////////
 
-        void validateKey (char const*) const;
+        void validateKey (std::string const&) const;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief get a string representation of the collection

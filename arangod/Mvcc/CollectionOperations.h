@@ -51,7 +51,9 @@ namespace triagens {
 
         Document (struct TRI_shaper_s*,
                   struct TRI_shaped_json_s const*,
-                  char const*,
+                  std::string const&,
+                  TRI_voc_rid_t,
+                  bool,
                   bool);
 
       public:
@@ -68,11 +70,13 @@ namespace triagens {
         
         static Document createFromShapedJson (struct TRI_shaper_s*,
                                               struct TRI_shaped_json_s const*,
-                                              char const* key = nullptr);
+                                              char const* = nullptr);
 
         struct TRI_shaper_s* shaper;
         struct TRI_shaped_json_s const* shaped;
-        char const* key;
+        std::string key;
+        TRI_voc_rid_t revision;
+        bool keySpecified;
         bool freeShape;
     };
 
@@ -155,16 +159,20 @@ namespace triagens {
                                                Document&,
                                                OperationOptions&);
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief creates a key if not specified, or validates it if specified
-/// returns the key
-////////////////////////////////////////////////////////////////////////////////
-
       private:
 
-        static std::string createOrValidateKey (TransactionCollection&,
-                                                Document&);                   
+////////////////////////////////////////////////////////////////////////////////
+/// @brief creates a key if not specified, or validates it if specified
+/// will throw if the key is invalid
+////////////////////////////////////////////////////////////////////////////////
 
+        static void createOrValidateKey (TransactionCollection&,
+                                         Document&);                   
+
+      public:
+       
+        static int const KeySpecified = true;
+        static int const NoKeySpecified = false;
     };
   }
 }
