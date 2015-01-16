@@ -169,6 +169,10 @@ namespace triagens {
 
           try {
             _table = new Entry[_nrAlloc];
+            IndexType i;
+            for (i = 0; i < _nrAlloc; i++) {
+              invalidateEntry(i);
+            }
           }
           catch (...) {
             _table = nullptr;
@@ -504,6 +508,10 @@ namespace triagens {
           _nrAlloc = TRI_NearPrime(size);
           try {
             _table = new Entry[_nrAlloc];
+            IndexType i;
+            for (i = 0; i < _nrAlloc; i++) {
+              invalidateEntry(i);
+            }
           }
           catch (...) {
             _nrAlloc = oldAlloc;
@@ -534,6 +542,8 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         bool check (bool checkCount, bool checkPositions) const {
+          std::cout << "Performing AssocMulti check " << checkCount
+                    << checkPositions << std::endl;
           IndexType i, ii, j, k;
 
           bool ok = true;
