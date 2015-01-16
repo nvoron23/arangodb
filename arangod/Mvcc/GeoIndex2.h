@@ -34,6 +34,7 @@
 #include "GeoIndex/GeoIndex.h"
 #include "Mvcc/Index.h"
 #include "ShapedJson/shaped-json.h"
+#include "VocBase/index.h"
 
 struct TRI_doc_mptr_t;
 struct TRI_document_collection_t;
@@ -53,10 +54,18 @@ namespace triagens {
 
         GeoIndex2 (TRI_idx_iid_t id,
                    struct TRI_document_collection_t*,
-                   std::vector<std::string> const& fields,
+                   std::vector<std::string> const&,
+                   std::vector<TRI_shape_pid_t> const&,
                    bool unique,
                    bool ignoreNull,
-                   bool sparse);
+                   bool geoJson);
+        
+        GeoIndex2 (TRI_idx_iid_t id,
+                   struct TRI_document_collection_t*,
+                   std::vector<std::string> const&,
+                   std::vector<TRI_shape_pid_t> const&,
+                   bool unique,
+                   bool ignoreNull);
 
         ~GeoIndex2 ();
 
@@ -66,32 +75,51 @@ namespace triagens {
         int remove (struct TRI_doc_mptr_t const*, bool) override final;
         int postInsert (struct TRI_transaction_collection_s*, struct TRI_doc_mptr_t const*) override final;
 
-        int sizeHint (size_t) override final;
-  
         size_t memory () override final;
         struct TRI_json_t* toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
-          // TODO: honor variant
-          return TRI_IDX_TYPE_GEO1_INDEX;
+          if (_variant == INDEX_GEO_COMBINED_LAT_LON || 
+              _variant == INDEX_GEO_COMBINED_LON_LAT) {
+            return TRI_IDX_TYPE_GEO1_INDEX;
+          }
+          return TRI_IDX_TYPE_GEO2_INDEX;
         }
         
         std::string typeName () const override final {
-          // TODO: honor variant
-          return "geo1";
+          if (_variant == INDEX_GEO_COMBINED_LAT_LON || 
+              _variant == INDEX_GEO_COMBINED_LON_LAT) {
+            return "geo1";
+          }
+          return "geo2";
         }
 
       private:
-  
-        TRI_index_geo_variant_e _variant;
+
+        bool extractDoubleArray (struct TRI_shaper_s*,
+                                 struct TRI_shaped_json_s const*,
+                                 TRI_shape_pid_t,
+                                 double*,
+                                 bool*);
+
+        bool extractDoubleList (struct TRI_shaper_s*,
+                                struct TRI_shaped_json_s const*,
+                                TRI_shape_pid_t,
+                                double*,
+                                double*,
+                                bool*);
+
+      private:
+ 
+        std::vector<TRI_shape_pid_t> const _paths; 
         GeoIndex* _geoIndex;
+        TRI_index_geo_variant_e const _variant;
 
         TRI_shape_pid_t _location;
         TRI_shape_pid_t _latitude;
         TRI_shape_pid_t _longitude;
 
         bool _geoJson;
-        bool _constraint;
     };
 
   }
