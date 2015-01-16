@@ -7,6 +7,8 @@ v2.5.0 (XXXX-XX-XX)
 v2.4.1 (XXXX-XX-XX)
 -------------------
 
+* better diagnostics for arangoimp
+
 * fixed invalid result of HTTP REST API method `/_admin/foxx/rescan`
 
 * fixed possible segmentation fault when passing a Buffer object into a V8 function 
@@ -259,6 +261,8 @@ v2.4.0-beta1 (2014-12-26)
 
 v2.3.5 (2015-XX-XX)
 -------------------
+
+* fixed intermittent 404 errors in Foxx apps after mounting or unmounting apps
 
 * fixed issue #1200: Expansion operator results in "Cannot call method 'forEach' of null"
 
