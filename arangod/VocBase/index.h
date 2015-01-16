@@ -284,7 +284,7 @@ int TRI_SaveIndex (struct TRI_document_collection_t*,
 /// @brief looks up an index identifier
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupIndex (struct TRI_document_collection_t*,
+TRI_index_t* TRI_LookupIndex (struct TRI_document_collection_t const*,
                               TRI_idx_iid_t);
 
 ////////////////////////////////////////////////////////////////////////////////

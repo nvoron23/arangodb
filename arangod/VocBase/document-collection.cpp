@@ -307,11 +307,11 @@ static int InsertSecondaryIndexes (TRI_document_collection_t* document,
   }
 
   int result = TRI_ERROR_NO_ERROR;
-  size_t const n = document->_allIndexes._length;
+  size_t const n = document->_allIndexes.size();
 
   // we can start at index #1 here (index #0 is the primary index)
   for (size_t i = 1;  i < n;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
+    TRI_index_t* idx = document->_allIndexes[i];
     int res = idx->insert(idx, header, isRollback);
 
     // in case of no-memory, return immediately
@@ -366,11 +366,11 @@ static int DeleteSecondaryIndexes (TRI_document_collection_t* document,
   }
 
   int result = TRI_ERROR_NO_ERROR;
-  size_t const n = document->_allIndexes._length;
+  size_t const n = document->_allIndexes.size();
 
   // we can start at index #1 here (index #0 is the primary index)
   for (size_t i = 1;  i < n;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
+    TRI_index_t* idx = document->_allIndexes[i];
     int res = idx->remove(idx, header, isRollback);
 
     if (res != TRI_ERROR_NO_ERROR) {
@@ -472,10 +472,11 @@ static int AddIndex (TRI_document_collection_t* document,
             TRI_TypeNameIndex(idx->_type),
             document->_info._name);
 
-  int res = TRI_PushBackVectorPointer(&document->_allIndexes, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    return res;
+  try {
+    document->_allIndexes.push_back(idx);
+  }
+  catch (...) {
+    return TRI_ERROR_OUT_OF_MEMORY;
   }
 
   if (idx->cleanup != nullptr) {
@@ -493,11 +494,8 @@ static int AddIndex (TRI_document_collection_t* document,
 
 static void RebuildIndexInfo (TRI_document_collection_t* document) {
   bool result = false;
-  size_t const n = document->_allIndexes._length;
 
-  for (size_t i = 0 ; i < n ; ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
-
+  for (auto idx : document->_allIndexes) {
     if (idx->cleanup != nullptr) {
       result = true;
       break;
@@ -518,11 +516,8 @@ static int CleanupIndexes (TRI_document_collection_t* document) {
   // collection
   if (document->_cleanupIndexes) {
     TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-    size_t const n = document->_allIndexes._length;
 
-    for (size_t i = 0 ; i < n ; ++i) {
-      TRI_index_t* idx = (TRI_index_t*) document->_allIndexes._buffer[i];
-
+    for (auto idx : document->_allIndexes) {
       if (idx->cleanup != nullptr) {
         res = idx->cleanup(idx);
         if (res != TRI_ERROR_NO_ERROR) {
@@ -549,11 +544,11 @@ static int PostInsertIndexes (TRI_transaction_collection_t* trxCollection,
     return TRI_ERROR_NO_ERROR;
   }
 
-  size_t const n = document->_allIndexes._length;
+  size_t const n = document->_allIndexes.size();
 
   // we can start at index #1 here (index #0 is the primary index)
   for (size_t i = 1;  i < n;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
+    TRI_index_t* idx = document->_allIndexes[i];
 
     if (idx->postInsert != nullptr) {
       idx->postInsert(trxCollection, idx, header);
@@ -1828,9 +1823,7 @@ static bool OpenIterator (TRI_df_marker_t const* marker,
 static int FillInternalIndexes (TRI_document_collection_t* document) {
   int res = TRI_ERROR_NO_ERROR;
 
-  for (size_t i = 0;  i < document->_allIndexes._length;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
-
+  for (auto idx : document->_allIndexes) {
     if (idx->_type == TRI_IDX_TYPE_EDGE_INDEX) {
       int r = FillIndex(document, idx);
 
@@ -1935,9 +1928,7 @@ static TRI_doc_collection_info_t* Figures (TRI_document_collection_t* document) 
   info->_numberIndexes = 0;
   info->_sizeIndexes   = 0;
 
-  for (size_t i = 0; i < document->_allIndexes._length; ++i) {
-    TRI_index_t const* idx = static_cast<TRI_index_t const*>(TRI_AtVectorPointer(&document->_allIndexes, i));
-
+  for (auto idx : document->_allIndexes) {
     if (idx->memory != nullptr) {
       info->_sizeIndexes += idx->memory(idx);
     }
@@ -2067,20 +2058,10 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
     return false;
   }
 
-  res = TRI_InitVectorPointer2(&document->_allIndexes, TRI_UNKNOWN_MEM_ZONE, 2);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    DestroyBaseDocumentCollection(document);
-    TRI_set_errno(res);
-
-    return false;
-  }
-
   // create primary index
   TRI_index_t* primaryIndex = TRI_CreatePrimaryIndex(document);
 
   if (primaryIndex == nullptr) {
-    TRI_DestroyVectorPointer(&document->_allIndexes);
     DestroyBaseDocumentCollection(document);
     TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2091,7 +2072,6 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
 
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_FreeIndex(primaryIndex);
-    TRI_DestroyVectorPointer(&document->_allIndexes);
     DestroyBaseDocumentCollection(document);
     TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2104,7 +2084,6 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
 
     if (edgesIndex == nullptr) {
       TRI_FreeIndex(primaryIndex);
-      TRI_DestroyVectorPointer(&document->_allIndexes);
       DestroyBaseDocumentCollection(document);
       TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2116,7 +2095,6 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
     if (res != TRI_ERROR_NO_ERROR) {
       TRI_FreeIndex(edgesIndex);
       TRI_FreeIndex(primaryIndex);
-      TRI_DestroyVectorPointer(&document->_allIndexes);
       DestroyBaseDocumentCollection(document);
       TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2256,7 +2234,7 @@ TRI_document_collection_t* TRI_CreateDocumentCollection (TRI_vocbase_t* vocbase,
   if (false == InitDocumentCollection(document, shaper)) {
     LOG_ERROR("cannot initialise document collection");
 
-    // TODO: shouldn't we destroy &document->_allIndexes, free document->_headersPtr etc.?
+    // TODO: shouldn't we free document->_headersPtr etc.?
     TRI_CloseCollection(collection);
     TRI_DestroyCollection(collection);
     delete document;
@@ -2270,7 +2248,7 @@ TRI_document_collection_t* TRI_CreateDocumentCollection (TRI_vocbase_t* vocbase,
   int res = TRI_SaveCollectionInfo(collection->_directory, parameters, doSync);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    // TODO: shouldn't we destroy &document->_allIndexes, free document->_headersPtr etc.?
+    // TODO: shouldn't we destroy free document->_headersPtr etc.?
     LOG_ERROR("cannot save collection parameters in directory '%s': '%s'",
               collection->_directory,
               TRI_last_error());
@@ -2297,15 +2275,9 @@ void TRI_DestroyDocumentCollection (TRI_document_collection_t* document) {
   TRI_DestroyCondition(&document->_journalsCondition);
 
   // free memory allocated for indexes
-  size_t const n = document->_allIndexes._length;
-  for (size_t i = 0 ; i < n ; ++i) {
-    TRI_index_t* idx = (TRI_index_t*) document->_allIndexes._buffer[i];
-
+  for (auto idx : document->_allIndexes) {
     TRI_FreeIndex(idx);
   }
-
-  // free index vector
-  TRI_DestroyVectorPointer(&document->_allIndexes);
 
   if (document->_failedTransactions != nullptr) {
     delete document->_failedTransactions;
@@ -3045,9 +3017,7 @@ static TRI_index_t* LookupPathIndexDocumentCollection (TRI_document_collection_t
   // go through every index and see if we have a match
   // ...........................................................................
 
-  for (size_t j = 0;  j < collection->_allIndexes._length;  ++j) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(collection->_allIndexes._buffer[j]);
-
+  for (auto idx : collection->_allIndexes) {
     // .........................................................................
     // check if the type of the index matches
     // .........................................................................
@@ -3275,10 +3245,7 @@ TRI_vector_pointer_t* TRI_IndexesDocumentCollection (TRI_document_collection_t* 
 
   TRI_InitVectorPointer(vector, TRI_CORE_MEM_ZONE);
 
-  size_t const n = document->_allIndexes._length;
-
-  for (size_t i = 0;  i < n;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
+  for (auto idx : document->_allIndexes) {
     TRI_json_t* json = idx->json(idx);
 
     if (json != nullptr) {
@@ -3312,10 +3279,10 @@ bool TRI_DropIndexDocumentCollection (TRI_document_collection_t* document,
 
   TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
 
-  size_t const n = document->_allIndexes._length;
+  size_t const n = document->_allIndexes.size();
 
   for (size_t i = 0;  i < n;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
+    TRI_index_t* idx = document->_allIndexes[i];
 
     if (idx->_iid == iid) {
       if (idx->_type == TRI_IDX_TYPE_PRIMARY_INDEX ||
@@ -3324,12 +3291,14 @@ bool TRI_DropIndexDocumentCollection (TRI_document_collection_t* document,
         break;
       }
 
-      found = static_cast<TRI_index_t*>(TRI_RemoveVectorPointer(&document->_allIndexes, i));
-
-      if (found != nullptr && found->removeIndex != nullptr) {
+      if (idx->removeIndex != nullptr) {
         // notify the index about its removal
-        found->removeIndex(found, document);
+        idx->removeIndex(idx, document);
       }
+      
+      // remove the element
+      found = idx;
+      document->_allIndexes.erase(document->_allIndexes.begin() + i);
       break;
     }
   }
@@ -3939,11 +3908,7 @@ TRI_index_t* TRI_LookupGeoIndex1DocumentCollection (TRI_document_collection_t* d
     return nullptr;
   }
 
-  size_t const n = document->_allIndexes._length;
-
-  for (size_t i = 0;  i < n;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
-
+  for (auto idx : document->_allIndexes) {
     if (idx->_type == TRI_IDX_TYPE_GEO1_INDEX) {
       TRI_geo_index_t* geo = (TRI_geo_index_t*) idx;
 
@@ -3978,11 +3943,7 @@ TRI_index_t* TRI_LookupGeoIndex2DocumentCollection (TRI_document_collection_t* d
     return nullptr;
   }
 
-  size_t const n = document->_allIndexes._length;
-
-  for (size_t i = 0;  i < n;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
-
+  for (auto idx : document->_allIndexes) {
     if (idx->_type == TRI_IDX_TYPE_GEO2_INDEX) {
       TRI_geo_index_t* geo = (TRI_geo_index_t*) idx;
 
@@ -4467,12 +4428,9 @@ static TRI_index_t* LookupFulltextIndexDocumentCollection (TRI_document_collecti
                                                            int minWordLength) {
   TRI_ASSERT(attributeName != nullptr);
 
-  for (size_t i = 0; i < document->_allIndexes._length; ++i) {
-    TRI_index_t* idx = (TRI_index_t*) document->_allIndexes._buffer[i];
-
+  for (auto idx : document->_allIndexes) {
     if (idx->_type == TRI_IDX_TYPE_FULLTEXT_INDEX) {
       TRI_fulltext_index_t* fulltext = (TRI_fulltext_index_t*) idx;
-      char* fieldName;
 
       // 2013-01-17: deactivated substring indexing
       // if (fulltext->_indexSubstrings != indexSubstrings) {
@@ -4487,7 +4445,7 @@ static TRI_index_t* LookupFulltextIndexDocumentCollection (TRI_document_collecti
         continue;
       }
 
-      fieldName = (char*) fulltext->base._fields._buffer[0];
+      char* fieldName = (char*) fulltext->base._fields._buffer[0];
 
       if (fieldName != nullptr && TRI_EqualString(fieldName, attributeName)) {
         return idx;

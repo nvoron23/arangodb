@@ -366,7 +366,7 @@ public:
   KeyGenerator*                _keyGenerator;
   struct TRI_cap_constraint_s* _capConstraint;
 
-  TRI_vector_pointer_t         _allIndexes;
+  std::vector<TRI_index_t*>    _allIndexes;
   std::set<TRI_voc_tid_t>*     _failedTransactions;
 
   int64_t                      _uncollectedLogfileEntries;

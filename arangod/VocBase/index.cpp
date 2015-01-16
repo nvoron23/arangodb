@@ -401,13 +401,9 @@ int TRI_SaveIndex (TRI_document_collection_t* document,
 /// @brief looks up an index identifier
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupIndex (TRI_document_collection_t* document,
+TRI_index_t* TRI_LookupIndex (TRI_document_collection_t const* document,
                               TRI_idx_iid_t iid) {
-  size_t const n = document->_allIndexes._length;
-
-  for (size_t i = 0;  i < n;  ++i) {
-    TRI_index_t* idx = static_cast<TRI_index_t*>(document->_allIndexes._buffer[i]);
-
+  for (auto idx : document->_allIndexes) {
     if (idx->_iid == iid) {
       return idx;
     }

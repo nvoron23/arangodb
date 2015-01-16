@@ -70,9 +70,16 @@ arangod_libarangod_a_SOURCES = \
 	arangod/HashIndex/hash-array-multi.cpp \
 	arangod/HashIndex/hash-index.cpp \
 	arangod/IndexOperators/index-operator.cpp \
+	arangod/Mvcc/CapConstraint.cpp \
 	arangod/Mvcc/CollectionOperations.cpp \
 	arangod/Mvcc/DistributedTransactionManager.cpp \
+	arangod/Mvcc/EdgeIndex.cpp \
+	arangod/Mvcc/FulltextIndex.cpp \
+	arangod/Mvcc/GeoIndex2.cpp \
+	arangod/Mvcc/HashIndex.cpp \
+	arangod/Mvcc/Index.cpp \
 	arangod/Mvcc/LocalTransactionManager.cpp \
+	arangod/Mvcc/SkiplistIndex2.cpp \
 	arangod/Mvcc/SubTransaction.cpp \
 	arangod/Mvcc/TopLevelTransaction.cpp \
 	arangod/Mvcc/Transaction.cpp \

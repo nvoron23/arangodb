@@ -266,15 +266,14 @@ void Collection::fillIndexes () const {
         TRI_index_t* data = nullptr;
 
         // now check if we can find the local index and map it
-        for (size_t j = 0; j < document->_allIndexes._length; ++j) {
-          auto localIndex = static_cast<TRI_index_t*>(document->_allIndexes._buffer[j]);
-          if (localIndex != nullptr && localIndex->_iid == iid) {
+        for (auto idx : document->_allIndexes) {
+          if (idx != nullptr && idx->_iid == iid) {
             // found
-            data = localIndex;
+            data = idx;
             break;
           }
-          else if (localIndex->_type == TRI_IDX_TYPE_PRIMARY_INDEX || 
-                   localIndex->_type == TRI_IDX_TYPE_EDGE_INDEX) {
+          else if (idx->_type == TRI_IDX_TYPE_PRIMARY_INDEX || 
+                   idx->_type == TRI_IDX_TYPE_EDGE_INDEX) {
           }
         }
 
@@ -290,11 +289,11 @@ void Collection::fillIndexes () const {
     // local collection
     TRI_ASSERT(collection != nullptr);
     auto document = documentCollection();
-    size_t const n = document->_allIndexes._length;
+    size_t const n = document->_allIndexes.size();
     indexes.reserve(n);
 
     for (size_t i = 0; i < n; ++i) {
-      indexes.emplace_back(new Index(static_cast<TRI_index_t*>(document->_allIndexes._buffer[i])));
+      indexes.emplace_back(new Index(document->_allIndexes[i]));
     }
   }
 }
