@@ -594,27 +594,26 @@ void TRI_FreePrimaryIndex (TRI_index_t* idx) {
 /// @brief hashes an edge key
 ////////////////////////////////////////////////////////////////////////////////
 
-static uint64_t HashElementKey (TRI_multi_pointer_t* array, void const* data) {
+static uint32_t HashElementKey (void const* data) {
   TRI_edge_header_t const* h = static_cast<TRI_edge_header_t const*>(data);
   char const* key = h->_key;
 
-  uint64_t hash = h->_cid;
-  hash ^=  (uint64_t) fasthash64(key, strlen(key), 0x87654321);
+  uint32_t hash = TRI_64to32(h->_cid);
+  hash ^=  fasthash32(key, strlen(key), 0x87654321);
 
-  return fasthash64(&hash, sizeof(hash), 0x56781234);
+  return fasthash32(&hash, sizeof(hash), 0x56781234);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief hashes an edge (_from case)
 ////////////////////////////////////////////////////////////////////////////////
 
-static uint64_t HashElementEdgeFrom (TRI_multi_pointer_t* array,
-                                     void const* data,
+static uint32_t HashElementEdgeFrom (void const* data,
                                      bool byKey) {
-  uint64_t hash;
+  uint32_t hash;
 
   if (! byKey) {
-    hash = (uint64_t) data;
+    hash = TRI_64to32(reinterpret_cast<uintptr_t>(data));
   }
   else {
     TRI_doc_mptr_t const* mptr = static_cast<TRI_doc_mptr_t const*>(data);
@@ -626,8 +625,8 @@ static uint64_t HashElementEdgeFrom (TRI_multi_pointer_t* array,
 
       // LOG_TRACE("HASH FROM: COLLECTION: %llu, KEY: %s", (unsigned long long) edge->_fromCid, key);
 
-      hash = edge->_fromCid;
-      hash ^= (uint64_t) fasthash64(key, strlen(key), 0x87654321);
+      hash = TRI_64to32(edge->_fromCid);
+      hash ^= fasthash32(key, strlen(key), 0x87654321);
     }
     else if (marker->_type == TRI_WAL_MARKER_EDGE) {
       triagens::wal::edge_marker_t const* edge = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);  // ONLY IN INDEX, PROTECTED by RUNTIME
@@ -635,25 +634,24 @@ static uint64_t HashElementEdgeFrom (TRI_multi_pointer_t* array,
 
       // LOG_TRACE("HASH FROM: COLLECTION: %llu, KEY: %s", (unsigned long long) edge->_fromCid, key);
 
-      hash = edge->_fromCid;
-      hash ^= (uint64_t) fasthash64(key, strlen(key), 0x87654321);
+      hash = TRI_64to32(edge->_fromCid);
+      hash ^= fasthash32(key, strlen(key), 0x87654321);
     }
   }
 
-  return fasthash64(&hash, sizeof(hash), 0x56781234);
+  return fasthash32(&hash, sizeof(hash), 0x56781234);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief hashes an edge (_to case)
 ////////////////////////////////////////////////////////////////////////////////
 
-static uint64_t HashElementEdgeTo (TRI_multi_pointer_t* array,
-                                   void const* data,
+static uint32_t HashElementEdgeTo (void const* data,
                                    bool byKey) {
-  uint64_t hash;
+  uint32_t hash;
 
   if (! byKey) {
-    hash = (uint64_t) data;
+    hash = TRI_64to32(reinterpret_cast<uintptr_t>(data));
   }
   else {
     TRI_doc_mptr_t const* mptr = static_cast<TRI_doc_mptr_t const*>(data);
@@ -665,8 +663,8 @@ static uint64_t HashElementEdgeTo (TRI_multi_pointer_t* array,
 
       // LOG_TRACE("HASH TO: COLLECTION: %llu, KEY: %s", (unsigned long long) edge->_toCid, key);
 
-      hash = edge->_toCid;
-      hash ^= (uint64_t) fasthash64(key, strlen(key), 0x87654321);
+      hash = TRI_64to32(edge->_toCid);
+      hash ^= fasthash32(key, strlen(key), 0x87654321);
     }
     else if (marker->_type == TRI_WAL_MARKER_EDGE) {
       triagens::wal::edge_marker_t const* edge = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);  // ONLY IN INDEX, PROTECTED by RUNTIME
@@ -674,20 +672,19 @@ static uint64_t HashElementEdgeTo (TRI_multi_pointer_t* array,
 
       // LOG_TRACE("HASH TO: COLLECTION: %llu, KEY: %s", (unsigned long long) edge->_toCid, key);
 
-      hash = edge->_toCid;
-      hash ^= (uint64_t) fasthash64(key, strlen(key), 0x87654321);
+      hash = TRI_64to32(edge->_toCid);
+      hash ^= fasthash32(key, strlen(key), 0x87654321);
     }
   }
 
-  return fasthash64(&hash, sizeof(hash), 0x56781234);
+  return fasthash32(&hash, sizeof(hash), 0x56781234);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief checks if key and element match (_from case)
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool IsEqualKeyEdgeFrom (TRI_multi_pointer_t* array,
-                                void const* left,
+static bool IsEqualKeyEdgeFrom (void const* left,
                                 void const* right) {
   // left is a key
   // right is an element, that is a master pointer
@@ -720,8 +717,7 @@ static bool IsEqualKeyEdgeFrom (TRI_multi_pointer_t* array,
 /// @brief checks if key and element match (_to case)
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool IsEqualKeyEdgeTo (TRI_multi_pointer_t* array,
-                              void const* left,
+static bool IsEqualKeyEdgeTo (void const* left,
                               void const* right) {
   // left is a key
   // right is an element, that is a master pointer
@@ -755,8 +751,7 @@ static bool IsEqualKeyEdgeTo (TRI_multi_pointer_t* array,
 /// @brief checks for elements are equal (_from case)
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool IsEqualElementEdgeFrom (TRI_multi_pointer_t* array,
-                                    void const* left,
+static bool IsEqualElementEdgeFrom (void const* left,
                                     void const* right,
                                     bool byKey) {
   if (! byKey) {
@@ -815,8 +810,7 @@ static bool IsEqualElementEdgeFrom (TRI_multi_pointer_t* array,
 /// @brief checks for elements are equal (_to case)
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool IsEqualElementEdgeTo (TRI_multi_pointer_t* array,
-                                  void const* left,
+static bool IsEqualElementEdgeTo (void const* left,
                                   void const* right,
                                   bool byKey) {
   if (! byKey) {
@@ -879,14 +873,14 @@ static int InsertEdge (TRI_index_t* idx,
                        TRI_doc_mptr_t const* mptr,
                        bool isRollback) {
 
-  TRI_multi_pointer_t* edgesIndex;
+  TRI_EdgeIndexHash_t* edgesIndex;
 
   // OUT
-  edgesIndex = &(((TRI_edge_index_t*) idx)->_edges_from);
-  TRI_InsertElementMultiPointer(edgesIndex, CONST_CAST(mptr), true, isRollback);
+  edgesIndex = ((TRI_edge_index_t*) idx)->_edges_from;
+  edgesIndex->insert(CONST_CAST(mptr), true, isRollback);
   // IN
-  edgesIndex = &(((TRI_edge_index_t*) idx)->_edges_to);
-  TRI_InsertElementMultiPointer(edgesIndex, CONST_CAST(mptr), true, isRollback);
+  edgesIndex = ((TRI_edge_index_t*) idx)->_edges_to;
+  edgesIndex->insert(CONST_CAST(mptr), true, isRollback);
 
   return TRI_ERROR_NO_ERROR;
 }
@@ -899,14 +893,14 @@ static int RemoveEdge (TRI_index_t* idx,
                        TRI_doc_mptr_t const* mptr,
                        bool isRollback) {
 
-  TRI_multi_pointer_t* edgesIndex;
+  TRI_EdgeIndexHash_t* edgesIndex;
 
   // OUT
-  edgesIndex = &(((TRI_edge_index_t*) idx)->_edges_from);
-  TRI_RemoveElementMultiPointer(edgesIndex, mptr);
+  edgesIndex = ((TRI_edge_index_t*) idx)->_edges_from;
+  edgesIndex->remove(mptr);
   // IN
-  edgesIndex = &(((TRI_edge_index_t*) idx)->_edges_to);
-  TRI_RemoveElementMultiPointer(edgesIndex, mptr);
+  edgesIndex = ((TRI_edge_index_t*) idx)->_edges_to;
+  edgesIndex->remove(mptr);
 
   return TRI_ERROR_NO_ERROR;
 }
@@ -916,8 +910,8 @@ static int RemoveEdge (TRI_index_t* idx,
 ////////////////////////////////////////////////////////////////////////////////
 
 static size_t MemoryEdge (TRI_index_t const* idx) {
-  return TRI_MemoryUsageMultiPointer(&(((TRI_edge_index_t*) idx)->_edges_from)) +
-         TRI_MemoryUsageMultiPointer(&(((TRI_edge_index_t*) idx)->_edges_to));
+  return ((TRI_edge_index_t*) idx)->_edges_from->memoryUsage() +
+         ((TRI_edge_index_t*) idx)->_edges_to->memoryUsage();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -948,29 +942,29 @@ static int SizeHintEdge (TRI_index_t* idx,
 
   int err;
 
-  TRI_multi_pointer_t* edgesIndex = &(((TRI_edge_index_t*) idx)->_edges_from);
+  TRI_EdgeIndexHash_t* edgesIndex = ((TRI_edge_index_t*) idx)->_edges_from;
 
   // we assume this is called when setting up the index and the index
   // is still empty
-  TRI_ASSERT(edgesIndex->_nrUsed == 0);
+  TRI_ASSERT(edgesIndex->size() == 0);
 
   // set an initial size for the index for some new nodes to be created
   // without resizing
-  err = TRI_ResizeMultiPointer(edgesIndex, size + 2049);
+  err = edgesIndex->resize(size + 2049);
 
   if (err != TRI_ERROR_NO_ERROR) {
     return err;
   }
 
-  edgesIndex = &(((TRI_edge_index_t*) idx)->_edges_to);
+  edgesIndex = ((TRI_edge_index_t*) idx)->_edges_to;
 
   // we assume this is called when setting up the index and the index
   // is still empty
-  TRI_ASSERT(edgesIndex->_nrUsed == 0);
+  TRI_ASSERT(edgesIndex->size() == 0);
 
   // set an initial size for the index for some new nodes to be created
   // without resizing
-  return TRI_ResizeMultiPointer(edgesIndex, size + 2049);
+  return edgesIndex->resize(size + 2049);
 }
 
 // -----------------------------------------------------------------------------
@@ -985,7 +979,6 @@ TRI_index_t* TRI_CreateEdgeIndex (TRI_document_collection_t* document,
                                   TRI_idx_iid_t iid) {
   TRI_index_t* idx;
   char* id;
-  int res;
 
   // create index
   TRI_edge_index_t* edgeIndex = static_cast<TRI_edge_index_t*>(TRI_Allocate(TRI_CORE_MEM_ZONE, sizeof(TRI_edge_index_t), false));
@@ -994,29 +987,25 @@ TRI_index_t* TRI_CreateEdgeIndex (TRI_document_collection_t* document,
     return nullptr;
   }
 
-  res = TRI_InitMultiPointer(&edgeIndex->_edges_from,
-                             TRI_UNKNOWN_MEM_ZONE,
-                             HashElementKey,
-                             HashElementEdgeFrom,
-                             IsEqualKeyEdgeFrom,
-                             IsEqualElementEdgeFrom);
-
-  if (res != TRI_ERROR_NO_ERROR) {
+  try {
+    edgeIndex->_edges_from = new TRI_EdgeIndexHash_t(HashElementKey,
+                                                     HashElementEdgeFrom,
+                                                     IsEqualKeyEdgeFrom,
+                                                     IsEqualElementEdgeFrom);
+  }
+  catch (...) {
     TRI_Free(TRI_CORE_MEM_ZONE, edgeIndex);
-
     return nullptr;
   }
-  res = TRI_InitMultiPointer(&edgeIndex->_edges_to,
-                             TRI_UNKNOWN_MEM_ZONE,
-                             HashElementKey,
-                             HashElementEdgeTo,
-                             IsEqualKeyEdgeTo,
-                             IsEqualElementEdgeTo);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_DestroyMultiPointer(&edgeIndex->_edges_from);
+  try {
+    edgeIndex->_edges_to = new TRI_EdgeIndexHash_t(HashElementKey,
+                                                   HashElementEdgeTo,
+                                                   IsEqualKeyEdgeTo,
+                                                   IsEqualElementEdgeTo);
+  }
+  catch (...) {
+    delete edgeIndex->_edges_from;
     TRI_Free(TRI_CORE_MEM_ZONE, edgeIndex);
-
     return nullptr;
   }
 
@@ -1047,8 +1036,8 @@ void TRI_DestroyEdgeIndex (TRI_index_t* idx) {
 
   LOG_TRACE("destroying edge index");
 
-  TRI_DestroyMultiPointer(&edgesIndex->_edges_to);
-  TRI_DestroyMultiPointer(&edgesIndex->_edges_from);
+  delete edgesIndex->_edges_to;
+  delete edgesIndex->_edges_from;
 
   TRI_DestroyVectorString(&idx->_fields);
 }

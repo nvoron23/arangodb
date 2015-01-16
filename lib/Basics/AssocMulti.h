@@ -32,10 +32,10 @@
 #ifndef ARANGODB_BASICS_ASSOC_MULTI_H
 #define ARANGODB_BASICS_ASSOC_MULTI_H 1
 
-#if 0
+//#if 0
 // Activate for additional debugging: 
-// #define TRI_CHECK_MULTI_POINTER_HASH 1 
-#endif 
+#define TRI_CHECK_MULTI_POINTER_HASH 1 
+//#endif 
 
 #include "Basics/Common.h"
 #include "Basics/prime-numbers.h"
@@ -104,7 +104,8 @@ namespace triagens {
         typedef std::function<bool(Key const*, 
                                    Element const*)> IsEqualKeyElementFuncType;
         typedef std::function<bool(Element const*, 
-                                   Element const*)> IsEqualElementElementFuncType;
+                                   Element const*,
+                                   bool byKey)> IsEqualElementElementFuncType;
 
       private:
 
@@ -198,6 +199,22 @@ namespace triagens {
 
         size_t memoryUsage () const {
           return static_cast<size_t> (_nrAlloc * sizeof(Entry));
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief size(), return the number of items stored
+////////////////////////////////////////////////////////////////////////////////
+
+        size_t size () const {
+          return static_cast<size_t>(_nrUsed);
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief capacity(), return the number of allocated items
+////////////////////////////////////////////////////////////////////////////////
+
+        size_t capacity () const {
+          return static_cast<size_t>(_nrAlloc);
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -471,7 +488,7 @@ namespace triagens {
 /// @brief increment IndexType by 1 modulo _nrAlloc:
 ////////////////////////////////////////////////////////////////////////////////
 
-        inline IndexType incr (IndexType i) {
+        inline IndexType incr (IndexType i) const {
           IndexType dummy = (++i) - _nrAlloc;
           return i < _nrAlloc ? i : dummy;
         }
@@ -566,9 +583,9 @@ namespace triagens {
                   for (k = j; k != i; ) {
                     if (_table[k].ptr == nullptr ||
                         (_table[k].prev == INVALID_INDEX &&
-                         isEqualElementElement(_table[i].ptr,
-                                               _table[k].ptr,
-                                               true))) {
+                         _isEqualElementElement(_table[i].ptr,
+                                                _table[k].ptr,
+                                                true))) {
                       ok = false;
                       std::cout << "Alarm pos bykey: " << i << std::endl;
                     }
@@ -581,8 +598,8 @@ namespace triagens {
                   j = hash % _nrAlloc;
                   for (k = j; k != i; ) {
                     if (_table[k].ptr == nullptr ||
-                        isEqualElementElement(_table[i].ptr,
-                                              _table[k].ptr, false)) {
+                        _isEqualElementElement(_table[i].ptr,
+                                               _table[k].ptr, false)) {
                       ok = false;
                       std::cout << "Alarm unique: " << k << ", " 
                                 << i << std::endl;
@@ -700,7 +717,7 @@ namespace triagens {
 /// @brief helper to move an entry from one slot to another
 ////////////////////////////////////////////////////////////////////////////////
 
-        inline void MoveEntry (IndexType from, IndexType to) {
+        inline void moveEntry (IndexType from, IndexType to) {
           // Moves an entry, adjusts the linked lists, but does not take care
           // for the hole. to must be unused. from can be any element in a
           // linked list.
@@ -718,7 +735,7 @@ namespace triagens {
 /// @brief helper to heal a hole where we deleted something
 ////////////////////////////////////////////////////////////////////////////////
 
-        void HealHole (IndexType i) {
+        void healHole (IndexType i) {
           IndexType j = incr(i);
 
           while (_table[j].ptr != nullptr) {

@@ -34,7 +34,7 @@
 
 #include "VocBase/vocbase.h"
 
-#include "Basics/associative-multi.h"
+#include "Basics/AssocMulti.h"
 #include "Basics/json.h"
 #include "FulltextIndex/fulltext-index.h"
 #include "GeoIndex/GeoIndex.h"
@@ -152,11 +152,13 @@ TRI_geo_index_t;
 /// @brief edge index
 ////////////////////////////////////////////////////////////////////////////////
 
+typedef triagens::basics::AssocMulti<void, void, uint32_t> TRI_EdgeIndexHash_t;
+
 typedef struct TRI_edge_index_s {
   TRI_index_t base;
 
-  TRI_multi_pointer_t _edges_from;
-  TRI_multi_pointer_t _edges_to;
+  TRI_EdgeIndexHash_t* _edges_from;
+  TRI_EdgeIndexHash_t* _edges_to;
 }
 TRI_edge_index_t;
 

@@ -30,7 +30,7 @@
 
 #include "edge-collection.h"
 
-#include "Basics/associative-multi.h"
+#include "Basics/AssocMulti.h"
 #include "Basics/logging.h"
 
 #include "VocBase/document-collection.h"
@@ -103,31 +103,38 @@ static bool IsReflexive (TRI_doc_mptr_t const* mptr) {
 /// this function is called two times for each edge query:
 /// the first call (with matchType 1) will query the index with the originally
 /// requested direction, whereas the second call will query the index with the
-/// opposite direction (with matchType 2 or 3) to find all counterparts
+/// opposite direction (with matchType 2 or 3) to find all counterparts.
+/// Return value is an error code.
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool FindEdges (TRI_edge_direction_e direction,
-                       TRI_edge_index_t* idx,
-                       std::vector<TRI_doc_mptr_copy_t>& result,
-                       TRI_edge_header_t* entry,
-                       int matchType) {
-  TRI_vector_pointer_t found;
+static int FindEdges (TRI_edge_direction_e direction,
+                      TRI_edge_index_t* idx,
+                      std::vector<TRI_doc_mptr_copy_t>& result,
+                      TRI_edge_header_t* entry,
+                      int matchType) {
+  std::vector<void*>* found = nullptr;
 
   if (direction == TRI_EDGE_OUT) {
-    found = TRI_LookupByKeyMultiPointer(TRI_UNKNOWN_MEM_ZONE,
-                                        &idx->_edges_from,
-                                        entry);
+    try {
+      found = idx->_edges_from->lookupByKey(entry);
+    }
+    catch (...) {
+      return TRI_ERROR_OUT_OF_MEMORY;
+    }
   }
   else if (direction == TRI_EDGE_IN) {
-    found = TRI_LookupByKeyMultiPointer(TRI_UNKNOWN_MEM_ZONE,
-                                        &idx->_edges_to,
-                                        entry);
+    try {
+      found = idx->_edges_to->lookupByKey(entry);
+    }
+    catch (...) {
+      return TRI_ERROR_OUT_OF_MEMORY;
+    }
   }
   else {
     TRI_ASSERT(false);   // TRI_EDGE_ANY not supported here
   }
 
-  size_t const n = found._length;
+  size_t const n = found->size();
 
   if (n > 0) {
     if (result.capacity() == 0) {
@@ -138,7 +145,7 @@ static bool FindEdges (TRI_edge_direction_e direction,
 
     // add all results found
     for (size_t i = 0;  i < n;  ++i) {
-      TRI_doc_mptr_t* edge = (TRI_doc_mptr_t*) found._buffer[i];
+      TRI_doc_mptr_t* edge = (TRI_doc_mptr_t*) found->at(i);
 
       // the following queries will use the following sequences of matchTypes:
       // inEdges(): 1,  outEdges(): 1,  edges(): 1, 3
@@ -164,9 +171,9 @@ static bool FindEdges (TRI_edge_direction_e direction,
     }
   }
 
-  TRI_DestroyVectorPointer(&found);
+  delete found;
 
-  return true;
+  return TRI_ERROR_NO_ERROR;
 }
 
 // -----------------------------------------------------------------------------
@@ -199,17 +206,33 @@ std::vector<TRI_doc_mptr_copy_t> TRI_LookupEdgesDocumentCollection (
 
   if (direction == TRI_EDGE_IN) {
     // get all edges with a matching IN vertex
-    FindEdges(TRI_EDGE_IN, edgesIndex, result, &entry, 1);
+    if (FindEdges(TRI_EDGE_IN, edgesIndex, result, &entry, 1) !=
+        TRI_ERROR_NO_ERROR) {
+      result.clear();  // there is currently no way to report the error
+      return result;
+    }
   }
   else if (direction == TRI_EDGE_OUT) {
     // get all edges with a matching OUT vertex
-    FindEdges(TRI_EDGE_OUT, edgesIndex, result, &entry, 1);
+    if (FindEdges(TRI_EDGE_OUT, edgesIndex, result, &entry, 1) !=
+        TRI_ERROR_NO_ERROR) {
+      result.clear();
+      return result;
+    }
   }
   else if (direction == TRI_EDGE_ANY) {
     // get all edges with a matching IN vertex
-    FindEdges(TRI_EDGE_IN, edgesIndex, result, &entry, 1);
+    if (FindEdges(TRI_EDGE_IN, edgesIndex, result, &entry, 1) != 
+        TRI_ERROR_NO_ERROR) {
+      result.clear();
+      return result;
+    }
     // add all non-reflexive edges with a matching OUT vertex
-    FindEdges(TRI_EDGE_OUT, edgesIndex, result, &entry, 3);
+    if (FindEdges(TRI_EDGE_OUT, edgesIndex, result, &entry, 3) !=
+        TRI_ERROR_NO_ERROR) {
+      result.clear();
+      return result;
+    }
   }
 
   return result;
