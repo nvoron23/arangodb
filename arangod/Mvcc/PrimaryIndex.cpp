@@ -28,6 +28,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "PrimaryIndex.h"
+#include "Basics/fasthash.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 
@@ -46,8 +47,9 @@ using namespace triagens::mvcc;
 /// @brief hash function only looking at the key
 ////////////////////////////////////////////////////////////////////////////////
 
-static uint64_t hashKey (char const* key) {
-  return 0;
+static inline uint64_t hashKey (char const* key) {
+  size_t len = strlen(key);
+  return fasthash64(key, len, 0x13579864);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +57,26 @@ static uint64_t hashKey (char const* key) {
 ////////////////////////////////////////////////////////////////////////////////
 
 static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
-  return 0;
+  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(elm->getDataPtr());
+  TRI_ASSERT(marker != nullptr);
+  char const* charMarker = static_cast<char const*>(elm->getDataPtr());
+
+  uint64_t hash;
+
+  if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
+      marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
+    auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker))->_offsetKey;
+    hash = hashKey(charMarker + offset);
+  }
+  else if (marker->_type == TRI_WAL_MARKER_DOCUMENT ||
+           marker->_type == TRI_WAL_MARKER_EDGE) {
+    auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(marker))->_offsetKey;
+    hash = hashKey(charMarker + offset);
+  }
+  if (byKey) {
+    return hash;
+  }
+  return fasthash64(&elm->_rid, sizeof(elm->_rid), hash);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,6 +85,20 @@ static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
 
 static bool compareKeyElement(char const* key,
                               TRI_doc_mptr_t const* elm) {
+  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(elm->getDataPtr());
+  TRI_ASSERT(marker != nullptr);
+  char const* charMarker = static_cast<char const*>(elm->getDataPtr());
+  if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
+      marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
+    auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker))->_offsetKey;
+    return strcmp(key, charMarker + offset) == 0;
+  }
+  else if (marker->_type == TRI_WAL_MARKER_DOCUMENT ||
+           marker->_type == TRI_WAL_MARKER_EDGE) {
+    auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(marker))->_offsetKey;
+    return strcmp(key, charMarker + offset) == 0;
+  }
+  TRI_ASSERT(false);
   return false;
 }
 
@@ -74,7 +109,46 @@ static bool compareKeyElement(char const* key,
 static bool compareElementElement(TRI_doc_mptr_t const* left,
                                   TRI_doc_mptr_t const* right,
                                   bool byKey) {
-  return false;
+  TRI_df_marker_t const* lmarker = static_cast<TRI_df_marker_t const*>(left->getDataPtr());
+  TRI_ASSERT(lmarker != nullptr);
+  char const* lCharMarker = static_cast<char const*>(left->getDataPtr());
+
+  TRI_df_marker_t const* rmarker = static_cast<TRI_df_marker_t const*>(right->getDataPtr());
+  TRI_ASSERT(rmarker != nullptr);
+  char const* rCharMarker = static_cast<char const*>(right->getDataPtr());
+
+  char const* leftKey;
+  char const* rightKey;
+
+  if (lmarker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
+      lmarker->_type == TRI_DOC_MARKER_KEY_EDGE) {
+    auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(lmarker))->_offsetKey;
+    leftKey = lCharMarker + offset;
+  }
+  else if (lmarker->_type == TRI_WAL_MARKER_DOCUMENT ||
+           lmarker->_type == TRI_WAL_MARKER_EDGE) {
+    auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(lmarker))->_offsetKey;
+    leftKey = lCharMarker + offset;
+  }
+
+  if (rmarker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
+      rmarker->_type == TRI_DOC_MARKER_KEY_EDGE) {
+    auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(rmarker))->_offsetKey;
+    rightKey = rCharMarker + offset;
+  }
+  else if (rmarker->_type == TRI_WAL_MARKER_DOCUMENT ||
+           rmarker->_type == TRI_WAL_MARKER_EDGE) {
+    auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(rmarker))->_offsetKey;
+    rightKey = rCharMarker + offset;
+  }
+
+  if (strcmp(leftKey, rightKey) != 0) {
+    return false;
+  }
+  if (byKey) {
+    return true;
+  }
+  return left->_rid == right->_rid;
 }
 
 
