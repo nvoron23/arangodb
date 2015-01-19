@@ -160,6 +160,9 @@ function reloadUserFunctions () {
 
     try {
       var res = INTERNAL.executeScript(code, undefined, "(user function " + key + ")");
+      if (typeof res !== "function") {
+        foundError = true;
+      }
 
       functions[key.toUpperCase()] = {
         name: key,
@@ -177,8 +180,8 @@ function reloadUserFunctions () {
   
   // now reset the functions for all databases
   // this ensures that functions of other databases will be reloaded next 
-  // time (the reload does not necessarily needed to be carried out in the
-  // database in which the function was registered)
+  // time (the reload does not necessarily need to be carried out in the
+  // database in which the function is registered)
   UserFunctions = { }; 
   UserFunctions[prefix] = functions;
 
@@ -1986,6 +1989,42 @@ function AQL_SUBSTITUTE (value, search, replace, limit) {
     }
     return match;
   });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief generates the MD5 value for a string
+////////////////////////////////////////////////////////////////////////////////
+
+function AQL_MD5 (value) {
+  "use strict";
+
+  return INTERNAL.md5(AQL_TO_STRING(value));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief generates the SHA1 value for a string
+////////////////////////////////////////////////////////////////////////////////
+
+function AQL_SHA1 (value) {
+  "use strict";
+
+  return INTERNAL.sha1(AQL_TO_STRING(value));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief generates a random token of the specified length
+////////////////////////////////////////////////////////////////////////////////
+
+function AQL_RANDOM_TOKEN (length) {
+  "use strict";
+
+  length = AQL_TO_NUMBER(length);
+
+  if (length <= 0 || length > 65536) {
+    THROW("RANDOM_TOKEN", INTERNAL.errors.ERROR_QUERY_FUNCTION_ARGUMENT_TYPE_MISMATCH, "RANDOM_TOKEN");
+  }
+
+  return INTERNAL.genRandomAlphaNumbers(AQL_TO_NUMBER(length));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -7505,6 +7544,9 @@ exports.AQL_LTRIM = AQL_LTRIM;
 exports.AQL_RTRIM = AQL_RTRIM;
 exports.AQL_SPLIT = AQL_SPLIT;
 exports.AQL_SUBSTITUTE = AQL_SUBSTITUTE;
+exports.AQL_MD5 = AQL_MD5;
+exports.AQL_SHA1 = AQL_SHA1;
+exports.AQL_RANDOM_TOKEN = AQL_RANDOM_TOKEN;
 exports.AQL_FIND_FIRST = AQL_FIND_FIRST;
 exports.AQL_FIND_LAST = AQL_FIND_LAST;
 exports.AQL_TO_BOOL = AQL_TO_BOOL;
