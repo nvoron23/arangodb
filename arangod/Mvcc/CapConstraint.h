@@ -36,10 +36,11 @@
 struct TRI_doc_mptr_t;
 struct TRI_document_collection_t;
 struct TRI_json_t;
-struct TRI_transaction_collection_s;
 
 namespace triagens {
   namespace mvcc {
+
+    class TransactionCollection;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                               class CapConstraint
@@ -58,12 +59,17 @@ namespace triagens {
 
       public:
   
-        int insert (struct TRI_doc_mptr_t const*, bool) override final;
-        int remove (struct TRI_doc_mptr_t const*, bool) override final;
-        int postInsert (struct TRI_transaction_collection_s*, struct TRI_doc_mptr_t const*) override final;
+        void insert (class TransactionCollection*, 
+                     struct TRI_doc_mptr_t const*) = 0;
+        void remove (class TransactionCollection*,
+                     struct TRI_doc_mptr_t const*) = 0;
+        void forget (class TransactionCollection*,
+                     struct TRI_doc_mptr_t const*) = 0;
+
+        void preCommit (class TransactionCollection*) = 0;
 
         size_t memory () override final;
-        struct TRI_json_t* toJson (TRI_memory_zone_t*) const override final;
+        triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
           return TRI_IDX_TYPE_CAP_CONSTRAINT;

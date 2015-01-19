@@ -59,20 +59,20 @@ struct data_container_t {
   data_container_t (int key, int value) : value(value), key(key) {};
 };
 
-static uint32_t HashKey (void const* e) {
+static uint64_t HashKey (void const* e) {
   int const* key = (int const*) e;
 
-  return fasthash32(key, sizeof(int), 0x12345678);
+  return fasthash64(key, sizeof(int), 0x12345678);
 }
 
-static uint32_t HashElement (void const* e, bool byKey) {
+static uint64_t HashElement (void const* e, bool byKey) {
   data_container_t const* element = (data_container_t const*) e;
 
   if (byKey) {
-    return fasthash32(&element->key, sizeof(element->key), 0x12345678);
+    return fasthash64(&element->key, sizeof(element->key), 0x12345678);
   }
   else {
-    return fasthash32(&element->value, sizeof(element->value), 0x12345678);
+    return fasthash64(&element->value, sizeof(element->value), 0x12345678);
   }
 }
 

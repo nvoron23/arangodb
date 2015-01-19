@@ -36,6 +36,7 @@
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
 
+using namespace triagens::basics;
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
@@ -54,7 +55,7 @@ FulltextIndex::FulltextIndex (TRI_idx_iid_t id,
                               TRI_document_collection_t* collection,
                               std::vector<std::string> const& fields,
                               int minWordLength) 
-  : Index(id, collection, fields, false, false, false),
+  : Index(id, collection, fields),
     _fulltextIndex(nullptr),
     _attribute(0),
     _minWordLength(minWordLength > 0 ? minWordLength : 1) {
@@ -92,13 +93,13 @@ FulltextIndex::~FulltextIndex () {
 /// @brief insert a document into the index
 ////////////////////////////////////////////////////////////////////////////////
         
-int FulltextIndex::insert (TRI_doc_mptr_t const* doc,
-                           bool isRollback) {
+void FulltextIndex::insert (TransactionCollection*,
+                            TRI_doc_mptr_t const* doc) {
   TRI_fulltext_wordlist_t* wordlist = getWordlist(doc);
 
   if (wordlist == nullptr) {
     // TODO: distinguish the cases "empty wordlist" and "out of memory"
-    return TRI_ERROR_NO_ERROR;
+    return;
   }
 
   int res = TRI_ERROR_NO_ERROR;
@@ -112,40 +113,36 @@ int FulltextIndex::insert (TRI_doc_mptr_t const* doc,
 
   TRI_FreeWordlistFulltextIndex(wordlist);
 
-  return res;
+  if (res != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(res);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove a document from the index
 ////////////////////////////////////////////////////////////////////////////////
 
-int FulltextIndex::remove (TRI_doc_mptr_t const* doc, 
-                           bool isRollback) {
+void FulltextIndex::remove (TransactionCollection*, 
+                            TRI_doc_mptr_t const* doc) {
   TRI_DeleteDocumentFulltextIndex(_fulltextIndex, (TRI_fulltext_doc_t) ((uintptr_t) doc));
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief post-insert operation (does nothing for this index type)
 ////////////////////////////////////////////////////////////////////////////////
 
-int FulltextIndex::postInsert (TRI_transaction_collection_t*, 
-                               TRI_doc_mptr_t const*) {
-  return TRI_ERROR_NO_ERROR;
+void FulltextIndex::preCommit (TransactionCollection*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief clean up the index
 ////////////////////////////////////////////////////////////////////////////////
 
-int FulltextIndex::cleanup () {
+void FulltextIndex::cleanup () {
   // check whether we should do a cleanup at all
   if (! TRI_CompactFulltextIndex(_fulltextIndex)) {
-    return TRI_ERROR_INTERNAL;
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
   }
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -160,20 +157,14 @@ size_t FulltextIndex::memory () {
 /// @brief get the memory usage of the index
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_json_t* FulltextIndex::toJson (TRI_memory_zone_t* zone) const {
-  TRI_json_t* json = Index::toJson(zone);
-
-  if (json != nullptr) {
-    TRI_Insert3ObjectJson(zone, json, "minLength", TRI_CreateNumberJson(zone, (double) _minWordLength));
-
-    TRI_json_t* fields = TRI_CreateArrayJson(zone);
-
-    if (fields != nullptr) {
-      TRI_PushBack3ArrayJson(zone, fields, TRI_CreateStringCopyJson(zone, _fields[0].c_str(), _fields[0].size()));
-      TRI_Insert3ObjectJson(zone, json, "fields", fields);
-    }
+Json FulltextIndex::toJson (TRI_memory_zone_t* zone) const {
+  Json json(zone, Json::Object, 2);
+  Json fields(zone, Json::Array, _fields.size());
+  for (auto& field : _fields) {
+    fields.add(Json(zone, field));
   }
-
+  json("fields", fields)
+      ("minLength", Json(zone, static_cast<double>(_minWordLength)));
   return json;
 }
 

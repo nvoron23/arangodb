@@ -97,8 +97,8 @@ namespace triagens {
       public:
         static IndexType const INVALID_INDEX = ((IndexType)0)-1;
 
-        typedef std::function<IndexType(Key const*)> HashKeyFuncType;
-        typedef std::function<IndexType(Element const*, bool)> HashElementFuncType;
+        typedef std::function<uint64_t(Key const*)> HashKeyFuncType;
+        typedef std::function<uint64_t(Element const*, bool)> HashElementFuncType;
         typedef std::function<bool(Key const*, 
                                    Element const*)> IsEqualKeyElementFuncType;
         typedef std::function<bool(Element const*, 
@@ -249,7 +249,9 @@ namespace triagens {
 #endif
 
           // compute the hash by the key only first
-          IndexType hash = _hashElement(element, true);
+          IndexType hash = sizeof(IndexType) == 8 ?
+                             _hashElement(element, true) :
+                             TRI_64to32(_hashElement(element, true));
           IndexType i = hash % _nrAlloc;
 
           // If this slot is free, just use it:
@@ -361,7 +363,9 @@ namespace triagens {
           auto result = new std::vector<Element*>();
 
           // compute the hash
-          IndexType hash = _hashKey(key);
+          IndexType hash = sizeof(IndexType) == 8 ?
+                             _hashKey(key) :
+                             TRI_64to32(_hashKey(key));
           IndexType i = hash % _nrAlloc;
 
 #ifdef TRI_INTERNAL_STATS
@@ -586,7 +590,9 @@ namespace triagens {
                 IndexType hash;
                 if (_table[i].prev == INVALID_INDEX) {
                   // We are the first in a linked list.
-                  hash = _hashElement(_table[i].ptr, true);
+                  hash = sizeof(IndexType) == 8 ?
+                             _hashElement(_table[i].ptr, true) :
+                             TRI_64to32(_hashElement(_table[i].ptr, true));
                   j = hash % _nrAlloc;
                   for (k = j; k != i; ) {
                     if (_table[k].ptr == nullptr ||
@@ -602,7 +608,9 @@ namespace triagens {
                 }
                 else {
                   // We are not the first in a linked list.
-                  hash = _hashElement(_table[i].ptr, false);
+                  hash = sizeof(IndexType) == 8 ?
+                             _hashElement(_table[i].ptr, false) :
+                             TRI_64to32(_hashElement(_table[i].ptr, false));
                   j = hash % _nrAlloc;
                   for (k = j; k != i; ) {
                     if (_table[k].ptr == nullptr ||
@@ -641,7 +649,9 @@ namespace triagens {
           // pointer into the table, which is either empty or points to
           // an entry that compares equal to element.
 
-          IndexType hash = _hashElement(element, false);
+          IndexType hash = sizeof(IndexType) == 8 ?
+                             _hashElement(element, false) :
+                             TRI_64to32(_hashElement(element, false));
           IndexType i = hash % _nrAlloc;
 
           while (_table[i].ptr != nullptr &&
@@ -664,7 +674,9 @@ namespace triagens {
           // number. This slot is either empty or contains an element that
           // compares equal to element.
           //
-          IndexType hash = _hashElement(element, true);
+          IndexType hash = sizeof(IndexType) == 8 ?
+                             _hashElement(element, true) :
+                             TRI_64to32(_hashElement(element, true));
           IndexType i = hash % _nrAlloc;
 
           // Now find the first slot with an entry with the same key
@@ -750,8 +762,11 @@ namespace triagens {
             // Find out where this element ought to be:
             // If it is the start of one of the linked lists, we need to hash
             // by key, otherwise, we hash by the full identity of the element:
-            IndexType hash = _hashElement(_table[j].ptr,
-                                          _table[j].prev == INVALID_INDEX);
+            IndexType hash = sizeof(IndexType) == 8 ?
+                               _hashElement(_table[j].ptr,
+                                            _table[j].prev == INVALID_INDEX) :
+                               TRI_64to32(_hashElement(_table[j].ptr,
+                                            _table[j].prev == INVALID_INDEX));
             IndexType k = hash % _nrAlloc;
             if (! isBetween(i, k, j)) {
               // we have to move j to i:

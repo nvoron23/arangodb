@@ -29,10 +29,12 @@
 
 #include "EdgeIndex.h"
 #include "Basics/fasthash.h"
+#include "Utils/Exception.h"
 #include "VocBase/edge-collection.h"
 #include "Wal/LogfileManager.h"
 #include "Wal/Marker.h"
 
+using namespace triagens::basics;
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
@@ -43,26 +45,26 @@ using namespace triagens::mvcc;
 /// @brief hashes an edge key
 ////////////////////////////////////////////////////////////////////////////////
 
-static uint32_t HashElementKey (void const* data) {
+static uint64_t HashElementKey (void const* data) {
   TRI_edge_header_t const* h = static_cast<TRI_edge_header_t const*>(data);
   char const* key = h->_key;
 
-  uint32_t hash = TRI_64to32(h->_cid);
-  hash ^=  fasthash32(key, strlen(key), 0x87654321);
+  uint64_t hash = h->_cid;
+  hash ^=  fasthash64(key, strlen(key), 0x87654321);
 
-  return fasthash32(&hash, sizeof(hash), 0x56781234);
+  return fasthash64(&hash, sizeof(hash), 0x56781234);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief hashes an edge (_from case)
 ////////////////////////////////////////////////////////////////////////////////
 
-static uint32_t HashElementEdgeFrom (void const* data,
+static uint64_t HashElementEdgeFrom (void const* data,
                                      bool byKey) {
-  uint32_t hash;
+  uint64_t hash;
 
   if (! byKey) {
-    hash = TRI_64to32(reinterpret_cast<uintptr_t>(data));
+    hash = reinterpret_cast<uint64_t>(data);
   }
   else {
     TRI_doc_mptr_t const* mptr = static_cast<TRI_doc_mptr_t const*>(data);
@@ -74,8 +76,8 @@ static uint32_t HashElementEdgeFrom (void const* data,
 
       // LOG_TRACE("HASH FROM: COLLECTION: %llu, KEY: %s", (unsigned long long) edge->_fromCid, key);
 
-      hash = TRI_64to32(edge->_fromCid);
-      hash ^= fasthash32(key, strlen(key), 0x87654321);
+      hash = edge->_fromCid;
+      hash ^= fasthash64(key, strlen(key), 0x87654321);
     }
     else if (marker->_type == TRI_WAL_MARKER_EDGE) {
       triagens::wal::edge_marker_t const* edge = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);  // ONLY IN INDEX, PROTECTED by RUNTIME
@@ -83,24 +85,24 @@ static uint32_t HashElementEdgeFrom (void const* data,
 
       // LOG_TRACE("HASH FROM: COLLECTION: %llu, KEY: %s", (unsigned long long) edge->_fromCid, key);
 
-      hash = TRI_64to32(edge->_fromCid);
-      hash ^= fasthash32(key, strlen(key), 0x87654321);
+      hash = edge->_fromCid;
+      hash ^= fasthash64(key, strlen(key), 0x87654321);
     }
   }
 
-  return fasthash32(&hash, sizeof(hash), 0x56781234);
+  return fasthash64(&hash, sizeof(hash), 0x56781234);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief hashes an edge (_to case)
 ////////////////////////////////////////////////////////////////////////////////
 
-static uint32_t HashElementEdgeTo (void const* data,
+static uint64_t HashElementEdgeTo (void const* data,
                                    bool byKey) {
-  uint32_t hash;
+  uint64_t hash;
 
   if (! byKey) {
-    hash = TRI_64to32(reinterpret_cast<uintptr_t>(data));
+    hash = reinterpret_cast<uint64_t>(data);
   }
   else {
     TRI_doc_mptr_t const* mptr = static_cast<TRI_doc_mptr_t const*>(data);
@@ -112,8 +114,8 @@ static uint32_t HashElementEdgeTo (void const* data,
 
       // LOG_TRACE("HASH TO: COLLECTION: %llu, KEY: %s", (unsigned long long) edge->_toCid, key);
 
-      hash = TRI_64to32(edge->_toCid);
-      hash ^= fasthash32(key, strlen(key), 0x87654321);
+      hash = edge->_toCid;
+      hash ^= fasthash64(key, strlen(key), 0x87654321);
     }
     else if (marker->_type == TRI_WAL_MARKER_EDGE) {
       triagens::wal::edge_marker_t const* edge = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);  // ONLY IN INDEX, PROTECTED by RUNTIME
@@ -121,12 +123,12 @@ static uint32_t HashElementEdgeTo (void const* data,
 
       // LOG_TRACE("HASH TO: COLLECTION: %llu, KEY: %s", (unsigned long long) edge->_toCid, key);
 
-      hash = TRI_64to32(edge->_toCid);
-      hash ^= fasthash32(key, strlen(key), 0x87654321);
+      hash = edge->_toCid;
+      hash ^= fasthash64(key, strlen(key), 0x87654321);
     }
   }
 
-  return fasthash32(&hash, sizeof(hash), 0x56781234);
+  return fasthash64(&hash, sizeof(hash), 0x56781234);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -329,7 +331,7 @@ static bool IsEqualElementEdgeTo (void const* left,
 
 EdgeIndex::EdgeIndex (TRI_idx_iid_t id,
                       TRI_document_collection_t* collection) 
-  : Index(id, collection, std::vector<std::string>({ TRI_VOC_ATTRIBUTE_FROM, TRI_VOC_ATTRIBUTE_TO }), false, false, false),
+  : Index(id, collection, std::vector<std::string>({ TRI_VOC_ATTRIBUTE_FROM, TRI_VOC_ATTRIBUTE_TO })),
     _from(nullptr),
     _to(nullptr) {
 
@@ -366,42 +368,34 @@ EdgeIndex::~EdgeIndex () {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
-        
-int EdgeIndex::insert (TRI_doc_mptr_t const* doc, 
-                       bool isRollback) {
+ 
+void EdgeIndex::insert (TransactionCollection*, TRI_doc_mptr_t const* doc) {
   
-  _from->insert(CONST_CAST(doc), true, isRollback); // OUT
-  _to->insert(CONST_CAST(doc), true, isRollback);   // IN
-
-  return TRI_ERROR_NO_ERROR;
+  _from->insert(CONST_CAST(doc), true, false); // OUT
+  _to->insert(CONST_CAST(doc), true, false);   // IN
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove document from index
 ////////////////////////////////////////////////////////////////////////////////
         
-int EdgeIndex::remove (TRI_doc_mptr_t const* doc,
-                       bool isRollback) {
+void EdgeIndex::remove (TransactionCollection*, TRI_doc_mptr_t const* doc) {
   _from->remove(doc);  // OUT
   _to->remove(doc);    // IN
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief post insert (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-int EdgeIndex::postInsert (TRI_transaction_collection_t*, 
-                           TRI_doc_mptr_t const*) {
-  return TRI_ERROR_NO_ERROR;
+void EdgeIndex::preCommit (TransactionCollection*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief provide a hint for the expected index size
 ////////////////////////////////////////////////////////////////////////////////
 
-int EdgeIndex::sizeHint (size_t size) {
+void EdgeIndex::sizeHint (size_t size) {
   // we assume this is called when setting up the index and the index
   // is still empty
   TRI_ASSERT(_from->size() == 0);
@@ -411,7 +405,7 @@ int EdgeIndex::sizeHint (size_t size) {
   int res = _from->resize(size + 2049);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    return res;
+    THROW_ARANGO_EXCEPTION(res);
   }
 
   // we assume this is called when setting up the index and the index
@@ -420,7 +414,12 @@ int EdgeIndex::sizeHint (size_t size) {
 
   // set an initial size for the index for some new nodes to be created
   // without resizing
-  return _to->resize(size + 2049);
+  res = _to->resize(size + 2049);
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(res);
+  }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -435,20 +434,13 @@ size_t EdgeIndex::memory () {
 /// @brief return a JSON representation of the index
 ////////////////////////////////////////////////////////////////////////////////
       
-TRI_json_t* EdgeIndex::toJson (TRI_memory_zone_t* zone) const {
-  TRI_json_t* json = Index::toJson(zone);
-
-  if (json != nullptr) {
-    TRI_json_t* fields = TRI_CreateArrayJson(zone, _fields.size());
-  
-    if (fields != nullptr) {
-      for (auto field : _fields) {
-        TRI_PushBack3ArrayJson(zone, fields, TRI_CreateStringCopyJson(zone, field.c_str(), field.size()));
-      }
-      TRI_Insert3ObjectJson(zone, json, "fields", fields);
-    }
+Json EdgeIndex::toJson (TRI_memory_zone_t* zone) const {
+  Json json(zone, Json::Object, 1);
+  Json fields(zone, Json::Array, _fields.size());
+  for (auto& field : _fields) {
+    fields.add(Json(zone, field));
   }
-
+  json("fields", fields);
   return json;
 }
 

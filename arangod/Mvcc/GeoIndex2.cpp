@@ -53,14 +53,16 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
                       bool unique,
                       bool ignoreNull,
                       bool geoJson)
-  : Index(id, collection, fields, unique, ignoreNull, false),
+  : Index(id, collection, fields),
     _paths(paths),
     _geoIndex(nullptr),
     _variant(geoJson ? INDEX_GEO_COMBINED_LAT_LON : INDEX_GEO_COMBINED_LON_LAT),
     _location(paths[0]),
     _latitude(0),
     _longitude(0),
-    _geoJson(geoJson) {
+    _geoJson(geoJson),
+    _unique(unique),
+    _ignoreNull(ignoreNull) {
  
   _geoIndex = GeoIndex_new();
 
@@ -109,8 +111,8 @@ GeoIndex2::~GeoIndex2 () {
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
 
-int GeoIndex2::insert (TRI_doc_mptr_t const* doc, 
-                       bool isRollback) {
+void GeoIndex2::insert (TransactionCollection*,
+                        TRI_doc_mptr_t const* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
   // lookup latitude and longitude
@@ -138,14 +140,14 @@ int GeoIndex2::insert (TRI_doc_mptr_t const* doc,
   if (! ok) {
     if (_unique) {
       if (_ignoreNull && missing) {
-        return TRI_ERROR_NO_ERROR;
+        return;
       }
       else {
-        return TRI_set_errno(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
       }
     }
     else {
-      return TRI_ERROR_NO_ERROR;
+      return;
     }
   }
 
@@ -159,32 +161,30 @@ int GeoIndex2::insert (TRI_doc_mptr_t const* doc,
   int res = GeoIndex_insert(_geoIndex, &gc);
 
   if (res == -1) {
-    return TRI_set_errno(TRI_ERROR_INTERNAL);
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
   }
   else if (res == -2) {
-    return TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
   else if (res == -3) {
     if (_unique) {
-      return TRI_set_errno(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
     }
     else {
-      return TRI_ERROR_NO_ERROR;
+      return;
     }
   }
   else if (res < 0) {
-    return TRI_set_errno(TRI_ERROR_INTERNAL);
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
   }
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove document from index
 ////////////////////////////////////////////////////////////////////////////////
 
-int GeoIndex2::remove (TRI_doc_mptr_t const* doc, 
-                       bool isRollback) {
+void GeoIndex2::remove (TransactionCollection*,
+                        TRI_doc_mptr_t const* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
   TRI_shaped_json_t shapedJson;
@@ -215,17 +215,13 @@ int GeoIndex2::remove (TRI_doc_mptr_t const* doc,
     // ignore non-existing elements in geo-index
     GeoIndex_remove(_geoIndex, &gc);
   }
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief post insert (does nothing) 
 ////////////////////////////////////////////////////////////////////////////////
 
-int GeoIndex2::postInsert (TRI_transaction_collection_t*, 
-                           TRI_doc_mptr_t const*) {
-  return TRI_ERROR_NO_ERROR;
+void GeoIndex2::preCommit (TransactionCollection*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -240,7 +236,7 @@ size_t GeoIndex2::memory () {
 /// @brief return a JSON representation of the index
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_json_t* GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
+GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
   std::vector<std::string> f;
 
   auto shaper = _collection->getShaper();

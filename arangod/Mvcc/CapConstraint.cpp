@@ -32,7 +32,9 @@
 #include "Utils/transactions.h"
 #include "VocBase/datafile.h"
 #include "VocBase/document-collection.h"
+#include "Mvcc/TransactionCollection.h"
 
+using namespace triagens::basics;
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
@@ -51,7 +53,7 @@ CapConstraint::CapConstraint (TRI_idx_iid_t id,
                               TRI_document_collection_t* collection,
                               size_t count,
                               int64_t size)
-  : Index(id, collection, std::vector<std::string>(), false, false, false),
+  : Index(id, collection, std::vector<std::string>()),
     _count(count),
     _size(size) {
 
@@ -73,41 +75,39 @@ CapConstraint::~CapConstraint () {
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-int CapConstraint::insert (TRI_doc_mptr_t const* doc,
-                           bool isRollback) {
+void CapConstraint::insert (TransactionCollection* traColl,
+                           TRI_doc_mptr_t const* doc) {
   if (_size > 0) {
     // there is a size restriction
     auto marker = static_cast<TRI_df_marker_t const*>(doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME
 
     // check if the document would be too big
     if ((int64_t) marker->_size > (int64_t) _size) {
-      return TRI_ERROR_ARANGO_DOCUMENT_TOO_LARGE;
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TOO_LARGE);
     }
   }
-  
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove a document (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-int CapConstraint::remove (TRI_doc_mptr_t const* doc,
-                           bool isRollback) {
-  return TRI_ERROR_NO_ERROR;
+void CapConstraint::remove (TransactionCollection*, TRI_doc_mptr_t const*) {
 }  
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief post insert
+/// @brief forget a document (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
-        
-int CapConstraint::postInsert (TRI_transaction_collection_t* trxCollection, 
-                               TRI_doc_mptr_t const* doc) {
-  
-  TRI_ASSERT(_count > 0 || _size > 0);
 
-  return apply(trxCollection);
-}
+void CapConstraint::forget (TransactionCollection*, TRI_doc_mptr_t const*) {
+}  
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief preCommit a document (does nothing so far)
+////////////////////////////////////////////////////////////////////////////////
+
+void CapConstraint::preCommit (TransactionCollection*) {
+}  
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the amount of memory used by the index
@@ -121,14 +121,10 @@ size_t CapConstraint::memory () {
 /// @brief return a JSON representation of the index
 ////////////////////////////////////////////////////////////////////////////////
         
-TRI_json_t* CapConstraint::toJson (TRI_memory_zone_t* zone) const {
-  TRI_json_t* json = Index::toJson(zone);
-
-  if (json != nullptr) {
-    TRI_Insert3ObjectJson(zone, json, "size",  TRI_CreateNumberJson(zone, static_cast<double>(_count)));
-    TRI_Insert3ObjectJson(zone, json, "byteSize",  TRI_CreateNumberJson(zone, static_cast<double>(_size)));
-  }
-
+Json CapConstraint::toJson (TRI_memory_zone_t* zone) const {
+  Json json(zone, Json::Object, 2);
+  json("size", Json(zone, static_cast<double>(_count)))
+      ("byteSize", Json(zone, static_cast<double>(_size)));
   return json;
 }
 

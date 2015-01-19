@@ -32,6 +32,7 @@
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
 
+using namespace triagens::basics;
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
@@ -53,9 +54,12 @@ SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
                                 bool unique,
                                 bool ignoreNull,
                                 bool sparse)
-  : Index(id, collection, fields, unique, ignoreNull, sparse),
+  : Index(id, collection, fields),
     _paths(paths),
-    _skiplistIndex(nullptr) {
+    _skiplistIndex(nullptr),
+    _unique(unique),
+    _ignoreNull(ignoreNull),
+    _sparse(sparse) {
   
     _skiplistIndex = SkiplistIndex_new(_collection, _paths.size(), unique);
 
@@ -82,8 +86,8 @@ SkiplistIndex2::~SkiplistIndex2 () {
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
         
-int SkiplistIndex2::insert (TRI_doc_mptr_t const* doc, 
-                            bool isRollback) {
+void SkiplistIndex2::insert (TransactionCollection*,
+                             TRI_doc_mptr_t const* doc) {
   // ...........................................................................
   // Allocate storage to shaped json objects stored as a simple list.
   // These will be used for comparisions
@@ -93,7 +97,7 @@ int SkiplistIndex2::insert (TRI_doc_mptr_t const* doc,
   skiplistElement._subObjects = static_cast<TRI_shaped_sub_t*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(TRI_shaped_sub_t) * _paths.size(), false));
 
   if (skiplistElement._subObjects == nullptr) {
-    return TRI_ERROR_OUT_OF_MEMORY;
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 
   int res = shapify(&skiplistElement, doc);
@@ -122,10 +126,10 @@ int SkiplistIndex2::insert (TRI_doc_mptr_t const* doc,
     // .........................................................................
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
-      return TRI_ERROR_NO_ERROR;
+      return;
     }
 
-    return res;
+    THROW_ARANGO_EXCEPTION(res);
   }
 
   // ...........................................................................
@@ -141,15 +145,17 @@ int SkiplistIndex2::insert (TRI_doc_mptr_t const* doc,
 
   TRI_Free(TRI_UNKNOWN_MEM_ZONE, skiplistElement._subObjects);
 
-  return res;
+  if (res != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(res);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove document from index
 ////////////////////////////////////////////////////////////////////////////////
         
-int SkiplistIndex2::remove (TRI_doc_mptr_t const* doc,
-                            bool isRollback) {
+void SkiplistIndex2::remove (TransactionCollection*,
+                             TRI_doc_mptr_t const* doc) {
   // ...........................................................................
   // Allocate some memory for the SkiplistIndexElement structure
   // ...........................................................................
@@ -158,7 +164,7 @@ int SkiplistIndex2::remove (TRI_doc_mptr_t const* doc,
   skiplistElement._subObjects = static_cast<TRI_shaped_sub_t*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(TRI_shaped_sub_t) * _paths.size(), false));
 
   if (skiplistElement._subObjects == nullptr) {
-    return TRI_ERROR_OUT_OF_MEMORY;
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 
   // ..........................................................................
@@ -187,10 +193,10 @@ int SkiplistIndex2::remove (TRI_doc_mptr_t const* doc,
     // ........................................................................
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
-      return TRI_ERROR_NO_ERROR;
+      return;
     }
 
-    return res;
+    THROW_ARANGO_EXCEPTION(res);
   }
 
   // ...........................................................................
@@ -205,16 +211,16 @@ int SkiplistIndex2::remove (TRI_doc_mptr_t const* doc,
 
   TRI_Free(TRI_UNKNOWN_MEM_ZONE, skiplistElement._subObjects);
 
-  return res;
+  if (res != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(res);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief post-insert (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-int SkiplistIndex2::postInsert (TRI_transaction_collection_t*, 
-                                TRI_doc_mptr_t const*) {
-  return TRI_ERROR_NO_ERROR;
+void SkiplistIndex2::preCommit (TransactionCollection*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -229,20 +235,16 @@ size_t SkiplistIndex2::memory () {
 /// @brief return a JSON representation of the index
 ////////////////////////////////////////////////////////////////////////////////
         
-TRI_json_t* SkiplistIndex2::toJson (TRI_memory_zone_t* zone) const {
-  TRI_json_t* json = Index::toJson(zone);
-  
-  if (json != nullptr) {
-    TRI_json_t* fields = TRI_CreateArrayJson(zone, _fields.size());
-
-    if (fields != nullptr) {
-      for (auto const& field : _fields) {
-        TRI_PushBack3ArrayJson(zone, fields, TRI_CreateStringCopyJson(zone, field.c_str(), field.size()));
-      }
-      TRI_Insert3ObjectJson(zone, json, "fields", fields);
-    }
+Json SkiplistIndex2::toJson (TRI_memory_zone_t* zone) const {
+  Json json(zone, Json::Object, 4);
+  Json fields(zone, Json::Array, _fields.size());
+  for (auto& field : _fields) {
+    fields.add(Json(zone, field));
   }
-
+  json("fields", fields)
+      ("unique", Json(zone, _unique))
+      ("ignoreNull", Json(zone, _ignoreNull))
+      ("sparse", Json(zone, _sparse));
   return json;
 }
 

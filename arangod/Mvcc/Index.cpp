@@ -46,16 +46,10 @@ using namespace triagens::mvcc;
 
 Index::Index (TRI_idx_iid_t id,
               TRI_document_collection_t* collection,
-              std::vector<std::string> const& fields,
-              bool unique,
-              bool ignoreNull,
-              bool sparse)
+              std::vector<std::string> const& fields) {
   : _id(id),
     _collection(collection),
-    _fields(fields),
-    _unique(unique),
-    _ignoreNull(ignoreNull),
-    _sparse(sparse) {
+    _fields(fields) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -73,7 +67,7 @@ Index::~Index () {
 /// @brief cleans up the index - default implementation (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
       
-int Index::cleanup () {
+void Index::cleanup () {
   return TRI_ERROR_NO_ERROR;
 }
 
@@ -82,7 +76,7 @@ int Index::cleanup () {
 /// (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
       
-int Index::sizeHint (size_t) {
+void Index::sizeHint (size_t) {
   return TRI_ERROR_NO_ERROR;
 }
 
@@ -91,16 +85,10 @@ int Index::sizeHint (size_t) {
 /// base functionality (called from derived classes)
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_json_t* Index::toJson (TRI_memory_zone_t* zone) const {
-  TRI_json_t* json = TRI_CreateObjectJson(zone);
-
-  if (json != nullptr) {
-    std::string id(std::to_string(_id));
-    TRI_Insert3ObjectJson(zone, json, "id", TRI_CreateStringCopyJson(zone, id.c_str(), id.size()));
-    TRI_Insert3ObjectJson(zone, json, "type", TRI_CreateStringCopyJson(zone, typeName().c_str(), typeName().size()));
-    TRI_Insert3ObjectJson(zone, json, "unique", TRI_CreateBooleanJson(zone, _unique));
-  }
-
+triagens::basics::Json Index::toJson (TRI_memory_zone_t* zone) const {
+  triagens::basics::Json json(zone, 2, triagens::basics::Json::Object);
+  json("id", triagens::basics::Json(zone, id))
+      ("type", triagens::basics::Json(zone, typeName));
   return json;
 }
 

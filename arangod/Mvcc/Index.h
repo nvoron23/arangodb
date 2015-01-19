@@ -31,16 +31,18 @@
 #define ARANGODB_MVCC_INDEX_H 1
 
 #include "Basics/Common.h"
+#include "Basics/JsonHelper.h"
 #include "VocBase/index.h"
 #include "VocBase/voc-types.h"
 
 struct TRI_doc_mptr_t;
 struct TRI_document_collection_t;
 struct TRI_json_t;
-struct TRI_transaction_collection_s;
 
 namespace triagens {
   namespace mvcc {
+
+    class TransactionCollection;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       class Index
@@ -55,30 +57,32 @@ namespace triagens {
 
         Index (TRI_idx_iid_t id,
                struct TRI_document_collection_t*,
-               std::vector<std::string> const& fields,
-               bool unique,
-               bool ignoreNull,
-               bool sparse);
+               std::vector<std::string> const& fields);
 
       public:
 
         virtual ~Index ();
 
       public:
-  
-        virtual int insert (struct TRI_doc_mptr_t const*, bool) = 0;
-        virtual int remove (struct TRI_doc_mptr_t const*, bool) = 0;
-        virtual int postInsert (struct TRI_transaction_collection_s*, struct TRI_doc_mptr_t const*) = 0;
+
+        virtual void insert (class TransactionCollection*, 
+                             struct TRI_doc_mptr_t const*) = 0;
+        virtual void remove (class TransactionCollection*,
+                             struct TRI_doc_mptr_t const*) = 0;
+        virtual void forget (class TransactionCollection*,
+                             struct TRI_doc_mptr_t const*) = 0;
+
+        virtual void preCommit (class TransactionCollection*) = 0;
 
         virtual size_t memory () = 0;
         virtual TRI_idx_type_e type () const = 0;
         virtual std::string typeName () const = 0;
         
         // a garbage collection function for the index
-        virtual int cleanup ();
-        virtual int sizeHint (size_t);
+        virtual void cleanup ();
+        virtual void sizeHint (size_t);
         
-        virtual struct TRI_json_t* toJson (TRI_memory_zone_t*) const;
+        virtual triagens::basics::Json toJson (TRI_memory_zone_t*) const;
 
         inline TRI_idx_iid_t id () const {
           return _id;
@@ -91,9 +95,6 @@ namespace triagens {
         struct TRI_document_collection_t* _collection;
 
         std::vector<std::string> const    _fields;
-        bool const                        _unique;
-        bool const                        _ignoreNull;
-        bool const                        _sparse;
     };
 
   }
