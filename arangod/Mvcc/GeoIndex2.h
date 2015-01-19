@@ -31,7 +31,7 @@
 #define ARANGODB_MVCC_GEO_INDEX_H 1
 
 #include "Basics/Common.h"
-#include "Bascis/JsonHelper.h"
+#include "Basics/JsonHelper.h"
 #include "GeoIndex/GeoIndex.h"
 #include "Mvcc/Index.h"
 #include "ShapedJson/shaped-json.h"

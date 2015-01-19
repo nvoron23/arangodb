@@ -82,14 +82,17 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
                       std::vector<TRI_shape_pid_t> const& paths,
                       bool unique,
                       bool ignoreNull)
-  : Index(id, collection, fields, unique, ignoreNull, false),
+  : Index(id, collection, fields),
     _paths(paths),
     _geoIndex(nullptr),
     _variant(INDEX_GEO_INDIVIDUAL_LAT_LON),
     _location(0),
     _latitude(paths[0]),
     _longitude(paths[1]),
-    _geoJson(false) {
+    _geoJson(false),
+    _unique(unique),
+    _ignoreNull(ignoreNull)
+{
   
   _geoIndex = GeoIndex_new();
 
@@ -250,7 +253,7 @@ Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
     TRI_shape_path_t const* path = shaper->lookupAttributePathByPid(shaper, _location);  // ONLY IN INDEX, PROTECTED by RUNTIME
 
     if (path == nullptr) {
-      return nullptr;
+      return Json();
     }
 
     char const* location = TRI_NAME_SHAPE_PATH(path);
@@ -261,7 +264,7 @@ Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
     TRI_shape_path_t const* path = shaper->lookupAttributePathByPid(shaper, _latitude);  // ONLY IN INDEX, PROTECTED by RUNTIME
 
     if (path == nullptr) {
-      return nullptr;
+      return Json();
     }
 
     char const* latitude = TRI_NAME_SHAPE_PATH(path);
@@ -271,7 +274,7 @@ Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
     path = shaper->lookupAttributePathByPid(shaper, _longitude);  // ONLY IN INDEX, PROTECTED by RUNTIME
 
     if (path == nullptr) {
-      return nullptr;
+      return Json();
     }
 
     char const* longitude = TRI_NAME_SHAPE_PATH(path);
@@ -279,28 +282,24 @@ Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
   }
 
   // create json
-  TRI_json_t* json = Index::toJson(zone);
+  Json json = Index::toJson(zone);
 
-  if (json != nullptr) {
-    if (_variant == INDEX_GEO_COMBINED_LAT_LON || 
-        _variant == INDEX_GEO_COMBINED_LON_LAT) {
-      TRI_Insert3ObjectJson(zone, json, "geoJson", TRI_CreateBooleanJson(zone, _geoJson));
-    }
-
-    // "constraint" and "unique" are identical for geo indexes.
-    // we return "constraint" just for downwards-compatibility
-    TRI_Insert3ObjectJson(zone, json, "constraint", TRI_CreateBooleanJson(zone, _unique));
-    TRI_Insert3ObjectJson(zone, json, "ignoreNull", TRI_CreateBooleanJson(zone, _ignoreNull));
-
-    TRI_json_t* fields = TRI_CreateArrayJson(zone, f.size());
-
-    if (fields != nullptr) {
-      for (auto field : f) {
-        TRI_PushBack3ArrayJson(zone, fields, TRI_CreateStringCopyJson(zone, field.c_str(), field.size()));
-      }
-      TRI_Insert3ObjectJson(zone, json, "fields", fields);
-    }
+  if (_variant == INDEX_GEO_COMBINED_LAT_LON || 
+      _variant == INDEX_GEO_COMBINED_LON_LAT) {
+    json("geoJson", Json(zone, _geoJson));
   }
+
+  // "constraint" and "unique" are identical for geo indexes.
+  // we return "constraint" just for downwards-compatibility
+  json("constraint", Json(zone, _unique))
+      ("ignoreNull", Json(zone, _ignoreNull));
+
+  Json fields(zone, Json::Object, f.size());
+
+  for (auto const& field : f) {
+    fields.add(Json(zone, field));
+  }
+  json("fields", fields);
 
   return json;
 }

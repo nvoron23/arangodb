@@ -33,6 +33,7 @@
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
 
+using namespace triagens::basics;
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
@@ -52,8 +53,9 @@ HashIndex::HashIndex (TRI_idx_iid_t id,
                       std::vector<std::string> const& fields,
                       std::vector<TRI_shape_pid_t> const& paths,
                       bool unique) 
-  : Index(id, collection, fields, unique, false, false),
-    _paths(paths) {
+  : Index(id, collection, fields),
+    _paths(paths),
+    _unique(unique) {
   
   int res;
   if (unique) {
@@ -89,8 +91,8 @@ HashIndex::~HashIndex () {
 /// @brief insert a document into the index
 ////////////////////////////////////////////////////////////////////////////////
         
-int HashIndex::insert (TRI_doc_mptr_t const* doc, 
-                       bool isRollback) {
+void HashIndex::insert (TransactionCollection*,
+                        TRI_doc_mptr_t const* doc) {
   int res;
 
   if (_unique) {
@@ -99,18 +101,19 @@ int HashIndex::insert (TRI_doc_mptr_t const* doc,
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_t>(&hashElement);
-      return TRI_ERROR_NO_ERROR;
+      return;
     }
 
     if (res != TRI_ERROR_NO_ERROR) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_t>(&hashElement);
-      return res;
+      THROW_ARANGO_EXCEPTION(res);
     }
 
-    res = insertUnique(&hashElement, isRollback);
+    res = insertUnique(&hashElement, false);
 
     if (res != TRI_ERROR_NO_ERROR) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_t>(&hashElement);
+      THROW_ARANGO_EXCEPTION(res);
     }
   }
   else {
@@ -119,29 +122,28 @@ int HashIndex::insert (TRI_doc_mptr_t const* doc,
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_multi_t>(&hashElement);
-      return TRI_ERROR_NO_ERROR;
+      return;
     }
 
     if (res != TRI_ERROR_NO_ERROR) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_multi_t>(&hashElement);
-      return res;
+      THROW_ARANGO_EXCEPTION(res);
     }
 
-    res = insertMulti(&hashElement, isRollback);
+    res = insertMulti(&hashElement, false);
     if (res != TRI_ERROR_NO_ERROR) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_multi_t>(&hashElement);
+      THROW_ARANGO_EXCEPTION(res);
     }
   }
-
-  return res;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove a document from the index
 ////////////////////////////////////////////////////////////////////////////////
 
-int HashIndex::remove (TRI_doc_mptr_t const* doc,
-                       bool isRollback) {
+void HashIndex::remove (TransactionCollection*,
+                        TRI_doc_mptr_t const* doc) {
   int res;
 
   if (_unique) {
@@ -150,12 +152,12 @@ int HashIndex::remove (TRI_doc_mptr_t const* doc,
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_t>(&hashElement);
-      return TRI_ERROR_NO_ERROR;
+      return;
     }
 
     if (res != TRI_ERROR_NO_ERROR) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_t>(&hashElement);
-      return res;
+      THROW_ARANGO_EXCEPTION(res);
     }
     res = removeUnique(&hashElement);
     freeSubObjectsHashIndexElement<TRI_hash_index_element_t>(&hashElement);
@@ -166,42 +168,40 @@ int HashIndex::remove (TRI_doc_mptr_t const* doc,
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_multi_t>(&hashElement);
-      return TRI_ERROR_NO_ERROR;
+      return;
     }
 
     if (res != TRI_ERROR_NO_ERROR) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_multi_t>(&hashElement);
-      return res;
+      THROW_ARANGO_EXCEPTION(res);
     }
     res = removeMulti(&hashElement);
     freeSubObjectsHashIndexElement<TRI_hash_index_element_multi_t>(&hashElement);
   }
 
-  return res;
+  if (res != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(res);
+  }
 }        
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief post insert (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
         
-int HashIndex::postInsert (TRI_transaction_collection_t*, 
-                           TRI_doc_mptr_t const*) {
-  return TRI_ERROR_NO_ERROR;
+void HashIndex::preCommit (TransactionCollection*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief provides a hint for the expected index size
 ////////////////////////////////////////////////////////////////////////////////
 
-int HashIndex::sizeHint (size_t size) {
+void HashIndex::sizeHint (size_t size) {
   if (_unique) {
     TRI_ResizeHashArray(&_hashArray, size);
   }
   else {
     TRI_ResizeHashArrayMulti(&_hashArrayMulti, size);
   }
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -223,20 +223,14 @@ size_t HashIndex::memory () {
 /// @brief return a JSON representation of the index
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_json_t* HashIndex::toJson (TRI_memory_zone_t* zone) const {
-  TRI_json_t* json = Index::toJson(zone);
-
-  if (json != nullptr) {
-    TRI_json_t* fields = TRI_CreateArrayJson(zone, _fields.size());
-
-    if (fields != nullptr) {
-      for (auto const& field : _fields) {
-        TRI_PushBack3ArrayJson(zone, fields, TRI_CreateStringCopyJson(zone, field.c_str(), field.size()));
-      }
-      TRI_Insert3ObjectJson(zone, json, "fields", fields);
-    }
+Json HashIndex::toJson (TRI_memory_zone_t* zone) const {
+  Json json = Index::toJson(zone);
+  Json fields(zone, Json::Array, _fields.size());
+  for (auto& field : _fields) {
+    fields.add(Json(zone, field));
   }
-
+  json("fields", fields)
+      ("unique", Json(zone, _unique));
   return json;
 }
 

@@ -122,7 +122,7 @@ size_t CapConstraint::memory () {
 ////////////////////////////////////////////////////////////////////////////////
         
 Json CapConstraint::toJson (TRI_memory_zone_t* zone) const {
-  Json json(zone, Json::Object, 2);
+  Json json = Index::toJson(zone);
   json("size", Json(zone, static_cast<double>(_count)))
       ("byteSize", Json(zone, static_cast<double>(_size)));
   return json;

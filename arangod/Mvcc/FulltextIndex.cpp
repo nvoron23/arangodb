@@ -158,7 +158,7 @@ size_t FulltextIndex::memory () {
 ////////////////////////////////////////////////////////////////////////////////
 
 Json FulltextIndex::toJson (TRI_memory_zone_t* zone) const {
-  Json json(zone, Json::Object, 2);
+  Json json = Index::toJson(zone);
   Json fields(zone, Json::Array, _fields.size());
   for (auto& field : _fields) {
     fields.add(Json(zone, field));

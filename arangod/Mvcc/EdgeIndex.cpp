@@ -435,7 +435,7 @@ size_t EdgeIndex::memory () {
 ////////////////////////////////////////////////////////////////////////////////
       
 Json EdgeIndex::toJson (TRI_memory_zone_t* zone) const {
-  Json json(zone, Json::Object, 1);
+  Json json = Index::toJson(zone);
   Json fields(zone, Json::Array, _fields.size());
   for (auto& field : _fields) {
     fields.add(Json(zone, field));

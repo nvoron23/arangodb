@@ -30,6 +30,7 @@
 #include "Index.h"
 #include "Basics/json.h"
 
+using namespace triagens::basics;
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
@@ -46,7 +47,7 @@ using namespace triagens::mvcc;
 
 Index::Index (TRI_idx_iid_t id,
               TRI_document_collection_t* collection,
-              std::vector<std::string> const& fields) {
+              std::vector<std::string> const& fields)
   : _id(id),
     _collection(collection),
     _fields(fields) {
@@ -68,7 +69,6 @@ Index::~Index () {
 ////////////////////////////////////////////////////////////////////////////////
       
 void Index::cleanup () {
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +77,6 @@ void Index::cleanup () {
 ////////////////////////////////////////////////////////////////////////////////
       
 void Index::sizeHint (size_t) {
-  return TRI_ERROR_NO_ERROR;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -86,9 +85,9 @@ void Index::sizeHint (size_t) {
 ////////////////////////////////////////////////////////////////////////////////
 
 triagens::basics::Json Index::toJson (TRI_memory_zone_t* zone) const {
-  triagens::basics::Json json(zone, 2, triagens::basics::Json::Object);
-  json("id", triagens::basics::Json(zone, id))
-      ("type", triagens::basics::Json(zone, typeName));
+  triagens::basics::Json json(zone, triagens::basics::Json::Object, 4);
+  json("id", triagens::basics::Json(zone, static_cast<double>(_id)))
+      ("type", triagens::basics::Json(zone, typeName()));
   return json;
 }
 
