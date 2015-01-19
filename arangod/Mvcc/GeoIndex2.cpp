@@ -32,6 +32,7 @@
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
 
+using namespace triagens::basics;
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
@@ -236,7 +237,7 @@ size_t GeoIndex2::memory () {
 /// @brief return a JSON representation of the index
 ////////////////////////////////////////////////////////////////////////////////
 
-GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
+Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
   std::vector<std::string> f;
 
   auto shaper = _collection->getShaper();
