@@ -3242,6 +3242,96 @@ static void JS_StatusVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
   TRI_V8_RETURN(v8::Number::New(isolate, (int) status));
 }
 
+#include "Mvcc/CollectionOperations.h"
+#include "Mvcc/SubTransaction.h"
+#include "Mvcc/TopLevelTransaction.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionManager.h"
+#include "Mvcc/Index.h"
+#include "Mvcc/GeoIndex2.h"
+#include "Mvcc/HashIndex.h"
+#include "Mvcc/SkiplistIndex2.h"
+#include "Mvcc/FulltextIndex.h"
+#include "Mvcc/EdgeIndex.h"
+#include "Mvcc/CapConstraint.h"
+
+static void JS_Test (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+            
+  TransactionBase trx(true);
+
+
+  triagens::mvcc::TransactionManager::initialize();
+
+  {
+    auto transactionManager = triagens::mvcc::TransactionManager::instance();
+ 
+    std::unique_ptr<triagens::mvcc::Transaction> trx1(transactionManager->createTransaction(collection->_vocbase));
+    std::cout << "TRX1: " << trx1.get() << "\n";
+
+    {
+      std::unique_ptr<triagens::mvcc::Transaction> trx2(transactionManager->createTransaction(collection->_vocbase));
+      std::cout << "TRX2: " << trx2.get() << "\n";
+    }
+    
+    {
+      std::unique_ptr<triagens::mvcc::Transaction> trx3(transactionManager->createTransaction(collection->_vocbase));
+      std::cout << "TRX3: " << trx3.get() << "\n";
+    
+      {
+        std::unique_ptr<triagens::mvcc::Transaction> trx4(transactionManager->createTransaction(collection->_vocbase));
+        std::cout << "TRX4: " << trx4.get() << "\n";
+      }
+      
+    }
+
+    delete trx1.release();
+  
+    {
+      std::unique_ptr<triagens::mvcc::Transaction> trx5(transactionManager->createTransaction(collection->_vocbase));
+      std::cout << "TRX5: " << trx5.get() << "\n";
+      trx5->commit();
+    }
+    
+    {
+      std::unique_ptr<triagens::mvcc::Transaction> trx6(transactionManager->createTransaction(collection->_vocbase));
+      std::cout << "TRX6: " << trx6.get() << "\n";
+      trx6->rollback();
+    }
+    
+
+    {
+      std::unique_ptr<triagens::mvcc::Transaction> trx7(transactionManager->createTransaction(collection->_vocbase));
+      std::cout << "TRX7: " << *(trx7) << "\n";
+
+      auto c1 = trx7->collection("yy");
+      std::cout << c1 << "\n";
+      std::cout << trx7->collection("_users") << "\n";
+      std::cout << trx7->collection("yy") << "\n";
+
+      auto json = JsonHelper::fromString("{ \"_key\": \"der-hans\", \"kanns\": false, \"lol\": 1 }");
+      triagens::mvcc::Document doc = triagens::mvcc::Document::createFromJson(c1->shaper(), json);
+      triagens::mvcc::OperationOptions options;
+      triagens::mvcc::OperationResult result = triagens::mvcc::CollectionOperations::insertDocument(*trx7, *trx7->collection("yy"), doc, options);
+
+      trx7->commit();
+    }
+  }
+
+  triagens::mvcc::TransactionManager::shutdown();
+
+  TRI_V8_RETURN(v8::Null(isolate));
+}
+ 
+  
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief truncates a collection
 ////////////////////////////////////////////////////////////////////////////////
@@ -4341,6 +4431,7 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("rotate"), JS_RotateVocbaseCol);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("save"), JS_InsertVocbaseCol); // note: save is now an alias for insert
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("status"), JS_StatusVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("test"), JS_Test);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("TRUNCATE"), JS_TruncateVocbaseCol, true);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("truncateDatafile"), JS_TruncateDatafileVocbaseCol);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("type"), JS_TypeVocbaseCol);
