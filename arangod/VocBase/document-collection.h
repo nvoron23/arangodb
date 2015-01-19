@@ -33,6 +33,8 @@
 
 #include "Basics/Common.h"
 
+#include "Mvcc/TransactionId.h"
+
 #include "VocBase/barrier.h"
 #include "VocBase/collection.h"
 #include "VocBase/headers.h"
@@ -117,7 +119,10 @@ struct TRI_doc_mptr_t {
     TRI_doc_mptr_t*        _prev;    // previous master pointer
     TRI_doc_mptr_t*        _next;    // next master pointer
   protected:
-    void const*            _dataptr; // this is the pointer to the beginning of the raw marker
+    std::atomic<void const*> _dataptr; 
+                   // this is the pointer to the beginning of the raw marker
+    triagens::mvcc::TransactionId::IdType              _from;
+    std::atomic<triagens::mvcc::TransactionId::IdType> _to;
 
   public:
     TRI_doc_mptr_t () : _rid(0), 
@@ -125,7 +130,9 @@ struct TRI_doc_mptr_t {
                         _hash(0),
                         _prev(nullptr),
                         _next(nullptr),
-                        _dataptr(nullptr) {
+                        _dataptr(nullptr),
+                        _from(0),
+                        _to(0) {
     }
 
     virtual ~TRI_doc_mptr_t () {
@@ -138,16 +145,20 @@ struct TRI_doc_mptr_t {
       _hash = 0;
       _prev = nullptr;
       _next = nullptr;
+      _from = 0;
+      _to = 0;
     }
 
     void copy (TRI_doc_mptr_t const& that) {
       // This is for cases where we explicitly have to copy originals!
       _rid = that._rid;
       _fid = that._fid;
-      _dataptr = that._dataptr;
+      _dataptr.store(that._dataptr.load());
       _hash = that._hash;
       _prev = that._prev;
       _next = that._next;
+      _from = that._from;
+      _to.store(that._to.load());
     }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +167,7 @@ struct TRI_doc_mptr_t {
 
 #ifndef TRI_ENABLE_MAINTAINER_MODE
     inline void const* getDataPtr () const {
-      return _dataptr;
+      return _dataptr.load(memory_order_acquire);
     }
 #else
     // The actual code has an assertion about transactions!
@@ -169,7 +180,7 @@ struct TRI_doc_mptr_t {
 
 #ifndef TRI_ENABLE_MAINTAINER_MODE
     inline void setDataPtr (void const* d) {
-      _dataptr = d;
+      _dataptr.store(d, memory_order_release);
     }
 #else
     // The actual code has an assertion about transactions!
@@ -182,19 +193,19 @@ struct TRI_doc_mptr_t {
 ////////////////////////////////////////////////////////////////////////////////
 
     char const* getShapedJsonPtr () const {
-      TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(_dataptr);
+      TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(getDataPtr());
 
       TRI_ASSERT(marker != nullptr);
 
       if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
           marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
         auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker))->_offsetJson;
-        return static_cast<char const*>(_dataptr) + offset;
+        return static_cast<char const*>(getDataPtr()) + offset;
       }
       else if (marker->_type == TRI_WAL_MARKER_DOCUMENT ||
                marker->_type == TRI_WAL_MARKER_EDGE) {
         auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(marker))->_offsetJson;
-        return static_cast<char const*>(_dataptr) + offset;
+        return static_cast<char const*>(getDataPtr()) + offset;
       }
 
       TRI_ASSERT(false);

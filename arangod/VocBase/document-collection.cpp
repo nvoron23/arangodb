@@ -64,7 +64,7 @@ using namespace triagens::arango;
 #ifdef TRI_ENABLE_MAINTAINER_MODE
 void const* TRI_doc_mptr_t::getDataPtr () const {
   TransactionBase::assertCurrentTrxActive();
-  return _dataptr;
+  return _dataptr.load(std::memory_order_acquire);
 }
 #endif
 
@@ -75,7 +75,7 @@ void const* TRI_doc_mptr_t::getDataPtr () const {
 #ifdef TRI_ENABLE_MAINTAINER_MODE
 void TRI_doc_mptr_t::setDataPtr (void const* d) {
   TransactionBase::assertCurrentTrxActive();
-  _dataptr = d;
+  _dataptr.store(d, std::memory_order_release);
 }
 #endif
 
