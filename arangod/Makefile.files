@@ -73,6 +73,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/CapConstraint.cpp \
 	arangod/Mvcc/CollectionOperations.cpp \
 	arangod/Mvcc/DistributedTransactionManager.cpp \
+	arangod/Mvcc/PrimaryIndex.cpp \
 	arangod/Mvcc/EdgeIndex.cpp \
 	arangod/Mvcc/FulltextIndex.cpp \
 	arangod/Mvcc/GeoIndex2.cpp \
