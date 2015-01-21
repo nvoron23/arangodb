@@ -152,6 +152,61 @@ bool Transaction::isAborted () {
   return _aborted;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief visibility, this implements the MVCC logic of what this transaction
+/// can see, returns the visibility of the other transaction for this one.
+/// The result can be INVISIBLE, INCONFLICT or VISIBLE. We guarantee
+/// INVISIBLE < INCONFLICT < VISIBLE, such that one can do things like
+/// "visibility(other) < VISIBLE" legally.
+////////////////////////////////////////////////////////////////////////////////
+    
+Transaction::VisibilityType Transaction::visibility(TransactionId other) {
+  if (_id.isSameTransaction(other())) {   // same top level transaction?
+    if (other.sequencePart() > _id.sequencePart()) {
+      return VisibilityType::INVISIBLE;
+    }
+    else if (other.sequencePart() < _id.sequencePart()) {
+      return _transactionManager->statusTransaction(other) == 
+             StatusType::COMMITTED
+           ? VisibilityType::VISIBLE
+           : VisibilityType::INVISIBLE;
+    }
+    else {
+      return VisibilityType::VISIBLE;
+    }
+  }
+  else {
+    // Other top level transaction
+    if (other.mainPart() > _id.mainPart()) {
+      // Started after us
+      return VisibilityType::INVISIBLE;
+    }
+
+    if (wasOngoingAtStart(other)) {
+      return VisibilityType::CONCURRENT;
+    }
+
+    // Optimisation:
+    if (isNotAborted(other)) {
+      return VisibilityType::VISIBLE;
+    }
+
+    return _transactionManager->statusTransaction(other) == 
+           StatusType::COMMITTED
+         ? VisibilityType::VISIBLE
+         : VisibilityType::INVISIBLE;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wasOngoingAtStart, check whether or not another transaction was
+/// ongoing when this one started
+////////////////////////////////////////////////////////////////////////////////
+
+bool Transaction::wasOngoingAtStart (TransactionId other) {
+  return false;   // FIXME: do something sensible
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                          non-class friend methods
 // -----------------------------------------------------------------------------

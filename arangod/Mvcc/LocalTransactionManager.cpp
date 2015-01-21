@@ -168,6 +168,15 @@ void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
   transaction->_flags.initialized();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns the status of a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+Transaction::StatusType LocalTransactionManager::statusTransaction (
+                TransactionId id) {
+  return Transaction::StatusType::COMMITTED;  // FIXME: do something sensible
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
 // -----------------------------------------------------------------------------

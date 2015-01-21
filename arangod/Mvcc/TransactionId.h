@@ -88,8 +88,8 @@ namespace triagens {
         return SequencePart(_id);
       }
       
-      inline bool IsSameTransaction (IdType other) const {
-        return IsSameTransaction(_id, other);
+      inline bool isSameTransaction (IdType other) const {
+        return isSameTransaction(_id, other);
       }
 
       static inline IdType MainPart (IdType id) {
@@ -100,7 +100,7 @@ namespace triagens {
         return (id & SequenceMask);
       }
       
-      static inline bool IsSameTransaction (IdType lhs, IdType rhs) {
+      static inline bool isSameTransaction (IdType lhs, IdType rhs) {
         return (MainPart(lhs) == MainPart(rhs));
       }
 

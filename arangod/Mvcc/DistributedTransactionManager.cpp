@@ -92,6 +92,15 @@ void DistributedTransactionManager::initializeTransaction (Transaction* transact
   TRI_ASSERT(false);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns the status of a transaction
+////////////////////////////////////////////////////////////////////////////////
+Transaction::StatusType DistributedTransactionManager::statusTransaction (
+        TransactionId) {
+  // TODO
+  return Transaction::StatusType::COMMITTED;
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       END-OF-FILE
 // -----------------------------------------------------------------------------
