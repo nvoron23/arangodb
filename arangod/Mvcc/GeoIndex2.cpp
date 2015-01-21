@@ -116,7 +116,7 @@ GeoIndex2::~GeoIndex2 () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void GeoIndex2::insert (TransactionCollection*,
-                        TRI_doc_mptr_t const* doc) {
+                        TRI_doc_mptr_t* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
   // lookup latitude and longitude

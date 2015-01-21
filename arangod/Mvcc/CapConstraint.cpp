@@ -76,7 +76,7 @@ CapConstraint::~CapConstraint () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void CapConstraint::insert (TransactionCollection* traColl,
-                           TRI_doc_mptr_t const* doc) {
+                           TRI_doc_mptr_t* doc) {
   if (_size > 0) {
     // there is a size restriction
     auto marker = static_cast<TRI_df_marker_t const*>(doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME

@@ -29,6 +29,7 @@
 
 #include "PrimaryIndex.h"
 #include "Basics/fasthash.h"
+#include "Basics/WriteLocker.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 
@@ -47,9 +48,8 @@ using namespace triagens::mvcc;
 /// @brief hash function only looking at the key
 ////////////////////////////////////////////////////////////////////////////////
 
-static inline uint64_t hashKey (char const* key) {
-  size_t len = strlen(key);
-  return fasthash64(key, len, 0x13579864);
+static inline uint64_t hashKey (std::string const* key) {
+  return PrimaryIndex::hashKeyString(key->c_str(), key->size());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -57,26 +57,9 @@ static inline uint64_t hashKey (char const* key) {
 ////////////////////////////////////////////////////////////////////////////////
 
 static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
-  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(elm->getDataPtr());
-  TRI_ASSERT(marker != nullptr);
-  char const* charMarker = static_cast<char const*>(elm->getDataPtr());
-
-  uint64_t hash;
-
-  if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
-      marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
-    auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker))->_offsetKey;
-    hash = hashKey(charMarker + offset);
-  }
-  else if (marker->_type == TRI_WAL_MARKER_DOCUMENT ||
-           marker->_type == TRI_WAL_MARKER_EDGE) {
-    auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(marker))->_offsetKey;
-    hash = hashKey(charMarker + offset);
-  }
-  else {
-    TRI_ASSERT(false);
-    return 0;
-  }
+  size_t len;
+  char const* keyString = TRI_EXTRACT_MARKER_KEY(elm, len);
+  uint64_t hash = PrimaryIndex::hashKeyString(keyString, len);
   if (byKey) {
     return hash;
   }
@@ -87,23 +70,10 @@ static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
 /// @brief comparison function key/element
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool compareKeyElement(char const* key,
+static bool compareKeyElement(std::string const* key,
                               TRI_doc_mptr_t const* elm) {
-  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(elm->getDataPtr());
-  TRI_ASSERT(marker != nullptr);
-  char const* charMarker = static_cast<char const*>(elm->getDataPtr());
-  if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
-      marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
-    auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker))->_offsetKey;
-    return strcmp(key, charMarker + offset) == 0;
-  }
-  else if (marker->_type == TRI_WAL_MARKER_DOCUMENT ||
-           marker->_type == TRI_WAL_MARKER_EDGE) {
-    auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(marker))->_offsetKey;
-    return strcmp(key, charMarker + offset) == 0;
-  }
-  TRI_ASSERT(false);
-  return false;
+  char const* elmKey = TRI_EXTRACT_MARKER_KEY(elm);
+  return strcmp(key->c_str(), elmKey) == 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -113,47 +83,8 @@ static bool compareKeyElement(char const* key,
 static bool compareElementElement(TRI_doc_mptr_t const* left,
                                   TRI_doc_mptr_t const* right,
                                   bool byKey) {
-  TRI_df_marker_t const* lmarker = static_cast<TRI_df_marker_t const*>(left->getDataPtr());
-  TRI_ASSERT(lmarker != nullptr);
-  char const* lCharMarker = static_cast<char const*>(left->getDataPtr());
-
-  TRI_df_marker_t const* rmarker = static_cast<TRI_df_marker_t const*>(right->getDataPtr());
-  TRI_ASSERT(rmarker != nullptr);
-  char const* rCharMarker = static_cast<char const*>(right->getDataPtr());
-
-  char const* leftKey;
-  char const* rightKey;
-
-  if (lmarker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
-      lmarker->_type == TRI_DOC_MARKER_KEY_EDGE) {
-    auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(lmarker))->_offsetKey;
-    leftKey = lCharMarker + offset;
-  }
-  else if (lmarker->_type == TRI_WAL_MARKER_DOCUMENT ||
-           lmarker->_type == TRI_WAL_MARKER_EDGE) {
-    auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(lmarker))->_offsetKey;
-    leftKey = lCharMarker + offset;
-  }
-  else {
-    TRI_ASSERT(false);
-    return false;
-  }
-
-  if (rmarker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
-      rmarker->_type == TRI_DOC_MARKER_KEY_EDGE) {
-    auto offset = (reinterpret_cast<TRI_doc_document_key_marker_t const*>(rmarker))->_offsetKey;
-    rightKey = rCharMarker + offset;
-  }
-  else if (rmarker->_type == TRI_WAL_MARKER_DOCUMENT ||
-           rmarker->_type == TRI_WAL_MARKER_EDGE) {
-    auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(rmarker))->_offsetKey;
-    rightKey = rCharMarker + offset;
-  }
-  else {
-    TRI_ASSERT(false);
-    return false;
-  }
-
+  char const* leftKey = TRI_EXTRACT_MARKER_KEY(left);
+  char const* rightKey = TRI_EXTRACT_MARKER_KEY(right);
   if (strcmp(leftKey, rightKey) != 0) {
     return false;
   }
@@ -198,20 +129,29 @@ PrimaryIndex::~PrimaryIndex () {
 /// @brief insert a document into the index
 ////////////////////////////////////////////////////////////////////////////////
         
-void PrimaryIndex::insert (TransactionCollection*,
-                           TRI_doc_mptr_t const* doc) {
-  TRI_doc_mptr_t const* old;
-  
-  old = _theHash->insert(doc, false, true);
+void PrimaryIndex::insert (TransactionCollection* transColl,
+                           TRI_doc_mptr_t* doc) {
+  size_t len;
+  char const* keyPtr = TRI_EXTRACT_MARKER_KEY(doc, len);
+  std::string key(keyPtr, len);
+
+  WRITE_LOCKER(_lock);
+
+  Transaction::VisibilityType visibility;
+  findRelevantRevision(transColl, key, visibility);
+  if (visibility == Transaction::VisibilityType::CONCURRENT) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+  }
+  else if (visibility == Transaction::VisibilityType::VISIBLE) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
+  }
+
+  TRI_doc_mptr_t const* old = _theHash->insert(doc, false, true);
   if (old != nullptr) {
     // This is serious: a document with this exact key and revision already
     // exists!
     THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_EXISTS);
   }
-  // Note that this is not the place to check whether a document with the
-  // same key already exists! It might have been deleted since but still
-  // resides in the primary index for older transactions to see!
-  // Therefore no more check is needed here.
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -284,6 +224,70 @@ Json PrimaryIndex::toJson (TRI_memory_zone_t* zone) const {
   json("fields", Json(zone, Json::Array, 1)
                      (Json(zone, "_key")));
   return json;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief find the visible revision by its key
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* PrimaryIndex::lookup (TransactionCollection* transColl,
+                        std::string const& key,
+                        Transaction::VisibilityType& visibility) {
+
+  return findRelevantRevision(transColl, key, visibility);
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief findRelevantRevision, this gets a key and a transaction (via 
+/// transColl). It looks up all revisions for that key in the primary
+/// index and looks for the relevant one. This is the one the transaction
+/// in transColl may see or nullptr if there is no such revision. In addition
+/// the variable visibility is set to VISIBLE, if the found revision is
+/// not yet obsolete, and to CONCURRENT, if another concurrent transaction
+/// has already removed this revision, and to INVISIBLE, if no relevant
+/// revision was found.
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
+                            TransactionCollection* transColl,
+                            std::string const& key,
+                            Transaction::VisibilityType& visibility) {
+  // Get all available revisions:
+  std::vector<TRI_doc_mptr_t*>* revisions = _theHash->lookupByKey(&key);
+
+  // Now look through them and find "the right one":
+  Transaction* trans = transColl->getTransaction();
+  for (auto p : *revisions) {
+    if (trans->visibility(p->from()) == Transaction::VisibilityType::VISIBLE) {
+      TransactionId to = p->to();
+      if (to() == 0) {
+        visibility = Transaction::VisibilityType::VISIBLE;
+        delete revisions;
+        return p;
+      }
+      Transaction::VisibilityType v = trans->visibility(to);
+      if (v == Transaction::VisibilityType::VISIBLE) {
+        continue;
+      }
+      else if (v == Transaction::VisibilityType::CONCURRENT) {
+        visibility = Transaction::VisibilityType::CONCURRENT;
+        delete revisions;
+        return p;
+      }
+      else {  // INVISIBLE
+        visibility = Transaction::VisibilityType::VISIBLE;
+        delete revisions;
+        return p;
+      }
+    }
+  }
+  visibility = Transaction::VisibilityType::INVISIBLE;
+  delete revisions;
+  return nullptr;
 }
 
 // -----------------------------------------------------------------------------

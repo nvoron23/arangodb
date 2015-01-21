@@ -43,8 +43,6 @@ struct TRI_json_t;
 namespace triagens {
   namespace mvcc {
 
-    class TransactionCollection;
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       class Index
 // -----------------------------------------------------------------------------
@@ -67,7 +65,7 @@ namespace triagens {
       public:
 
         virtual void insert (class TransactionCollection*, 
-                             struct TRI_doc_mptr_t const*) = 0;
+                             struct TRI_doc_mptr_t*) = 0;
         virtual void remove (class TransactionCollection*,
                              struct TRI_doc_mptr_t const*) = 0;
         virtual void forget (class TransactionCollection*,

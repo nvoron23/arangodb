@@ -190,7 +190,7 @@ std::cout << "MARKER TYPE: " << static_cast<TRI_df_marker_t const*>((*mptr)->get
   // iterate over all indexes while holding the index read-lock
   for (auto index : indexUser.indexes()) {
     // and call insert for each index
-    index->insert(&collection, const_cast<TRI_doc_mptr_t const*>(*mptr));
+    index->insert(&collection, const_cast<TRI_doc_mptr_t*>(*mptr));
   }
 
   // do a final sync by clicking each index' lock

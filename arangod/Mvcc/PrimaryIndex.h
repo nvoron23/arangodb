@@ -33,7 +33,11 @@
 #include "Basics/Common.h"
 #include "Basics/JsonHelper.h"
 #include "Basics/AssocMulti.h"
+#include "Basics/fasthash.h"
+
 #include "Mvcc/Index.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
 
 struct TRI_doc_mptr_t;
 struct TRI_document_collection_t;
@@ -57,13 +61,17 @@ namespace triagens {
       public:
   
         virtual void insert (class TransactionCollection*, 
-                             struct TRI_doc_mptr_t const*) override final;
+                             struct TRI_doc_mptr_t*) override final;
         virtual void remove (class TransactionCollection*,
                              struct TRI_doc_mptr_t const*) override final;
         virtual void forget (class TransactionCollection*,
                              struct TRI_doc_mptr_t const*) override final;
 
         virtual void preCommit (class TransactionCollection*) override final;
+
+        struct TRI_doc_mptr_t* lookup (class TransactionCollection*,
+                                       std::string const& key,
+                                       Transaction::VisibilityType&);
 
         // a garbage collection function for the index
         void cleanup () override final;
@@ -82,14 +90,23 @@ namespace triagens {
           return "primary";
         }
 
+        static uint64_t hashKeyString (char const* key, size_t len) {
+          return fasthash64(key, len, 0x13579864);
+        }
+
       private:
 
-        typedef triagens::basics::AssocMulti<char const, 
-                                             struct TRI_doc_mptr_t const,
+        typedef triagens::basics::AssocMulti<std::string const, 
+                                             struct TRI_doc_mptr_t,
                                              uint32_t>
                 PrimaryIndexHash_t;
 
         PrimaryIndexHash_t* _theHash;
+
+        TRI_doc_mptr_t* findRelevantRevision (
+                    TransactionCollection* transColl,
+                    std::string const& key,
+                    triagens::mvcc::Transaction::VisibilityType& visibility);
     };
 
   }

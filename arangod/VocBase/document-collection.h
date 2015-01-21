@@ -223,6 +223,28 @@ struct TRI_doc_mptr_t {
     TRI_doc_mptr_t& operator= (TRI_doc_mptr_t const&) = delete;
     TRI_doc_mptr_t(TRI_doc_mptr_t const&) = delete;
 
+    inline triagens::mvcc::TransactionId from () const {
+      return triagens::mvcc::TransactionId(_from);
+    }
+
+    inline void setFrom (triagens::mvcc::TransactionId::IdType from) {
+      _from = from;
+    }
+
+    inline triagens::mvcc::TransactionId to () const {
+      return triagens::mvcc::TransactionId(_to.load());
+    }
+
+    inline void setTo (triagens::mvcc::TransactionId::IdType to) {
+      _to.store(to);
+    }
+
+    inline void changeTo (triagens::mvcc::TransactionId::IdType original,
+                          triagens::mvcc::TransactionId::IdType to) {
+      _to.compare_exchange_strong(original, to,
+          std::memory_order_release, std::memory_order_relaxed);
+    }
+
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -273,7 +295,6 @@ struct TRI_doc_mptr_copy_t : public TRI_doc_mptr_t {
     // The actual code has an assertion about transactions!
     virtual void setDataPtr (void const* d);
 #endif
-
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -652,15 +673,43 @@ static inline TRI_voc_rid_t TRI_EXTRACT_MARKER_RID (TRI_df_marker_t const* marke
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief extracts the pointer to the key from a marker
+/// @brief extracts the pointer to the key from a marker, second variant
+/// returns the length as well
 ////////////////////////////////////////////////////////////////////////////////
 
 static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_df_marker_t const* marker) {
-  if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT || marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
-    return ((char const*) marker) + ((TRI_doc_document_key_marker_t const*) marker)->_offsetKey;  
+  if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT || 
+      marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
+    auto m = reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker);
+    return ((char const*) marker) + m->_offsetKey;  
   }
-  else if (marker->_type == TRI_WAL_MARKER_DOCUMENT || marker->_type == TRI_WAL_MARKER_EDGE) {
-    return ((char const*) marker) + ((triagens::wal::document_marker_t const*) marker)->_offsetKey; 
+  else if (marker->_type == TRI_WAL_MARKER_DOCUMENT || 
+           marker->_type == TRI_WAL_MARKER_EDGE) {
+    auto m = reinterpret_cast<triagens::wal::document_marker_t const*>(marker);
+    return ((char const*) marker) + m->_offsetKey;
+  }
+
+#ifdef TRI_ENABLE_MAINTAINER_MODE
+  // invalid marker type
+  TRI_ASSERT(false);
+#endif
+
+  return nullptr;
+}
+
+static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_df_marker_t const* marker,
+                                                  size_t& len) {
+  if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT || 
+      marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
+    auto m = reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker);
+    len = m->_offsetJson - m->_offsetKey - 1;
+    return ((char const*) marker) + m->_offsetKey;  
+  }
+  else if (marker->_type == TRI_WAL_MARKER_DOCUMENT || 
+           marker->_type == TRI_WAL_MARKER_EDGE) {
+    auto m = reinterpret_cast<triagens::wal::document_marker_t const*>(marker);
+    len = m->_offsetLegend - m->_offsetKey - 1;
+    return ((char const*) marker) + m->_offsetKey;
   }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
@@ -680,6 +729,12 @@ static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_doc_mptr_t const* mptr) {
   return TRI_EXTRACT_MARKER_KEY(marker);
 }
 
+static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_doc_mptr_t const* mptr,
+                                                  size_t& len) {
+  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());  // PROTECTED by TRI_EXTRACT_MARKER_KEY search
+  return TRI_EXTRACT_MARKER_KEY(marker, len);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief extracts the pointer to the key from a marker
 ////////////////////////////////////////////////////////////////////////////////
@@ -687,6 +742,12 @@ static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_doc_mptr_t const* mptr) {
 static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_doc_mptr_copy_t const* mptr) {
   TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());  // PROTECTED by TRI_EXTRACT_MARKER_KEY search
   return TRI_EXTRACT_MARKER_KEY(marker);
+}
+
+static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_doc_mptr_copy_t const* mptr,
+                                                  size_t& len) {
+  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());  // PROTECTED by TRI_EXTRACT_MARKER_KEY search
+  return TRI_EXTRACT_MARKER_KEY(marker, len);
 }
 
 // -----------------------------------------------------------------------------

@@ -63,7 +63,7 @@ namespace triagens {
       public:
   
         virtual void insert (class TransactionCollection*, 
-                             struct TRI_doc_mptr_t const*) override final;
+                             struct TRI_doc_mptr_t*) override final;
         virtual void remove (class TransactionCollection*,
                              struct TRI_doc_mptr_t const*) override final;
         virtual void forget (class TransactionCollection*,

@@ -118,7 +118,7 @@ TransactionCollection* TopLevelTransaction::collection (std::string const& name)
   }
 
   // not found. now create it. note: this may throw 
-  return registerCollection(new TransactionCollection(_vocbase, name));
+  return registerCollection(new TransactionCollection(_vocbase, name, this));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -136,7 +136,7 @@ TransactionCollection* TopLevelTransaction::collection (TRI_voc_cid_t id) {
   }
 
   // not found. now create it. note: this may throw 
-  return registerCollection(new TransactionCollection(_vocbase, id));
+  return registerCollection(new TransactionCollection(_vocbase, id, this));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -369,7 +369,7 @@ EdgeIndex::~EdgeIndex () {
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
  
-void EdgeIndex::insert (TransactionCollection*, TRI_doc_mptr_t const* doc) {
+void EdgeIndex::insert (TransactionCollection*, TRI_doc_mptr_t* doc) {
   
   _from->insert(CONST_CAST(doc), true, false); // OUT
   _to->insert(CONST_CAST(doc), true, false);   // IN

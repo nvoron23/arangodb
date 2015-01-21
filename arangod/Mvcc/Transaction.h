@@ -296,6 +296,10 @@ namespace triagens {
 /// "visibility(other) < VISIBLE" legally.
 ////////////////////////////////////////////////////////////////////////////////
     
+         inline VisibilityType visibility (TransactionId::IdType other) {
+           return visibility(TransactionId(other));
+         }
+
          VisibilityType visibility (TransactionId other);
 
 ////////////////////////////////////////////////////////////////////////////////

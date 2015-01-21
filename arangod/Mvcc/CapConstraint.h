@@ -60,7 +60,7 @@ namespace triagens {
       public:
   
         void insert (class TransactionCollection*, 
-                     struct TRI_doc_mptr_t const*) = 0;
+                     struct TRI_doc_mptr_t*) = 0;
         void remove (class TransactionCollection*,
                      struct TRI_doc_mptr_t const*) = 0;
         void forget (class TransactionCollection*,

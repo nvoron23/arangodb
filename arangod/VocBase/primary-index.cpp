@@ -28,6 +28,7 @@
 /// @author Copyright 2006-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
+#include "Mvcc/PrimaryIndex.h"
 #include "primary-index.h"
 
 #include "Basics/hashes.h"
@@ -174,7 +175,7 @@ void* TRI_LookupByKeyPrimaryIndex (TRI_primary_index_t* idx,
   }
 
   // compute the hash
-  uint64_t const hash = TRI_HashKeyPrimaryIndex(key);
+  uint64_t const hash = triagens::mvcc::PrimaryIndex::hashKeyString(key, strlen(key));
   uint64_t const n = idx->_nrAlloc;
   uint64_t i, k;
 
@@ -247,7 +248,7 @@ int TRI_InsertKeyPrimaryIndex (TRI_primary_index_t* idx,
 
 void* TRI_RemoveKeyPrimaryIndex (TRI_primary_index_t* idx,
                                  char const* key) {
-  uint64_t const hash = TRI_HashKeyPrimaryIndex(key);
+  uint64_t const hash = triagens::mvcc::PrimaryIndex::hashKeyString(key, strlen(key));
   uint64_t const n = idx->_nrAlloc;
   uint64_t i, k;
 

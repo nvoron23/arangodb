@@ -223,6 +223,8 @@
 /// - 1236: @LIT{write-throttling timeout}
 ///   Will be raised when the server is write-throttled and a write operation
 ///   has waited too long for the server to process queued operations.
+/// - 1237: @LIT{write conflict in MVCC happened}
+///   Will be raised when a write/write conflict is detected by the MVCC logic.
 /// - 1300: @LIT{datafile full}
 ///   Will be raised when the datafile reaches its limit.
 /// - 1301: @LIT{server database directory is empty}
@@ -1577,6 +1579,16 @@ void TRI_InitialiseErrorMessages ();
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_ERROR_ARANGO_WRITE_THROTTLE_TIMEOUT                           (1236)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1237: ERROR_ARANGO_MVCC_WRITE_CONFLICT
+///
+/// write conflict in MVCC happened
+///
+/// Will be raised when a write/write conflict is detected by the MVCC logic.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT                              (1237)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief 1300: ERROR_ARANGO_DATAFILE_FULL

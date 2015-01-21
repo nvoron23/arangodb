@@ -87,7 +87,7 @@ SkiplistIndex2::~SkiplistIndex2 () {
 ////////////////////////////////////////////////////////////////////////////////
         
 void SkiplistIndex2::insert (TransactionCollection*,
-                             TRI_doc_mptr_t const* doc) {
+                             TRI_doc_mptr_t* doc) {
   // ...........................................................................
   // Allocate storage to shaped json objects stored as a simple list.
   // These will be used for comparisions

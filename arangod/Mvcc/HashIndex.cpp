@@ -92,7 +92,7 @@ HashIndex::~HashIndex () {
 ////////////////////////////////////////////////////////////////////////////////
         
 void HashIndex::insert (TransactionCollection*,
-                        TRI_doc_mptr_t const* doc) {
+                        TRI_doc_mptr_t* doc) {
   int res;
 
   if (_unique) {

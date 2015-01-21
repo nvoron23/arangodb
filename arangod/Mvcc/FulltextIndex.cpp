@@ -94,7 +94,7 @@ FulltextIndex::~FulltextIndex () {
 ////////////////////////////////////////////////////////////////////////////////
         
 void FulltextIndex::insert (TransactionCollection*,
-                            TRI_doc_mptr_t const* doc) {
+                            TRI_doc_mptr_t* doc) {
   TRI_fulltext_wordlist_t* wordlist = getWordlist(doc);
 
   if (wordlist == nullptr) {

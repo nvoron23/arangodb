@@ -39,6 +39,7 @@
 #include "HashIndex/hash-index.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/MasterpointerManager.h"
+#include "Mvcc/PrimaryIndex.h"
 #include "ShapedJson/shape-accessor.h"
 #include "Utils/transactions.h"
 #include "Utils/CollectionReadLocker.h"
@@ -477,7 +478,9 @@ static int CreateHeader (TRI_document_collection_t* document,
   header->_rid     = marker->_rid;
   header->_fid     = fid;
   header->setDataPtr(marker);  // ONLY IN OPENITERATOR
-  header->_hash    = TRI_HashKeyPrimaryIndex(TRI_EXTRACT_MARKER_KEY(header));  // ONLY IN OPENITERATOR, PROTECTED by RUNTIME
+  size_t len;
+  char const* key = TRI_EXTRACT_MARKER_KEY(header, len);
+  header->_hash   = triagens::mvcc::PrimaryIndex::hashKeyString(key, len);
   *result = header;
 
   return TRI_ERROR_NO_ERROR;
@@ -5057,7 +5060,7 @@ int TRI_InsertShapedJsonDocumentCollection (TRI_transaction_collection_t* trxCol
     keyString = key;
   }
 
-  uint64_t const hash = TRI_HashKeyPrimaryIndex(keyString.c_str(), keyString.size());
+  uint64_t const hash = triagens::mvcc::PrimaryIndex::hashKeyString(keyString.c_str(), keyString.size());
 
 
   int res = TRI_ERROR_NO_ERROR;
