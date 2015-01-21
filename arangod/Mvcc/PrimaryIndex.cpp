@@ -73,6 +73,9 @@ static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
     auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(marker))->_offsetKey;
     hash = hashKey(charMarker + offset);
   }
+  else {
+    TRI_ASSERT(false);
+  }
   if (byKey) {
     return hash;
   }
@@ -130,6 +133,9 @@ static bool compareElementElement(TRI_doc_mptr_t const* left,
     auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(lmarker))->_offsetKey;
     leftKey = lCharMarker + offset;
   }
+  else {
+    TRI_ASSERT(false);
+  }
 
   if (rmarker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
       rmarker->_type == TRI_DOC_MARKER_KEY_EDGE) {
@@ -140,6 +146,9 @@ static bool compareElementElement(TRI_doc_mptr_t const* left,
            rmarker->_type == TRI_WAL_MARKER_EDGE) {
     auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(rmarker))->_offsetKey;
     rightKey = rCharMarker + offset;
+  }
+  else {
+    TRI_ASSERT(false);
   }
 
   if (strcmp(leftKey, rightKey) != 0) {

@@ -31,6 +31,7 @@
 #define ARANGODB_MVCC_INDEX_H 1
 
 #include "Basics/Common.h"
+#include "Basics/ReadWriteLock.h"
 #include "Basics/JsonHelper.h"
 #include "VocBase/index.h"
 #include "VocBase/voc-types.h"
@@ -88,6 +89,11 @@ namespace triagens {
           return _id;
         }
 
+        inline void clickLock (void) {
+          _lock.writeLock();
+          _lock.unlock();
+        }
+
       protected:
 
         TRI_idx_iid_t const               _id;
@@ -95,6 +101,8 @@ namespace triagens {
         struct TRI_document_collection_t* _collection;
 
         std::vector<std::string> const    _fields;
+
+        triagens::basics::ReadWriteLock   _lock;
     };
 
   }
