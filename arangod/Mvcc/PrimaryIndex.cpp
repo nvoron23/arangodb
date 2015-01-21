@@ -75,6 +75,7 @@ static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
   }
   else {
     TRI_ASSERT(false);
+    return 0;
   }
   if (byKey) {
     return hash;
@@ -135,6 +136,7 @@ static bool compareElementElement(TRI_doc_mptr_t const* left,
   }
   else {
     TRI_ASSERT(false);
+    return false;
   }
 
   if (rmarker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
@@ -149,6 +151,7 @@ static bool compareElementElement(TRI_doc_mptr_t const* left,
   }
   else {
     TRI_ASSERT(false);
+    return false;
   }
 
   if (strcmp(leftKey, rightKey) != 0) {
