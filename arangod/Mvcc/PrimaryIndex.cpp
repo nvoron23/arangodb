@@ -163,7 +163,6 @@ static bool compareElementElement(TRI_doc_mptr_t const* left,
   return left->_rid == right->_rid;
 }
 
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -175,7 +174,8 @@ static bool compareElementElement(TRI_doc_mptr_t const* left,
 PrimaryIndex::PrimaryIndex (TRI_idx_iid_t id,
                             TRI_document_collection_t* collection)
   : Index(id, collection, 
-          std::vector<std::string>( { TRI_VOC_ATTRIBUTE_KEY } )) {
+          std::vector<std::string>( { TRI_VOC_ATTRIBUTE_KEY } )),
+    _theHash(nullptr) {
   
   _theHash = new PrimaryIndexHash_t(hashKey, hashElement,
                                     compareKeyElement,
@@ -246,6 +246,13 @@ void PrimaryIndex::forget (TransactionCollection*,
 void PrimaryIndex::preCommit (TransactionCollection*) {
   // This is a no op, since the primary index is not used for pre commit
   // cleanup.
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief clean up (does nothing)
+////////////////////////////////////////////////////////////////////////////////
+        
+void PrimaryIndex::cleanup () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

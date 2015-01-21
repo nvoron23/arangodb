@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief Read Unlocker
+/// @brief MVCC index user class
 ///
 /// @file
 ///
@@ -22,52 +22,59 @@
 ///
 /// Copyright holder is ArangoDB GmbH, Cologne, Germany
 ///
-/// @author Frank Celler
-/// @author Achim Brandt
-/// @author Copyright 2014, ArangoDB GmbH, Cologne, Germany
-/// @author Copyright 2010-2013, triAGENS GmbH, Cologne, Germany
+/// @author Jan Steemann
+/// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
+/// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "ReadUnlocker.h"
+#ifndef ARANGODB_MVCC_INDEX_USER_H
+#define ARANGODB_MVCC_INDEX_USER_H 1
 
-#include "Basics/Exceptions.h"
-#include "Basics/StringUtils.h"
+#include "Basics/Common.h"
 
-using namespace triagens::basics;
+struct TRI_document_collection_t;
+
+namespace triagens {
+  namespace mvcc {
+
+    class Index;
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                      constructors and destructors
+// --SECTION--                                                   class IndexUser
 // -----------------------------------------------------------------------------
 
+    class IndexUser {
+
+      public:
+
+        IndexUser (IndexUser const&) = delete;
+        IndexUser& operator= (IndexUser const&) = delete;
+
+        IndexUser (struct TRI_document_collection_t*);
+
+        ~IndexUser ();
+
+      public:
+
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unlocks the lock
-///
-/// The constructors unlocks the lock, the destructors aquires a read-lock.
+/// @brief return a reference to the list of indexes
 ////////////////////////////////////////////////////////////////////////////////
 
-ReadUnlocker::ReadUnlocker (ReadWriteLock* readWriteLock)
-  : _readWriteLock(readWriteLock), _file(0), _line(0) {
-  _readWriteLock->readUnlock();
+        inline std::vector<triagens::mvcc::Index*> const& indexes () const {
+          return _indexes;
+        }
+
+      private:
+       
+        TRI_document_collection_t* _collection; 
+        std::vector<Index*>        _indexes;
+
+    };
+
+  }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief unlocks the lock
-///
-/// The constructors unlocks the lock, the destructors aquires a read-lock.
-////////////////////////////////////////////////////////////////////////////////
-
-ReadUnlocker::ReadUnlocker (ReadWriteLock* readWriteLock, char const* file, int line)
-  : _readWriteLock(readWriteLock), _file(file), _line(line) {
-  _readWriteLock->readUnlock();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief aquires the read-lock
-////////////////////////////////////////////////////////////////////////////////
-
-ReadUnlocker::~ReadUnlocker () {
-  _readWriteLock->readLock();
-}
+#endif
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       END-OF-FILE

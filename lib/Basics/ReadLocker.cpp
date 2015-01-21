@@ -63,7 +63,7 @@ ReadLocker::ReadLocker (ReadWriteLock* readWriteLock, char const* file, int line
 ////////////////////////////////////////////////////////////////////////////////
 
 ReadLocker::~ReadLocker () {
-  _readWriteLock->unlock();
+  _readWriteLock->readUnlock();
 }
 
 // -----------------------------------------------------------------------------

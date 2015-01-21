@@ -41,8 +41,7 @@ using namespace triagens::basics;
 ////////////////////////////////////////////////////////////////////////////////
 
 ReadWriteLock::ReadWriteLock ()
-  : _rwlock(),
-    _writeLocked(false) {
+  : _rwlock() {
   TRI_InitReadWriteLock(&_rwlock);
 
 #ifdef TRI_READ_WRITE_LOCK_COUNTER
@@ -116,8 +115,6 @@ bool ReadWriteLock::isWriteLocked () const {
 void ReadWriteLock::writeLock () {
   TRI_WriteLockReadWriteLock(&_rwlock);
 
-  _writeLocked = true;
-
 #ifdef TRI_READ_WRITE_LOCK_COUNTER
 
   TRI_LockMutex(&_mutex);
@@ -128,32 +125,41 @@ void ReadWriteLock::writeLock () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief releases the read-lock or write-lock
+/// @brief releases the read-lock
 ////////////////////////////////////////////////////////////////////////////////
 
-void ReadWriteLock::unlock () {
+void ReadWriteLock::readUnlock () {
 #ifdef TRI_READ_WRITE_LOCK_COUNTER
 
   TRI_LockMutex(&_mutex);
 
-  if (_writeLocked) {
-    _writeLockedCounter--;
-  }
-  else {
-    _readLockedCounter--;
-  }
+  TRI_ASSERT(_readLockedCounter > 0);
+  _readLockedCounter--;
 
   TRI_UnlockMutex(&_mutex);
 
 #endif
 
-  if (_writeLocked) {
-    _writeLocked = false;
-    TRI_WriteUnlockReadWriteLock(&_rwlock);
-  }
-  else {
-    TRI_ReadUnlockReadWriteLock(&_rwlock);
-  }
+  TRI_ReadUnlockReadWriteLock(&_rwlock);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief releases the write-lock
+////////////////////////////////////////////////////////////////////////////////
+
+void ReadWriteLock::writeUnlock () {
+#ifdef TRI_READ_WRITE_LOCK_COUNTER
+
+  TRI_LockMutex(&_mutex);
+
+  TRI_ASSERT(_writeLockedCounter == 1);
+  _writeLockedCounter--;
+
+  TRI_UnlockMutex(&_mutex);
+
+#endif
+
+  TRI_WriteUnlockReadWriteLock(&_rwlock);
 }
 
 // -----------------------------------------------------------------------------

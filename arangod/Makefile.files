@@ -73,13 +73,15 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/CapConstraint.cpp \
 	arangod/Mvcc/CollectionOperations.cpp \
 	arangod/Mvcc/DistributedTransactionManager.cpp \
-	arangod/Mvcc/PrimaryIndex.cpp \
 	arangod/Mvcc/EdgeIndex.cpp \
 	arangod/Mvcc/FulltextIndex.cpp \
 	arangod/Mvcc/GeoIndex2.cpp \
 	arangod/Mvcc/HashIndex.cpp \
 	arangod/Mvcc/Index.cpp \
+	arangod/Mvcc/IndexUser.cpp \
 	arangod/Mvcc/LocalTransactionManager.cpp \
+	arangod/Mvcc/MasterpointerManager.cpp \
+	arangod/Mvcc/PrimaryIndex.cpp \
 	arangod/Mvcc/SkiplistIndex2.cpp \
 	arangod/Mvcc/SubTransaction.cpp \
 	arangod/Mvcc/TopLevelTransaction.cpp \

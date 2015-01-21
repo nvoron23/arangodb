@@ -91,7 +91,7 @@ namespace triagens {
 
         inline void clickLock (void) {
           _lock.writeLock();
-          _lock.unlock();
+          _lock.writeUnlock();
         }
 
       protected:

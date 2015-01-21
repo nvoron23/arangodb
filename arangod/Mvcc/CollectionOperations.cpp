@@ -29,6 +29,9 @@
 
 #include "CollectionOperations.h"
 #include "Basics/json.h"
+#include "Mvcc/Index.h"
+#include "Mvcc/IndexUser.h"
+#include "Mvcc/MasterpointerManager.h"
 #include "ShapedJson/shaped-json.h"
 #include "Utils/Exception.h"
 #include "VocBase/server.h"
@@ -154,9 +157,12 @@ OperationResult CollectionOperations::insertDocument (Transaction& transaction,
                                                       TransactionCollection& collection,
                                                       Document& document,
                                                       OperationOptions& options) {
-
+  // first valdidate the document _key or create a new one
   createOrValidateKey(collection, document);
+  
+  std::cout << "KEY: " << document.key << "\n";
 
+  // create a WAL marker for the document
   std::unique_ptr<triagens::wal::DocumentMarker> marker;
   marker.reset(new triagens::wal::DocumentMarker(transaction.vocbase()->_id,
                                                  collection.id(),
@@ -166,7 +172,31 @@ OperationResult CollectionOperations::insertDocument (Transaction& transaction,
                                                  8, /* legendSize */
                                                  document.shaped));
   
-  std::cout << "KEY: " << document.key << "\n";
+  std::cout << "MARKER: " << marker.get() << "\n";
+  // create a master pointer which will hold the marker
+  MasterpointerContainer mptr = collection.masterpointerManager()->create();
+
+  // set data pointer to point to the marker just created
+  mptr.setDataPtr(marker.get()->mem());
+  
+  std::cout << "MARKER: " << marker.get() << "\n";
+  std::cout << "MPTR: " << *mptr << "\n";
+
+std::cout << "MARKER TYPE: " << static_cast<TRI_df_marker_t const*>((*mptr)->getDataPtr())->_type << "\n";
+  // acquire a read-lock on the list of indexes so no one else creates or drops indexes
+  // while the insert operation is ongoing
+  IndexUser indexUser(collection.documentCollection());
+
+  // iterate over all indexes while holding the index read-lock
+  for (auto index : indexUser.indexes()) {
+    // and call insert for each index
+    index->insert(&collection, const_cast<TRI_doc_mptr_t const*>(*mptr));
+  }
+
+  // do a final sync by clicking each index' lock
+  for (auto index : indexUser.indexes()) {
+    index->clickLock();
+  }
 
   OperationResult result;
   std::cout << "INSERT DOCUMENT\n";

@@ -34,13 +34,16 @@
 #include "VocBase/voc-types.h"
 #include "VocBase/vocbase.h"
 
+struct TRI_document_collection_t;
 struct TRI_shaper_s;
 struct TRI_vocbase_s;
 struct TRI_vocbase_col_s;
 
 namespace triagens {
   namespace mvcc {
-    
+
+    class MasterpointerManager;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                       class TransactionCollection
 // -----------------------------------------------------------------------------
@@ -96,10 +99,32 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return the underlying collection 
+////////////////////////////////////////////////////////////////////////////////
+
+        inline struct TRI_vocbase_col_s* collection () const {
+          return _collection;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the underlying collection 
+////////////////////////////////////////////////////////////////////////////////
+
+        inline struct TRI_document_collection_t* documentCollection () const {
+          return _collection->_collection;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief return the collection shaper
 ////////////////////////////////////////////////////////////////////////////////
 
         struct TRI_shaper_s* shaper () const;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the collection's masterpointer manager
+////////////////////////////////////////////////////////////////////////////////
+
+        MasterpointerManager* masterpointerManager ();
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief generate a key
@@ -119,6 +144,18 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         std::string toString () const;
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
+      private:
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                          non-class friend methods
+// -----------------------------------------------------------------------------
+
+      public:
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief append the transaction to an output stream

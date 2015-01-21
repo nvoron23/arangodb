@@ -66,7 +66,7 @@ WriteLocker::WriteLocker (ReadWriteLock* readWriteLock, char const* file, int li
 ////////////////////////////////////////////////////////////////////////////////
 
 WriteLocker::~WriteLocker () {
-  _readWriteLock->unlock();
+  _readWriteLock->writeUnlock();
 }
 
 // -----------------------------------------------------------------------------

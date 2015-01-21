@@ -28,6 +28,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "TransactionCollection.h"
+#include "Mvcc/Index.h"
+#include "Mvcc/MasterpointerManager.h"
 #include "ShapedJson/json-shaper.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
@@ -103,6 +105,14 @@ TRI_shaper_t* TransactionCollection::shaper () const {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return the collection's masterpointer manager
+////////////////////////////////////////////////////////////////////////////////
+
+MasterpointerManager* TransactionCollection::masterpointerManager () {
+  return _collection->_collection->masterpointerManager();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief generate a key
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -135,6 +145,10 @@ std::string TransactionCollection::toString () const {
 
   return result;
 }
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                          non-class friend methods

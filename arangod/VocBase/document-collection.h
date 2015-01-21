@@ -58,6 +58,13 @@ struct TRI_json_t;
 
 class KeyGenerator;
 
+namespace triagens {
+  namespace mvcc {
+    class Index;
+    class MasterpointerManager;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                     public macros
 // -----------------------------------------------------------------------------
@@ -357,6 +364,22 @@ public:
   TRI_shaper_t* getShaper () const;
 #endif
 
+  // a lock that solely protects the list of indexes
+  triagens::basics::ReadWriteLock     _indexesLock;
+  std::vector<triagens::mvcc::Index*> _indexes;
+ 
+  void shutdownIndexes ();
+  void addIndex (triagens::mvcc::Index*);
+  std::vector<triagens::mvcc::Index*> indexes () const;
+  void readLockIndexes();
+  void readUnlockIndexes();
+  void writeLockIndexes();
+  void writeUnlockIndexes();
+
+  triagens::mvcc::MasterpointerManager* masterpointerManager () const;
+  triagens::mvcc::MasterpointerManager* _masterpointerManager;
+  
+  
   inline bool useSecondaryIndexes () const {
     return _useSecondaryIndexes;
   }

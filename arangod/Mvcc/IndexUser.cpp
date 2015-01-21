@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief Read Unlocker
+/// @brief MVCC index user class
 ///
 /// @file
 ///
@@ -22,51 +22,44 @@
 ///
 /// Copyright holder is ArangoDB GmbH, Cologne, Germany
 ///
-/// @author Frank Celler
-/// @author Achim Brandt
-/// @author Copyright 2014, ArangoDB GmbH, Cologne, Germany
-/// @author Copyright 2010-2013, triAGENS GmbH, Cologne, Germany
+/// @author Jan Steemann
+/// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
+/// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "ReadUnlocker.h"
-
-#include "Basics/Exceptions.h"
-#include "Basics/StringUtils.h"
+#include "IndexUser.h"
+#include "Mvcc/Index.h"
+#include "VocBase/document-collection.h"
 
 using namespace triagens::basics;
+using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                      constructors and destructors
+// --SECTION--                                                   class IndexUser
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unlocks the lock
-///
-/// The constructors unlocks the lock, the destructors aquires a read-lock.
+/// @brief read-locks the lists of indexes of a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-ReadUnlocker::ReadUnlocker (ReadWriteLock* readWriteLock)
-  : _readWriteLock(readWriteLock), _file(0), _line(0) {
-  _readWriteLock->readUnlock();
+IndexUser::IndexUser (TRI_document_collection_t* collection)
+  : _collection(collection),
+    _indexes() {
+
+  _collection->readLockIndexes();
+  _indexes = _collection->indexes();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unlocks the lock
-///
-/// The constructors unlocks the lock, the destructors aquires a read-lock.
+/// @brief give up index usage
 ////////////////////////////////////////////////////////////////////////////////
 
-ReadUnlocker::ReadUnlocker (ReadWriteLock* readWriteLock, char const* file, int line)
-  : _readWriteLock(readWriteLock), _file(file), _line(line) {
-  _readWriteLock->readUnlock();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief aquires the read-lock
-////////////////////////////////////////////////////////////////////////////////
-
-ReadUnlocker::~ReadUnlocker () {
-  _readWriteLock->readLock();
+IndexUser::~IndexUser () {
+  _collection->readUnlockIndexes();
 }
 
 // -----------------------------------------------------------------------------

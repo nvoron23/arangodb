@@ -47,7 +47,7 @@ using namespace triagens::basics;
 
 WriteUnlocker::WriteUnlocker (ReadWriteLock* readWriteLock)
   : _readWriteLock(readWriteLock), _file(0), _line(0) {
-  _readWriteLock->unlock();
+  _readWriteLock->writeUnlock();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +58,7 @@ WriteUnlocker::WriteUnlocker (ReadWriteLock* readWriteLock)
 
 WriteUnlocker::WriteUnlocker (ReadWriteLock* readWriteLock, char const* file, int line)
   : _readWriteLock(readWriteLock), _file(file), _line(line) {
-  _readWriteLock->unlock();
+  _readWriteLock->writeUnlock();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -37,6 +37,8 @@
 #include "FulltextIndex/fulltext-index.h"
 #include "GeoIndex/geo-index.h"
 #include "HashIndex/hash-index.h"
+#include "Mvcc/Index.h"
+#include "Mvcc/MasterpointerManager.h"
 #include "ShapedJson/shape-accessor.h"
 #include "Utils/transactions.h"
 #include "Utils/CollectionReadLocker.h"
@@ -108,10 +110,13 @@ void TRI_doc_mptr_copy_t::setDataPtr (void const* d) {
 
 TRI_document_collection_t::TRI_document_collection_t () 
   : _useSecondaryIndexes(true),
+    _masterpointerManager(nullptr),
     _keyGenerator(nullptr),
     _uncollectedLogfileEntries(0) {
 
   _tickMax = 0;
+
+  _masterpointerManager = new triagens::mvcc::MasterpointerManager;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -122,6 +127,10 @@ TRI_document_collection_t::~TRI_document_collection_t () {
   if (_keyGenerator != nullptr) {
     delete _keyGenerator;
   }
+
+  shutdownIndexes();
+
+  delete _masterpointerManager;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -136,6 +145,77 @@ TRI_shaper_t* TRI_document_collection_t::getShaper () const {
   return _shaper;
 }
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief shutdown indexes
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::shutdownIndexes () {
+  WRITE_LOCKER(_indexesLock);
+
+  for (auto it: _indexes) {
+    delete it;
+  }
+  _indexes.clear();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief adds an index to the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::addIndex (triagens::mvcc::Index* index) {
+  WRITE_LOCKER(_indexesLock);
+
+  _indexes.push_back(index);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the list of indexes of the collection
+////////////////////////////////////////////////////////////////////////////////
+  
+std::vector<triagens::mvcc::Index*> TRI_document_collection_t::indexes () const {
+  return _indexes;
+} 
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief read-lock the list of indexes
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::readLockIndexes () {
+  _indexesLock.readLock();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief read-unlock the list of indexes
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::readUnlockIndexes () {
+  _indexesLock.readUnlock();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief write-lock the list of indexes
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::writeLockIndexes () {
+  _indexesLock.writeLock();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief write-unlock the list of indexes
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::writeUnlockIndexes () {
+  _indexesLock.writeUnlock();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the collection's master pointer manager
+////////////////////////////////////////////////////////////////////////////////
+
+triagens::mvcc::MasterpointerManager* TRI_document_collection_t::masterpointerManager () const {
+  return _masterpointerManager;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief add a WAL operation for a transaction collection

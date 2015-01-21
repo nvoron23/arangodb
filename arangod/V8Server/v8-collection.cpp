@@ -3255,6 +3255,7 @@ static void JS_StatusVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
 #include "Mvcc/FulltextIndex.h"
 #include "Mvcc/EdgeIndex.h"
 #include "Mvcc/CapConstraint.h"
+#include "Mvcc/PrimaryIndex.h"
 
 static void JS_Test (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
@@ -3313,6 +3314,17 @@ static void JS_Test (const v8::FunctionCallbackInfo<v8::Value>& args) {
       std::cout << "TRX7: " << *(trx7) << "\n";
 
       auto c1 = trx7->collection("yy");
+
+      
+      auto primaryIndex = new triagens::mvcc::PrimaryIndex(0, c1->documentCollection());
+      try {
+        c1->documentCollection()->addIndex(primaryIndex);
+      }
+      catch (...) {
+        delete primaryIndex;
+        throw;
+      }
+
       std::cout << c1 << "\n";
       std::cout << trx7->collection("_users") << "\n";
       std::cout << trx7->collection("yy") << "\n";
