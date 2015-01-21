@@ -34,6 +34,7 @@
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "VocBase/document-collection.h"
+#include "Wal/Logfile.h"
 
 struct TRI_json_t;
 struct TRI_shaped_json_s;
@@ -65,10 +66,10 @@ namespace triagens {
 
         ~Document ();
 
-        static Document createFromJson (struct TRI_shaper_s*,
+        static Document CreateFromJson (struct TRI_shaper_s*,
                                         struct TRI_json_t const*);
         
-        static Document createFromShapedJson (struct TRI_shaper_s*,
+        static Document CreateFromShapedJson (struct TRI_shaper_s*,
                                               struct TRI_shaped_json_s const*,
                                               char const* = nullptr);
 
@@ -97,11 +98,19 @@ namespace triagens {
       }
 
       OperationResult () 
-        : code(TRI_ERROR_NO_ERROR) {
+        : mptr(),
+          logfileId(0),
+          tick(0),
+          data(nullptr),
+          code(TRI_ERROR_NO_ERROR) {
       }
 
-      TRI_doc_mptr_copy_t document;
-      int code;
+      TRI_doc_mptr_copy_t            mptr;
+      triagens::wal::Logfile::IdType logfileId;
+      TRI_voc_tick_t                 tick;
+      void const*                    data;
+      int                            code;
+    
     };
 
 // -----------------------------------------------------------------------------
@@ -145,7 +154,7 @@ namespace triagens {
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult insertDocument (Transaction&, 
+        static OperationResult InsertDocument (Transaction&, 
                                                TransactionCollection&, 
                                                Document&, 
                                                OperationOptions&);
@@ -154,7 +163,7 @@ namespace triagens {
 /// @brief remove a document
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult removeDocument (Transaction&, 
+        static OperationResult RemoveDocument (Transaction&, 
                                                TransactionCollection&,
                                                Document&,
                                                OperationOptions&);
@@ -166,8 +175,12 @@ namespace triagens {
 /// will throw if the key is invalid
 ////////////////////////////////////////////////////////////////////////////////
 
-        static void createOrValidateKey (TransactionCollection&,
+        static void CreateOrValidateKey (TransactionCollection&,
                                          Document&);                   
+
+        static int WriteMarker (triagens::wal::Marker*,
+                                TransactionCollection&,
+                                OperationResult&);
 
       public:
        

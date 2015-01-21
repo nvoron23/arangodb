@@ -32,6 +32,7 @@
 
 #include "Basics/Common.h"
 #include "Basics/Mutex.h"
+#include "Mvcc/TransactionId.h"
 
 struct TRI_doc_mptr_t;
 
@@ -59,9 +60,11 @@ namespace triagens {
 
         void setDataPtr (void const*);
         TRI_doc_mptr_t* operator* () const;
+        void link ();
 
         MasterpointerManager* const manager;
         struct TRI_doc_mptr_t*      mptr;
+        bool                        owns;
 
     };
 
@@ -95,7 +98,14 @@ namespace triagens {
 /// the master pointer is not yet linked
 ////////////////////////////////////////////////////////////////////////////////
 
-        MasterpointerContainer create ();
+        MasterpointerContainer create (void const*,
+                                       triagens::mvcc::TransactionId::IdType);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief link the master pointer
+////////////////////////////////////////////////////////////////////////////////
+
+        void link (TRI_doc_mptr_t*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief recycle a master pointer in the collection

@@ -3330,9 +3330,9 @@ static void JS_Test (const v8::FunctionCallbackInfo<v8::Value>& args) {
       std::cout << trx7->collection("yy") << "\n";
 
       auto json = JsonHelper::fromString("{ \"_key\": \"der-hans\", \"kanns\": false, \"lol\": 1 }");
-      triagens::mvcc::Document doc = triagens::mvcc::Document::createFromJson(c1->shaper(), json);
+      triagens::mvcc::Document doc = triagens::mvcc::Document::CreateFromJson(c1->shaper(), json);
       triagens::mvcc::OperationOptions options;
-      triagens::mvcc::OperationResult result = triagens::mvcc::CollectionOperations::insertDocument(*trx7, *trx7->collection("yy"), doc, options);
+      triagens::mvcc::OperationResult result = triagens::mvcc::CollectionOperations::InsertDocument(*trx7, *trx7->collection("yy"), doc, options);
 
       trx7->commit();
     }
