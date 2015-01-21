@@ -142,8 +142,8 @@ void HashIndex::insert (TransactionCollection*,
 /// @brief remove a document from the index
 ////////////////////////////////////////////////////////////////////////////////
 
-void HashIndex::remove (TransactionCollection*,
-                        TRI_doc_mptr_t const* doc) {
+TRI_doc_mptr_t* HashIndex::remove (TransactionCollection*,
+                                   TRI_doc_mptr_t const* doc) {
   int res;
 
   if (_unique) {
@@ -152,7 +152,7 @@ void HashIndex::remove (TransactionCollection*,
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_t>(&hashElement);
-      return;
+      return nullptr;  // FIXME: this is nonsense
     }
 
     if (res != TRI_ERROR_NO_ERROR) {
@@ -168,7 +168,7 @@ void HashIndex::remove (TransactionCollection*,
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
       freeSubObjectsHashIndexElement<TRI_hash_index_element_multi_t>(&hashElement);
-      return;
+      return nullptr; // FIXME: this is nonsense
     }
 
     if (res != TRI_ERROR_NO_ERROR) {
@@ -182,6 +182,7 @@ void HashIndex::remove (TransactionCollection*,
   if (res != TRI_ERROR_NO_ERROR) {
     THROW_ARANGO_EXCEPTION(res);
   }
+  return nullptr;  // FIXME this is nonsense
 }        
 
 ////////////////////////////////////////////////////////////////////////////////

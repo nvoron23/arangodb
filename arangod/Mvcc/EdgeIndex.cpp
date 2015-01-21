@@ -379,9 +379,11 @@ void EdgeIndex::insert (TransactionCollection*, TRI_doc_mptr_t* doc) {
 /// @brief remove document from index
 ////////////////////////////////////////////////////////////////////////////////
         
-void EdgeIndex::remove (TransactionCollection*, TRI_doc_mptr_t const* doc) {
+TRI_doc_mptr_t* EdgeIndex::remove (TransactionCollection*,
+                                   TRI_doc_mptr_t const* doc) {
   _from->remove(doc);  // OUT
   _to->remove(doc);    // IN
+  return nullptr;  // this is nonsense
 }
 
 ////////////////////////////////////////////////////////////////////////////////

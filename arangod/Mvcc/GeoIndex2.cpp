@@ -187,8 +187,8 @@ void GeoIndex2::insert (TransactionCollection*,
 /// @brief remove document from index
 ////////////////////////////////////////////////////////////////////////////////
 
-void GeoIndex2::remove (TransactionCollection*,
-                        TRI_doc_mptr_t const* doc) {
+TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
+                                   TRI_doc_mptr_t const* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
   TRI_shaped_json_t shapedJson;
@@ -219,6 +219,7 @@ void GeoIndex2::remove (TransactionCollection*,
     // ignore non-existing elements in geo-index
     GeoIndex_remove(_geoIndex, &gc);
   }
+  return nullptr;  // FIXME: this is nonsense
 }
 
 ////////////////////////////////////////////////////////////////////////////////

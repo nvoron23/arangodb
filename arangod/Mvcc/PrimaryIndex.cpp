@@ -158,10 +158,25 @@ void PrimaryIndex::insert (TransactionCollection* transColl,
 /// @brief remove a document from the index
 ////////////////////////////////////////////////////////////////////////////////
 
-void PrimaryIndex::remove (TransactionCollection*,
-                           TRI_doc_mptr_t const*) {
-  // This is a no op, since we need to keep old revisions around in the index.
-  // See forget for the actual removal of the document from the index.
+TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
+                                      TRI_doc_mptr_t const* doc) {
+  size_t len;
+  char const* keyPtr = TRI_EXTRACT_MARKER_KEY(doc, len);
+  std::string key(keyPtr, len);
+
+  WRITE_LOCKER(_lock);
+
+  Transaction::VisibilityType visibility;
+  TRI_doc_mptr_t* previous = findRelevantRevision(transColl, key, visibility);
+  if (visibility == Transaction::VisibilityType::CONCURRENT) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+  }
+  else if (visibility == Transaction::VisibilityType::INVISIBLE) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
+  }
+
+  previous->setTo(transColl->getTransaction()->id()());
+  return previous;
 }        
 
 ////////////////////////////////////////////////////////////////////////////////

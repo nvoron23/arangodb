@@ -122,9 +122,10 @@ void FulltextIndex::insert (TransactionCollection*,
 /// @brief remove a document from the index
 ////////////////////////////////////////////////////////////////////////////////
 
-void FulltextIndex::remove (TransactionCollection*, 
-                            TRI_doc_mptr_t const* doc) {
+TRI_doc_mptr_t* FulltextIndex::remove (TransactionCollection*, 
+                                       TRI_doc_mptr_t const* doc) {
   TRI_DeleteDocumentFulltextIndex(_fulltextIndex, (TRI_fulltext_doc_t) ((uintptr_t) doc));
+  return nullptr;  // FIXME this is nonsense
 }
 
 ////////////////////////////////////////////////////////////////////////////////

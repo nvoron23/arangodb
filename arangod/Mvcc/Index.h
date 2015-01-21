@@ -66,8 +66,9 @@ namespace triagens {
 
         virtual void insert (class TransactionCollection*, 
                              struct TRI_doc_mptr_t*) = 0;
-        virtual void remove (class TransactionCollection*,
-                             struct TRI_doc_mptr_t const*) = 0;
+        virtual struct TRI_doc_mptr_t* remove (
+                         class TransactionCollection*,
+                         struct TRI_doc_mptr_t const*) = 0;
         virtual void forget (class TransactionCollection*,
                              struct TRI_doc_mptr_t const*) = 0;
 

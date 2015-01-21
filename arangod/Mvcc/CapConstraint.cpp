@@ -92,7 +92,8 @@ void CapConstraint::insert (TransactionCollection* traColl,
 /// @brief remove a document (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-void CapConstraint::remove (TransactionCollection*, TRI_doc_mptr_t const*) {
+TRI_doc_mptr_t* CapConstraint::remove (TransactionCollection*, TRI_doc_mptr_t const*) {
+  return nullptr;  // FIXME: this is nonsense
 }  
 
 ////////////////////////////////////////////////////////////////////////////////

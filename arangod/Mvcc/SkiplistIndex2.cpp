@@ -154,8 +154,8 @@ void SkiplistIndex2::insert (TransactionCollection*,
 /// @brief remove document from index
 ////////////////////////////////////////////////////////////////////////////////
         
-void SkiplistIndex2::remove (TransactionCollection*,
-                             TRI_doc_mptr_t const* doc) {
+TRI_doc_mptr_t* SkiplistIndex2::remove (TransactionCollection*,
+                                        TRI_doc_mptr_t const* doc) {
   // ...........................................................................
   // Allocate some memory for the SkiplistIndexElement structure
   // ...........................................................................
@@ -193,7 +193,7 @@ void SkiplistIndex2::remove (TransactionCollection*,
     // ........................................................................
 
     if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
-      return;
+      return nullptr;   // this is nonsense
     }
 
     THROW_ARANGO_EXCEPTION(res);
@@ -214,6 +214,7 @@ void SkiplistIndex2::remove (TransactionCollection*,
   if (res != TRI_ERROR_NO_ERROR) {
     THROW_ARANGO_EXCEPTION(res);
   }
+  return nullptr;   // this is nonsense
 }
 
 ////////////////////////////////////////////////////////////////////////////////
