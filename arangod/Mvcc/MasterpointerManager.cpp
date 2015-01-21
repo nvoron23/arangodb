@@ -45,8 +45,10 @@ using namespace triagens::mvcc;
 
 MasterpointerContainer::MasterpointerContainer (MasterpointerContainer&& other) 
   : manager(other.manager),
-    mptr(other.mptr) {
+    mptr(other.mptr),
+    owns(other.owns) {
   other.mptr = nullptr;
+  other.owns = false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +58,8 @@ MasterpointerContainer::MasterpointerContainer (MasterpointerContainer&& other)
 MasterpointerContainer::MasterpointerContainer (MasterpointerManager* manager,
                                                 TRI_doc_mptr_t* mptr)
   : manager(manager),
-    mptr(mptr) {
+    mptr(mptr),
+    owns(true) {
 
 }
 
@@ -65,9 +68,9 @@ MasterpointerContainer::MasterpointerContainer (MasterpointerManager* manager,
 ////////////////////////////////////////////////////////////////////////////////
 
 MasterpointerContainer::~MasterpointerContainer () {
-  if (mptr != nullptr) {
+  if (owns && mptr != nullptr) {
     manager->recycle(mptr);
-    mptr = nullptr;
+    owns = false;
   }
 }
 
@@ -85,6 +88,20 @@ void MasterpointerContainer::setDataPtr (void const* data) {
         
 TRI_doc_mptr_t* MasterpointerContainer::operator* () const {
   return mptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief tell the master pointer manager to link the master pointer
+/// this will also transfer ownership back to the master pointer manager
+////////////////////////////////////////////////////////////////////////////////
+        
+void MasterpointerContainer::link () {
+  if (! owns) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "should not link a non-owned master pointer");
+  }
+
+  owns = false;
+  manager->link(mptr);
 }
 
 // -----------------------------------------------------------------------------
@@ -124,7 +141,8 @@ MasterpointerManager::~MasterpointerManager () {
 /// the master pointer is not yet linked
 ////////////////////////////////////////////////////////////////////////////////
 
-MasterpointerContainer MasterpointerManager::create () {
+MasterpointerContainer MasterpointerManager::create (void const* data,
+                                                     triagens::mvcc::TransactionId::IdType transactionId) {
   TRI_doc_mptr_t* mptr = nullptr;
 
   {
@@ -162,11 +180,23 @@ MasterpointerContainer MasterpointerManager::create () {
   TRI_ASSERT_EXPENSIVE(mptr != nullptr);
 
   // TODO: properly initialize the master pointer
+  mptr->setDataPtr(data);
+  // mptr->_from = transactionId;
+  // mptr->_to   = 0;
+  mptr->_prev = nullptr;
   mptr->_next = nullptr;
   
   std::cout << "CREATED MPTR: " << mptr << "\n";
 
   return MasterpointerContainer(this, mptr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief link the master pointer
+////////////////////////////////////////////////////////////////////////////////
+
+void MasterpointerManager::link (TRI_doc_mptr_t* mptr) {
+  // TODO: 
 }
 
 ////////////////////////////////////////////////////////////////////////////////

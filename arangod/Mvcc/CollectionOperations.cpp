@@ -32,10 +32,12 @@
 #include "Mvcc/Index.h"
 #include "Mvcc/IndexUser.h"
 #include "Mvcc/MasterpointerManager.h"
+#include "ShapedJson/Legends.h"
 #include "ShapedJson/shaped-json.h"
 #include "Utils/Exception.h"
 #include "VocBase/server.h"
 #include "VocBase/vocbase.h"
+#include "Wal/LogfileManager.h"
 #include "Wal/Marker.h"
 
 using namespace triagens::mvcc;
@@ -96,7 +98,7 @@ Document::~Document () {
 /// @brief create a document from JSON
 ////////////////////////////////////////////////////////////////////////////////
 
-Document Document::createFromJson (TRI_shaper_t* shaper,
+Document Document::CreateFromJson (TRI_shaper_t* shaper,
                                    TRI_json_t const* json) {
          
   if (! TRI_IsObjectJson(json)) {
@@ -132,7 +134,7 @@ Document Document::createFromJson (TRI_shaper_t* shaper,
 /// @brief create a document from ShapedJson
 ////////////////////////////////////////////////////////////////////////////////
 
-Document Document::createFromShapedJson (TRI_shaper_t* shaper,
+Document Document::CreateFromShapedJson (TRI_shaper_t* shaper,
                                          TRI_shaped_json_t const* shaped,
                                          char const* key) {
 
@@ -149,20 +151,25 @@ Document Document::createFromShapedJson (TRI_shaper_t* shaper,
 // --SECTION--                                       struct CollectionOperations
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::insertDocument (Transaction& transaction,
+OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
                                                       TransactionCollection& collection,
                                                       Document& document,
                                                       OperationOptions& options) {
   // first valdidate the document _key or create a new one
-  createOrValidateKey(collection, document);
+  CreateOrValidateKey(collection, document);
   
   std::cout << "KEY: " << document.key << "\n";
 
-  // create a WAL marker for the document
+  // create a temporary marker for the document on the heap
+  // the marker memory will be freed automatically when we leave this method
   std::unique_ptr<triagens::wal::DocumentMarker> marker;
   marker.reset(new triagens::wal::DocumentMarker(transaction.vocbase()->_id,
                                                  collection.id(),
@@ -174,32 +181,69 @@ OperationResult CollectionOperations::insertDocument (Transaction& transaction,
   
   std::cout << "MARKER: " << marker.get() << "\n";
   // create a master pointer which will hold the marker
-  MasterpointerContainer mptr = collection.masterpointerManager()->create();
-
+  // this will automatically release the master pointer when we leave this method 
+  // and have not linked the master pointer
+  
   // set data pointer to point to the marker just created
-  mptr.setDataPtr(marker.get()->mem());
+  MasterpointerContainer mptr = collection.masterpointerManager()->create(marker.get()->mem(), transaction.id()());
   
   std::cout << "MARKER: " << marker.get() << "\n";
+  std::cout << "MARKER TYPE: " << static_cast<TRI_df_marker_t const*>((*mptr)->getDataPtr())->_type << "\n";
   std::cout << "MPTR: " << *mptr << "\n";
 
-std::cout << "MARKER TYPE: " << static_cast<TRI_df_marker_t const*>((*mptr)->getDataPtr())->_type << "\n";
+
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the insert operation is ongoing
   IndexUser indexUser(collection.documentCollection());
 
   // iterate over all indexes while holding the index read-lock
+  size_t i = 0;
   for (auto index : indexUser.indexes()) {
     // and call insert for each index
-    index->insert(&collection, const_cast<TRI_doc_mptr_t const*>(*mptr));
+    try {
+      index->insert(&collection, const_cast<TRI_doc_mptr_t const*>(*mptr));
+    }
+    catch (...) {
+      // an error occurred during insert
+      // now revert the operation in all indexes 
+      while (i > 0) {
+        --i;
+        try {
+          index->forget(&collection, const_cast<TRI_doc_mptr_t const*>(*mptr));
+        }
+        catch (...) {
+        }
+      }
+      throw;
+    }
+
+    // next index
+    ++i;
+  }
+
+  // when we are here, the document is present in all indexes 
+
+  // now append the marker to the WAL
+  OperationResult result;
+  result.code = WriteMarker(marker.get(), collection, result);
+
+  if (result.code == TRI_ERROR_NO_ERROR) {
+    // make the master pointer point to the WAL location
+    mptr.setDataPtr(result.data);
   }
 
   // do a final sync by clicking each index' lock
   for (auto index : indexUser.indexes()) {
     index->clickLock();
   }
+  
+  // link the master pointer in the list of master pointers of the collection 
+  if (result.code == TRI_ERROR_NO_ERROR) {
+    mptr.link();
+    result.mptr = *(*mptr);
+  }
 
-  OperationResult result;
-  std::cout << "INSERT DOCUMENT\n";
+  std::cout << "INSERTED DOCUMENT. RESULT CODE: " << result.code << ", TICK: " << result.tick << ", FID: " << result.logfileId << "\n";
   return result;
 }
 
@@ -207,7 +251,7 @@ std::cout << "MARKER TYPE: " << static_cast<TRI_df_marker_t const*>((*mptr)->get
 /// @brief remove a document
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::removeDocument (Transaction& transaction,
+OperationResult CollectionOperations::RemoveDocument (Transaction& transaction,
                                                       TransactionCollection& collection,
                                                       Document& document,
                                                       OperationOptions& options) {
@@ -221,7 +265,7 @@ OperationResult CollectionOperations::removeDocument (Transaction& transaction,
 /// will throw if the key is invalid
 ////////////////////////////////////////////////////////////////////////////////
   
-void CollectionOperations::createOrValidateKey (TransactionCollection& collection,
+void CollectionOperations::CreateOrValidateKey (TransactionCollection& collection,
                                                 Document& document) {                   
   if (! document.keySpecified) {
     TRI_ASSERT(document.key.empty());
@@ -237,6 +281,107 @@ void CollectionOperations::createOrValidateKey (TransactionCollection& collectio
     // key was specified, now validate it
     collection.validateKey(document.key); // TODO: handle case isRestore
   }
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief append a marker to the WAL
+////////////////////////////////////////////////////////////////////////////////
+
+int CollectionOperations::WriteMarker (triagens::wal::Marker* marker,
+                                       TransactionCollection& collection,
+                                       OperationResult& result) {
+  auto logfileManager = triagens::wal::LogfileManager::instance();
+  
+  char* oldmarker = static_cast<char*>(marker->mem());
+  auto oldm = reinterpret_cast<triagens::wal::document_marker_t*>(oldmarker);
+
+  if ((oldm->_type == TRI_WAL_MARKER_DOCUMENT ||
+       oldm->_type == TRI_WAL_MARKER_EDGE) &&
+      ! logfileManager->suppressShapeInformation()) {
+    // In this case we have to take care of the legend, we know that the
+    // marker does not have a legend so far, so first try to get away 
+    // with this:
+    // (Note that the latter also works for edges!
+    TRI_voc_cid_t const cid   = oldm->_collectionId;
+    TRI_shape_sid_t const sid = oldm->_shape;
+    void* oldLegend;
+    triagens::wal::SlotInfoCopy slotInfo = logfileManager->allocateAndWrite(oldmarker, marker->size(), false, cid, sid, 0, oldLegend);
+
+    if (slotInfo.errorCode == TRI_ERROR_LEGEND_NOT_IN_WAL_FILE) {
+      // Oh dear, we have to build a legend and patch the marker:
+      TRI_document_collection_t* documentCollection = collection.documentCollection();
+      triagens::basics::JsonLegend legend(documentCollection->getShaper());  // PROTECTED by trx in trxCollection
+
+      int res = legend.addShape(sid, oldmarker + oldm->_offsetJson, oldm->_size - oldm->_offsetJson);
+
+      if (res != TRI_ERROR_NO_ERROR) {
+        return res;
+      }
+
+      int64_t sizeChanged = legend.getSize() - (oldm->_offsetJson - oldm->_offsetLegend);
+      TRI_voc_size_t newMarkerSize = static_cast<TRI_voc_size_t>(oldm->_size + sizeChanged);
+
+      // Now construct the new marker on the heap:
+      char* newmarker = new char[newMarkerSize];
+      memcpy(newmarker, oldmarker, oldm->_offsetLegend);
+      try {
+        legend.dump(newmarker + oldm->_offsetLegend);
+      }
+      catch (...) {
+        delete[] newmarker;
+        throw;
+      }
+      memcpy(newmarker + oldm->_offsetLegend + legend.getSize(), oldmarker + oldm->_offsetJson, oldm->_size - oldm->_offsetJson);
+
+      // And fix its entries:
+      auto newm = reinterpret_cast<triagens::wal::document_marker_t*>(newmarker);
+      newm->_size = newMarkerSize;
+      newm->_offsetJson = (uint32_t) (oldm->_offsetLegend + legend.getSize());
+
+      triagens::wal::SlotInfoCopy slotInfo2 = logfileManager->allocateAndWrite(newmarker, newMarkerSize, false, cid, sid, newm->_offsetLegend, oldLegend);
+      delete[] newmarker;
+
+      if (slotInfo2.errorCode != TRI_ERROR_NO_ERROR) {
+        return slotInfo2.errorCode;
+      }
+
+      result.logfileId = slotInfo2.logfileId;
+      result.data      = slotInfo2.mem; 
+      result.tick      = slotInfo2.tick;
+    }
+    else if (slotInfo.errorCode != TRI_ERROR_NO_ERROR) {
+      return slotInfo.errorCode;
+    }
+    else {
+      int64_t* legendPtr = reinterpret_cast<int64_t*>(oldmarker + oldm->_offsetLegend);
+      *legendPtr =  reinterpret_cast<char*>(oldLegend) - reinterpret_cast<char*>(legendPtr);
+      // This means that we can find the old legend relative to
+      // the new position in the same WAL file.
+      result.logfileId = slotInfo.logfileId;
+      result.data      = slotInfo.mem; 
+      result.tick      = slotInfo.tick;
+    }
+
+  }
+  else {  
+    // No document or edge marker, just append it to the WAL:
+    triagens::wal::SlotInfoCopy slotInfo = logfileManager->allocateAndWrite(marker->mem(), marker->size(), false);
+
+    if (slotInfo.errorCode != TRI_ERROR_NO_ERROR) {
+      // some error occurred
+      return slotInfo.errorCode;
+    }
+
+    result.logfileId = slotInfo.logfileId;
+    result.data      = slotInfo.mem;
+    result.tick      = slotInfo.tick;
+  }
+
+  return TRI_ERROR_NO_ERROR;
 }
 
 // -----------------------------------------------------------------------------
