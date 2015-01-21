@@ -97,6 +97,12 @@ namespace triagens {
 
         void initializeTransaction (Transaction*) override final;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns the status of a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        Transaction::StatusType statusTransaction (TransactionId) override final;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
 // -----------------------------------------------------------------------------

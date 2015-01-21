@@ -94,6 +94,12 @@ namespace triagens {
 
         void initializeTransaction (Transaction*) override final;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns the status of a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        virtual Transaction::StatusType statusTransaction (TransactionId) override final;
+
     };
 
   }

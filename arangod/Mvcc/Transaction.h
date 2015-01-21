@@ -71,6 +71,16 @@ namespace triagens {
         };
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief statuses that a transaction can have
+////////////////////////////////////////////////////////////////////////////////
+
+        enum class VisibilityType : uint16_t {
+          INVISIBLE  = 1,
+          CONCURRENT = 2,
+          VISIBLE    = 3
+        };
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief transaction flags
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -277,6 +287,39 @@ namespace triagens {
         friend std::ostream& operator<< (std::ostream&, Transaction const*);
     
         friend std::ostream& operator<< (std::ostream&, Transaction const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief visibility, this implements the MVCC logic of what this transaction
+/// can see, returns the visibility of the other transaction for this one.
+/// The result can be INVISIBLE, INCONFLICT or VISIBLE. We guarantee
+/// INVISIBLE < INCONFLICT < VISIBLE, such that one can do things like
+/// "visibility(other) < VISIBLE" legally.
+////////////////////////////////////////////////////////////////////////////////
+    
+         VisibilityType visibility (TransactionId other);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wasOngoingAtStart, check whether or not another transaction was
+/// ongoing when this one started
+////////////////////////////////////////////////////////////////////////////////
+
+         bool wasOngoingAtStart (TransactionId other);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief isNotAborted, this is a pure optimisation method. It checks
+/// whether another transaction was aborted. It is only legal to call
+/// this on transactions that were already committed or aborted before
+/// this transaction has started. If the method returns true, then other
+/// is guaranteed to be a transaction that has committed before this
+/// transaction was started. The method may return false even if the
+/// transaction with id other has committed. This is a method of the
+/// Transaction class to allow for clever optimisations using a bloom
+/// filter.
+////////////////////////////////////////////////////////////////////////////////
+
+         bool isNotAborted(TransactionId other) {
+           return false;  // Optimise later
+         }
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
