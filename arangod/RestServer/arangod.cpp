@@ -32,6 +32,7 @@
 #include "Basics/messages.h"
 #include "Basics/logging.h"
 #include "Basics/tri-strings.h"
+#include "Basics/process-utils.h"
 #include "Rest/InitialiseRest.h"
 #include "RestServer/ArangoServer.h"
 
@@ -401,6 +402,10 @@ static void WINAPI ServiceMain (DWORD dwArgc, LPSTR *lpszArgv) {
 ////////////////////////////////////////////////////////////////////////////////
 
 int main (int argc, char* argv[]) {
+  
+  // Inherit some command line options from environment:
+  TRI_EnvironmentToCommandLine(argc, argv);
+
   int res = 0;
   bool startAsService = false;
 

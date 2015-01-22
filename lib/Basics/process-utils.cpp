@@ -1317,15 +1317,44 @@ void TRI_EnvironmentToCommandLine (int& argc, char**& argv) {
   char* p = environ[i];
   while (p != nullptr) {
     std::string envVar(p);
-    if (envVar.size() > 9 && envVar.substr(0,9) == "ARANGODB_") {
+    if (envVar.compare(0, 9, "ARANGODB_") == 0) {
       size_t pos = envVar.find('=');
       if (pos != std::string::npos) {
         std::string name = envVar.substr(0, pos);
         std::string value = getenv(name.c_str());
-        // GO on with this one.
+        if (! value.empty()) {
+          newargv.push_front(value);
+        }
+        name.erase(0, 9);  // Remove "ARANGODB_"
+        // Replace __ by a dot .
+        while ((pos = name.find("__")) != std::string::npos) {
+          name.replace(pos, 2, ".");
+        }
+        while ((pos = name.find('_')) != std::string::npos) {
+          name.replace(pos, 1, "-");
+        }
+        for (pos = 0; pos < name.size(); pos++) {
+          if (name[pos] >= 'A' && name[pos] <= 'Z') {
+            name[pos] = name[pos] - 'A' + 'a';
+          }
+        }
+        newargv.push_front("--" + name);
       }
     }
     i++;
+    p = environ[i];
+  }
+  argc = static_cast<int>(newargv.size() + 1);
+  std::cout << "New argc: " << argc << std::endl;
+  auto nargv = static_cast<char**>(malloc(sizeof(char*) * argc));
+  nargv[0] = argv[0];
+  argv = nargv;
+  std::cout << "argv[0] = \"" << argv[0] << "\"" << std::endl;
+  size_t pos;
+  for (pos = 1; pos < static_cast<size_t>(argc); pos++) {
+    argv[pos] = static_cast<char*>(malloc(newargv[pos-1].size() + 1));
+    strcpy(argv[pos], newargv[pos-1].c_str());
+    std::cout << "argv[" << pos << "] = \"" << argv[pos] << "\"" << std::endl;
   }
 }
 
