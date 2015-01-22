@@ -1,6 +1,8 @@
 v2.5.0 (XXXX-XX-XX)
 -------------------
 
+* use exclusive native SRWLocks on Windows instead of native mutexes
+
 * added AQL functions MD5, SHA1, and RANDOM_TOKEN.
 
 * reduced number of string allocations when parsing certain AQL queries
@@ -18,8 +20,28 @@ v2.5.0 (XXXX-XX-XX)
   behavior.
 
 
-v2.4.1 (XXXX-XX-XX)
+v2.4.2 (2015-XX-XX)
 -------------------
+
+* enable use of indexes for certain AQL conditions with non-equality predicates, in 
+  case the condition(s) also refer to indexed attributes
+
+  The following queries will now be able to use indexes:
+
+      FILTER a.indexed == ... && a.indexed != ...
+      FILTER a.indexed == ... && a.nonIndexed != ...
+      FILTER a.indexed == ... && ! (a.indexed == ...)
+      FILTER a.indexed == ... && ! (a.nonIndexed == ...)
+      FILTER a.indexed == ... && ! (a.indexed != ...)
+      FILTER a.indexed == ... && ! (a.nonIndexed != ...)
+      FILTER (a.indexed == ... && a.nonIndexed == ...) || (a.indexed == ... && a.nonIndexed == ...)
+      FILTER (a.indexed == ... && a.nonIndexed != ...) || (a.indexed == ... && a.nonIndexed != ...)
+
+
+v2.4.1 (2015-01-19)
+-------------------
+
+* improved WAL recovery output
 
 * fixed certain OR optimizations in AQL optimizer
 

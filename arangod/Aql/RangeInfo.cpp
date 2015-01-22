@@ -130,7 +130,10 @@ AstNode const* RangeInfoBound::getExpressionAst (Ast* ast) const {
   if (_isConstant) {
     return nullptr;
   }
+
+  // TODO: check who is going to free this node... 
   _expressionAst = new AstNode(ast, _bound);
+
   return _expressionAst;
 }
 
@@ -408,6 +411,7 @@ bool RangeInfoMap::isValid (std::string const& var) {
 void RangeInfoMap::attributes (std::unordered_set<std::string>& set, 
                                std::string const& var) {
   std::unordered_map<std::string, RangeInfo>* map = find(var);
+
   if (map != nullptr) {
     for(auto x: *map) {
       set.insert(x.first);
@@ -415,11 +419,17 @@ void RangeInfoMap::attributes (std::unordered_set<std::string>& set,
   }
 }
 
-std::unordered_set<std::string> RangeInfoMap::variables () {
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the names of variables contained in the RangeInfoMap
+////////////////////////////////////////////////////////////////////////////////
+
+std::unordered_set<std::string> RangeInfoMap::variables () const {
   std::unordered_set<std::string> vars;
+
   for(auto x: _ranges) {
     vars.insert(x.first);
   }
+
   return vars;
 }
 
@@ -432,8 +442,8 @@ std::unordered_set<std::string> RangeInfoMap::variables () {
 /// RangeInfoMap containing a single RangeInfo.
 ////////////////////////////////////////////////////////////////////////////////
 
-RangeInfoMapVec::RangeInfoMapVec (RangeInfoMap* rim) :
-  _rangeInfoMapVec() {
+RangeInfoMapVec::RangeInfoMapVec (RangeInfoMap* rim)
+  : _rangeInfoMapVec() {
   
   _rangeInfoMapVec.emplace_back(rim);
 }
@@ -657,6 +667,37 @@ RangeInfoMapVec* triagens::aql::andCombineRangeInfoMapVecs (RangeInfoMapVec* lhs
   delete lhs;
   delete rhs;
   return rimv;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief andCombineRangeInfoMapVecs: same as before, but will return the
+/// mapvec even if one side is a nullptr
+////////////////////////////////////////////////////////////////////////////////
+
+RangeInfoMapVec* triagens::aql::andCombineRangeInfoMapVecsIgnoreEmpty (RangeInfoMapVec* lhs, 
+                                                                       RangeInfoMapVec* rhs) {
+  if (lhs == nullptr && rhs == nullptr) {
+    return nullptr;
+  }
+
+  if ((lhs == nullptr || lhs->empty()) && rhs != nullptr) {
+    if (lhs != nullptr) {
+      delete lhs;
+    }
+    return rhs;
+  }
+
+  if (lhs != nullptr && (rhs == nullptr || rhs->empty())) {
+    if (rhs != nullptr) {
+      delete rhs;
+    }
+    return lhs;
+  }
+
+  TRI_ASSERT(lhs != nullptr);
+  TRI_ASSERT(rhs != nullptr);
+        
+  return andCombineRangeInfoMapVecs(lhs, rhs);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

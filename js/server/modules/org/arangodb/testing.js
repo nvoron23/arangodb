@@ -466,6 +466,7 @@ function shutdownInstance (instanceInfo, options) {
         if (instanceInfo.exitStatus.status === "RUNNING") {
           count ++;
           if (typeof(options.valgrind) === 'string') {
+            wait(1);
             continue;
           }
           if (count % 10 ===0) {
@@ -760,6 +761,9 @@ function performTests(options, testList, testname, remote) {
       }
       if (r.hasOwnProperty('status')) {
         results[te] = r;
+        if (results[te].status === false) {
+          options.cleanup = false;
+        }
         if (! r.status && ! options.force) {
           break;
         }
@@ -814,6 +818,9 @@ testFuncs.single_server = function (options) {
     result = {};
     result[te] = runThere(options, instanceInfo, makePath(te));
     print("Shutting down...");
+    if (result[te].status === false) {
+      options.cleanup = false;
+    }
     shutdownInstance(instanceInfo,options);
     print("done.");
     return result;
@@ -832,6 +839,9 @@ testFuncs.single_localserver = function (options) {
     print("\nArangod: Trying",te,"...");
     result = {};
     result[te] = runHere(options, instanceInfo, makePath(te));
+    if (result[te].status === false) {
+      options.cleanup = false;
+    }
     return result;
   }
   else {
@@ -850,7 +860,11 @@ testFuncs.single_client = function (options) {
     var te = options.test;
     print("\narangosh: Trying ",te,"...");
     result[te] = runInArangosh(options, instanceInfo, te);
+
     print("Shutting down...");
+    if (result[te].status === false) {
+      options.cleanup = false;
+    }
     shutdownInstance(instanceInfo,options);
     print("done.");
     return result;
@@ -954,8 +968,11 @@ testFuncs.shell_client = function(options) {
 
       var r = runInArangosh(options, instanceInfo, te);
       results[te] = r;
-      if (r.status !== true && ! options.force) {
-        break;
+      if (r.status !== true) {
+        options.cleanup = false;
+        if (! options.force) {
+          break;
+        }
       }
 
       continueTesting = checkInstanceAlive(instanceInfo, options);
@@ -1072,8 +1089,11 @@ function rubyTests (options, ssl) {
         print("\nTrying ",te,"...");
 
         result[te] = executeAndWait(command, args);
-        if (result[te].status === false && !options.force) {
-          break;
+        if (result[te].status === false) {
+          options.cleanup = false;
+          if (!options.force) {
+            break;
+          }
         }
 
         continueTesting = checkInstanceAlive(instanceInfo, options);
@@ -1686,7 +1706,7 @@ function UnitTest (which, options) {
   else {
     var r;
     results[which] = r = testFuncs[which](options);
-    print("Testresult:", r);
+    print("Testresult:", yaml.safeDump(r));
     ok = true;
     for (i in r) {
       if (r.hasOwnProperty(i) &&
