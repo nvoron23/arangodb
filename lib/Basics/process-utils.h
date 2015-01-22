@@ -224,6 +224,12 @@ void TRI_InitialiseProcess (int argc, char* argv[]);
 
 void TRI_ShutdownProcess (void);
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief move certain environment variable values to the command line
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_EnvironmentToCommandLine (int& argc, char**& argv);
+
 #endif
 
 // -----------------------------------------------------------------------------

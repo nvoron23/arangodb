@@ -1301,6 +1301,34 @@ void TRI_ShutdownProcess () {
   TRI_DestroyMutex(&ExternalProcessesLock);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief move certain environment variable values to the command line
+////////////////////////////////////////////////////////////////////////////////
+
+extern char** environ;
+
+void TRI_EnvironmentToCommandLine (int& argc, char**& argv) {
+  std::deque<std::string> newargv;
+  int i;
+  for (i = 1; i < argc ; i++) {
+    newargv.push_back(std::string(argv[i]));
+  }
+  i = 0;
+  char* p = environ[i];
+  while (p != nullptr) {
+    std::string envVar(p);
+    if (envVar.size() > 9 && envVar.substr(0,9) == "ARANGODB_") {
+      size_t pos = envVar.find('=');
+      if (pos != std::string::npos) {
+        std::string name = envVar.substr(0, pos);
+        std::string value = getenv(name.c_str());
+        // GO on with this one.
+      }
+    }
+    i++;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       END-OF-FILE
 // -----------------------------------------------------------------------------
