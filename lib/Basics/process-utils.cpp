@@ -1346,16 +1346,33 @@ void TRI_EnvironmentToCommandLine (int& argc, char**& argv) {
   }
   argc = static_cast<int>(newargv.size() + 1);
   std::cout << "New argc: " << argc << std::endl;
-  auto nargv = static_cast<char**>(malloc(sizeof(char*) * argc));
+  auto nargv = static_cast<char**>(TRI_Allocate(TRI_CORE_MEM_ZONE,
+                                                sizeof(char*) * argc,
+                                                false));
   nargv[0] = argv[0];
   argv = nargv;
   std::cout << "argv[0] = \"" << argv[0] << "\"" << std::endl;
   size_t pos;
   for (pos = 1; pos < static_cast<size_t>(argc); pos++) {
-    argv[pos] = static_cast<char*>(malloc(newargv[pos-1].size() + 1));
+    argv[pos] = static_cast<char*>(TRI_Allocate(TRI_CORE_MEM_ZONE,
+                                                newargv[pos-1].size() + 1,
+                                                false));
     strcpy(argv[pos], newargv[pos-1].c_str());
     std::cout << "argv[" << pos << "] = \"" << argv[pos] << "\"" << std::endl;
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief free the memory allocated for TRI_EnvironmentToCommandLine
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_FreeNewCommandLine (int argc, char** argv) {
+  int i;
+  for (i = 1; i < argc; i++) {
+    TRI_Free(TRI_CORE_MEM_ZONE, argv[i]);
+    argv[i] = nullptr;
+  }
+  TRI_Free(TRI_CORE_MEM_ZONE, argv);
 }
 
 // -----------------------------------------------------------------------------

@@ -230,6 +230,12 @@ void TRI_ShutdownProcess (void);
 
 void TRI_EnvironmentToCommandLine (int& argc, char**& argv);
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief free the memory allocated for TRI_EnvironmentToCommandLine
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_FreeNewCommandLine (int argc, char** argv);
+
 #endif
 
 // -----------------------------------------------------------------------------

@@ -476,6 +476,8 @@ int main (int argc, char* argv[]) {
   TRIAGENS_REST_SHUTDOWN;
   TRI_GlobalExitFunction(res, nullptr);
 
+  TRI_FreeNewCommandLine(argc, argv);
+
   return res;
 }
 
