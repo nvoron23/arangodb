@@ -360,7 +360,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         std::vector<Element*>* lookupByKey (Key const* key) const {
-          auto result = new std::vector<Element*>();
+          std::unique_ptr<std::vector<Element*>> result(new std::vector<Element*>());
 
           // compute the hash
           IndexType hash = sizeof(IndexType) == 8 ?
@@ -396,7 +396,7 @@ namespace triagens {
           }
 
           // return whatever we found
-          return result;
+          return result.release();
         }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -163,10 +163,15 @@ OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
                                                       TransactionCollection& collection,
                                                       Document& document,
                                                       OperationOptions& options) {
-  // first valdidate the document _key or create a new one
+  // create a revision for the document
+  if (document.revision == 0) {
+    document.revision = TRI_NewTickServer();
+  }
+  
+  // valdidate the document _key or create a new one
   CreateOrValidateKey(collection, document);
   
-  std::cout << "KEY: " << document.key << "\n";
+  std::cout << "KEY: " << document.key << ", REVISION: " << document.revision << "\n";
 
   // create a temporary marker for the document on the heap
   // the marker memory will be freed automatically when we leave this method
@@ -271,7 +276,7 @@ void CollectionOperations::CreateOrValidateKey (TransactionCollection& collectio
     TRI_ASSERT(document.key.empty());
 
     // no key specified. now let the collection create one
-    document.key.assign(collection.generateKey(TRI_NewTickServer()));
+    document.key.assign(collection.generateKey(document.revision));
 
     if (document.key.empty()) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_OUT_OF_KEYS);

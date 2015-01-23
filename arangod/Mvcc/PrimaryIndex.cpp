@@ -272,16 +272,15 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
                             std::string const& key,
                             Transaction::VisibilityType& visibility) {
   // Get all available revisions:
-  std::vector<TRI_doc_mptr_t*>* revisions = _theHash->lookupByKey(&key);
+  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> revisions(_theHash->lookupByKey(&key));
 
   // Now look through them and find "the right one":
   Transaction* trans = transColl->getTransaction();
-  for (auto p : *revisions) {
+  for (auto p : *(revisions.get())) {
     if (trans->visibility(p->from()) == Transaction::VisibilityType::VISIBLE) {
       TransactionId to = p->to();
       if (to() == 0) {
         visibility = Transaction::VisibilityType::VISIBLE;
-        delete revisions;
         return p;
       }
       Transaction::VisibilityType v = trans->visibility(to);
@@ -290,18 +289,15 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
       }
       else if (v == Transaction::VisibilityType::CONCURRENT) {
         visibility = Transaction::VisibilityType::CONCURRENT;
-        delete revisions;
         return p;
       }
       else {  // INVISIBLE
         visibility = Transaction::VisibilityType::VISIBLE;
-        delete revisions;
         return p;
       }
     }
   }
   visibility = Transaction::VisibilityType::INVISIBLE;
-  delete revisions;
   return nullptr;
 }
 
