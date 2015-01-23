@@ -63,6 +63,7 @@ namespace triagens {
         void insert (class TransactionCollection*, 
                      struct TRI_doc_mptr_t*);
         struct TRI_doc_mptr_t* remove (class TransactionCollection*,
+                                       std::string const&,
                                        struct TRI_doc_mptr_t const*);
         void forget (class TransactionCollection*,
                      struct TRI_doc_mptr_t const*);

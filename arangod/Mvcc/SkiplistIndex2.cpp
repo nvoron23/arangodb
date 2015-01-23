@@ -155,6 +155,7 @@ void SkiplistIndex2::insert (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
         
 TRI_doc_mptr_t* SkiplistIndex2::remove (TransactionCollection*,
+                                        std::string const&,
                                         TRI_doc_mptr_t const* doc) {
   // ...........................................................................
   // Allocate some memory for the SkiplistIndexElement structure

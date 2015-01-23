@@ -154,17 +154,24 @@ void PrimaryIndex::insert (TransactionCollection* transColl,
     THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_EXISTS);
   }
 }
-
+        
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief remove a document from the index
+/// @brief remove a document from the index, stub method
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
-                                      TRI_doc_mptr_t const* doc) {
-  size_t len;
-  char const* keyPtr = TRI_EXTRACT_MARKER_KEY(doc, len);
-  std::string key(keyPtr, len);
+                                      std::string const& key,
+                                      TRI_doc_mptr_t const* mptr) {
+  THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "should not call this method");
+}
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove a document from the index, specialized method
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
+                                      std::string const& key,
+                                      TransactionId::IdType& originalTransactionId) {
   WRITE_LOCKER(_lock);
 
   Transaction::VisibilityType visibility;
@@ -176,6 +183,19 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
   }
 
+  // TODO: check revision
+  /*
+  int revisionCheckResult = checkRevision(previous);
+
+  if (revisionCheckResult != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(revisionCheckResult);
+  }
+  */
+
+  // store original _to value so we can restore it later
+  originalTransactionId = previous->to()();
+
+  // modify _to attribute so the revision becomes invisible
   previous->setTo(transColl->getTransaction()->id()());
   return previous;
 }        

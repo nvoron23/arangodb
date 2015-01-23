@@ -68,6 +68,7 @@ namespace triagens {
                              struct TRI_doc_mptr_t*) = 0;
         virtual struct TRI_doc_mptr_t* remove (
                          class TransactionCollection*,
+                         std::string const&,
                          struct TRI_doc_mptr_t const*) = 0;
         virtual void forget (class TransactionCollection*,
                              struct TRI_doc_mptr_t const*) = 0;

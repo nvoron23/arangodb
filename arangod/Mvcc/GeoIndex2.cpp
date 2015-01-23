@@ -188,6 +188,7 @@ void GeoIndex2::insert (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
+                                   std::string const&,
                                    TRI_doc_mptr_t const* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 

@@ -316,7 +316,6 @@ static bool IsEqualElementEdgeTo (void const* left,
   }
 }
 
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   class EdgeIndex
 // -----------------------------------------------------------------------------
@@ -380,6 +379,7 @@ void EdgeIndex::insert (TransactionCollection*, TRI_doc_mptr_t* doc) {
 ////////////////////////////////////////////////////////////////////////////////
         
 TRI_doc_mptr_t* EdgeIndex::remove (TransactionCollection*,
+                                   std::string const& key,
                                    TRI_doc_mptr_t const* doc) {
   _from->remove(doc);  // OUT
   _to->remove(doc);    // IN

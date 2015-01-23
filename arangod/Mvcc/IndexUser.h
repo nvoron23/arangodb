@@ -75,10 +75,24 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief note that we need to click
+////////////////////////////////////////////////////////////////////////////////
+
+        inline void mustClick () {
+          _mustClick = true;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief return a reference to the primary index
 ////////////////////////////////////////////////////////////////////////////////
 
         triagens::mvcc::PrimaryIndex* primaryIndex () const;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief "click" all indexes to enforce a synchronization
+////////////////////////////////////////////////////////////////////////////////
+
+        void click ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
@@ -88,6 +102,7 @@ namespace triagens {
        
         TRI_document_collection_t* _collection; 
         std::vector<Index*>        _indexes;
+        bool                       _mustClick;
 
     };
 

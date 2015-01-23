@@ -143,6 +143,7 @@ void HashIndex::insert (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* HashIndex::remove (TransactionCollection*,
+                                   std::string const&,
                                    TRI_doc_mptr_t const* doc) {
   int res;
 

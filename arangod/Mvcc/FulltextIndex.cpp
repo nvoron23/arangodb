@@ -123,6 +123,7 @@ void FulltextIndex::insert (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* FulltextIndex::remove (TransactionCollection*, 
+                                       std::string const&,
                                        TRI_doc_mptr_t const* doc) {
   TRI_DeleteDocumentFulltextIndex(_fulltextIndex, (TRI_fulltext_doc_t) ((uintptr_t) doc));
   return nullptr;  // FIXME this is nonsense

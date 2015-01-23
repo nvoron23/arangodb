@@ -38,6 +38,7 @@
 #include "Mvcc/Index.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionId.h"
 
 struct TRI_doc_mptr_t;
 struct TRI_document_collection_t;
@@ -64,7 +65,14 @@ namespace triagens {
                              struct TRI_doc_mptr_t*) override final;
         virtual struct TRI_doc_mptr_t* remove (
                   class TransactionCollection*,
+                  std::string const&,
                   struct TRI_doc_mptr_t const*) override final;
+        
+        struct TRI_doc_mptr_t* remove (
+                class TransactionCollection*,
+                std::string const&,
+                TransactionId::IdType&);
+
         virtual void forget (class TransactionCollection*,
                              struct TRI_doc_mptr_t const*) override final;
 

@@ -60,6 +60,10 @@ IndexUser::IndexUser (TRI_document_collection_t* collection)
 ////////////////////////////////////////////////////////////////////////////////
 
 IndexUser::~IndexUser () {
+  if (_mustClick) {
+    click();
+  }
+
   _collection->readUnlockIndexes();
 }
 
@@ -77,6 +81,26 @@ triagens::mvcc::PrimaryIndex* IndexUser::primaryIndex () const {
   }
 
   return static_cast<triagens::mvcc::PrimaryIndex*>(_indexes[0]);
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief "click" all indexes to enforce a synchronization
+////////////////////////////////////////////////////////////////////////////////
+
+void IndexUser::click () {
+  for (auto it : _indexes) {
+    try {
+      it->clickLock();
+    }
+    catch (...) {
+    }
+  }
+
+  _mustClick = false;
 }
 
 // -----------------------------------------------------------------------------

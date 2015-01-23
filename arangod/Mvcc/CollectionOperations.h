@@ -34,6 +34,7 @@
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "VocBase/document-collection.h"
+#include "VocBase/update-policy.h"
 #include "Wal/Logfile.h"
 
 struct TRI_json_t;
@@ -103,12 +104,14 @@ namespace triagens {
       OperationResult (OperationResult const& other) {
         mptr = other.mptr;
         tick = other.tick;
+        actualRevision = other.actualRevision;
         code = other.code;
       }
 
       OperationResult& operator= (OperationResult const& other) {
         mptr = other.mptr;
         tick = other.tick;
+        actualRevision = other.actualRevision;
         code = other.code;
         return *this;
       }
@@ -116,17 +119,27 @@ namespace triagens {
       OperationResult () 
         : mptr(nullptr),
           tick(0),
+          actualRevision(0),
           code(TRI_ERROR_NO_ERROR) {
       }
       
       explicit OperationResult (TRI_doc_mptr_t const* mptr) 
         : mptr(mptr),
           tick(0),
+          actualRevision(0),
           code(TRI_ERROR_NO_ERROR) {
+      }
+      
+      explicit OperationResult (TRI_voc_rid_t actualRevision) 
+        : mptr(nullptr),
+          tick(0),
+          actualRevision(actualRevision),
+          code(TRI_ERROR_ARANGO_CONFLICT) {
       }
 
       TRI_doc_mptr_t const*          mptr;
       TRI_voc_tick_t                 tick;
+      TRI_voc_rid_t                  actualRevision;
       int                            code;
     
     };
@@ -137,8 +150,10 @@ namespace triagens {
 
     struct OperationOptions {
       OperationOptions (int options,
-                        TRI_voc_rid_t expectedRevision = 0) 
+                        TRI_voc_rid_t expectedRevision = 0,
+                        TRI_doc_update_policy_e policy = TRI_DOC_UPDATE_LAST_WRITE) 
         : expectedRevision(expectedRevision),
+          policy(policy),
           waitForSync(options & WaitForSync),
           keepNull(options & KeepNull),
           mergeObjects(options & MergeObjects),
@@ -149,12 +164,13 @@ namespace triagens {
         : OperationOptions(0) {
       }
 
-      TRI_voc_rid_t const expectedRevision;
+      TRI_voc_rid_t const           expectedRevision; // the document revision expected. can be 0 to match any
+      TRI_doc_update_policy_e const policy;           // the update policy
 
-      bool const waitForSync;      // wait for sync?
-      bool const keepNull;         // treat null attributes as to-be-removed?
-      bool const mergeObjects;     // merge object attributes on patch or overwrite?
-      bool const overwrite;        // ignore revision conflicts?
+      bool const                    waitForSync;      // wait for sync?
+      bool const                    keepNull;         // treat null attributes as to-be-removed?
+      bool const                    mergeObjects;     // merge object attributes on patch or overwrite?
+      bool const                    overwrite;        // ignore revision conflicts?
 
       static int const WaitForSync  = 0x1;
       static int const KeepNull     = 0x2;
@@ -167,6 +183,10 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     struct CollectionOperations {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief insert a document
@@ -195,7 +215,20 @@ namespace triagens {
                                                Document const&,
                                                OperationOptions const&);
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
       private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief validate the revision of the document found
+////////////////////////////////////////////////////////////////////////////////
+    
+        static int CheckRevision (TRI_doc_mptr_t const*,
+                                  Document const&,
+                                  TRI_doc_update_policy_e,
+                                  TRI_voc_rid_t* = nullptr);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief creates a key if not specified, or validates it if specified

@@ -68,6 +68,7 @@ namespace triagens {
                              struct TRI_doc_mptr_t*) override final;
         virtual struct TRI_doc_mptr_t* remove (
                    class TransactionCollection*,
+                   std::string const&,
                    struct TRI_doc_mptr_t const*) override final;
         virtual void forget (class TransactionCollection*,
                              struct TRI_doc_mptr_t const*) override final;
