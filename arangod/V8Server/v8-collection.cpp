@@ -3337,7 +3337,14 @@ static void JS_Test (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
       int res = TRI_ERROR_NO_ERROR;
       try {
-        triagens::mvcc::OperationResult result = triagens::mvcc::CollectionOperations::InsertDocument(*trx7, *trx7->collection("yy"), doc, options);
+        triagens::mvcc::OperationResult insertResult = triagens::mvcc::CollectionOperations::InsertDocument(*trx7, *trx7->collection("yy"), doc, options);
+
+        std::cout << "INSERT RESULT KEY: " << TRI_EXTRACT_MARKER_KEY(insertResult.mptr) << ", REV: " << TRI_EXTRACT_MARKER_RID(insertResult.mptr) << "\n";
+        
+        triagens::mvcc::Document readDoc = triagens::mvcc::Document::CreateFromKey(c1->shaper(), "der-hans");
+        triagens::mvcc::OperationResult readResult = triagens::mvcc::CollectionOperations::ReadDocument(*trx7, *trx7->collection("yy"), readDoc, options);
+        
+        std::cout << "READ RESULT KEY: " << TRI_EXTRACT_MARKER_KEY(readResult.mptr) << ", REV: " << TRI_EXTRACT_MARKER_RID(readResult.mptr) << "\n";
       }
       catch (triagens::arango::Exception const& ex) {
         res = ex.code();
@@ -3345,6 +3352,7 @@ static void JS_Test (const v8::FunctionCallbackInfo<v8::Value>& args) {
       catch (...) {
         res = TRI_ERROR_INTERNAL;
       }
+
       if (res != TRI_ERROR_NO_ERROR) {
         std::cout << "EXCEPTION CAUGHT: " << TRI_errno_string(res) << "\n";
       }

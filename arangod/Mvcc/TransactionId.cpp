@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC index user class
+/// @brief MVCC transaction class
 ///
 /// @file
 ///
@@ -27,74 +27,39 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef ARANGODB_MVCC_INDEX_USER_H
-#define ARANGODB_MVCC_INDEX_USER_H 1
+#include "TransactionId.h"
 
-#include "Basics/Common.h"
-#include "Utils/Exception.h"
+using namespace triagens::mvcc;
 
-struct TRI_document_collection_t;
+// -----------------------------------------------------------------------------
+// --SECTION--                                               class TransactionId
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                          non-class friend methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief append the transaction id to an output stream
+////////////////////////////////////////////////////////////////////////////////
 
 namespace triagens {
   namespace mvcc {
 
-    class Index;
-    class PrimaryIndex;
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                   class IndexUser
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                        constructors / destructors
-// -----------------------------------------------------------------------------
-
-    class IndexUser {
-
-      public:
-
-        IndexUser (IndexUser const&) = delete;
-        IndexUser& operator= (IndexUser const&) = delete;
-
-        IndexUser (struct TRI_document_collection_t*);
-
-        ~IndexUser ();
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                    public methods
-// -----------------------------------------------------------------------------
-
-      public:
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return a reference to the list of indexes
-////////////////////////////////////////////////////////////////////////////////
-
-        inline std::vector<triagens::mvcc::Index*> const& indexes () const {
-          return _indexes;
-        }
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return a reference to the primary index
-////////////////////////////////////////////////////////////////////////////////
-
-        triagens::mvcc::PrimaryIndex* primaryIndex () const;
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                 private variables
-// -----------------------------------------------------------------------------
-
-      private:
-       
-        TRI_document_collection_t* _collection; 
-        std::vector<Index*>        _indexes;
-
-    };
+     std::ostream& operator<< (std::ostream& stream,
+                               TransactionId const* id) {
+       stream << (*id)();
+       return stream;
+     }
+     
+     std::ostream& operator<< (std::ostream& stream,
+                               TransactionId const& id) {
+       stream << id();
+       return stream;
+     }
 
   }
 }
-
-#endif
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       END-OF-FILE

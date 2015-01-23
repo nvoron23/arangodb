@@ -32,6 +32,7 @@
 #include "Mvcc/Index.h"
 #include "Mvcc/IndexUser.h"
 #include "Mvcc/MasterpointerManager.h"
+#include "Mvcc/PrimaryIndex.h"
 #include "ShapedJson/Legends.h"
 #include "ShapedJson/shaped-json.h"
 #include "Utils/Exception.h"
@@ -64,7 +65,6 @@ Document::Document (TRI_shaper_t* shaper,
     freeShape(freeShape) {
 
   TRI_ASSERT(shaper != nullptr);
-  TRI_ASSERT(shaped != nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -147,6 +147,16 @@ Document Document::CreateFromShapedJson (TRI_shaper_t* shaper,
   return Document(shaper, shaped, std::string(), 0, CollectionOperations::NoKeySpecified, false);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a document from a key only
+////////////////////////////////////////////////////////////////////////////////
+
+Document Document::CreateFromKey (TRI_shaper_t* shaper,
+                                  std::string const& key) {
+
+  return Document(shaper, nullptr, key, 0, CollectionOperations::KeySpecified, false);
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                       struct CollectionOperations
 // -----------------------------------------------------------------------------
@@ -162,10 +172,14 @@ Document Document::CreateFromShapedJson (TRI_shaper_t* shaper,
 OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
                                                       TransactionCollection& collection,
                                                       Document& document,
-                                                      OperationOptions& options) {
+                                                      OperationOptions const& options) {
   // create a revision for the document
   if (document.revision == 0) {
     document.revision = TRI_NewTickServer();
+  }
+  
+  if (document.shaped == nullptr) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "should not insert a document without body");
   }
   
   // valdidate the document _key or create a new one
@@ -229,27 +243,59 @@ OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
   // when we are here, the document is present in all indexes 
 
   // now append the marker to the WAL
-  OperationResult result;
-  result.code = WriteMarker(marker.get(), collection, result);
+  WriteResult writeResult;
+  int res = WriteMarker(marker.get(), collection, writeResult);
 
-  if (result.code == TRI_ERROR_NO_ERROR) {
+  if (res == TRI_ERROR_NO_ERROR) {
     // make the master pointer point to the WAL location
-    mptr.setDataPtr(result.data);
+    TRI_ASSERT_EXPENSIVE(writeResult.mem != nullptr);
+    mptr->setDataPtr(writeResult.mem);
+    mptr->setFrom(transaction.id()());
   }
-
+  
   // do a final sync by clicking each index' lock
   for (auto index : indexUser.indexes()) {
     index->clickLock();
   }
   
   // link the master pointer in the list of master pointers of the collection 
-  if (result.code == TRI_ERROR_NO_ERROR) {
+  if (res == TRI_ERROR_NO_ERROR) {
     mptr.link();
-    result.mptr = *(*mptr);
+  }
+  
+  return OperationResult(mptr.get());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief reads a document by its key
+////////////////////////////////////////////////////////////////////////////////
+
+OperationResult CollectionOperations::ReadDocument (Transaction& transaction,
+                                                    TransactionCollection& collection,
+                                                    Document const& document,
+                                                    OperationOptions const& options) {
+
+  std::cout << "KEY: " << document.key << ", REVISION: " << document.revision << "\n";
+
+  if (document.key.empty()) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
+  }
+  
+  // acquire a read-lock on the list of indexes so no one else creates or drops indexes
+  // while the insert operation is ongoing
+  IndexUser indexUser(collection.documentCollection());
+
+  auto primaryIndex = indexUser.primaryIndex();
+ 
+  auto visibility = Transaction::VisibilityType::VISIBLE;
+
+  auto mptr = primaryIndex->lookup(&collection, document.key, visibility);
+
+  if (mptr == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
   }
 
-  std::cout << "INSERTED DOCUMENT. RESULT CODE: " << result.code << ", TICK: " << result.tick << ", FID: " << result.logfileId << "\n";
-  return result;
+  return OperationResult(mptr);  
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -258,8 +304,8 @@ OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
 
 OperationResult CollectionOperations::RemoveDocument (Transaction& transaction,
                                                       TransactionCollection& collection,
-                                                      Document& document,
-                                                      OperationOptions& options) {
+                                                      Document const& document,
+                                                      OperationOptions const& options) {
   OperationResult result;
   std::cout << "REMOVE DOCUMENT\n";
   return result;
@@ -298,7 +344,7 @@ void CollectionOperations::CreateOrValidateKey (TransactionCollection& collectio
 
 int CollectionOperations::WriteMarker (triagens::wal::Marker* marker,
                                        TransactionCollection& collection,
-                                       OperationResult& result) {
+                                       WriteResult& result) {
   auto logfileManager = triagens::wal::LogfileManager::instance();
   
   char* oldmarker = static_cast<char*>(marker->mem());
@@ -355,7 +401,7 @@ int CollectionOperations::WriteMarker (triagens::wal::Marker* marker,
       }
 
       result.logfileId = slotInfo2.logfileId;
-      result.data      = slotInfo2.mem; 
+      result.mem       = slotInfo2.mem; 
       result.tick      = slotInfo2.tick;
     }
     else if (slotInfo.errorCode != TRI_ERROR_NO_ERROR) {
@@ -367,7 +413,7 @@ int CollectionOperations::WriteMarker (triagens::wal::Marker* marker,
       // This means that we can find the old legend relative to
       // the new position in the same WAL file.
       result.logfileId = slotInfo.logfileId;
-      result.data      = slotInfo.mem; 
+      result.mem       = slotInfo.mem; 
       result.tick      = slotInfo.tick;
     }
 
@@ -382,7 +428,7 @@ int CollectionOperations::WriteMarker (triagens::wal::Marker* marker,
     }
 
     result.logfileId = slotInfo.logfileId;
-    result.data      = slotInfo.mem;
+    result.mem       = slotInfo.mem;
     result.tick      = slotInfo.tick;
   }
 

@@ -702,13 +702,17 @@ static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_df_marker_t const* marker,
   if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT || 
       marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
     auto m = reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker);
-    len = m->_offsetJson - m->_offsetKey - 1;
+    len = strlen((char const*) marker + m->_offsetKey);
+    // key is padded with 0 bytes so the following does not always work
+    // len = m->_offsetJson - m->_offsetKey - 1;
     return ((char const*) marker) + m->_offsetKey;  
   }
   else if (marker->_type == TRI_WAL_MARKER_DOCUMENT || 
            marker->_type == TRI_WAL_MARKER_EDGE) {
     auto m = reinterpret_cast<triagens::wal::document_marker_t const*>(marker);
-    len = m->_offsetLegend - m->_offsetKey - 1;
+    len = strlen((char const*) marker + m->_offsetKey);
+    // key is padded with 0 bytes so the following does not always work
+    // len = m->_offsetLegend - m->_offsetKey - 1;
     return ((char const*) marker) + m->_offsetKey;
   }
 
@@ -748,6 +752,15 @@ static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_doc_mptr_copy_t const* mpt
                                                   size_t& len) {
   TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());  // PROTECTED by TRI_EXTRACT_MARKER_KEY search
   return TRI_EXTRACT_MARKER_KEY(marker, len);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief extracts the revision id from a marker
+////////////////////////////////////////////////////////////////////////////////
+
+static inline TRI_voc_rid_t TRI_EXTRACT_MARKER_RID (TRI_doc_mptr_t const* mptr) {
+  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());  // PROTECTED by TRI_EXTRACT_MARKER_KEY search
+  return TRI_EXTRACT_MARKER_RID(marker);
 }
 
 // -----------------------------------------------------------------------------

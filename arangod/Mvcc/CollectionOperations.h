@@ -72,6 +72,9 @@ namespace triagens {
         static Document CreateFromShapedJson (struct TRI_shaper_s*,
                                               struct TRI_shaped_json_s const*,
                                               char const* = nullptr);
+        
+        static Document CreateFromKey (struct TRI_shaper_s*,
+                                       std::string const&);
 
         struct TRI_shaper_s* shaper;
         struct TRI_shaped_json_s const* shaped;
@@ -82,33 +85,48 @@ namespace triagens {
     };
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                                struct WriteResult
+// -----------------------------------------------------------------------------
+
+    struct WriteResult {
+      triagens::wal::Logfile::IdType  logfileId;
+      void const*                     mem;
+      TRI_voc_tick_t                  tick;
+    };
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                            struct OperationResult
 // -----------------------------------------------------------------------------
 
     struct OperationResult {
       // TODO: implement copy ctor & copy assignment ctor
       OperationResult (OperationResult const& other) {
-        // TODO: implement
-        // ...
+        mptr = other.mptr;
+        tick = other.tick;
+        code = other.code;
       }
 
       OperationResult& operator= (OperationResult const& other) {
-        // TODO: implement
+        mptr = other.mptr;
+        tick = other.tick;
+        code = other.code;
         return *this;
       }
 
       OperationResult () 
-        : mptr(),
-          logfileId(0),
+        : mptr(nullptr),
           tick(0),
-          data(nullptr),
+          code(TRI_ERROR_NO_ERROR) {
+      }
+      
+      explicit OperationResult (TRI_doc_mptr_t const* mptr) 
+        : mptr(mptr),
+          tick(0),
           code(TRI_ERROR_NO_ERROR) {
       }
 
-      TRI_doc_mptr_copy_t            mptr;
-      triagens::wal::Logfile::IdType logfileId;
+      TRI_doc_mptr_t const*          mptr;
       TRI_voc_tick_t                 tick;
-      void const*                    data;
       int                            code;
     
     };
@@ -157,7 +175,16 @@ namespace triagens {
         static OperationResult InsertDocument (Transaction&, 
                                                TransactionCollection&, 
                                                Document&, 
-                                               OperationOptions&);
+                                               OperationOptions const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief read a document by its key
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult ReadDocument (Transaction&, 
+                                             TransactionCollection&, 
+                                             Document const&, 
+                                             OperationOptions const&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove a document
@@ -165,8 +192,8 @@ namespace triagens {
 
         static OperationResult RemoveDocument (Transaction&, 
                                                TransactionCollection&,
-                                               Document&,
-                                               OperationOptions&);
+                                               Document const&,
+                                               OperationOptions const&);
 
       private:
 
@@ -180,7 +207,7 @@ namespace triagens {
 
         static int WriteMarker (triagens::wal::Marker*,
                                 TransactionCollection&,
-                                OperationResult&);
+                                WriteResult&);
 
       public:
        

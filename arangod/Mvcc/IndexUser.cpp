@@ -29,6 +29,7 @@
 
 #include "IndexUser.h"
 #include "Mvcc/Index.h"
+#include "Mvcc/PrimaryIndex.h"
 #include "VocBase/document-collection.h"
 
 using namespace triagens::basics;
@@ -60,6 +61,22 @@ IndexUser::IndexUser (TRI_document_collection_t* collection)
 
 IndexUser::~IndexUser () {
   _collection->readUnlockIndexes();
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return a reference to the primary index
+////////////////////////////////////////////////////////////////////////////////
+
+triagens::mvcc::PrimaryIndex* IndexUser::primaryIndex () const {
+  if (_indexes.empty()) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no primary index found");
+  }
+
+  return static_cast<triagens::mvcc::PrimaryIndex*>(_indexes[0]);
 }
 
 // -----------------------------------------------------------------------------

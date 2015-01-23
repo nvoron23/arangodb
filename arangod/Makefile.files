@@ -87,6 +87,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/TopLevelTransaction.cpp \
 	arangod/Mvcc/Transaction.cpp \
 	arangod/Mvcc/TransactionCollection.cpp \
+	arangod/Mvcc/TransactionId.cpp \
 	arangod/Mvcc/TransactionManager.cpp \
 	arangod/Replication/ContinuousSyncer.cpp \
 	arangod/Replication/InitialSyncer.cpp \

@@ -104,6 +104,10 @@ namespace triagens {
         return (MainPart(lhs) == MainPart(rhs));
       }
 
+      friend std::ostream& operator<< (std::ostream&, TransactionId const*);
+    
+      friend std::ostream& operator<< (std::ostream&, TransactionId const&);
+
       IdType const _id;
 
       static IdType const MainMask      = 0xffffffffffffff00ULL;

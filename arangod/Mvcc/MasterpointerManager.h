@@ -58,8 +58,26 @@ namespace triagens {
 
         ~MasterpointerContainer ();
 
-        void setDataPtr (void const*);
-        TRI_doc_mptr_t* operator* () const;
+        TRI_doc_mptr_t const* operator* () const {
+          return mptr;
+        }
+        
+        TRI_doc_mptr_t* operator* () {
+          return mptr;
+        }
+
+        TRI_doc_mptr_t* operator-> () {
+          return mptr;
+        }
+
+        TRI_doc_mptr_t const* get () const {
+          return mptr;
+        }
+        
+        TRI_doc_mptr_t* get () {
+          return mptr;
+        }
+
         void link ();
 
         MasterpointerManager* const manager;

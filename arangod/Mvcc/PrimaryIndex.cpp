@@ -147,6 +147,7 @@ void PrimaryIndex::insert (TransactionCollection* transColl,
   }
 
   TRI_doc_mptr_t const* old = _theHash->insert(doc, false, true);
+
   if (old != nullptr) {
     // This is serious: a document with this exact key and revision already
     // exists!
@@ -215,7 +216,7 @@ void PrimaryIndex::cleanup () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void PrimaryIndex::sizeHint (size_t size) {
-  int res = _theHash->resize(3*size+1);   // Take into account old revisions
+  int res = _theHash->resize(3 * size + 1);   // Take into account old revisions
   if (res == TRI_ERROR_OUT_OF_MEMORY) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
@@ -291,7 +292,7 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
         visibility = Transaction::VisibilityType::CONCURRENT;
         return p;
       }
-      else {  // INVISIBLE
+      else {  // _to is INVISIBLE
         visibility = Transaction::VisibilityType::VISIBLE;
         return p;
       }
