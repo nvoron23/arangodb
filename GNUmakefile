@@ -306,7 +306,8 @@ pack-tar-config:
 		--disable-mruby
 
 pack-tar:
-	make install DESTDIR=/tmp/pack-arangodb
+	rm -rf /tmp/pack-arangodb
+	make install-strip DESTDIR=/tmp/pack-arangodb
 	tar -c -v -z -f arangodb-$(VERSION).tar.gz -C /tmp/pack-arangodb .
 
 ## -----------------------------------------------------------------------------
