@@ -849,7 +849,7 @@ int ServerState::lookupLocalInfoToId (std::string const& localInfo,
     if (! result.successful()) {
       const std::string endpoints = AgencyComm::getEndpointsString();
 
-      std::cout << "Baeh: could not get Target/MapLocalToId\n";
+      std::cout << "Baeh: could not get Target/MapLocalToID\n";
       LOG_TRACE("Could not fetch configuration from agency endpoints (%s): "
                 "got status code %d, message: %s, key: %s",
                 endpoints.c_str(),
@@ -858,7 +858,7 @@ int ServerState::lookupLocalInfoToId (std::string const& localInfo,
                 key.c_str());
     }
     else {
-      std::cout << "Good: got Target/MapLocalToId\n";
+      std::cout << "Good: got Target/MapLocalToID\n";
       result.parse("Target/MapLocalToID/", false);
       std::map<std::string, AgencyCommResultEntry>::const_iterator it = result._values.find(localInfo);
 
