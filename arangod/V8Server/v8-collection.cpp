@@ -3303,7 +3303,7 @@ static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
 
-    triagens::mvcc::OperationResult readResult = triagens::mvcc::CollectionOperations::ReadDocument(transaction, transactionCollection, document, options);
+    auto readResult = triagens::mvcc::CollectionOperations::ReadDocument(transaction, transactionCollection, document, options);
  
     if (readResult.code != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(readResult.code);
@@ -3387,14 +3387,11 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_shaped_json_t* shaped = TRI_ShapedJsonV8Object(isolate, args[0], shaper, true);  // PROTECTED by trx from above
     auto document = triagens::mvcc::Document::CreateFromShapedJson(shaper, shaped, key.get(), true);
 
-    triagens::mvcc::OperationResult insertResult = triagens::mvcc::CollectionOperations::InsertDocument(transaction, transactionCollection, document, options);
+    auto insertResult = triagens::mvcc::CollectionOperations::InsertDocument(&transactionScope, transactionCollection, document, options);
    
     if (insertResult.code != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(insertResult.code);
     }
-
-    // now commit the operation 
-    transactionScope.commit();
 
     // from here, the operation is durable
 
@@ -3492,7 +3489,7 @@ static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
 
-    triagens::mvcc::OperationResult removeResult = triagens::mvcc::CollectionOperations::RemoveDocument(transaction, transactionCollection, document, options);
+    auto removeResult = triagens::mvcc::CollectionOperations::RemoveDocument(transaction, transactionCollection, document, options);
  
     if (removeResult.code != TRI_ERROR_NO_ERROR) {
       if (removeResult.code == TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND && options.policy == TRI_DOC_UPDATE_LAST_WRITE) {

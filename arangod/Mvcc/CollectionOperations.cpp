@@ -33,6 +33,7 @@
 #include "Mvcc/IndexUser.h"
 #include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/TransactionScope.h"
 #include "ShapedJson/Legends.h"
 #include "ShapedJson/shaped-json.h"
 #include "Utils/Exception.h"
@@ -194,10 +195,11 @@ Document Document::CreateFromKey (std::string const& key,
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::InsertDocument (Transaction* transaction,
+OperationResult CollectionOperations::InsertDocument (TransactionScope* transactionScope,
                                                       TransactionCollection* collection,
                                                       Document& document,
                                                       OperationOptions const& options) {
+  auto* transaction = transactionScope->transaction();
   auto const transactionId = transaction->id()();
 
   // create a revision for the document
@@ -277,6 +279,10 @@ OperationResult CollectionOperations::InsertDocument (Transaction* transaction,
     // link the master pointer in the list of master pointers of the collection 
     mptr.link(); // TODO: what if this operation fails?
   }
+
+  // commit the local operation
+  transactionScope->commit();
+  collection->_stats.numInserted++;
  
   TRI_ASSERT(mptr.get() != nullptr); 
   

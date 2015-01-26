@@ -47,10 +47,21 @@ namespace triagens {
     class MasterpointerManager;
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                            struct CollectionStats
+// -----------------------------------------------------------------------------
+
+    struct CollectionStats {
+      size_t numInserted = 0;
+      size_t numRemoved  = 0;
+    };
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                       class TransactionCollection
 // -----------------------------------------------------------------------------
 
     class TransactionCollection {
+
+      friend struct CollectionOperations;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -225,7 +236,13 @@ namespace triagens {
 /// @brief an optional barrier acquired for the collection
 ////////////////////////////////////////////////////////////////////////////////
   
-        struct TRI_barrier_s*         _barrier;
+        struct TRI_barrier_s* _barrier;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief collection modification statistics
+////////////////////////////////////////////////////////////////////////////////
+
+        CollectionStats _stats;
       
     };
   }

@@ -44,6 +44,8 @@ struct TRI_shaper_s;
 namespace triagens {
   namespace mvcc {
 
+    class TransactionScope;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   struct Document
 // -----------------------------------------------------------------------------
@@ -204,7 +206,7 @@ namespace triagens {
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult InsertDocument (Transaction*, 
+        static OperationResult InsertDocument (TransactionScope*, 
                                                TransactionCollection*, 
                                                Document&, 
                                                OperationOptions const&);
