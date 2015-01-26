@@ -107,6 +107,7 @@ add_executable(
     Mvcc/TransactionCollection.cpp
     Mvcc/TransactionId.cpp
     Mvcc/TransactionManager.cpp
+    Mvcc/TransactionScope.cpp
     Replication/ContinuousSyncer.cpp
     Replication/InitialSyncer.cpp
     Replication/Syncer.cpp

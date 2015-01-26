@@ -56,8 +56,7 @@ DistributedTransactionManager::~DistributedTransactionManager () {
 /// @brief create a (potentially nested) transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* DistributedTransactionManager::createTransaction (TRI_vocbase_t* vocbase,
-                                                               bool forceTopLevel) {
+Transaction* DistributedTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
   // TODO
   TRI_ASSERT(false);
   return nullptr;

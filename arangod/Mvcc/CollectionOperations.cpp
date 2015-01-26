@@ -64,7 +64,7 @@ Document::Document (TRI_shaper_t* shaper,
     keySpecified(keySpecified),
     freeShape(freeShape) {
 
-  TRI_ASSERT(shaper != nullptr);
+  TRI_ASSERT(shaped == nullptr || shaper != nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -90,6 +90,7 @@ Document::Document (Document&& other)
 
 Document::~Document () {
   if (shaped != nullptr && freeShape) {
+    TRI_ASSERT(shaper != nullptr);
     TRI_FreeShapedJson(shaper->_memoryZone, const_cast<TRI_shaped_json_t*>(shaped));
   }
 }
@@ -104,7 +105,9 @@ Document Document::CreateFromJson (TRI_shaper_t* shaper,
   if (! TRI_IsObjectJson(json)) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
   }
-  
+ 
+  std::string keyString;
+   
   // check if _key is there
   TRI_json_t const* key = TRI_LookupObjectJson(json, TRI_VOC_ATTRIBUTE_KEY);
   
@@ -113,6 +116,8 @@ Document Document::CreateFromJson (TRI_shaper_t* shaper,
       // _key is there but not a string
       THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_KEY_BAD);
     }
+    
+    keyString.assign(key->_value._string.data, key->_value._string.length - 1);
   }
   
   auto* shaped = TRI_ShapedJsonJson(shaper, json, true);
@@ -121,13 +126,18 @@ Document Document::CreateFromJson (TRI_shaper_t* shaper,
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_SHAPER_FAILED);
   }
 
-  if (key != nullptr) {
-    // user has specified a key
-    return Document(shaper, shaped, std::string(key->_value._string.data, key->_value._string.length - 1), 0, CollectionOperations::KeySpecified, true);
+  try {
+    return Document(shaper, 
+                    shaped, 
+                    keyString,
+                    0, // TODO: revision 
+                    key == nullptr ? CollectionOperations::NoKeySpecified : CollectionOperations::KeySpecified, 
+                    true);
   }
-
-  // user has not specified a key
-  return Document(shaper, shaped, std::string(), 0, CollectionOperations::NoKeySpecified, true);
+  catch (...) {
+    TRI_FreeShapedJson(shaper->_memoryZone, shaped);
+    throw;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -136,25 +146,40 @@ Document Document::CreateFromJson (TRI_shaper_t* shaper,
 
 Document Document::CreateFromShapedJson (TRI_shaper_t* shaper,
                                          TRI_shaped_json_t const* shaped,
-                                         char const* key) {
+                                         char const* key,
+                                         bool freeShape) {
+  try {
+    std::string keyString;
 
-  if (key != nullptr) {         
-    // user has specified a key
-    return Document(shaper, shaped, std::string(key), 0, CollectionOperations::KeySpecified, false);
-  }
+    if (key != nullptr) {         
+      // user has specified a key
+      keyString.assign(key);
+    }
      
-  // user has not specified a key
-  return Document(shaper, shaped, std::string(), 0, CollectionOperations::NoKeySpecified, false);
+    return Document(shaper, 
+                    shaped, 
+                    keyString,
+                    0, // TODO: revision 
+                    key == nullptr ? CollectionOperations::NoKeySpecified : CollectionOperations::KeySpecified, 
+                    freeShape);
+  }
+  catch (...) {
+    // make sure that the shape gets deleted in every case
+    if (freeShape) {
+      TRI_FreeShapedJson(shaper->_memoryZone, const_cast<TRI_shaped_json_t*>(shaped));
+    }
+    throw;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a document from a key only
 ////////////////////////////////////////////////////////////////////////////////
 
-Document Document::CreateFromKey (TRI_shaper_t* shaper,
-                                  std::string const& key) {
+Document Document::CreateFromKey (std::string const& key,
+                                  TRI_voc_rid_t revisionId) {
 
-  return Document(shaper, nullptr, key, 0, CollectionOperations::KeySpecified, false);
+  return Document(nullptr, nullptr, key, revisionId, CollectionOperations::KeySpecified, false);
 }
 
 // -----------------------------------------------------------------------------
@@ -169,10 +194,12 @@ Document Document::CreateFromKey (TRI_shaper_t* shaper,
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
-                                                      TransactionCollection& collection,
+OperationResult CollectionOperations::InsertDocument (Transaction* transaction,
+                                                      TransactionCollection* collection,
                                                       Document& document,
                                                       OperationOptions const& options) {
+  auto const transactionId = transaction->id()();
+
   // create a revision for the document
   if (document.revision == 0) {
     document.revision = TRI_NewTickServer();
@@ -183,17 +210,15 @@ OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
   }
   
   // valdidate the document _key or create a new one
-  CreateOrValidateKey(collection, document);
+  CreateOrValidateKey(collection, &document);
   
-  // std::cout << "KEY: " << document.key << ", REVISION: " << document.revision << "\n";
-
   // create a temporary marker for the document on the heap
   // the marker memory will be freed automatically when we leave this method
   std::unique_ptr<triagens::wal::DocumentMarker> marker(
-    new triagens::wal::DocumentMarker(transaction.vocbase()->_id,
-                                      collection.id(),
+    new triagens::wal::DocumentMarker(transaction->vocbase()->_id,
+                                      collection->id(),
                                       document.revision,
-                                      transaction.id()(),
+                                      transactionId,
                                       document.key,
                                       8, /* legendSize */
                                       document.shaped)
@@ -204,19 +229,19 @@ OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
   // and have not linked the master pointer
   
   // set data pointer to point to the marker just created
-  MasterpointerContainer mptr = collection.masterpointerManager()->create(marker.get()->mem(), transaction.id()());
+  MasterpointerContainer mptr = collection->masterpointerManager()->create(marker.get()->mem(), transactionId);
   
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the insert operation is ongoing
   {
-    IndexUser indexUser(collection.documentCollection());
+    IndexUser indexUser(collection);
 
     // iterate over all indexes while holding the index read-lock
     auto indexes = indexUser.indexes();
     for (size_t i = 0; i < indexes.size(); ++i) {
       // and call insert for each index
       try {
-        indexes[i]->insert(&collection, *mptr);
+        indexes[i]->insert(collection, *mptr);
         indexUser.mustClick();
       }
       catch (...) {
@@ -225,7 +250,7 @@ OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
         while (i > 0) {
           --i;
           try {
-            indexes[i]->forget(&collection, const_cast<TRI_doc_mptr_t const*>(*mptr));
+            indexes[i]->forget(collection, const_cast<TRI_doc_mptr_t const*>(*mptr));
           }
           catch (...) {
           }
@@ -247,7 +272,7 @@ OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
     // make the master pointer point to the WAL location
     TRI_ASSERT_EXPENSIVE(writeResult.mem != nullptr);
     mptr->setDataPtr(writeResult.mem);
-    mptr->setFrom(transaction.id()());
+    mptr->setFrom(transactionId);
 
     // link the master pointer in the list of master pointers of the collection 
     mptr.link(); // TODO: what if this operation fails?
@@ -262,12 +287,10 @@ OperationResult CollectionOperations::InsertDocument (Transaction& transaction,
 /// @brief reads a document by its key
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::ReadDocument (Transaction& transaction,
-                                                    TransactionCollection& collection,
+OperationResult CollectionOperations::ReadDocument (Transaction* transaction,
+                                                    TransactionCollection* collection,
                                                     Document const& document,
                                                     OperationOptions const& options) {
-
-  // std::cout << "KEY: " << document.key << ", REVISION: " << document.revision << "\n";
 
   if (document.key.empty()) {
     return OperationResult(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
@@ -278,11 +301,11 @@ OperationResult CollectionOperations::ReadDocument (Transaction& transaction,
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the insert operation is ongoing
   {
-    IndexUser indexUser(collection.documentCollection());
+    IndexUser indexUser(collection);
     auto primaryIndex = indexUser.primaryIndex();
  
     auto visibility = Transaction::VisibilityType::VISIBLE;
-    mptr = primaryIndex->lookup(&collection, document.key, visibility);
+    mptr = primaryIndex->lookup(collection, document.key, visibility);
 
     if (mptr == nullptr) {
       return OperationResult(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
@@ -306,28 +329,28 @@ OperationResult CollectionOperations::ReadDocument (Transaction& transaction,
 /// @brief remove a document
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::RemoveDocument (Transaction& transaction,
-                                                      TransactionCollection& collection,
+OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
+                                                      TransactionCollection* collection,
                                                       Document const& document,
                                                       OperationOptions const& options) {
-  // std::cout << "KEY: " << document.key << ", REVISION: " << document.revision << "\n";
+  auto const transactionId = transaction->id()();
 
   // create a temporary marker for the document on the heap
   // the marker memory will be freed automatically when we leave this method
   std::unique_ptr<triagens::wal::RemoveMarker> marker(
-    new triagens::wal::RemoveMarker(transaction.vocbase()->_id,
-                                    collection.id(),
+    new triagens::wal::RemoveMarker(transaction->vocbase()->_id,
+                                    collection->id(),
                                     document.revision,
-                                    transaction.id()(),
+                                    transactionId,
                                     document.key)
   );
   
   TRI_doc_mptr_t* mptr = nullptr;
-
+      
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the insert operation is ongoing
   {
-    IndexUser indexUser(collection.documentCollection());
+    IndexUser indexUser(collection);
 
     // remove document from primary index
     // this fetches the master pointer of the to-be-deleted revision
@@ -337,7 +360,7 @@ OperationResult CollectionOperations::RemoveDocument (Transaction& transaction,
     // this throws on error
     TransactionId::IdType originalTransactionId = 0;
 
-    mptr = primaryIndex->remove(&collection, document.key, originalTransactionId);
+    mptr = primaryIndex->remove(collection, document.key, originalTransactionId);
     TRI_ASSERT(mptr != nullptr);
     indexUser.mustClick();
 
@@ -347,11 +370,12 @@ OperationResult CollectionOperations::RemoveDocument (Transaction& transaction,
 
       for (size_t i = 1; i < indexes.size(); ++i) {
         // call remove for each secondary indexes
-        indexes[i]->remove(&collection, document.key, mptr);
+        indexes[i]->remove(collection, document.key, mptr);
       }
 
       // when we are here, the document has been removed from all indexes 
       TRI_voc_rid_t actualRevision;
+
       int res = CheckRevision(mptr, document, options.policy, &actualRevision);
 
       if (res != TRI_ERROR_NO_ERROR) {
@@ -423,21 +447,21 @@ int CollectionOperations::CheckRevision (TRI_doc_mptr_t const* mptr,
 /// will throw if the key is invalid
 ////////////////////////////////////////////////////////////////////////////////
   
-void CollectionOperations::CreateOrValidateKey (TransactionCollection& collection,
-                                                Document& document) {                   
-  if (! document.keySpecified) {
-    TRI_ASSERT(document.key.empty());
+void CollectionOperations::CreateOrValidateKey (TransactionCollection* collection,
+                                                Document* document) {                   
+  if (! document->keySpecified) {
+    TRI_ASSERT(document->key.empty());
 
     // no key specified. now let the collection create one
-    document.key.assign(collection.generateKey(document.revision));
+    document->key.assign(collection->generateKey(document->revision));
 
-    if (document.key.empty()) {
+    if (document->key.empty()) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_OUT_OF_KEYS);
     }
   }
   else {
     // key was specified, now validate it
-    collection.validateKey(document.key); // TODO: handle case isRestore
+    collection->validateKey(document->key); // TODO: handle case isRestore
   }
 }
 
@@ -450,7 +474,7 @@ void CollectionOperations::CreateOrValidateKey (TransactionCollection& collectio
 ////////////////////////////////////////////////////////////////////////////////
 
 int CollectionOperations::WriteMarker (triagens::wal::Marker* marker,
-                                       TransactionCollection& collection,
+                                       TransactionCollection* collection,
                                        WriteResult& result) {
   auto logfileManager = triagens::wal::LogfileManager::instance();
   
@@ -471,8 +495,7 @@ int CollectionOperations::WriteMarker (triagens::wal::Marker* marker,
 
     if (slotInfo.errorCode == TRI_ERROR_LEGEND_NOT_IN_WAL_FILE) {
       // Oh dear, we have to build a legend and patch the marker:
-      TRI_document_collection_t* documentCollection = collection.documentCollection();
-      triagens::basics::JsonLegend legend(documentCollection->getShaper());  // PROTECTED by trx in trxCollection
+      triagens::basics::JsonLegend legend(collection->documentCollection()->getShaper());  // PROTECTED by trx in trxCollection
 
       int res = legend.addShape(sid, oldmarker + oldm->_offsetJson, oldm->_size - oldm->_offsetJson);
 

@@ -38,8 +38,6 @@
 
 using namespace triagens::mvcc;
 
-thread_local std::vector<Transaction*> LocalTransactionManager::_threadTransactions;
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -69,51 +67,13 @@ LocalTransactionManager::~LocalTransactionManager () {
 /// @brief create a (potentially nested) transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase,
-                                                         bool forceTopLevel) {
-  std::unique_ptr<Transaction> transaction;
-
-  if (forceTopLevel || _threadTransactions.empty()) {
-    // no other transactions present in thread
-
-    // now create a new top-level transaction
-    transaction.reset(new TopLevelTransaction(this, nextId(), vocbase));
-  }
-  else {
-    // there is already a transaction present in our thread
-
-    // determine the parent transaction
-    auto parent = _threadTransactions.back();
-    TRI_ASSERT(parent != nullptr);
-
-    // check if the database is still the same
-    if (vocbase != parent->vocbase()) {
-      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot change database for sub transaction");
-    }
-
-    transaction.reset(new SubTransaction(parent));
-  }
+Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
+  std::unique_ptr<Transaction> transaction(new TopLevelTransaction(this, nextId(), vocbase));
 
   // we do have a transaction now
-  TRI_ASSERT(transaction.get() != nullptr);
 
   // insert into list of currently running transactions  
   insertRunningTransaction(transaction.get());
-
-
-  // only push onto thread-local stack if the caller has not explicitly 
-  // requested a top-level transaction
-  if (! forceTopLevel) {
-    try {
-      // insert into thread-local list of transactions
-      pushOnThreadStack(transaction.get());
-    }
-    catch (...) {
-      // if we got here, we have run out of memory
-      removeRunningTransaction(transaction.get());
-      throw;
-    }
-  }
 
   return transaction.release();
 }
@@ -125,11 +85,6 @@ Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase,
 void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
   // transaction must have already finished
   TRI_ASSERT(! transaction->isOngoing());
-
-  if (transaction->_flags.pushedOnThreadStack()) {
-    // remove the transaction from the stack
-    popFromThreadStack(transaction);
-  }
 
   removeRunningTransaction(transaction);
 }
@@ -207,29 +162,6 @@ void LocalTransactionManager::insertRunningTransaction (Transaction* transaction
 void LocalTransactionManager::removeRunningTransaction (Transaction* transaction) {
   WRITE_LOCKER(_lock); 
   _runningTransactions.erase(transaction->id());
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief push the transaction onto the thread-local stack
-////////////////////////////////////////////////////////////////////////////////
-
-void LocalTransactionManager::pushOnThreadStack (Transaction* transaction) {
-  _threadTransactions.push_back(transaction);
-  transaction->_flags.pushedOnThreadStack(true);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief pop the transaction from the thread-local stack
-////////////////////////////////////////////////////////////////////////////////
-
-void LocalTransactionManager::popFromThreadStack (Transaction* transaction) {
-  TRI_ASSERT(! _threadTransactions.empty());
-
-  // the transaction that is popped must be at the top of the stack
-  TRI_ASSERT(_threadTransactions.back() == transaction);
-  _threadTransactions.pop_back();
-  
-  transaction->_flags.pushedOnThreadStack(false);
 }
 
 // -----------------------------------------------------------------------------

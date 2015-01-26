@@ -2159,6 +2159,16 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
     return false;
   }
 
+  // add an MVCC primary index to the collection
+  auto mvccPrimaryIndex = new triagens::mvcc::PrimaryIndex(0, document);
+  try {
+    document->addIndex(mvccPrimaryIndex);
+  }
+  catch (...) {
+    delete mvccPrimaryIndex;
+    return false;
+  }
+
   res = AddIndex(document, primaryIndex);
 
   if (res != TRI_ERROR_NO_ERROR) {

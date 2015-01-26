@@ -52,6 +52,7 @@
 #include "Dispatcher/Dispatcher.h"
 #include "HttpServer/ApplicationEndpointServer.h"
 #include "HttpServer/AsyncJobManager.h"
+#include "Mvcc/TransactionManager.h"
 #include "Rest/InitialiseRest.h"
 #include "Rest/OperationMode.h"
 #include "Rest/Version.h"
@@ -368,6 +369,8 @@ void ArangoServer::buildApplicationServer () {
   wal::LogfileManager::initialise(&_databasePath, _server);
   // and add the feature to the application server
   _applicationServer->addFeature(wal::LogfileManager::instance());
+
+  mvcc::TransactionManager::initialize();
 
   // .............................................................................
   // dispatcher
@@ -1216,6 +1219,8 @@ void ArangoServer::closeDatabases () {
   
   // stop the replication appliers so all replication transactions can end
   TRI_StopReplicationAppliersServer(_server);
+
+  mvcc::TransactionManager::shutdown();
 
   // enforce logfile manager shutdown so we are sure no one else will
   // write to the logs

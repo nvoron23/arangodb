@@ -85,6 +85,7 @@ static bool compareElementElement(TRI_doc_mptr_t const* left,
                                   bool byKey) {
   char const* leftKey = TRI_EXTRACT_MARKER_KEY(left);
   char const* rightKey = TRI_EXTRACT_MARKER_KEY(right);
+  
   if (strcmp(leftKey, rightKey) != 0) {
     return false;
   }
@@ -175,8 +176,10 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
   WRITE_LOCKER(_lock);
 
   Transaction::VisibilityType visibility;
+
   TRI_doc_mptr_t* previous = findRelevantRevision(transColl, key, visibility);
   if (visibility == Transaction::VisibilityType::CONCURRENT) {
+    std::cout << "CONCURRENT!\n";
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
   }
   else if (visibility == Transaction::VisibilityType::INVISIBLE) {
@@ -297,6 +300,7 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
 
   // Now look through them and find "the right one":
   Transaction* trans = transColl->getTransaction();
+
   for (auto p : *(revisions.get())) {
     if (trans->visibility(p->from()) == Transaction::VisibilityType::VISIBLE) {
       TransactionId to = p->to();

@@ -74,7 +74,7 @@ namespace triagens {
 /// @brief create a (potentially nested) transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* createTransaction (struct TRI_vocbase_s*, bool = false) override final;
+        Transaction* createTransaction (struct TRI_vocbase_s*) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief unregister a transaction

@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC transaction manager, local
+/// @brief MVCC transaction scope
 ///
 /// @file
 ///
@@ -27,27 +27,27 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef ARANGODB_MVCC_LOCAL_TRANSACTION_MANAGER_H
-#define ARANGODB_MVCC_LOCAL_TRANSACTION_MANAGER_H 1
+#ifndef ARANGODB_MVCC_TRANSACTION_SCOPE_H
+#define ARANGODB_MVCC_TRANSACTION_SCOPE_H 1
 
 #include "Basics/Common.h"
-#include "Basics/ReadWriteLock.h"
 #include "Mvcc/Transaction.h"
-#include "Mvcc/TransactionId.h"
-#include "Mvcc/TransactionManager.h"
 
 struct TRI_vocbase_s;
 
 namespace triagens {
   namespace mvcc {
 
-    class TopLevelTransaction;
+    class Transaction;
+    class TransactionManager;
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                     class LocalTransactionManager
+// --SECTION--                                            class TransactionScope
 // -----------------------------------------------------------------------------
 
-    class LocalTransactionManager final : public TransactionManager {
+    class TransactionScope {
+
+      public:
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -55,77 +55,56 @@ namespace triagens {
 
       public:
 
+        TransactionScope (TransactionScope const&) = delete;
+        TransactionScope& operator= (TransactionScope const&) = delete;
+      
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create the transaction manager
-////////////////////////////////////////////////////////////////////////////////
-
-        LocalTransactionManager ();
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief destroy the transaction manager
+/// @brief join an existing transaction in an outer scope or a new transaction, 
+/// which will be automatically freed when the scope is left
 ////////////////////////////////////////////////////////////////////////////////
 
-        ~LocalTransactionManager ();
+        TransactionScope (struct TRI_vocbase_s*, bool allowNesting = true);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy the transaction scope
+////////////////////////////////////////////////////////////////////////////////
+
+        ~TransactionScope ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
 
-      public:
-
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a transaction
+/// @brief return the transaction manager
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* createTransaction (struct TRI_vocbase_s*) override final;
+        inline TransactionManager* transactionManager () const {
+          return _transactionManager;
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unregister a transaction
+/// @brief return the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void unregisterTransaction (Transaction*) override final;
+        inline Transaction* transaction () const {
+          TRI_ASSERT_EXPENSIVE(_transaction != nullptr);
+          return _transaction;
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief aborts a transaction
+/// @brief commit the scoped transaction
+/// this will do nothing if the transaction was re-used from an outer scope,
+/// but will commit the transaction otherwise
 ////////////////////////////////////////////////////////////////////////////////
 
-        void abortTransaction (TransactionId const&) override final;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief initializes a transaction with state
-////////////////////////////////////////////////////////////////////////////////
-
-        void initializeTransaction (Transaction*) override final;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief returns the status of a transaction
-////////////////////////////////////////////////////////////////////////////////
-
-        Transaction::StatusType statusTransaction (TransactionId) override final;
+        void commit ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
 // -----------------------------------------------------------------------------
 
       private:
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief increment the transaction id counter and return it
-////////////////////////////////////////////////////////////////////////////////
-
-        TransactionId nextId ();
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief insert the transaction into the list of running transactions
-////////////////////////////////////////////////////////////////////////////////
-
-        void insertRunningTransaction (Transaction*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief remove the transaction from the list of running transactions
-////////////////////////////////////////////////////////////////////////////////
-
-        void removeRunningTransaction (Transaction*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief push the transaction onto the thread-local stack
@@ -146,16 +125,28 @@ namespace triagens {
       private:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief lock for _runningTransactions
+/// @brief the transaction manager
 ////////////////////////////////////////////////////////////////////////////////
 
-        triagens::basics::ReadWriteLock _lock;
+        TransactionManager* _transactionManager;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief lock for _runningTransactions
+/// @brief the transaction 
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::unordered_map<TransactionId, Transaction*> _runningTransactions;
+        Transaction* _transaction;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the scope has created the transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        bool _isOur;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the transaction was pushed onto the thread stack
+////////////////////////////////////////////////////////////////////////////////
+
+        bool _pushedOnThreadStack;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief thread-local vector of started top-level transactions
@@ -164,7 +155,6 @@ namespace triagens {
         static thread_local std::vector<Transaction*> _threadTransactions;
 
     };
-
   }
 }
 

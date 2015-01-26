@@ -72,10 +72,11 @@ namespace triagens {
         
         static Document CreateFromShapedJson (struct TRI_shaper_s*,
                                               struct TRI_shaped_json_s const*,
-                                              char const* = nullptr);
+                                              char const*,
+                                              bool);
         
-        static Document CreateFromKey (struct TRI_shaper_s*,
-                                       std::string const&);
+        static Document CreateFromKey (std::string const&,
+                                       TRI_voc_rid_t = 0);
 
         struct TRI_shaper_s* shaper;
         struct TRI_shaped_json_s const* shaped;
@@ -157,25 +158,28 @@ namespace triagens {
           waitForSync(options & WaitForSync),
           keepNull(options & KeepNull),
           mergeObjects(options & MergeObjects),
-          overwrite(options & Overwrite) {
+          overwrite(options & Overwrite),
+          silent(options & Silent) {
       }
       
       OperationOptions () 
         : OperationOptions(0) {
       }
 
-      TRI_voc_rid_t const           expectedRevision; // the document revision expected. can be 0 to match any
-      TRI_doc_update_policy_e const policy;           // the update policy
+      TRI_voc_rid_t            expectedRevision; // the document revision expected. can be 0 to match any
+      TRI_doc_update_policy_e  policy;           // the update policy
 
-      bool const                    waitForSync;      // wait for sync?
-      bool const                    keepNull;         // treat null attributes as to-be-removed?
-      bool const                    mergeObjects;     // merge object attributes on patch or overwrite?
-      bool const                    overwrite;        // ignore revision conflicts?
+      bool                     waitForSync;      // wait for sync?
+      bool                     keepNull;         // treat null attributes as to-be-removed?
+      bool                     mergeObjects;     // merge object attributes on patch or overwrite?
+      bool                     overwrite;        // ignore revision conflicts?
+      bool                     silent;           // do not produce output, not used here but by caller
 
       static int const WaitForSync  = 0x1;
       static int const KeepNull     = 0x2;
       static int const MergeObjects = 0x4;
       static int const Overwrite    = 0x8;
+      static int const Silent       = 0x10;
     };
     
 // -----------------------------------------------------------------------------
@@ -192,8 +196,8 @@ namespace triagens {
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult InsertDocument (Transaction&, 
-                                               TransactionCollection&, 
+        static OperationResult InsertDocument (Transaction*, 
+                                               TransactionCollection*, 
                                                Document&, 
                                                OperationOptions const&);
 
@@ -201,8 +205,8 @@ namespace triagens {
 /// @brief read a document by its key
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult ReadDocument (Transaction&, 
-                                             TransactionCollection&, 
+        static OperationResult ReadDocument (Transaction*, 
+                                             TransactionCollection*, 
                                              Document const&, 
                                              OperationOptions const&);
 
@@ -210,8 +214,8 @@ namespace triagens {
 /// @brief remove a document
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult RemoveDocument (Transaction&, 
-                                               TransactionCollection&,
+        static OperationResult RemoveDocument (Transaction*, 
+                                               TransactionCollection*,
                                                Document const&,
                                                OperationOptions const&);
 
@@ -235,11 +239,11 @@ namespace triagens {
 /// will throw if the key is invalid
 ////////////////////////////////////////////////////////////////////////////////
 
-        static void CreateOrValidateKey (TransactionCollection&,
-                                         Document&);                   
+        static void CreateOrValidateKey (TransactionCollection*,
+                                         Document*);                   
 
         static int WriteMarker (triagens::wal::Marker*,
-                                TransactionCollection&,
+                                TransactionCollection*,
                                 WriteResult&);
 
       public:

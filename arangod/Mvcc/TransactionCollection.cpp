@@ -32,6 +32,7 @@
 #include "Mvcc/MasterpointerManager.h"
 #include "ShapedJson/json-shaper.h"
 #include "Utils/Exception.h"
+#include "VocBase/barrier.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/key-generator.h"
 #include "VocBase/vocbase.h"
@@ -55,7 +56,8 @@ TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
                                               Transaction* transaction)
   : _vocbase(vocbase),
     _collection(nullptr),
-    _transaction(transaction) {
+    _transaction(transaction),
+    _barrier(nullptr) {
 
   _collection = TRI_UseCollectionByIdVocBase(_vocbase, cid);
 
@@ -64,6 +66,7 @@ TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
   }
 
   TRI_ASSERT(_collection->_collection != nullptr);
+  orderBarrier();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +87,7 @@ TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
   }
 
   TRI_ASSERT(_collection->_collection != nullptr);
+  orderBarrier();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -91,6 +95,8 @@ TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionCollection::~TransactionCollection () {
+  freeBarrier();
+
   if (_collection != nullptr) {
     TRI_ReleaseCollectionVocBase(_vocbase, _collection);
   }
@@ -139,11 +145,50 @@ void TransactionCollection::validateKey (std::string const& key) const {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief order a barrier for the collection
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_barrier_t* TransactionCollection::orderBarrier () {
+  if (_barrier == nullptr) {
+    _barrier = TRI_CreateBarrierElement(&(documentCollection()->_barrierList));
+
+    if (_barrier == nullptr) {
+      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "could not acquire barrier");
+    }
+             
+    // tell everyone else this barrier is still in use,
+    // at least until the transaction is over
+    reinterpret_cast<TRI_barrier_blocker_t*>(_barrier)->_usedByTransaction = true;
+  }
+
+  return _barrier;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief free an unused barrier if one exists
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::freeBarrier () {
+  if (_barrier == nullptr) {
+    auto barrier = reinterpret_cast<TRI_barrier_blocker_t*>(_barrier);
+
+    // conditional freeing of the barrier:
+    // If some external entity is still using the barrier, it is kept!
+    TRI_FreeBarrier(barrier, true /* fromTransaction */ );
+
+    // we're done with this barrier
+    _barrier = nullptr;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief get a string representation of the collection
 ////////////////////////////////////////////////////////////////////////////////
 
 std::string TransactionCollection::toString () const {
-  std::string result("TransactionCollection '");
+  std::string result("TransactionCollection ");
+  result.append(std::to_string(id()));
+  result.append(", '");
   result.append(name());
   result.append("'");
 

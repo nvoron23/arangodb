@@ -3248,6 +3248,7 @@ static void JS_StatusVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionManager.h"
+#include "Mvcc/TransactionScope.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/GeoIndex2.h"
 #include "Mvcc/HashIndex.h"
@@ -3257,115 +3258,202 @@ static void JS_StatusVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
 #include "Mvcc/CapConstraint.h"
 #include "Mvcc/PrimaryIndex.h"
 
-static void JS_Test (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
+  TRI_GET_GLOBALS();
 
-  TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
   if (collection == nullptr) {
     TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
-            
-  TransactionBase trx(true);
-
-
-  triagens::mvcc::TransactionManager::initialize();
-
-  {
-    auto transactionManager = triagens::mvcc::TransactionManager::instance();
- 
-    std::unique_ptr<triagens::mvcc::Transaction> trx1(transactionManager->createTransaction(collection->_vocbase));
-    std::cout << "TRX1: " << trx1.get() << "\n";
-
-    {
-      std::unique_ptr<triagens::mvcc::Transaction> trx2(transactionManager->createTransaction(collection->_vocbase));
-      std::cout << "TRX2: " << trx2.get() << "\n";
-    }
-    
-    {
-      std::unique_ptr<triagens::mvcc::Transaction> trx3(transactionManager->createTransaction(collection->_vocbase));
-      std::cout << "TRX3: " << trx3.get() << "\n";
-    
-      {
-        std::unique_ptr<triagens::mvcc::Transaction> trx4(transactionManager->createTransaction(collection->_vocbase));
-        std::cout << "TRX4: " << trx4.get() << "\n";
-      }
-      
-    }
-
-    delete trx1.release();
   
-    {
-      std::unique_ptr<triagens::mvcc::Transaction> trx5(transactionManager->createTransaction(collection->_vocbase));
-      std::cout << "TRX5: " << trx5.get() << "\n";
-      trx5->commit();
-    }
-    
-    {
-      std::unique_ptr<triagens::mvcc::Transaction> trx6(transactionManager->createTransaction(collection->_vocbase));
-      std::cout << "TRX6: " << trx6.get() << "\n";
-      trx6->rollback();
-    }
-    
-
-    {
-      std::unique_ptr<triagens::mvcc::Transaction> trx7(transactionManager->createTransaction(collection->_vocbase));
-      std::cout << "TRX7: " << *(trx7) << "\n";
-
-      auto c1 = trx7->collection("yy");
-
-      
-      auto primaryIndex = new triagens::mvcc::PrimaryIndex(0, c1->documentCollection());
-      try {
-        c1->documentCollection()->addIndex(primaryIndex);
-      }
-      catch (...) {
-        delete primaryIndex;
-        throw;
-      }
-
-      std::cout << "PRIMARY INDEX: " << primaryIndex << "\n";
-
-      std::cout << c1 << "\n";
-      std::cout << trx7->collection("_users") << "\n";
-      std::cout << trx7->collection("yy") << "\n";
-
-      auto json = JsonHelper::fromString("{ \"_key\": \"der-hans\", \"kanns\": false, \"lol\": 1 }");
-      triagens::mvcc::Document doc = triagens::mvcc::Document::CreateFromJson(c1->shaper(), json);
-      triagens::mvcc::OperationOptions options;
-
-      int res = TRI_ERROR_NO_ERROR;
-      try {
-        triagens::mvcc::OperationResult insertResult = triagens::mvcc::CollectionOperations::InsertDocument(*trx7, *trx7->collection("yy"), doc, options);
-
-        std::cout << "INSERT RESULT KEY: " << TRI_EXTRACT_MARKER_KEY(insertResult.mptr) << ", REV: " << TRI_EXTRACT_MARKER_RID(insertResult.mptr) << "\n";
-        
-        triagens::mvcc::Document readDoc = triagens::mvcc::Document::CreateFromKey(c1->shaper(), "der-hans");
-        triagens::mvcc::OperationResult readResult = triagens::mvcc::CollectionOperations::ReadDocument(*trx7, *trx7->collection("yy"), readDoc, options);
-        
-        std::cout << "READ RESULT KEY: " << TRI_EXTRACT_MARKER_KEY(readResult.mptr) << ", REV: " << TRI_EXTRACT_MARKER_RID(readResult.mptr) << "\n";
-      }
-      catch (triagens::arango::Exception const& ex) {
-        res = ex.code();
-      }
-      catch (...) {
-        res = TRI_ERROR_INTERNAL;
-      }
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        std::cout << "EXCEPTION CAUGHT: " << TRI_errno_string(res) << "\n";
-      }
-
-      trx7->commit();
-    }
+  uint32_t const argLength = args.Length();
+  if (argLength < 1 || argLength > 2) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccInsert(<document>, [<waitForSync>])");
   }
 
-  triagens::mvcc::TransactionManager::shutdown();
+  triagens::mvcc::OperationOptions options;
+  if (argLength > 1 && args[1]->IsObject()) {
+    v8::Handle<v8::Object> optionsObject = args[1].As<v8::Object>();
+    TRI_GET_GLOBAL_STRING(WaitForSyncKey);
+    if (optionsObject->Has(WaitForSyncKey)) {
+      options.waitForSync = TRI_ObjectToBoolean(optionsObject->Get(WaitForSyncKey));
+    }
+    TRI_GET_GLOBAL_STRING(SilentKey);
+    if (optionsObject->Has(SilentKey)) {
+      options.silent = TRI_ObjectToBoolean(optionsObject->Get(SilentKey));
+    }
+  }
+  else {
+    options.waitForSync = ExtractWaitForSync(args, 2);
+  }
+  
+  // set document key
+  std::unique_ptr<char[]> key;
+  int res;
 
-  TRI_V8_RETURN(v8::Null(isolate));
-}
+  if (args[0]->IsObject() && ! args[0]->IsArray()) {
+    res = ExtractDocumentKey(isolate, v8g, args[0]->ToObject(), key);
+
+    if (res != TRI_ERROR_NO_ERROR && res != TRI_ERROR_ARANGO_DOCUMENT_KEY_MISSING) {
+      TRI_V8_THROW_EXCEPTION(res);
+    }
+  }
+  else {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
+  }
+  
+  
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+    auto* shaper = transactionCollection->shaper();
+
+    TRI_shaped_json_t* shaped = TRI_ShapedJsonV8Object(isolate, args[0], shaper, true);  // PROTECTED by trx from above
+    auto document = triagens::mvcc::Document::CreateFromShapedJson(shaper, shaped, key.get(), true);
+
+    triagens::mvcc::OperationResult insertResult = triagens::mvcc::CollectionOperations::InsertDocument(transaction, transactionCollection, document, options);
+   
+    if (insertResult.code != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(insertResult.code);
+    }
+   /* 
+      triagens::mvcc::Document readDoc = triagens::mvcc::Document::CreateFromKey(c1->shaper(), "der-hans");
+      triagens::mvcc::OperationResult readResult = triagens::mvcc::CollectionOperations::ReadDocument(*trx7, *trx7->collection("yy"), readDoc, options);
+      std::cout << "READ RESULT KEY: " << TRI_EXTRACT_MARKER_KEY(readResult.mptr) << ", REV: " << TRI_EXTRACT_MARKER_RID(readResult.mptr) << "\n";
+     */ 
+    // now commit the operation 
+    transactionScope.commit();
+
+    // from here, the operation is durable
+
+    if (options.silent) {
+      // no result to return
+      TRI_V8_RETURN_TRUE();
+    }
  
+    char const* docKey = TRI_EXTRACT_MARKER_KEY(insertResult.mptr);  // PROTECTED by trx here
+
+    v8::Handle<v8::Object> result = v8::Object::New(isolate);
+    TRI_GET_GLOBAL_STRING(_IdKey);
+    TRI_GET_GLOBAL_STRING(_RevKey);
+    TRI_GET_GLOBAL_STRING(_KeyKey);
+    result->ForceSet(_IdKey,  V8DocumentId(isolate, transactionCollection->name(), docKey));
+    result->ForceSet(_RevKey, V8RevisionId(isolate, TRI_EXTRACT_MARKER_RID(insertResult.mptr)));
+    result->ForceSet(_KeyKey, TRI_V8_STRING(docKey));
+
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
+}
+
+static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+  TRI_GET_GLOBALS();
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  uint32_t const argLength = args.Length();
+  if (argLength < 1 || argLength > 3) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccRemove(<document>, <options>)");
+  }
+
+  triagens::mvcc::OperationOptions options;
+  options.policy = TRI_DOC_UPDATE_ERROR;
+
+  if (argLength > 1 && args[1]->IsObject()) {
+    v8::Handle<v8::Object> optionsObject = args[1].As<v8::Object>();
+    TRI_GET_GLOBAL_STRING(OverwriteKey);
+    if (optionsObject->Has(OverwriteKey)) {
+      options.overwrite = TRI_ObjectToBoolean(optionsObject->Get(OverwriteKey));
+      options.policy = ExtractUpdatePolicy(options.overwrite);
+    }
+    TRI_GET_GLOBAL_STRING(WaitForSyncKey);
+    if (optionsObject->Has(WaitForSyncKey)) {
+      options.waitForSync = TRI_ObjectToBoolean(optionsObject->Get(WaitForSyncKey));
+    }
+  }
+  else {
+    options.overwrite = TRI_ObjectToBoolean(args[1]);
+    options.policy = ExtractUpdatePolicy(options.overwrite);
+    if (argLength > 2) {
+      options.waitForSync = TRI_ObjectToBoolean(args[2]);
+    }
+  }
+  
+  // set document key
+  std::unique_ptr<char[]> key;
+  TRI_voc_rid_t rid;
+  CollectionNameResolver resolver(collection->_vocbase); // TODO
+  int res = ParseDocumentOrDocumentHandle(collection->_vocbase, &resolver, collection, key, rid, args[0], args);
+  
+  if (key.get() == nullptr) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
+  }
+  
+  if (res != TRI_ERROR_NO_ERROR) {
+    TRI_V8_THROW_EXCEPTION(res);
+  }
+
+  
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+
+    auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
+
+    triagens::mvcc::OperationResult removeResult = triagens::mvcc::CollectionOperations::RemoveDocument(transaction, transactionCollection, document, options);
+ 
+    if (removeResult.code != TRI_ERROR_NO_ERROR) {
+      if (removeResult.code == TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND && options.policy == TRI_DOC_UPDATE_LAST_WRITE) {
+        TRI_V8_RETURN_FALSE();
+      }
+      else {
+        THROW_ARANGO_EXCEPTION(removeResult.code);
+      }
+    }
+     
+    // now commit the operation 
+    transactionScope.commit();
+
+    // from here, the operation is durable
+    TRI_V8_RETURN_TRUE();
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
+}
   
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief truncates a collection
@@ -4466,7 +4554,8 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("rotate"), JS_RotateVocbaseCol);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("save"), JS_InsertVocbaseCol); // note: save is now an alias for insert
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("status"), JS_StatusVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("test"), JS_Test);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccInsert"), JS_MvccInsert);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccRemove"), JS_MvccRemove);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("TRUNCATE"), JS_TruncateVocbaseCol, true);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("truncateDatafile"), JS_TruncateDatafileVocbaseCol);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("type"), JS_TypeVocbaseCol);

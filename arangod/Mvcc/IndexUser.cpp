@@ -30,6 +30,7 @@
 #include "IndexUser.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/TransactionCollection.h"
 #include "VocBase/document-collection.h"
 
 using namespace triagens::basics;
@@ -47,12 +48,12 @@ using namespace triagens::mvcc;
 /// @brief read-locks the lists of indexes of a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-IndexUser::IndexUser (TRI_document_collection_t* collection)
+IndexUser::IndexUser (TransactionCollection* collection)
   : _collection(collection),
     _indexes() {
 
-  _collection->readLockIndexes();
-  _indexes = _collection->indexes();
+  _collection->documentCollection()->readLockIndexes();
+  _indexes = _collection->documentCollection()->indexes();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +65,7 @@ IndexUser::~IndexUser () {
     click();
   }
 
-  _collection->readUnlockIndexes();
+  _collection->documentCollection()->readUnlockIndexes();
 }
 
 // -----------------------------------------------------------------------------

@@ -158,6 +158,8 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
     }
 
     mptr = _freelist;
+    _freelist = const_cast<TRI_doc_mptr_t*>(static_cast<TRI_doc_mptr_t const*>(mptr->getDataPtr())); // ONLY IN HEADERS, PROTECTED by RUNTIME
+    mptr->setDataPtr(nullptr);
   }
 
   // outside the lock
@@ -165,13 +167,12 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
 
   // TODO: properly initialize the master pointer
   mptr->setDataPtr(data);
+  mptr->_rid = TRI_EXTRACT_MARKER_RID(static_cast<TRI_df_marker_t const*>(data));
   // mptr->_from = transactionId;
   // mptr->_to   = 0;
   mptr->_prev = nullptr;
   mptr->_next = nullptr;
   
-  std::cout << "CREATED MPTR: " << mptr << "\n";
-
   return MasterpointerContainer(this, mptr);
 }
 

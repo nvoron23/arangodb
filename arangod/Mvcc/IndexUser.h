@@ -33,13 +33,12 @@
 #include "Basics/Common.h"
 #include "Utils/Exception.h"
 
-struct TRI_document_collection_t;
-
 namespace triagens {
   namespace mvcc {
 
     class Index;
     class PrimaryIndex;
+    class TransactionCollection;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   class IndexUser
@@ -56,7 +55,7 @@ namespace triagens {
         IndexUser (IndexUser const&) = delete;
         IndexUser& operator= (IndexUser const&) = delete;
 
-        IndexUser (struct TRI_document_collection_t*);
+        IndexUser (TransactionCollection*);
 
         ~IndexUser ();
 
@@ -100,7 +99,7 @@ namespace triagens {
 
       private:
        
-        TRI_document_collection_t* _collection; 
+        TransactionCollection*     _collection;
         std::vector<Index*>        _indexes;
         bool                       _mustClick;
 
