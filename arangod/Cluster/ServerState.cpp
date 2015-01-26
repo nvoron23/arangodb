@@ -113,6 +113,8 @@ std::string ServerState::roleToString (RoleEnum role) {
   switch (role) {
     case ROLE_UNDEFINED:
       return "UNDEFINED";
+    case ROLE_SINGLE:
+      return "SINGLE";
     case ROLE_PRIMARY:
       return "PRIMARY";
     case ROLE_SECONDARY:
@@ -130,7 +132,10 @@ std::string ServerState::roleToString (RoleEnum role) {
 ////////////////////////////////////////////////////////////////////////////////
 
 ServerState::RoleEnum ServerState::stringToRole (std::string const& value) {
-  if (value == "PRIMARY") {
+  if (value == "SINGLE") {
+    return ROLE_SINGLE;
+  }
+  else if (value == "PRIMARY") {
     return ROLE_PRIMARY;
   }
   else if (value == "SECONDARY") {

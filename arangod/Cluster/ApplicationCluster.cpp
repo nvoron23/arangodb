@@ -156,6 +156,7 @@ bool ApplicationCluster::prepare () {
   _enableCluster = (! _agencyEndpoints.empty() || ! _agencyPrefix.empty());
 
   if (! enabled()) {
+    ServerState::instance()->setRole(ServerState::ROLE_SINGLE);
     return true;
   }
 
@@ -218,18 +219,6 @@ bool ApplicationCluster::prepare () {
   // disable error logging for a while
   ClusterComm::instance()->enableConnectionErrorLogging(false);
 
-  return true;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// {@inheritDoc}
-////////////////////////////////////////////////////////////////////////////////
-
-bool ApplicationCluster::start () {
-  if (! enabled()) {
-    return true;
-  }
-
   // perfom an initial connect to the agency
   const std::string endpoints = AgencyComm::getEndpointsString();
 
@@ -262,6 +251,39 @@ bool ApplicationCluster::start () {
     _myAddress = ServerState::instance()->getAddress();
   }
   // if nonempty, it has already been set above
+
+  // If we are a coordinator, we wait until at least one DBServer is there,
+  // otherwise we can do very little, in particular, we cannot create
+  // any collection:
+  if (role == ServerState::ROLE_COORDINATOR) {
+    ClusterInfo* ci = ClusterInfo::instance();
+    do {
+      LOG_INFO("Waiting for a DBserver to show up...");
+      ci->loadCurrentDBServers();
+      std::vector<ServerID> DBServers = ci->getCurrentDBServers();
+      if (DBServers.size() > 0) {
+        LOG_INFO("Found a DBserver.");
+        break;
+      }
+      sleep(1);
+    } while (true);
+  }
+
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// {@inheritDoc}
+////////////////////////////////////////////////////////////////////////////////
+
+bool ApplicationCluster::start () {
+  if (! enabled()) {
+    return true;
+  }
+
+  const std::string endpoints = AgencyComm::getEndpointsString();
+
+  ServerState::RoleEnum role = ServerState::instance()->getRole();
 
   if (_myAddress.empty()) {
     LOG_FATAL_AND_EXIT("unable to determine internal address for server '%s'. "

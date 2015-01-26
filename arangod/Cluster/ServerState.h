@@ -54,6 +54,7 @@ namespace triagens {
 
         typedef enum {
           ROLE_UNDEFINED = 0,  // initial value
+          ROLE_SINGLE,         // is set when cluster feature is off
           ROLE_PRIMARY,
           ROLE_SECONDARY,
           ROLE_COORDINATOR

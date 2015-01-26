@@ -1447,7 +1447,7 @@ static void JS_GetClusterAuthentication (const v8::FunctionCallbackInfo<v8::Valu
   }
 
   std::string auth;
-  if (ServerState::instance()->getRole() == ServerState::ROLE_UNDEFINED) {
+  if (ServerState::instance()->getRole() == ServerState::ROLE_SINGLE) {
     // Only on dispatchers, otherwise this would be a security risk!
     auth = ServerState::instance()->getAuthentication();
   }
@@ -2073,7 +2073,7 @@ void TRI_InitV8Cluster (v8::Isolate* isolate, v8::Handle<v8::Context> context) {
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("flush"), JS_FlushServerState, true);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("localInfo"), JS_LocalInfoServerState);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("id"), JS_IdServerState);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("id"), JS_DescriptionServerState);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("description"), JS_DescriptionServerState);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("dataPath"), JS_DataPathServerState);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("logPath"), JS_LogPathServerState);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("agentPath"), JS_AgentPathServerState);
