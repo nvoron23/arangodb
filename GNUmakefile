@@ -292,6 +292,23 @@ pack-vistaXX-cmake:
 
 	./installer-generator.sh $(BITS) 
 
+################################################################################
+### @brief generates a tar archive
+################################################################################
+
+.PHONY: pack-tar pack-tar-config
+
+pack-tar-config:
+	./configure \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--disable-mruby
+
+pack-tar:
+	make install DESTDIR=/tmp/pack-arangodb
+	tar -c -v -z -f arangodb-$(VERSION).tar.gz -C /tmp/pack-arangodb .
+
 ## -----------------------------------------------------------------------------
 ## --SECTION--                                                       END-OF-FILE
 ## -----------------------------------------------------------------------------
