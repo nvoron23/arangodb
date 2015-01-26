@@ -131,11 +131,19 @@ namespace triagens {
           code(TRI_ERROR_NO_ERROR) {
       }
       
-      explicit OperationResult (TRI_voc_rid_t actualRevision) 
+      explicit OperationResult (int code, 
+                                TRI_voc_rid_t actualRevision) 
         : mptr(nullptr),
           tick(0),
           actualRevision(actualRevision),
-          code(TRI_ERROR_ARANGO_CONFLICT) {
+          code(code) {
+      }
+      
+      explicit OperationResult (int code)
+        : mptr(nullptr),
+          tick(0),
+          actualRevision(0),
+          code(code) {
       }
 
       TRI_doc_mptr_t const*          mptr;
@@ -217,6 +225,16 @@ namespace triagens {
         static OperationResult RemoveDocument (Transaction*, 
                                                TransactionCollection*,
                                                Document const&,
+                                               OperationOptions const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update a document
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult UpdateDocument (Transaction*, 
+                                               TransactionCollection*,
+                                               Document const&,
+                                               Document&,
                                                OperationOptions const&);
 
 // -----------------------------------------------------------------------------

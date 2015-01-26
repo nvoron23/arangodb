@@ -319,7 +319,7 @@ OperationResult CollectionOperations::ReadDocument (Transaction* transaction,
 
   if (res != TRI_ERROR_NO_ERROR) {
     // conflict etc.
-    return OperationResult(actualRevision);
+    return OperationResult(res, actualRevision);
   }
 
   return OperationResult(mptr);  
@@ -382,7 +382,7 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
         // conflict etc.
         // revert the value of the _to attribute
         mptr->setTo(originalTransactionId);
-        return OperationResult(actualRevision);
+        return OperationResult(res, actualRevision);
       }
 
       // now append the marker to the WAL
@@ -403,6 +403,18 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
   TRI_ASSERT(mptr != nullptr);
     
   return OperationResult(mptr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update a document
+////////////////////////////////////////////////////////////////////////////////
+
+OperationResult CollectionOperations::UpdateDocument (Transaction* transaction,
+                                                      TransactionCollection* collection,
+                                                      Document const& searchDocument,
+                                                      Document& updateDocument,
+                                                      OperationOptions const& options) {
+  return OperationResult(TRI_ERROR_NOT_IMPLEMENTED);
 }
 
 // -----------------------------------------------------------------------------

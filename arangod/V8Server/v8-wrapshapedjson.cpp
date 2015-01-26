@@ -31,6 +31,7 @@
 #include "v8-vocbaseprivate.h"
 
 #include "Basics/conversions.h"
+#include "Mvcc/TransactionCollection.h"
 #include "V8/v8-conv.h"
 #include "VocBase/key-generator.h"
 #include "Utils/transactions.h"
@@ -260,6 +261,80 @@ static void WeakBarrierCallback (const v8::WeakCallbackData<v8::External, v8::Pe
     // decrease the reference-counter for the database
     TRI_ReleaseVocBase(vocbase);
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wraps a TRI_shaped_json_t
+////////////////////////////////////////////////////////////////////////////////
+
+v8::Handle<v8::Value> TRI_WrapShapedJson (v8::Isolate* isolate,
+                                          triagens::arango::CollectionNameResolver const* resolver,
+                                          triagens::mvcc::TransactionCollection* collection,
+                                          void const* data) {
+  v8::EscapableHandleScope scope(isolate);
+  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(data);
+  TRI_ASSERT(marker != nullptr);
+
+  TRI_GET_GLOBALS();
+  bool const doCopy = TRI_IsWalDataMarkerDatafile(marker);
+
+  if (doCopy) {
+    // we'll create a full copy of the document
+    TRI_shaper_t* shaper = collection->shaper(); // PROTECTED by trx from above
+
+    TRI_shaped_json_t json;
+    TRI_EXTRACT_SHAPED_JSON_MARKER(json, marker);  // PROTECTED by trx from above
+
+    TRI_shape_t const* shape = shaper->lookupShapeId(shaper, json._sid);
+
+    if (shape == nullptr) {
+      return v8::Object::New(isolate);
+    }
+
+    v8::Handle<v8::Object> result = SetBasicDocumentAttributesJs(isolate, resolver, v8g, collection->id(), marker);
+
+    return scope.Escape<v8::Value>(TRI_JsonShapeData(isolate, result, shaper, shape, json._data.data, json._data.length));
+  }
+
+  // we'll create a document stub, with a pointer into the datafile
+
+  // create the new handle to return, and set its template type
+  TRI_GET_GLOBAL(ShapedJsonTempl, v8::ObjectTemplate);
+  v8::Handle<v8::Object> result = ShapedJsonTempl->NewInstance();
+
+  if (result.IsEmpty()) {
+    // error
+    return scope.Escape<v8::Value>(result);
+  }
+
+  // point the 0 index Field to the c++ pointer for unwrapping later
+  result->SetInternalField(SLOT_CLASS_TYPE, v8::Integer::New(isolate, WRP_SHAPED_JSON_TYPE));
+  result->SetInternalField(SLOT_CLASS, v8::External::New(isolate, (void*) marker));
+
+  // tell everyone else that this barrier is used by an external
+  auto barrier = collection->orderBarrier();
+  reinterpret_cast<TRI_barrier_blocker_t*>(barrier)->_usedByExternal = true;
+
+  auto it = v8g->JSBarriers.find(barrier);
+
+  if (it == v8g->JSBarriers.end()) {
+    // increase the reference-counter for the database
+    TRI_ASSERT(barrier->_container != nullptr);
+    TRI_ASSERT(barrier->_container->_collection != nullptr);
+    TRI_UseVocBase(collection->vocbase());
+    auto externalBarrier = v8::External::New(isolate, barrier);
+    v8::Persistent<v8::External>& per(v8g->JSBarriers[barrier]);
+    per.Reset(isolate, externalBarrier);
+    result->SetInternalField(SLOT_BARRIER, externalBarrier);
+    per.SetWeak(&per, WeakBarrierCallback);
+  }
+  else {
+    auto myBarrier = v8::Local<v8::External>::New(isolate, it->second);
+      
+    result->SetInternalField(SLOT_BARRIER, myBarrier);
+  }
+
+  return scope.Escape<v8::Value>(SetBasicDocumentAttributesShaped(isolate, resolver, v8g, collection->id(), marker, result));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

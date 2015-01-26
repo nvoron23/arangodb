@@ -3258,6 +3258,74 @@ static void JS_StatusVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
 #include "Mvcc/CapConstraint.h"
 #include "Mvcc/PrimaryIndex.h"
 
+
+static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+//  TRI_GET_GLOBALS();
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  uint32_t const argLength = args.Length();
+  if (argLength != 1) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccDocument(<document-handle>)");
+  }
+
+  triagens::mvcc::OperationOptions options;
+
+  // set document key
+  std::unique_ptr<char[]> key;
+  TRI_voc_rid_t rid;
+  CollectionNameResolver resolver(collection->_vocbase); // TODO
+  int res = ParseDocumentOrDocumentHandle(collection->_vocbase, &resolver, collection, key, rid, args[0], args);
+  
+  if (key.get() == nullptr) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
+  }
+  
+  if (res != TRI_ERROR_NO_ERROR) {
+    TRI_V8_THROW_EXCEPTION(res);
+  }
+
+  
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+
+    auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
+
+    triagens::mvcc::OperationResult readResult = triagens::mvcc::CollectionOperations::ReadDocument(transaction, transactionCollection, document, options);
+ 
+    if (readResult.code != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(readResult.code);
+    }
+     
+    // now commit the operation 
+    transactionScope.commit();
+
+    TRI_V8_RETURN(TRI_WrapShapedJson(isolate, &resolver, transactionCollection, readResult.mptr->getDataPtr()));
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
+}
+
+
 static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
@@ -3324,11 +3392,7 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
     if (insertResult.code != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(insertResult.code);
     }
-   /* 
-      triagens::mvcc::Document readDoc = triagens::mvcc::Document::CreateFromKey(c1->shaper(), "der-hans");
-      triagens::mvcc::OperationResult readResult = triagens::mvcc::CollectionOperations::ReadDocument(*trx7, *trx7->collection("yy"), readDoc, options);
-      std::cout << "READ RESULT KEY: " << TRI_EXTRACT_MARKER_KEY(readResult.mptr) << ", REV: " << TRI_EXTRACT_MARKER_RID(readResult.mptr) << "\n";
-     */ 
+
     // now commit the operation 
     transactionScope.commit();
 
@@ -3361,6 +3425,7 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
   // unreachable
   TRI_ASSERT(false);
 }
+
 
 static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
@@ -3454,6 +3519,8 @@ static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
   // unreachable
   TRI_ASSERT(false);
 }
+
+
   
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief truncates a collection
@@ -4554,6 +4621,7 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("rotate"), JS_RotateVocbaseCol);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("save"), JS_InsertVocbaseCol); // note: save is now an alias for insert
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("status"), JS_StatusVocbaseCol);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccDocument"), JS_MvccDocument);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccInsert"), JS_MvccInsert);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccRemove"), JS_MvccRemove);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("TRUNCATE"), JS_TruncateVocbaseCol, true);

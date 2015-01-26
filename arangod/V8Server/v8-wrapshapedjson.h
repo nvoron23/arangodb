@@ -34,6 +34,21 @@
 #include "v8-vocbase.h"
 #include "VocBase/server.h"
 
+namespace triagens {
+  namespace mvcc {
+    class TransactionCollection;
+  }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wraps a TRI_shaped_json_t
+////////////////////////////////////////////////////////////////////////////////
+
+v8::Handle<v8::Value> TRI_WrapShapedJson (v8::Isolate*,
+                                          triagens::arango::CollectionNameResolver const*,
+                                          triagens::mvcc::TransactionCollection*,
+                                          void const*);
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief wraps a TRI_shaped_json_t
 ////////////////////////////////////////////////////////////////////////////////
