@@ -388,6 +388,9 @@ public:
   // a lock that solely protects the list of indexes
   triagens::basics::ReadWriteLock     _indexesLock;
   std::vector<triagens::mvcc::Index*> _indexes;
+
+  triagens::basics::ReadWriteLock     _documentCounterLock;
+  int64_t _documentCounter;
  
   void shutdownIndexes ();
   void addIndex (triagens::mvcc::Index*);
@@ -396,7 +399,8 @@ public:
   void readUnlockIndexes();
   void writeLockIndexes();
   void writeUnlockIndexes();
-
+  int64_t documentCounter ();
+  void updateDocumentCounter (int64_t);
   triagens::mvcc::MasterpointerManager* masterpointerManager () const;
   triagens::mvcc::MasterpointerManager* _masterpointerManager;
   

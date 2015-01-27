@@ -31,6 +31,7 @@
 #include "Basics/logging.h"
 #include "Basics/ReadLocker.h"
 #include "Basics/WriteLocker.h"
+#include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
 #include "VocBase/vocbase.h"
@@ -59,6 +60,7 @@ Transaction::Transaction (TransactionManager* transactionManager,
     _status(Transaction::StatusType::ONGOING),
     _flags(),
     _lock(),
+    _stats(),
     _aborted(false) {
 
   TRI_ASSERT(_transactionManager != nullptr);
@@ -78,48 +80,59 @@ Transaction::~Transaction () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief update the number of inserted documents
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::incNumInserted (TransactionCollection const* collection,
+                                  bool waitForSync) {
+  auto cid = collection->id();
+  auto it = _stats.find(cid);
+
+  if (it == _stats.end()) {
+    CollectionStats stats;
+    stats.numInserted++;
+    stats.waitForSync = waitForSync || collection->waitForSync();
+    _stats.insert(std::make_pair(cid, stats));
+  }
+  else {
+    (*it).second.numInserted++;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the number of removed documents
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::incNumRemoved (TransactionCollection const* collection,
+                                 bool waitForSync) {
+  auto cid = collection->id();
+  auto it = _stats.find(cid);
+
+  if (it == _stats.end()) {
+    CollectionStats stats;
+    stats.numRemoved++;
+    stats.waitForSync = waitForSync || collection->waitForSync();
+    _stats.insert(std::make_pair(cid, stats));
+  }
+  else {
+    (*it).second.numRemoved++;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the number of removed documents
+////////////////////////////////////////////////////////////////////////////////
+
+        void incNumRemoved (TransactionCollection const*);
+
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief return the transaction status
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction::StatusType Transaction::status () const {
   // TODO: implement locking here in case multiple threads access the same transaction
   return _status;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief commit the transaction
-////////////////////////////////////////////////////////////////////////////////
-
-int Transaction::commit () {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  LOG_TRACE("committing transaction %s", toString().c_str());
-
-  if (_status != Transaction::StatusType::ONGOING) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
-  }
-
-  _status = StatusType::COMMITTED;
-  _transactionManager->unregisterTransaction(this);
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief roll back the transaction
-////////////////////////////////////////////////////////////////////////////////
-
-int Transaction::rollback () {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  LOG_TRACE("rolling back transaction %s", toString().c_str());
-
-  if (_status != Transaction::StatusType::ONGOING) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
-  }
-
-  _status = StatusType::ROLLED_BACK;
-  _transactionManager->unregisterTransaction(this);
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 // -----------------------------------------------------------------------------
@@ -132,6 +145,34 @@ int Transaction::rollback () {
 
 void Transaction::initializeState () {
   _transactionManager->initializeTransaction(this);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief this is called when a subtransaction is finished
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::updateSubTransaction (Transaction* transaction) {
+  auto id = transaction->id()();
+
+  _subTransactions.emplace_back(std::make_pair(id, transaction->status()));
+
+  if (transaction->status() == StatusType::COMMITTED) { 
+    // sub-transaction has committed, now copy their stats into our stats
+    for (auto const& it : transaction->_stats) {
+      auto it2 = _stats.find(it.first);
+      if (it2 != _stats.end()) {
+        // merge our own stats with the sub-transaction's stats
+        (*it2).second.merge(it.second);
+      }
+      else {
+        // take over the stats from the sub-transaction
+        _stats.insert(std::make_pair(it.first, it.second));
+      }
+    }
+  }
+  
+  // now delete the stats of the sub-transaction as they are not needed anymore
+  transaction->_stats.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -160,8 +201,8 @@ bool Transaction::isAborted () {
 /// "visibility(other) < VISIBLE" legally.
 ////////////////////////////////////////////////////////////////////////////////
     
-Transaction::VisibilityType Transaction::visibility(TransactionId other) {
-  if (_id.isSameTransaction(other())) {   // same top level transaction?
+Transaction::VisibilityType Transaction::visibility (TransactionId const& other) {
+  if (_id.isSameTransaction(other)) {   // same top level transaction?
     if (other.sequencePart() > _id.sequencePart()) {
       return VisibilityType::INVISIBLE;
     }

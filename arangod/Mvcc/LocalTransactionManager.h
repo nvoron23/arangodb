@@ -89,7 +89,7 @@ namespace triagens {
 /// @brief aborts a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void abortTransaction (TransactionId const&) override final;
+        void abortTransaction (TransactionId::IdType) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state
@@ -101,7 +101,7 @@ namespace triagens {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction::StatusType statusTransaction (TransactionId) override final;
+        Transaction::StatusType statusTransaction (TransactionId::IdType) override final;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
@@ -152,10 +152,16 @@ namespace triagens {
         triagens::basics::ReadWriteLock _lock;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief lock for _runningTransactions
+/// @brief list of all currently running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::unordered_map<TransactionId, Transaction*> _runningTransactions;
+        std::unordered_map<TransactionId::IdType, Transaction*> _runningTransactions;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief list of all failed transactions
+////////////////////////////////////////////////////////////////////////////////
+
+        std::unordered_set<TransactionId::IdType> _failedTransactions;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief thread-local vector of started top-level transactions

@@ -31,6 +31,7 @@
 #define ARANGODB_MVCC_SUB_TRANSACTION_H 1
 
 #include "Basics/Common.h"
+#include "Mvcc/CollectionStats.h"
 #include "Mvcc/Transaction.h"
 
 namespace triagens {
@@ -44,8 +45,6 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     class SubTransaction final : public Transaction {
-
-      public:
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -70,6 +69,24 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
       public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief commit the transaction
+////////////////////////////////////////////////////////////////////////////////
+   
+        int commit () override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief roll back the transaction
+////////////////////////////////////////////////////////////////////////////////
+   
+        int rollback () override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns aggregated transaction statistics
+////////////////////////////////////////////////////////////////////////////////
+
+        CollectionStats aggregatedStats (TRI_voc_cid_t) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns a collection used in the transaction
@@ -131,7 +148,7 @@ namespace triagens {
 /// @brief this transaction's direct parent transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* const _parentTransaction;
+        Transaction* _parentTransaction;
 
     };
 

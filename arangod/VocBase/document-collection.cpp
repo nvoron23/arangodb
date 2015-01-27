@@ -111,6 +111,10 @@ void TRI_doc_mptr_copy_t::setDataPtr (void const* d) {
 
 TRI_document_collection_t::TRI_document_collection_t () 
   : _useSecondaryIndexes(true),
+    _indexesLock(),
+    _indexes(),
+    _documentCounterLock(),
+    _documentCounter(0),
     _masterpointerManager(nullptr),
     _keyGenerator(nullptr),
     _uncollectedLogfileEntries(0) {
@@ -208,6 +212,25 @@ void TRI_document_collection_t::writeLockIndexes () {
 
 void TRI_document_collection_t::writeUnlockIndexes () {
   _indexesLock.writeUnlock();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the number of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+int64_t TRI_document_collection_t::documentCounter () {
+  READ_LOCKER(_documentCounterLock);
+  return _documentCounter;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the number of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::updateDocumentCounter (int64_t value) {
+  WRITE_LOCKER(_documentCounterLock);
+  TRI_ASSERT_EXPENSIVE(_documentCounter + value >= 0);
+  _documentCounter += value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

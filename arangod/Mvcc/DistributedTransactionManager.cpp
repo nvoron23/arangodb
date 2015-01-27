@@ -76,7 +76,7 @@ void DistributedTransactionManager::unregisterTransaction (Transaction* transact
 /// @brief aborts a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void DistributedTransactionManager::abortTransaction (TransactionId const& id) {
+void DistributedTransactionManager::abortTransaction (TransactionId::IdType id) {
   // TODO
   TRI_ASSERT(false);
 }
@@ -94,8 +94,8 @@ void DistributedTransactionManager::initializeTransaction (Transaction* transact
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
-Transaction::StatusType DistributedTransactionManager::statusTransaction (
-        TransactionId) {
+
+Transaction::StatusType DistributedTransactionManager::statusTransaction (TransactionId::IdType) {
   // TODO
   return Transaction::StatusType::COMMITTED;
 }

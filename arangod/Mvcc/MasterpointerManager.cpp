@@ -103,6 +103,8 @@ void MasterpointerContainer::link () {
 MasterpointerManager::MasterpointerManager () 
   : _lock(),
     _freelist(nullptr),
+    _head(nullptr),
+    _tail(nullptr),
     _blocks() {
 }
 
@@ -146,20 +148,23 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
       }
 
       // initialize all acquired master pointers
-      TRI_doc_mptr_t* header = nullptr;
+      TRI_doc_mptr_t* next = nullptr;
 
       TRI_doc_mptr_t* ptr = begin + (blockSize - 1);
       for (;  begin <= ptr;  ptr--) {
-        ptr->setDataPtr(header); // ONLY IN HEADERS
-        header = ptr;
+        ptr->_next = next;
+        next = ptr;
       }
     
-      _freelist = header;
+      _freelist = next;
     }
 
     mptr = _freelist;
-    _freelist = const_cast<TRI_doc_mptr_t*>(static_cast<TRI_doc_mptr_t const*>(mptr->getDataPtr())); // ONLY IN HEADERS, PROTECTED by RUNTIME
+    mptr->_rid = 0;
     mptr->setDataPtr(nullptr);
+    mptr->_prev = nullptr;
+    mptr->_next = nullptr;
+    _freelist = mptr->_next; 
   }
 
   // outside the lock
@@ -181,18 +186,36 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
 ////////////////////////////////////////////////////////////////////////////////
 
 void MasterpointerManager::link (TRI_doc_mptr_t* mptr) {
-  // TODO: 
+  TRI_ASSERT_EXPENSIVE(mptr->_prev == nullptr);
+  TRI_ASSERT_EXPENSIVE(mptr->_next == nullptr);
+
+  MUTEX_LOCKER(_lock);
+  if (_tail == nullptr) {
+    _head = mptr;
+    _tail = mptr;
+  }
+  else {
+    mptr->_prev = _tail;
+    _tail->_next = mptr;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief recycle a master pointer in the collection
-/// the caller must guarantee that the master pointer will not be read or
-/// modified by itself or any other threads
+/// the caller must guarantee that the master pointer passed into this function
+/// will not be read or modified by itself or any other threads
 ////////////////////////////////////////////////////////////////////////////////
 
 void MasterpointerManager::recycle (TRI_doc_mptr_t* mptr) {
-  // TODO: implement
-  std::cout << "RECYCLING MPTR: " << mptr << "\n";
+  mptr->setFrom(0);
+  mptr->setTo(0);
+
+  MUTEX_LOCKER(_lock);
+  TRI_ASSERT_EXPENSIVE(_head != mptr);
+  TRI_ASSERT_EXPENSIVE(_tail != mptr);
+
+  mptr->_next = _freelist;
+  _freelist = mptr;
 }
 
 // -----------------------------------------------------------------------------

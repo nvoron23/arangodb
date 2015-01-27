@@ -33,6 +33,7 @@
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
 #include "VocBase/vocbase.h"
+#include "Wal/LogfileManager.h"
 
 using namespace triagens::mvcc;
 
@@ -89,6 +90,134 @@ TopLevelTransaction::~TopLevelTransaction () {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief commit the transaction
+////////////////////////////////////////////////////////////////////////////////
+
+int TopLevelTransaction::commit () {
+  // TODO: implement locking here in case multiple threads access the same transaction
+  LOG_TRACE("committing transaction %s", toString().c_str());
+
+  if (_status != Transaction::StatusType::ONGOING) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
+  }
+
+  // loop over all statistics to check if there were any data modifications during 
+  // the transaction
+  bool transactionContainsModification = false;
+  bool waitForSync = false;
+
+  for (auto const& it : _stats) {
+    transactionContainsModification |= (it.second.numInserted >0 || it.second.numRemoved > 0);
+
+    // check if we must sync
+    waitForSync |= it.second.waitForSync;
+  }
+
+  if (transactionContainsModification) {
+    try {
+      // write a commit marker
+      triagens::wal::CommitTransactionMarker commitMarker(_vocbase->_id, _id());
+    
+      auto logfileManager = triagens::wal::LogfileManager::instance();
+      int res = logfileManager->allocateAndWrite(commitMarker, waitForSync).errorCode;
+      
+      if (res != TRI_ERROR_NO_ERROR) {
+        rollback();
+        THROW_ARANGO_EXCEPTION(res); // will be caught below
+      }
+    }
+    catch (...) {
+      // always roll back
+      rollback();
+
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
+    }
+
+    // finally check how many documents were changed in each collection
+    // and update the collection stats
+    for (auto const& it : _stats) {
+      int64_t difference = static_cast<int64_t>(it.second.numInserted - it.second.numRemoved);
+
+      if (difference != 0) {
+        auto it2 = _collectionIds.find(it.first);
+
+        if (it2 != _collectionIds.end()) {
+          (*it2).second->updateDocumentCounter(difference);
+        }
+      }
+    }
+  }
+  
+  _status = StatusType::COMMITTED;
+  _transactionManager->unregisterTransaction(this);
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief roll back the transaction
+////////////////////////////////////////////////////////////////////////////////
+
+int TopLevelTransaction::rollback () {
+  // TODO: implement locking here in case multiple threads access the same transaction
+  LOG_TRACE("rolling back transaction %s", toString().c_str());
+
+  if (_status != Transaction::StatusType::ONGOING) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
+  }
+
+  _status = StatusType::ROLLED_BACK;
+
+
+  // mark all subtransactions as failed, too
+  for (auto& it : _subTransactions) {
+    it.second = StatusType::ROLLED_BACK;
+  }
+  
+  bool transactionContainsModification = false;
+
+  for (auto const& it : _stats) {
+    if (it.second.numInserted >0 || it.second.numRemoved > 0) {
+      transactionContainsModification = true;
+      break;
+    }
+  }
+  
+  if (transactionContainsModification) {
+    try {
+      // write an abort marker
+      triagens::wal::AbortTransactionMarker abortMarker(_vocbase->_id, _id());
+    
+      auto logfileManager = triagens::wal::LogfileManager::instance();
+      logfileManager->allocateAndWrite(abortMarker, false).errorCode;
+    }
+    catch (...) {
+      // what to do if writing an abort marker failed?
+    }
+  }
+
+  _transactionManager->unregisterTransaction(this);
+  
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns aggregated transaction statistics
+////////////////////////////////////////////////////////////////////////////////
+
+CollectionStats TopLevelTransaction::aggregatedStats (TRI_voc_cid_t id) {
+  // create empty stats first
+  CollectionStats stats;
+
+  auto it = _stats.find(id);
+  if (it != _stats.end()) {
+    stats.merge((*it).second);
+  }
+
+  return stats;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns a collection used in the transaction
@@ -166,11 +295,11 @@ TransactionId TopLevelTransaction::nextSubId () {
 /// @brief sets the start state (e.g. list of running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-void TopLevelTransaction::setStartState (std::unordered_map<TransactionId, Transaction*> const& transactions) {
+void TopLevelTransaction::setStartState (std::unordered_map<TransactionId::IdType, Transaction*> const& transactions) {
   TRI_ASSERT(_runningTransactions == nullptr);
 
   if (! transactions.empty()) {
-    _runningTransactions = new std::unordered_set<TransactionId>();
+    _runningTransactions = new std::unordered_set<TransactionId::IdType>();
     _runningTransactions->reserve(transactions.size());
     for (auto it : transactions) {
       _runningTransactions->emplace(it.first);

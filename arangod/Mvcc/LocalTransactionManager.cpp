@@ -93,8 +93,9 @@ void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
 /// @brief aborts a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::abortTransaction (TransactionId const& id) {
+void LocalTransactionManager::abortTransaction (TransactionId::IdType id) {
   WRITE_LOCKER(_lock);
+
   auto it = _runningTransactions.find(id);
   if (it == _runningTransactions.end()) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "transaction not found"); // TODO: fix code and message
@@ -127,8 +128,7 @@ void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction::StatusType LocalTransactionManager::statusTransaction (
-                TransactionId id) {
+Transaction::StatusType LocalTransactionManager::statusTransaction (TransactionId::IdType id) {
   return Transaction::StatusType::COMMITTED;  // FIXME: do something sensible
 }
 
@@ -151,8 +151,10 @@ TransactionId LocalTransactionManager::nextId () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::insertRunningTransaction (Transaction* transaction) {
+  auto id = transaction->id()();
+
   WRITE_LOCKER(_lock); 
-  _runningTransactions.emplace(std::make_pair(transaction->id(), transaction));
+  _runningTransactions.emplace(std::make_pair(id, transaction));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -160,8 +162,19 @@ void LocalTransactionManager::insertRunningTransaction (Transaction* transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::removeRunningTransaction (Transaction* transaction) {
+  auto id = transaction->id()();
+
   WRITE_LOCKER(_lock); 
-  _runningTransactions.erase(transaction->id());
+  _runningTransactions.erase(id);
+
+  if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
+    _failedTransactions.insert(id);
+  }
+  for (auto it : transaction->_subTransactions) {
+    if (it.second == Transaction::StatusType::ROLLED_BACK) {
+      _failedTransactions.insert(id);
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------

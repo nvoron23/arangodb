@@ -91,6 +91,10 @@ namespace triagens {
       inline bool isSameTransaction (IdType other) const {
         return isSameTransaction(_id, other);
       }
+      
+      inline bool isSameTransaction (TransactionId const& other) const {
+        return isSameTransaction(_id, other._id);
+      }
 
       static inline IdType MainPart (IdType id) {
         return (id & MainMask);

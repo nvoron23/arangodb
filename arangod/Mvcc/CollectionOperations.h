@@ -203,6 +203,13 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return the number of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+        static int64_t Count (TransactionScope*,
+                              TransactionCollection*);
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -215,7 +222,7 @@ namespace triagens {
 /// @brief read a document by its key
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult ReadDocument (Transaction*, 
+        static OperationResult ReadDocument (TransactionScope*, 
                                              TransactionCollection*, 
                                              Document const&, 
                                              OperationOptions const&);
@@ -224,7 +231,7 @@ namespace triagens {
 /// @brief remove a document
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult RemoveDocument (Transaction*, 
+        static OperationResult RemoveDocument (TransactionScope*, 
                                                TransactionCollection*,
                                                Document const&,
                                                OperationOptions const&);
@@ -233,7 +240,7 @@ namespace triagens {
 /// @brief update a document
 ////////////////////////////////////////////////////////////////////////////////
 
-        static OperationResult UpdateDocument (Transaction*, 
+        static OperationResult UpdateDocument (TransactionScope*, 
                                                TransactionCollection*,
                                                Document const&,
                                                Document&,

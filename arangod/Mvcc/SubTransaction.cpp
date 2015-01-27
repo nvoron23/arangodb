@@ -79,6 +79,67 @@ SubTransaction::~SubTransaction () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief commit the transaction
+////////////////////////////////////////////////////////////////////////////////
+   
+int SubTransaction::commit () {
+  LOG_TRACE("committing transaction %s", toString().c_str());
+
+  if (_status != Transaction::StatusType::ONGOING) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
+  }
+
+  _status = StatusType::COMMITTED;
+  _parentTransaction->updateSubTransaction(this);
+  _transactionManager->unregisterTransaction(this);
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief roll back the transaction
+////////////////////////////////////////////////////////////////////////////////
+   
+int SubTransaction::rollback () {
+  // TODO: implement locking here in case multiple threads access the same transaction
+  LOG_TRACE("rolling back transaction %s", toString().c_str());
+
+  if (_status != Transaction::StatusType::ONGOING) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
+  }
+
+  _status = StatusType::ROLLED_BACK;
+  _parentTransaction->updateSubTransaction(this);
+  _transactionManager->unregisterTransaction(this);
+  
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns aggregated transaction statistics
+////////////////////////////////////////////////////////////////////////////////
+
+CollectionStats SubTransaction::aggregatedStats (TRI_voc_cid_t id) {
+  // create empty stats first
+  CollectionStats stats;
+
+  auto current = static_cast<Transaction*>(this);
+  while (current != nullptr) {
+    auto it = current->_stats.find(id);
+    if (it != current->_stats.end()) {
+      // merge with already collected stats
+      stats.merge((*it).second);
+    }
+
+    // until we're at the top
+    current = current->parentTransaction();
+  }
+
+  return stats;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief returns a collection used in the transaction
 /// this registers the collection in the transaction if not yet present
 ////////////////////////////////////////////////////////////////////////////////

@@ -86,7 +86,7 @@ namespace triagens {
 /// @brief aborts a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void abortTransaction (TransactionId const&) override final;
+        void abortTransaction (TransactionId::IdType) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state
@@ -98,7 +98,7 @@ namespace triagens {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual Transaction::StatusType statusTransaction (TransactionId) override final;
+        virtual Transaction::StatusType statusTransaction (TransactionId::IdType) override final;
 
     };
 

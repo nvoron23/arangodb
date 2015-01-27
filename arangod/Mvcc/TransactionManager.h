@@ -90,7 +90,7 @@ namespace triagens {
 /// @brief aborts a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual void abortTransaction (TransactionId const&) = 0;
+        virtual void abortTransaction (TransactionId::IdType) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state
@@ -102,7 +102,16 @@ namespace triagens {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual Transaction::StatusType statusTransaction (TransactionId) = 0;
+        virtual Transaction::StatusType statusTransaction (TransactionId::IdType) = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns the status of a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        inline Transaction::StatusType statusTransaction (TransactionId const& other) {
+          auto id = other();
+          return statusTransaction(id);
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initialize the transaction manager

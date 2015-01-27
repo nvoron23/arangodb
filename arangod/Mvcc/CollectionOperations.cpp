@@ -192,6 +192,23 @@ Document Document::CreateFromKey (std::string const& key,
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return the number of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+int64_t CollectionOperations::Count (TransactionScope* transactionScope,
+                                     TransactionCollection* collection) {
+  auto* transaction = transactionScope->transaction();
+
+  // initial value
+  int64_t count = collection->documentCounter();
+  auto stats = transaction->aggregatedStats(collection->id());
+  count += stats.numInserted;
+  count -= stats.numRemoved;
+
+  return count;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -277,12 +294,12 @@ OperationResult CollectionOperations::InsertDocument (TransactionScope* transact
     mptr->setFrom(transactionId);
 
     // link the master pointer in the list of master pointers of the collection 
-    mptr.link(); // TODO: what if this operation fails?
+    mptr.link();
   }
 
   // commit the local operation
+  transaction->incNumInserted(collection, options.waitForSync);
   transactionScope->commit();
-  collection->_stats.numInserted++;
  
   TRI_ASSERT(mptr.get() != nullptr); 
   
@@ -293,11 +310,10 @@ OperationResult CollectionOperations::InsertDocument (TransactionScope* transact
 /// @brief reads a document by its key
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::ReadDocument (Transaction* transaction,
+OperationResult CollectionOperations::ReadDocument (TransactionScope* transactionScope,
                                                     TransactionCollection* collection,
                                                     Document const& document,
                                                     OperationOptions const& options) {
-
   if (document.key.empty()) {
     return OperationResult(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
   }
@@ -335,10 +351,11 @@ OperationResult CollectionOperations::ReadDocument (Transaction* transaction,
 /// @brief remove a document
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
+OperationResult CollectionOperations::RemoveDocument (TransactionScope* transactionScope,
                                                       TransactionCollection* collection,
                                                       Document const& document,
                                                       OperationOptions const& options) {
+  auto* transaction = transactionScope->transaction();
   auto const transactionId = transaction->id()();
 
   // create a temporary marker for the document on the heap
@@ -370,6 +387,16 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
     TRI_ASSERT(mptr != nullptr);
     indexUser.mustClick();
 
+    TRI_voc_rid_t actualRevision;
+    int res = CheckRevision(mptr, document, options.policy, &actualRevision);
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      // conflict etc.
+      // revert the value of the _to attribute
+      mptr->setTo(originalTransactionId);
+      return OperationResult(res, actualRevision);
+    }
+
     try {
       // iterate over all secondary indexes while holding the index read-lock
       auto indexes = indexUser.indexes();
@@ -378,18 +405,8 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
         // call remove for each secondary indexes
         indexes[i]->remove(collection, document.key, mptr);
       }
-
+      
       // when we are here, the document has been removed from all indexes 
-      TRI_voc_rid_t actualRevision;
-
-      int res = CheckRevision(mptr, document, options.policy, &actualRevision);
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        // conflict etc.
-        // revert the value of the _to attribute
-        mptr->setTo(originalTransactionId);
-        return OperationResult(res, actualRevision);
-      }
 
       // now append the marker to the WAL
       WriteResult writeResult;
@@ -402,12 +419,18 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
     catch (...) {
       // revert the value of the _to attribute
       mptr->setTo(originalTransactionId);
+
+      // TODO: do we need to undo the remove() in the secondary indexes, too??
       throw;
     }
   }
 
   TRI_ASSERT(mptr != nullptr);
     
+  // commit the local operation
+  transaction->incNumRemoved(collection, options.waitForSync);
+  transactionScope->commit();
+
   return OperationResult(mptr);
 }
 
@@ -415,7 +438,7 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
 /// @brief update a document
 ////////////////////////////////////////////////////////////////////////////////
 
-OperationResult CollectionOperations::UpdateDocument (Transaction* transaction,
+OperationResult CollectionOperations::UpdateDocument (TransactionScope* transactionScope,
                                                       TransactionCollection* collection,
                                                       Document const& searchDocument,
                                                       Document& updateDocument,
