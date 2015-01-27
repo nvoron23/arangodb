@@ -380,7 +380,7 @@ namespace std {
 
       void operator() (TRI_json_t* json) {
         if (json != nullptr) {
-          TRI_Free(TRI_UNKNOWN_MEM_ZONE, json);
+          TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
         }
       }
   };

@@ -31,6 +31,7 @@
 #define ARANGODB_MVCC_COLLECTION_OPERATIONS_H 1
 
 #include "Basics/Common.h"
+#include "Mvcc/IndexUser.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "VocBase/document-collection.h"
@@ -69,8 +70,24 @@ namespace triagens {
 
         ~Document ();
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a document from JSON
+////////////////////////////////////////////////////////////////////////////////
+
         static Document CreateFromJson (struct TRI_shaper_s*,
                                         struct TRI_json_t const*);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a document from JSON, specifying the key separately
+////////////////////////////////////////////////////////////////////////////////
+
+        static Document CreateFromJson (struct TRI_shaper_s*,
+                                        struct TRI_json_t const*,
+                                        std::string const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a document from ShapedJson
+////////////////////////////////////////////////////////////////////////////////
         
         static Document CreateFromShapedJson (struct TRI_shaper_s*,
                                               struct TRI_shaped_json_s const*,
@@ -242,8 +259,8 @@ namespace triagens {
 
         static OperationResult UpdateDocument (TransactionScope*, 
                                                TransactionCollection*,
-                                               Document const&,
                                                Document&,
+                                               TRI_json_t const* updateDocument,
                                                OperationOptions const&);
 
 // -----------------------------------------------------------------------------
@@ -251,6 +268,37 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
       private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief insert a document
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult InsertDocumentWorker (TransactionScope*, 
+                                                     TransactionCollection*, 
+                                                     IndexUser&,
+                                                     Document&, 
+                                                     OperationOptions const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief read a document by its key
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult ReadDocumentWorker (TransactionScope*, 
+                                                   TransactionCollection*, 
+                                                   IndexUser&,
+                                                   Document const&, 
+                                                   OperationOptions const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove a document
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult RemoveDocumentWorker (TransactionScope*, 
+                                                     TransactionCollection*,
+                                                     IndexUser&,
+                                                     Document const&,
+                                                     OperationOptions const&,
+                                                     TransactionId::IdType&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief validate the revision of the document found
@@ -269,7 +317,11 @@ namespace triagens {
         static void CreateOrValidateKey (TransactionCollection*,
                                          Document*);                   
 
-        static int WriteMarker (triagens::wal::Marker*,
+////////////////////////////////////////////////////////////////////////////////
+/// @brief write a document or remove marker into the write-ahead log
+////////////////////////////////////////////////////////////////////////////////
+
+        static int WriteMarker (triagens::wal::Marker const*,
                                 TransactionCollection*,
                                 WriteResult&);
 

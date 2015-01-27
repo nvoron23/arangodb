@@ -738,9 +738,7 @@ TRI_json_t* TRI_MergeJson (TRI_memory_zone_t* zone,
   TRI_ASSERT(lhs->_type == TRI_JSON_OBJECT);
   TRI_ASSERT(rhs->_type == TRI_JSON_OBJECT);
 
-  TRI_json_t* result = MergeRecursive(zone, lhs, rhs, nullMeansRemove, mergeObjects);
-
-  return result;
+  return MergeRecursive(zone, lhs, rhs, nullMeansRemove, mergeObjects);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

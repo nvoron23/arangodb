@@ -3625,7 +3625,7 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
   std::unique_ptr<TRI_json_t> json(TRI_ObjectToJson(isolate, args[1]));
 
   if (json.get() == nullptr) {
-    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_errno(), "<data> is no valid JSON");
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_errno(), "<document> is no valid JSON");
   }
 
   
@@ -3639,10 +3639,7 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto* transactionCollection = transaction->collection(collection->_cid);
 
     auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
-    auto* shaper = transactionCollection->shaper();
-    auto updateDocument = triagens::mvcc::Document::CreateFromJson(shaper, json.get());
-
-    auto updateResult = triagens::mvcc::CollectionOperations::UpdateDocument(&transactionScope, transactionCollection, document, updateDocument, options);
+    auto updateResult = triagens::mvcc::CollectionOperations::UpdateDocument(&transactionScope, transactionCollection, document, json.get(), options);
  
     if (updateResult.code != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(updateResult.code);
@@ -3661,7 +3658,7 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_GET_GLOBAL_STRING(_KeyKey);
     result->ForceSet(_IdKey,  V8DocumentId(isolate, transactionCollection->name(), docKey));
     result->ForceSet(_RevKey, V8RevisionId(isolate, TRI_EXTRACT_MARKER_RID(updateResult.mptr)));
-//    result->ForceSet(_OldRevKey, V8RevisionId(isolate, actualRevision));
+    result->ForceSet(_OldRevKey, V8RevisionId(isolate, updateResult.actualRevision));
     result->ForceSet(_KeyKey, TRI_V8_STRING(docKey));
 
     TRI_V8_RETURN(result);
