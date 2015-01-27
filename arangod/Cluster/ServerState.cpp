@@ -816,6 +816,9 @@ ServerState::RoleEnum ServerState::checkCoordinatorsList (std::string const& id)
   }
 
   // check if we can find ourselves in the list returned by the agency
+  for (auto& p : result._values) {
+    std::cout << "Plan/Coordinators/" << p.first << std::endl;
+  }
   std::map<std::string, AgencyCommResultEntry>::const_iterator it = result._values.find(id);
 
   if (it != result._values.end()) {
@@ -928,6 +931,9 @@ ServerState::RoleEnum ServerState::checkServersList (std::string const& id) {
 
   // check if we can find ourselves in the list returned by the agency
   result.parse("Plan/DBServers/", false);
+  for (auto& p : result._values) {
+    std::cout << "Plan/DBServers/" << p.first << std::endl;
+  }
   std::map<std::string, AgencyCommResultEntry>::const_iterator it = result._values.find(id);
 
   if (it != result._values.end()) {

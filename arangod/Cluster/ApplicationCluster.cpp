@@ -153,7 +153,11 @@ bool ApplicationCluster::prepare () {
   ServerState::instance()->setDisableDispatcherKickstarter(_disableDispatcherKickstarter);
 
   // check the cluster state
-  _enableCluster = (! _agencyEndpoints.empty() || ! _agencyPrefix.empty());
+  _enableCluster = ! _agencyEndpoints.empty();
+
+  if (_agencyPrefix.empty()) {
+    _agencyPrefix = "arango";
+  }
 
   if (! enabled()) {
     ServerState::instance()->setRole(ServerState::ROLE_SINGLE);
