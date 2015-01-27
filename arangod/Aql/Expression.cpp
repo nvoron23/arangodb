@@ -45,6 +45,31 @@ using Json = triagens::basics::Json;
 using JsonHelper = triagens::basics::JsonHelper;
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                             public static members
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief "constant" global object for NULL which can be shared by all 
+/// expressions but must never be freed
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_json_t const Expression::NullJson  = { TRI_JSON_NULL, false };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief "constant" global object for TRUE which can be shared by all 
+/// expressions but must never be freed
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_json_t const Expression::TrueJson  = { TRI_JSON_BOOLEAN, true };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief "constant" global object for FALSE which can be shared by all 
+/// expressions but must never be freed
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_json_t const Expression::FalseJson = { TRI_JSON_BOOLEAN, false };
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
 
@@ -142,7 +167,7 @@ AqlValue Expression::execute (triagens::arango::AqlTransaction* trx,
         ISOLATE;
         // Dump the expression in question  
         // std::cout << triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, _node->toJson(TRI_UNKNOWN_MEM_ZONE, true)).toString()<< "\n";
-        return _func->execute(isolate, _ast->query(), trx, _attributes, docColls, argv, startPos, vars, regs);
+        return _func->execute(isolate, _ast->query(), trx, docColls, argv, startPos, vars, regs);
       }
       catch (triagens::arango::Exception& ex) {
         if (_ast->query()->verboseErrors()) {
@@ -314,9 +339,10 @@ void Expression::analyzeExpression () {
       _attributes = std::move(Ast::getReferencedAttributes(_node, isSafeForOptimization));
 
       if (! isSafeForOptimization) {
-        // unfortunately there are not only top-level attribute accesses but
-        // also other accesses, e.g. the index values or the whole value
         _attributes.clear();
+        // unfortunately there are not only top-level attribute accesses but
+        // also other accesses, e.g. the index values or accesses of the whole value.
+        // for example, we cannot optimize LET x = a +1 or LET x = a[0], but LET x = a._key 
       }
     }
   }
@@ -345,6 +371,12 @@ void Expression::buildExpression () {
   else if (_type == V8) {
     // generate a V8 expression
     _func = _executor->generateExpression(_node);
+  
+    // optimizations for the generated function 
+    if (_func != nullptr && ! _attributes.empty()) {
+      // pass which variables do not need to be fully constructed
+      _func->setAttributeRestrictions(_attributes);
+    }
   }
 
   _built = true;
@@ -443,7 +475,7 @@ AqlValue Expression::executeSimpleExpression (AstNode const* node,
     }
     result.destroy();
       
-    return AqlValue(new Json(Json::Null));
+    return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, &NullJson, Json::NOFREE));
   }
   
   else if (node->type == NODE_TYPE_ARRAY) {
@@ -578,7 +610,7 @@ AqlValue Expression::executeSimpleExpression (AstNode const* node,
     
     bool const operandIsTrue = operand.isTrue();
     operand.destroy();
-    return AqlValue(new triagens::basics::Json(! operandIsTrue));
+    return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, operandIsTrue ? &FalseJson : &TrueJson, Json::NOFREE));
   }
   
   else if (node->type == NODE_TYPE_OPERATOR_BINARY_AND ||
@@ -635,7 +667,7 @@ AqlValue Expression::executeSimpleExpression (AstNode const* node,
         left.destroy();
         right.destroy();
         // do not throw, but return "false" instead
-        return AqlValue(new triagens::basics::Json(false));
+        return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, &FalseJson, Json::NOFREE));
       }
    
       bool result = findInList(left, right, leftCollection, rightCollection, trx, node); 
@@ -657,22 +689,22 @@ AqlValue Expression::executeSimpleExpression (AstNode const* node,
     right.destroy();
 
     if (node->type == NODE_TYPE_OPERATOR_BINARY_EQ) {
-      return AqlValue(new triagens::basics::Json(compareResult == 0));
+      return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, (compareResult == 0) ? &TrueJson : &FalseJson, Json::NOFREE));
     }
     else if (node->type == NODE_TYPE_OPERATOR_BINARY_NE) {
-      return AqlValue(new triagens::basics::Json(compareResult != 0));
+      return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, (compareResult != 0) ? &TrueJson : &FalseJson, Json::NOFREE));
     }
     else if (node->type == NODE_TYPE_OPERATOR_BINARY_LT) {
-    return AqlValue(new triagens::basics::Json(compareResult < 0));
+      return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, (compareResult < 0) ? &TrueJson : &FalseJson, Json::NOFREE));
     }
     else if (node->type == NODE_TYPE_OPERATOR_BINARY_LE) {
-      return AqlValue(new triagens::basics::Json(compareResult <= 0));
+      return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, (compareResult <= 0) ? &TrueJson : &FalseJson, Json::NOFREE));
     }
     else if (node->type == NODE_TYPE_OPERATOR_BINARY_GT) {
-      return AqlValue(new triagens::basics::Json(compareResult > 0));
+      return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, (compareResult > 0) ? &TrueJson : &FalseJson, Json::NOFREE));
     }
     else if (node->type == NODE_TYPE_OPERATOR_BINARY_GE) {
-      return AqlValue(new triagens::basics::Json(compareResult >= 0));
+      return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, (compareResult >= 0) ? &TrueJson : &FalseJson, Json::NOFREE));
     }
     // fall-through intentional
   }
