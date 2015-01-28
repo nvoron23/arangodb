@@ -263,6 +263,15 @@ namespace triagens {
                                                TRI_json_t const* updateDocument,
                                                OperationOptions const&);
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief replace a document
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult ReplaceDocument (TransactionScope*, 
+                                                TransactionCollection*,
+                                                Document&,
+                                                OperationOptions const&);
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
 // -----------------------------------------------------------------------------

@@ -3547,6 +3547,130 @@ static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 
+static void JS_MvccReplace (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+  TRI_GET_GLOBALS();
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  uint32_t const argLength = args.Length();
+  if (argLength < 2 || argLength > 5) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccReplace(<document-handle>, <document>, <options>)");
+  }
+
+  triagens::mvcc::OperationOptions options;
+  options.policy = TRI_DOC_UPDATE_ERROR;
+
+  if (argLength > 2) {
+    if (args[2]->IsObject()) {
+      v8::Handle<v8::Object> optionsObject = args[2].As<v8::Object>();
+      TRI_GET_GLOBAL_STRING(OverwriteKey);
+      if (optionsObject->Has(OverwriteKey)) {
+        options.overwrite = TRI_ObjectToBoolean(optionsObject->Get(OverwriteKey));
+        options.policy = ExtractUpdatePolicy(options.overwrite);
+      }
+      TRI_GET_GLOBAL_STRING(KeepNullKey);
+      if (optionsObject->Has(KeepNullKey)) {
+        options.keepNull = TRI_ObjectToBoolean(optionsObject->Get(KeepNullKey));
+      }
+      TRI_GET_GLOBAL_STRING(MergeObjectsKey);
+      if (optionsObject->Has(MergeObjectsKey)) {
+        options.mergeObjects = TRI_ObjectToBoolean(optionsObject->Get(MergeObjectsKey));
+      }
+      TRI_GET_GLOBAL_STRING(WaitForSyncKey);
+      if (optionsObject->Has(WaitForSyncKey)) {
+        options.waitForSync = TRI_ObjectToBoolean(optionsObject->Get(WaitForSyncKey));
+      }
+      TRI_GET_GLOBAL_STRING(SilentKey);
+      if (optionsObject->Has(SilentKey)) {
+        options.silent = TRI_ObjectToBoolean(optionsObject->Get(SilentKey));
+      }
+    }
+    else { // old variant update(<document>, <data>, <overwrite>, <keepNull>, <waitForSync>)
+      options.overwrite = TRI_ObjectToBoolean(args[2]);
+      options.policy = ExtractUpdatePolicy(options.overwrite);
+      if (argLength > 3) {
+        options.keepNull = TRI_ObjectToBoolean(args[3]);
+      }
+      if (argLength > 4) {
+        options.waitForSync = TRI_ObjectToBoolean(args[4]);
+      }
+    }
+  }
+  
+  // set document key
+  std::unique_ptr<char[]> key;
+  TRI_voc_rid_t rid;
+  CollectionNameResolver resolver(collection->_vocbase); // TODO
+  int res = ParseDocumentOrDocumentHandle(collection->_vocbase, &resolver, collection, key, rid, args[0], args);
+  
+  if (key.get() == nullptr) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
+  }
+  
+  if (res != TRI_ERROR_NO_ERROR) {
+    TRI_V8_THROW_EXCEPTION(res);
+  }
+  
+  if (! args[1]->IsObject() || args[1]->IsArray()) {
+    // we're only accepting "real" object documents
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
+  }
+
+  
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+    auto* shaper = transactionCollection->shaper();
+
+    TRI_shaped_json_t* shaped = TRI_ShapedJsonV8Object(isolate, args[1], shaper, true);  // PROTECTED by trx from above
+    auto document = triagens::mvcc::Document::CreateFromShapedJson(shaper, shaped, key.get(), true);
+    auto replaceResult = triagens::mvcc::CollectionOperations::ReplaceDocument(&transactionScope, transactionCollection, document, options);
+ 
+    if (replaceResult.code != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(replaceResult.code);
+    }
+  
+    if (options.silent) {
+      TRI_V8_RETURN_TRUE();
+    }
+
+    char const* docKey = TRI_EXTRACT_MARKER_KEY(replaceResult.mptr);  // PROTECTED by trx here
+
+    v8::Handle<v8::Object> result = v8::Object::New(isolate);
+    TRI_GET_GLOBAL_STRING(_IdKey);
+    TRI_GET_GLOBAL_STRING(_RevKey);
+    TRI_GET_GLOBAL_STRING(_OldRevKey);
+    TRI_GET_GLOBAL_STRING(_KeyKey);
+    result->ForceSet(_IdKey,  V8DocumentId(isolate, transactionCollection->name(), docKey));
+    result->ForceSet(_RevKey, V8RevisionId(isolate, TRI_EXTRACT_MARKER_RID(replaceResult.mptr)));
+    result->ForceSet(_OldRevKey, V8RevisionId(isolate, replaceResult.actualRevision));
+    result->ForceSet(_KeyKey, TRI_V8_STRING(docKey));
+
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
+}
+
+
 static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
@@ -4778,6 +4902,7 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccDocument"), JS_MvccDocument);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccInsert"), JS_MvccInsert);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccRemove"), JS_MvccRemove);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccReplace"), JS_MvccReplace);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccUpdate"), JS_MvccUpdate);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("TRUNCATE"), JS_TruncateVocbaseCol, true);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("truncateDatafile"), JS_TruncateDatafileVocbaseCol);

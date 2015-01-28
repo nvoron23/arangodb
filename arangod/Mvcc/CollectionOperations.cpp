@@ -183,6 +183,11 @@ Document Document::CreateFromShapedJson (TRI_shaper_t* shaper,
                                          TRI_shaped_json_t const* shaped,
                                          char const* key,
                                          bool freeShape) {
+  if (shaped == nullptr) {
+    // the shaped data is invalid
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
+  }
+
   try {
     std::string keyString;
 
@@ -357,6 +362,70 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
     // now insert the updated document
     auto updateDocument = Document::CreateFromJson(collection->shaper(), merged.get(), document.key); 
     auto result = InsertDocumentWorker(transactionScope, collection, indexUser, updateDocument, options);
+
+    if (result.code != TRI_ERROR_NO_ERROR) {
+      return result;
+    }
+
+    // in this case, actualRevision contains the revision id of the updated document 
+    result.actualRevision = removeResult.mptr->_rid;
+  
+    try {
+      // commit the local operation
+      transaction->incNumRemoved(collection, options.waitForSync);
+      transaction->incNumInserted(collection, options.waitForSync);
+      transactionScope->commit();
+    }
+    catch (...) {
+      // revert the insert operation!
+      auto indexes = indexUser.indexes();
+      for (size_t i = 0; i < indexes.size(); ++i) {
+        indexes[i]->forget(collection, result.mptr);
+      }
+      
+      throw;
+    }
+
+    return result;
+  }
+  catch (...) {
+    // must revert the remove operation!
+    const_cast<TRI_doc_mptr_t*>(removeResult.mptr)->setTo(originalTransactionId);
+    throw;
+  }
+   
+  // unreachable
+  TRI_ASSERT(false); 
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief replace a document
+////////////////////////////////////////////////////////////////////////////////
+
+OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transactionScope,
+                                                       TransactionCollection* collection,
+                                                       Document& document,
+                                                       OperationOptions const& options) {
+  auto* transaction = transactionScope->transaction();
+
+  // acquire a read-lock on the list of indexes so no one else creates or drops indexes
+  // while the update operation is ongoing
+  IndexUser indexUser(collection);
+
+  // first remove the document...
+  TransactionId::IdType originalTransactionId;
+  auto removeResult = RemoveDocumentWorker(transactionScope, collection, indexUser, document, options, originalTransactionId);
+
+  if (removeResult.code != TRI_ERROR_NO_ERROR) {
+    return removeResult;
+  }
+
+  // we have found and removed a revision!
+  TRI_ASSERT(removeResult.mptr != nullptr);
+
+  try {
+    // now insert the replacement document
+    auto result = InsertDocumentWorker(transactionScope, collection, indexUser, document, options);
 
     if (result.code != TRI_ERROR_NO_ERROR) {
       return result;
