@@ -1,0 +1,6 @@
+This branch has been abandoned. All its changes have found its
+way into commit
+  6e186bf84f59389e0555910acb12fe01c128f220
+on the 2.4 branch, which has been cherry-picked as
+  973628653ccf6a6335a2b2421b267c2cf612fb1c
+on the devel branch.
