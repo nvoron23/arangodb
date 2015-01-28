@@ -53,10 +53,21 @@ DistributedTransactionManager::~DistributedTransactionManager () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a (potentially nested) transaction
+/// @brief create a top-level transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* DistributedTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
+Transaction* DistributedTransactionManager::createTransaction (TRI_vocbase_t*) {
+  // TODO
+  TRI_ASSERT(false);
+  return nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a top-level transaction
+////////////////////////////////////////////////////////////////////////////////
+
+Transaction* DistributedTransactionManager::createSubTransaction (TRI_vocbase_t*,
+                                                                  Transaction*) {
   // TODO
   TRI_ASSERT(false);
   return nullptr;
@@ -73,7 +84,25 @@ void DistributedTransactionManager::unregisterTransaction (Transaction* transact
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief aborts a transaction
+/// @brief commit a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+void DistributedTransactionManager::commitTransaction (TransactionId::IdType id) {
+  // TODO
+  TRI_ASSERT(false);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief roll back a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+void DistributedTransactionManager::rollbackTransaction (TransactionId::IdType id) {
+  // TODO
+  TRI_ASSERT(false);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief abort a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 void DistributedTransactionManager::abortTransaction (TransactionId::IdType id) {

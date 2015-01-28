@@ -470,6 +470,8 @@
 /// - 1655: @LIT{transaction id overflow}
 ///   Will be raised when the transaction id overflows due to too many
 ///   subtransactions.
+/// - 1656: @LIT{transaction not found}
+///   Will be raised when a transaction is not found.
 /// - 1700: @LIT{invalid user name}
 ///   Will be raised when an invalid user name is used.
 /// - 1701: @LIT{invalid password}
@@ -2541,6 +2543,16 @@ void TRI_InitialiseErrorMessages ();
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_ERROR_TRANSACTION_ID_OVERFLOW                                 (1655)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1656: ERROR_TRANSACTION_NOT_FOUND
+///
+/// transaction not found
+///
+/// Will be raised when a transaction is not found.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_TRANSACTION_NOT_FOUND                                   (1656)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief 1700: ERROR_USER_INVALID_NAME

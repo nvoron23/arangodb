@@ -99,6 +99,8 @@ int TopLevelTransaction::commit () {
   // TODO: implement locking here in case multiple threads access the same transaction
   LOG_TRACE("committing transaction %s", toString().c_str());
 
+std::cout << "COMMITTING " << this << "\n";
+
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
   }
@@ -119,7 +121,8 @@ int TopLevelTransaction::commit () {
     try {
       // write a commit marker
       triagens::wal::CommitTransactionMarker commitMarker(_vocbase->_id, _id());
-    
+
+std::cout << "WRITING COMMIT MARKER FOR " << this << "\n";    
       auto logfileManager = triagens::wal::LogfileManager::instance();
       int res = logfileManager->allocateAndWrite(commitMarker, waitForSync).errorCode;
       
@@ -164,6 +167,8 @@ int TopLevelTransaction::rollback () {
   // TODO: implement locking here in case multiple threads access the same transaction
   LOG_TRACE("rolling back transaction %s", toString().c_str());
 
+std::cout << "ROLLING BACK " << this << "\n";
+
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
   }
@@ -189,6 +194,7 @@ int TopLevelTransaction::rollback () {
     try {
       // write an abort marker
       triagens::wal::AbortTransactionMarker abortMarker(_vocbase->_id, _id());
+std::cout << "WRITING COMMIT MARKER FOR " << this << "\n";    
     
       auto logfileManager = triagens::wal::LogfileManager::instance();
       logfileManager->allocateAndWrite(abortMarker, false).errorCode;

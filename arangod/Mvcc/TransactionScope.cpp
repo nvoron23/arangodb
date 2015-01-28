@@ -30,6 +30,7 @@
 #include "TransactionScope.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionManager.h"
+#include "Mvcc/TransactionStackAccessor.h"
 #include "Utils/Exception.h"
 #include "VocBase/vocbase.h"
 
@@ -38,12 +39,6 @@ using namespace triagens::mvcc;
 // -----------------------------------------------------------------------------
 // --SECTION--                                            class TransactionScope
 // -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                            thread local variables
-// -----------------------------------------------------------------------------
-
-thread_local std::vector<Transaction*> TransactionScope::_threadTransactions;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -55,30 +50,50 @@ thread_local std::vector<Transaction*> TransactionScope::_threadTransactions;
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
-                                    bool allowNesting)
+                                    bool forceNew,
+                                    bool canBeSubTransaction) 
   : _transactionManager(triagens::mvcc::TransactionManager::instance()),
     _transaction(nullptr),
     _isOur(false),
     _pushedOnThreadStack(false) {
 
-  if (! allowNesting || _threadTransactions.empty()) {
+  TransactionStackAccessor accessor;
+  bool const hasThreadTransactions = ! accessor.isEmpty();
+
+  if (! hasThreadTransactions) {
+    // if there are no other transactions present in the thread, we
+    // definitely have to start our own
+    forceNew = true;
+  }
+  
+  if (forceNew) {
     // start our own transaction
-    _transaction = _transactionManager->createTransaction(vocbase);
-    _isOur = true;
-      
-    if (allowNesting) {
-      pushOnThreadStack(_transaction);
-      _pushedOnThreadStack = true;
+    if (canBeSubTransaction && hasThreadTransactions) {
+      // start a sub transaction
+      auto parent = accessor.peek();
+      TRI_ASSERT(parent != nullptr);
+
+      _transaction = _transactionManager->createSubTransaction(vocbase, parent);
     }
+    else {
+      // start a top-level transaction
+      _transaction = _transactionManager->createTransaction(vocbase);
+    }
+    _isOur = true;
+    
+    // push transaction on the stack 
+    accessor.push(_transaction); 
+
+    _pushedOnThreadStack = true;
   }
   else {
     // reuse an existing transaction
-    auto existing = _threadTransactions.back();
+    auto existing = accessor.peek();
     TRI_ASSERT(existing != nullptr);
     
     // check if the database is still the same
     if (vocbase != existing->vocbase()) {
-      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot change database for nested transaction");
+      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot change database for nested operation");
     }
     
     _transaction = existing;
@@ -96,8 +111,11 @@ TransactionScope::~TransactionScope () {
     TRI_ASSERT(_transaction != nullptr);
     if (_pushedOnThreadStack) {
       // remove the transaction from the stack
-      popFromThreadStack(_transaction);
+      TransactionStackAccessor accessor;
+      auto popped = accessor.pop();
+      TRI_ASSERT(popped == _transaction);
     }
+
     try {
       delete _transaction;
     }
@@ -121,30 +139,6 @@ void TransactionScope::commit () {
   if (_isOur) {
     _transaction->commit();
   }
-}
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                   private methods
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief push the transaction onto the thread-local stack
-////////////////////////////////////////////////////////////////////////////////
-
-void TransactionScope::pushOnThreadStack (Transaction* transaction) {
-  _threadTransactions.push_back(transaction);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief pop the transaction from the thread-local stack
-////////////////////////////////////////////////////////////////////////////////
-
-void TransactionScope::popFromThreadStack (Transaction* transaction) {
-  TRI_ASSERT(! _threadTransactions.empty());
-
-  // the transaction that is popped must be at the top of the stack
-  TRI_ASSERT(_threadTransactions.back() == transaction);
-  _threadTransactions.pop_back();
 }
 
 // -----------------------------------------------------------------------------

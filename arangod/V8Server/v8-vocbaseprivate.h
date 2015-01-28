@@ -31,6 +31,7 @@
 #define ARANGODB_V8SERVER_V8__VOCBASE_PRIVATE_H
 
 #include "Basics/Common.h"
+#include "Mvcc/TransactionStackAccessor.h"
 #include "V8/v8-utils.h"
 #include "v8-vocbase.h"
 
@@ -64,8 +65,11 @@ extern int32_t const WRP_VOCBASE_COL_TYPE;
 ////////////////////////////////////////////////////////////////////////////////
 
 #define PREVENT_EMBEDDED_TRANSACTION()                                  \
+  if (! triagens::mvcc::TransactionStackAccessor::IsEmpty()) {          \
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_TRANSACTION_DISALLOWED_OPERATION); \
+  }                                                                     \
   if (triagens::arango::V8TransactionContext::IsEmbedded()) {           \
-	  TRI_V8_THROW_EXCEPTION(TRI_ERROR_TRANSACTION_DISALLOWED_OPERATION); \
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_TRANSACTION_DISALLOWED_OPERATION); \
   }
 
 ////////////////////////////////////////////////////////////////////////////////

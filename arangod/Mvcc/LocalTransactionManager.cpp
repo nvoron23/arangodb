@@ -57,6 +57,7 @@ LocalTransactionManager::LocalTransactionManager ()
 ////////////////////////////////////////////////////////////////////////////////
 
 LocalTransactionManager::~LocalTransactionManager () {
+  // TODO: abort all open transactions on shutdown!
 }
 
 // -----------------------------------------------------------------------------
@@ -64,11 +65,33 @@ LocalTransactionManager::~LocalTransactionManager () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a (potentially nested) transaction
+/// @brief create a top-level transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
   std::unique_ptr<Transaction> transaction(new TopLevelTransaction(this, nextId(), vocbase));
+
+  // we do have a transaction now
+std::cout << "CREATING " << transaction.get() << "\n";
+
+  // insert into list of currently running transactions  
+  insertRunningTransaction(transaction.get());
+
+  return transaction.release();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a sub-transaction
+////////////////////////////////////////////////////////////////////////////////
+
+Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocbase,
+                                                            Transaction* parent) {
+  TRI_ASSERT(parent != nullptr);
+  TRI_ASSERT(vocbase == parent->vocbase());
+
+  std::unique_ptr<Transaction> transaction(new SubTransaction(parent));
+
+std::cout << "CREATING " << transaction.get() << "\n";
 
   // we do have a transaction now
 
@@ -90,13 +113,54 @@ void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief aborts a transaction
+/// @brief commit a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::commitTransaction (TransactionId::IdType id) {
+  WRITE_LOCKER(_lock);
+
+  auto it = _runningTransactions.find(id);
+
+  if (it == _runningTransactions.end()) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "transaction not found"); // TODO: fix code and message
+  }
+
+  auto transaction = (*it).second;
+  // still hold the write-lock while calling setAborted()
+  // this ensures that the transaction object cannot be invalidated by other threads
+  // while we are using it
+  transaction->setAborted();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief rollback a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::rollbackTransaction (TransactionId::IdType id) {
+  WRITE_LOCKER(_lock);
+
+  auto it = _runningTransactions.find(id);
+
+  if (it == _runningTransactions.end()) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "transaction not found"); // TODO: fix code and message
+  }
+
+  auto transaction = (*it).second;
+  // still hold the write-lock while calling setAborted()
+  // this ensures that the transaction object cannot be invalidated by other threads
+  // while we are using it
+  transaction->setAborted();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief abort a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::abortTransaction (TransactionId::IdType id) {
   WRITE_LOCKER(_lock);
 
   auto it = _runningTransactions.find(id);
+
   if (it == _runningTransactions.end()) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "transaction not found"); // TODO: fix code and message
   }

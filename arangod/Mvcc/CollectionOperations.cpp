@@ -286,7 +286,15 @@ OperationResult CollectionOperations::ReadDocument (TransactionScope* transactio
   // while the insert operation is ongoing
   IndexUser indexUser(collection);
 
-  return ReadDocumentWorker(transactionScope, collection, indexUser, document, options);
+  auto result = ReadDocumentWorker(transactionScope, collection, indexUser, document, options);
+
+  if (result.code == TRI_ERROR_NO_ERROR) {
+    // no need to commit a read, but if we don't commit, it would be rolled back 
+    // and rollbacks make you inspect logs too often unnecessarily
+    transactionScope->commit();
+  }
+
+  return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

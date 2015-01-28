@@ -47,8 +47,6 @@ namespace triagens {
 
     class TransactionScope {
 
-      public:
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -63,7 +61,9 @@ namespace triagens {
 /// which will be automatically freed when the scope is left
 ////////////////////////////////////////////////////////////////////////////////
 
-        TransactionScope (struct TRI_vocbase_s*, bool allowNesting = true);
+        TransactionScope (struct TRI_vocbase_s*, 
+                          bool forceNew = false,
+                          bool canBeSubTransaction = true);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief destroy the transaction scope
@@ -101,24 +101,6 @@ namespace triagens {
         void commit ();
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                                   private methods
-// -----------------------------------------------------------------------------
-
-      private:
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief push the transaction onto the thread-local stack
-////////////////////////////////////////////////////////////////////////////////
-
-        void pushOnThreadStack (Transaction*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief pop the transaction from the thread-local stack
-////////////////////////////////////////////////////////////////////////////////
-
-        void popFromThreadStack (Transaction*);
-
-// -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
 // -----------------------------------------------------------------------------
 
@@ -147,12 +129,6 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         bool _pushedOnThreadStack;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief thread-local vector of started top-level transactions
-////////////////////////////////////////////////////////////////////////////////
-    
-        static thread_local std::vector<Transaction*> _threadTransactions;
 
     };
   }

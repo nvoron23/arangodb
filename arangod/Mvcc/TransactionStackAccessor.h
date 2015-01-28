@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC transaction manager, distributed
+/// @brief MVCC transactions stack
 ///
 /// @file
 ///
@@ -27,24 +27,22 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef ARANGODB_MVCC_DISTRIBUTED_TRANSACTION_MANAGER_H
-#define ARANGODB_MVCC_DISTRIBUTED_TRANSACTION_MANAGER_H 1
+#ifndef ARANGODB_MVCC_TRANSACTION_STACK_ACCESSOR_H
+#define ARANGODB_MVCC_TRANSACTION_STACK_ACCESSOR_H 1
 
 #include "Basics/Common.h"
 #include "Mvcc/Transaction.h"
-#include "Mvcc/TransactionId.h"
-#include "Mvcc/TransactionManager.h"
-
-struct TRI_vocbase_s;
 
 namespace triagens {
   namespace mvcc {
 
+    class Transaction;
+
 // -----------------------------------------------------------------------------
-// --SECTION--                               class DistributedTransactionManager
+// --SECTION--                                    class TransactionStackAccessor
 // -----------------------------------------------------------------------------
 
-    class DistributedTransactionManager final : public TransactionManager {
+    class TransactionStackAccessor {
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -52,75 +50,103 @@ namespace triagens {
 
       public:
 
+        TransactionStackAccessor (TransactionStackAccessor const&) = delete;
+        TransactionStackAccessor& operator= (TransactionStackAccessor const&) = delete;
+      
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create the transaction manager
-////////////////////////////////////////////////////////////////////////////////
-
-        DistributedTransactionManager ();
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief destroy the transaction manager
+/// @brief create a stack accessor instance
 ////////////////////////////////////////////////////////////////////////////////
 
-        ~DistributedTransactionManager ();
+        TransactionStackAccessor ();
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy the stack accessor
+////////////////////////////////////////////////////////////////////////////////
+
+        ~TransactionStackAccessor ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
 
-      public:
-
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a top-level transaction
+/// @brief check if the stack is empty
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* createTransaction (struct TRI_vocbase_s*) override final;
+        inline bool isEmpty () const {
+          return _threadTransactions.empty();
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a sub-transaction
+/// @brief return the top of stack
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* createSubTransaction (struct TRI_vocbase_s*,
-                                           Transaction*) override final;
+        inline Transaction* peek () const {
+          if (isEmpty()) {
+            return nullptr;
+          }
+
+          return _threadTransactions.back();
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unregister a transaction
+/// @brief push a transaction on the stack
 ////////////////////////////////////////////////////////////////////////////////
 
-        void unregisterTransaction (Transaction*) override final;
+        void push (Transaction* transaction) {
+          _threadTransactions.push_back(transaction);
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief commit a transaction
+/// @brief pop a transaction from the stack
 ////////////////////////////////////////////////////////////////////////////////
 
-        void commitTransaction (TransactionId::IdType) override final;
+        Transaction* pop () {
+          if (isEmpty()) {
+            return nullptr;
+          }
+
+          auto result = _threadTransactions.back();
+          _threadTransactions.pop_back();
+          return result;
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief roll back a transaction
+/// @brief check if a transaction is present on the stack
 ////////////////////////////////////////////////////////////////////////////////
 
-        void rollbackTransaction (TransactionId::IdType) override final;
+        bool isOnStack (TransactionId::IdType id) const {
+          size_t i = _threadTransactions.size();
+          while (i > 0) {
+            --i;
+            if (_threadTransactions[i]->id()() == id) {
+              return true;
+            }
+          }
+          return false;
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief abort a transaction
+/// @brief check if the stack is empty
 ////////////////////////////////////////////////////////////////////////////////
 
-        void abortTransaction (TransactionId::IdType) override final;
+        static inline bool IsEmpty () {
+          return _threadTransactions.empty();
+        }
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+
+      private:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief initializes a transaction with state
+/// @brief thread-local vector of started top-level transactions
 ////////////////////////////////////////////////////////////////////////////////
-
-        void initializeTransaction (Transaction*) override final;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief returns the status of a transaction
-////////////////////////////////////////////////////////////////////////////////
-
-        virtual Transaction::StatusType statusTransaction (TransactionId::IdType) override final;
+    
+        static thread_local std::vector<Transaction*> _threadTransactions;
 
     };
-
   }
 }
 

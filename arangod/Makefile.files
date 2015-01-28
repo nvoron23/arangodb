@@ -90,6 +90,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/TransactionId.cpp \
 	arangod/Mvcc/TransactionManager.cpp \
 	arangod/Mvcc/TransactionScope.cpp \
+	arangod/Mvcc/TransactionStackAccessor.cpp \
 	arangod/Replication/ContinuousSyncer.cpp \
 	arangod/Replication/InitialSyncer.cpp \
 	arangod/Replication/Syncer.cpp \
