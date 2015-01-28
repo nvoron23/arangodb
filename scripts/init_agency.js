@@ -69,7 +69,7 @@ var agencyData = {
 
 var download = require("internal").download;
 var print = require("internal").print;
-var wait = require("intenral").wait;
+var wait = require("internal").wait;
 
 function encode (st) {
   var st2 = "";
