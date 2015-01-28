@@ -1,3 +1,6 @@
+/*jshint strict: false, -W083 */
+/*global require */
+
 // Discover a new server and give it a role
 
 var download = require("internal").download;

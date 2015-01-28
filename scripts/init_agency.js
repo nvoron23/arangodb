@@ -1,3 +1,5 @@
+/*jshint strict: false */
+/*global require*/
 var agencyData = {
   "arango" : {
      "Sync" : {
@@ -67,6 +69,7 @@ var agencyData = {
 
 var download = require("internal").download;
 var print = require("internal").print;
+var wait = require("intenral").wait;
 
 function encode (st) {
   var st2 = "";
