@@ -217,94 +217,123 @@ void Collection::fillIndexes () const {
   }
 
   if (ExecutionEngine::isCoordinator()) {
-    // coordinator case, remote collection
-    auto clusterInfo = triagens::arango::ClusterInfo::instance();
-    auto collectionInfo = clusterInfo->getCollection(std::string(vocbase->_name), name);
-    if (collectionInfo.get() == nullptr || (*collectionInfo).empty()) {
-      THROW_ARANGO_EXCEPTION_FORMAT(TRI_ERROR_INTERNAL,
-                                    "collection not found '%s' -> '%s'",
-                                    vocbase->_name, name.c_str());
-    }
-
-    TRI_json_t const* json = (*collectionInfo).getIndexes();
-
-    if (TRI_IsArrayJson(json)) {
-      size_t const n = TRI_LengthArrayJson(json);
-      indexes.reserve(n);
-
-      for (size_t i = 0; i < n; ++i) {
-        TRI_json_t const* v = TRI_LookupArrayJson(json, i);
-        if (v != nullptr) {
-          indexes.emplace_back(new Index(v));
-        }
-      }
-    }
+    fillIndexesCoordinator();
+    return;
   }
-  else if (ExecutionEngine::isDBServer()) {
-    TRI_ASSERT(collection != nullptr);
-    auto document = documentCollection();
   
-    // lookup collection in agency by plan id  
-    auto clusterInfo = triagens::arango::ClusterInfo::instance();
-    auto collectionInfo = clusterInfo->getCollection(std::string(vocbase->_name), triagens::basics::StringUtils::itoa(document->_info._planId));
-    if (collectionInfo.get() == nullptr || (*collectionInfo).empty()) {
-      THROW_ARANGO_EXCEPTION_FORMAT(TRI_ERROR_INTERNAL, 
-                                    "collection not found '%s' -> '%s'",
-                                    vocbase->_name, name.c_str());
-    }
+  // must have a collection  
+  TRI_ASSERT(collection != nullptr);
 
-    TRI_json_t const* json = (*collectionInfo).getIndexes();
-    if (! TRI_IsArrayJson(json)) {
-      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unexpected index list format");
-    }
+  if (ExecutionEngine::isDBServer() && documentCollection()->_info._planId > 0) {
+    fillIndexesDBServer();
+    return;
+  }
 
+  fillIndexesLocal();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief fills the index list, cluster coordinator case
+////////////////////////////////////////////////////////////////////////////////
+
+void Collection::fillIndexesCoordinator () const {
+  // coordinator case, remote collection
+  auto clusterInfo = triagens::arango::ClusterInfo::instance();
+  auto collectionInfo = clusterInfo->getCollection(std::string(vocbase->_name), name);
+  if (collectionInfo.get() == nullptr || (*collectionInfo).empty()) {
+    THROW_ARANGO_EXCEPTION_FORMAT(TRI_ERROR_INTERNAL, 
+                                  "collection not found '%s' in database '%s'",
+                                  name.c_str(), vocbase->_name);
+  }
+
+  TRI_json_t const* json = (*collectionInfo).getIndexes();
+
+  if (TRI_IsArrayJson(json)) {
     size_t const n = TRI_LengthArrayJson(json);
     indexes.reserve(n);
-      
-    // register indexes
+
     for (size_t i = 0; i < n; ++i) {
       TRI_json_t const* v = TRI_LookupArrayJson(json, i);
-      if (TRI_IsObjectJson(v)) {
-        // lookup index id
-        TRI_json_t const* id = TRI_LookupObjectJson(v, "id");
-        if (! TRI_IsStringJson(id)) {
-          continue;
-        }
-
-        // use numeric index id
-        uint64_t iid = triagens::basics::StringUtils::uint64(id->_value._string.data, id->_value._string.length - 1);
-        TRI_index_t* data = nullptr;
-
-        // now check if we can find the local index and map it
-        for (auto idx : document->_allIndexes) {
-          if (idx != nullptr && idx->_iid == iid) {
-            // found
-            data = idx;
-            break;
-          }
-          else if (idx->_type == TRI_IDX_TYPE_PRIMARY_INDEX || 
-                   idx->_type == TRI_IDX_TYPE_EDGE_INDEX) {
-          }
-        }
-
-        auto idx = new Index(v);
-        // assign the found local index
-        idx->data = data; 
-
-        indexes.push_back(idx);
+      if (v != nullptr) {
+        indexes.emplace_back(new Index(v));
       }
     }
   }
-  else {
-    // local collection
-    TRI_ASSERT(collection != nullptr);
-    auto document = documentCollection();
-    size_t const n = document->_allIndexes.size();
-    indexes.reserve(n);
+}
 
-    for (size_t i = 0; i < n; ++i) {
-      indexes.emplace_back(new Index(document->_allIndexes[i]));
+////////////////////////////////////////////////////////////////////////////////
+/// @brief fills the index list, cluster DB server case
+////////////////////////////////////////////////////////////////////////////////
+
+void Collection::fillIndexesDBServer () const {
+  auto document = documentCollection();
+
+  // lookup collection in agency by plan id  
+  auto clusterInfo = triagens::arango::ClusterInfo::instance();
+  auto collectionInfo = clusterInfo->getCollection(std::string(vocbase->_name), triagens::basics::StringUtils::itoa(document->_info._planId));
+  if (collectionInfo.get() == nullptr || (*collectionInfo).empty()) {
+    THROW_ARANGO_EXCEPTION_FORMAT(TRI_ERROR_INTERNAL, 
+                                  "collection not found '%s' in database '%s'",
+                                  name.c_str(), vocbase->_name);
+  }
+
+  TRI_json_t const* json = (*collectionInfo).getIndexes();
+  if (! TRI_IsArrayJson(json)) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "unexpected indexes definition format");
+  }
+
+  size_t const n = TRI_LengthArrayJson(json);
+  indexes.reserve(n);
+    
+  // register indexes
+  for (size_t i = 0; i < n; ++i) {
+    TRI_json_t const* v = TRI_LookupArrayJson(json, i);
+    if (TRI_IsObjectJson(v)) {
+      // lookup index id
+      TRI_json_t const* id = TRI_LookupObjectJson(v, "id");
+      if (! TRI_IsStringJson(id)) {
+        continue;
+      }
+
+      // use numeric index id
+      uint64_t iid = triagens::basics::StringUtils::uint64(id->_value._string.data, id->_value._string.length - 1);
+      TRI_index_t* data = nullptr;
+
+      // now check if we can find the local index and map it
+      for (auto it : document->_allIndexes) {
+        auto localIndex = it;
+        if (localIndex != nullptr && localIndex->_iid == iid) {
+          // found
+          data = localIndex;
+          break;
+        }
+        else if (localIndex->_type == TRI_IDX_TYPE_PRIMARY_INDEX || 
+                  localIndex->_type == TRI_IDX_TYPE_EDGE_INDEX) {
+        }
+      }
+
+      auto idx = new Index(v);
+      // assign the found local index
+      idx->setInternals(data);
+
+      indexes.push_back(idx);
     }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief fills the index list, local server case
+/// note: this will also be called for local collection on the DB server
+////////////////////////////////////////////////////////////////////////////////
+
+void Collection::fillIndexesLocal () const {
+  // local collection
+  auto document = documentCollection();
+  size_t const n = document->_allIndexes.size();
+  indexes.reserve(n);
+
+  for (size_t i = 0; i < n; ++i) {
+    indexes.emplace_back(new Index(document->_allIndexes[i]));
   }
 }
 
