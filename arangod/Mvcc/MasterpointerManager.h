@@ -32,7 +32,9 @@
 
 #include "Basics/Common.h"
 #include "Basics/Mutex.h"
+#include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionId.h"
+#include "VocBase/document-collection.h"
 
 struct TRI_doc_mptr_t;
 
@@ -133,6 +135,19 @@ namespace triagens {
 
         void recycle (TRI_doc_mptr_t*);
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initialize an iterator with the current list head and tails
+////////////////////////////////////////////////////////////////////////////////
+
+        void initializeIterator (TRI_doc_mptr_t const*& head, 
+                                 TRI_doc_mptr_t const*& tail);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief to be called when an iterator is finished
+////////////////////////////////////////////////////////////////////////////////
+
+        void shutdownIterator ();
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  private methods
 // -----------------------------------------------------------------------------
@@ -180,7 +195,72 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         std::vector<TRI_doc_mptr_t*> _blocks;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief number of iterators currently active
+////////////////////////////////////////////////////////////////////////////////
+
+        std::atomic<int64_t>         _numIteratorsActive;
         
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      struct MasterpointerIterator
+// -----------------------------------------------------------------------------
+
+    struct MasterpointerIterator {
+      MasterpointerIterator (Transaction* transaction,
+                             MasterpointerManager* manager)
+        : transaction(transaction),
+          manager(manager),
+          current(nullptr),
+          tail(nullptr) {
+
+        manager->initializeIterator(current, tail);
+      }
+
+      ~MasterpointerIterator () {
+        manager->shutdownIterator();
+      }
+
+      bool hasMore () const {
+        return (current != nullptr);
+      }
+
+      void next (std::vector<TRI_doc_mptr_t const*>& result,
+                 int64_t& skip,
+                 int64_t& limit,
+                 int64_t batchSize) {
+        TRI_ASSERT(limit > 0);
+
+        while (current != nullptr && limit > 0 && batchSize > 0) {
+          bool isVisible = transaction->isVisibleForRead(current->from()(), current->to()());
+
+          if (isVisible) {
+            if (skip > 0) {
+              --skip;
+            }
+            else {
+              result.push_back(current);
+              --limit;
+              --batchSize;
+            }
+          }
+
+          if (current == tail) {
+            current = nullptr;
+            break;
+          }
+
+          // next element
+          current = current->_next;
+        }
+      }
+
+      Transaction* transaction;
+      MasterpointerManager* const manager;
+      TRI_doc_mptr_t const* current;
+      TRI_doc_mptr_t const* tail;
     };
 
   }

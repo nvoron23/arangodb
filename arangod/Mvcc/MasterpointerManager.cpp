@@ -191,12 +191,15 @@ void MasterpointerManager::link (TRI_doc_mptr_t* mptr) {
 
   MUTEX_LOCKER(_lock);
   if (_tail == nullptr) {
+    TRI_ASSERT_EXPENSIVE(_head == nullptr);
     _head = mptr;
     _tail = mptr;
   }
   else {
+    TRI_ASSERT_EXPENSIVE(_head != nullptr);
     mptr->_prev = _tail;
     _tail->_next = mptr;
+    _tail = mptr;
   }
 }
 
@@ -216,6 +219,33 @@ void MasterpointerManager::recycle (TRI_doc_mptr_t* mptr) {
 
   mptr->_next = _freelist;
   _freelist = mptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initialize an iterator with the current list head and tails
+////////////////////////////////////////////////////////////////////////////////
+
+void MasterpointerManager::initializeIterator (TRI_doc_mptr_t const*& head, 
+                                               TRI_doc_mptr_t const*& tail) {
+  ++_numIteratorsActive;
+
+  try {
+    MUTEX_LOCKER(_lock);
+    head = _head;
+    tail = _tail;
+  }
+  catch (...) {
+    --_numIteratorsActive;
+    throw;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief to be called when an iterator is finished
+////////////////////////////////////////////////////////////////////////////////
+
+void MasterpointerManager::shutdownIterator () {
+  --_numIteratorsActive;
 }
 
 // -----------------------------------------------------------------------------

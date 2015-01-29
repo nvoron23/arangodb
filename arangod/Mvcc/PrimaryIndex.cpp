@@ -179,7 +179,6 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
 
   TRI_doc_mptr_t* previous = findRelevantRevision(transColl, key, visibility);
   if (visibility == Transaction::VisibilityType::CONCURRENT) {
-    std::cout << "CONCURRENT!\n";
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
   }
   else if (visibility == Transaction::VisibilityType::INVISIBLE) {

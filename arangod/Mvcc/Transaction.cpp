@@ -238,6 +238,16 @@ Transaction::VisibilityType Transaction::visibility (TransactionId const& other)
          : VisibilityType::INVISIBLE;
   }
 }
+         
+bool Transaction::isVisibleForRead (TransactionId::IdType from, 
+                                    TransactionId::IdType to) {
+  if (visibility(from) == Transaction::VisibilityType::VISIBLE) {
+    if (to == 0 || visibility(to) != Transaction::VisibilityType::VISIBLE) {
+      return true;
+    }
+  }
+  return false;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief wasOngoingAtStart, check whether or not another transaction was

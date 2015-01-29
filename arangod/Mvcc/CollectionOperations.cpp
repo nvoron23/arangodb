@@ -298,6 +298,43 @@ OperationResult CollectionOperations::ReadDocument (TransactionScope* transactio
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief read all documents of the collection
+////////////////////////////////////////////////////////////////////////////////
+
+OperationResult CollectionOperations::ReadAllDocuments (TransactionScope* transactionScope,
+                                                        TransactionCollection* collection,
+                                                        std::vector<TRI_doc_mptr_t const*>& foundDocuments,
+                                                        OperationOptions const& options) {
+  auto* transaction = transactionScope->transaction();
+
+  // must have search options!
+  TRI_ASSERT(options.searchOptions != nullptr);
+
+  auto skip = options.searchOptions->skip;
+  auto limit = options.searchOptions->limit;
+
+  {
+    std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager()));
+    auto it = iterator.get();
+   
+    // TODO: implement skip and limit
+    while (it->hasMore()) {
+      it->next(foundDocuments, skip, limit, 1000);
+    }
+  }
+
+  OperationResult result(TRI_ERROR_NO_ERROR);
+ 
+  if (result.code == TRI_ERROR_NO_ERROR) {
+    // no need to commit a read, but if we don't commit, it would be rolled back 
+    // and rollbacks make you inspect logs too often unnecessarily
+    transactionScope->commit();
+  }
+
+  return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief remove a document
 /// this calls the internal worker function for remove
 ////////////////////////////////////////////////////////////////////////////////

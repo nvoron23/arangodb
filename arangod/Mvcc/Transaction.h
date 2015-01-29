@@ -324,6 +324,9 @@ namespace triagens {
 
          VisibilityType visibility (TransactionId const& other);
 
+         bool isVisibleForRead (TransactionId::IdType from, 
+                                TransactionId::IdType to);
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief wasOngoingAtStart, check whether or not another transaction was
 /// ongoing when this one started

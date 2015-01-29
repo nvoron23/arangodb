@@ -3798,6 +3798,87 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_ASSERT(false);
 }
 
+
+static void JS_MvccAllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  uint32_t const argLength = args.Length();
+  if (argLength > 2) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccAllQuery(<skip>, <limit>)");
+  }
+  
+  triagens::mvcc::SearchOptions searchOptions;
+  if (args.Length() > 0 && ! args[0]->IsNull() && ! args[0]->IsUndefined()) {
+    searchOptions.skip = TRI_ObjectToInt64(args[0]);
+  }
+
+  if (args.Length() > 1 && ! args[1]->IsNull() && ! args[1]->IsUndefined()) {
+    searchOptions.limit = TRI_ObjectToInt64(args[1]);
+  }
+
+  triagens::mvcc::OperationOptions options;
+  options.searchOptions = &searchOptions;
+
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+  CollectionNameResolver resolver(collection->_vocbase); // TODO
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+
+    std::vector<TRI_doc_mptr_t const*> foundDocuments;
+    auto searchResult = triagens::mvcc::CollectionOperations::ReadAllDocuments(&transactionScope, transactionCollection, foundDocuments, options);
+ 
+    if (searchResult.code != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(searchResult.code);
+    }
+  
+    // setup result
+    size_t const n = foundDocuments.size();
+    uint32_t count = 0;
+    uint32_t total = 0;
+
+    v8::Handle<v8::Object> result = v8::Object::New(isolate);
+    v8::Handle<v8::Array> documents = v8::Array::New(isolate, static_cast<int>(n));
+  
+    for (size_t i = 0; i < n; ++i) {
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[i]->getDataPtr());
+
+      if (document.IsEmpty()) {
+        TRI_V8_THROW_EXCEPTION_MEMORY();
+      }
+      else {
+        documents->Set(count++, document);
+      }
+    }
+
+    result->ForceSet(TRI_V8_ASCII_STRING("documents"), documents);
+    result->ForceSet(TRI_V8_ASCII_STRING("total"), v8::Number::New(isolate, total));
+    result->ForceSet(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, count));
+
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
+}
+
   
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief truncates a collection
@@ -4904,6 +4985,7 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccRemove"), JS_MvccRemove);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccReplace"), JS_MvccReplace);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccUpdate"), JS_MvccUpdate);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccAllQuery"), JS_MvccAllQuery);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("TRUNCATE"), JS_TruncateVocbaseCol, true);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("truncateDatafile"), JS_TruncateDatafileVocbaseCol);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("type"), JS_TypeVocbaseCol);

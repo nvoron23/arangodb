@@ -173,6 +173,15 @@ namespace triagens {
     };
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                              struct SearchOptions
+// -----------------------------------------------------------------------------
+
+    struct SearchOptions {
+      int64_t skip   = 0;
+      int64_t limit  = INT64_MAX;
+    };
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                           struct OperationOptions
 // -----------------------------------------------------------------------------
 
@@ -181,6 +190,7 @@ namespace triagens {
                         TRI_voc_rid_t expectedRevision = 0,
                         TRI_doc_update_policy_e policy = TRI_DOC_UPDATE_LAST_WRITE) 
         : expectedRevision(expectedRevision),
+          searchOptions(nullptr),
           policy(policy),
           waitForSync(options & WaitForSync),
           keepNull(options & KeepNull),
@@ -194,6 +204,7 @@ namespace triagens {
       }
 
       TRI_voc_rid_t            expectedRevision; // the document revision expected. can be 0 to match any
+      SearchOptions*           searchOptions;    // pointer to more specific search options
       TRI_doc_update_policy_e  policy;           // the update policy
 
       bool                     waitForSync;      // wait for sync?
@@ -243,6 +254,15 @@ namespace triagens {
                                              TransactionCollection*, 
                                              Document const&, 
                                              OperationOptions const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief read all documents of the collection
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult ReadAllDocuments (TransactionScope*, 
+                                                 TransactionCollection*,
+                                                 std::vector<TRI_doc_mptr_t const*>&, 
+                                                 OperationOptions const&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove a document
