@@ -117,19 +117,22 @@ void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::commitTransaction (TransactionId::IdType id) {
-  WRITE_LOCKER(_lock);
+  Transaction* transaction = nullptr;
 
-  auto it = _runningTransactions.find(id);
+  {
+    WRITE_LOCKER(_lock);
 
-  if (it == _runningTransactions.end()) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "transaction not found"); // TODO: fix code and message
+    auto it = _runningTransactions.find(id);
+
+    if (it == _runningTransactions.end()) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
+    }
+
+    transaction = (*it).second;
   }
 
-  auto transaction = (*it).second;
-  // still hold the write-lock while calling setAborted()
-  // this ensures that the transaction object cannot be invalidated by other threads
-  // while we are using it
-  transaction->setAborted();
+  // TODO: assert that the transaction does not have any active subtransactions, or cancel them
+  transaction->commit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -137,19 +140,22 @@ void LocalTransactionManager::commitTransaction (TransactionId::IdType id) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::rollbackTransaction (TransactionId::IdType id) {
-  WRITE_LOCKER(_lock);
+  Transaction* transaction = nullptr;
 
-  auto it = _runningTransactions.find(id);
+  {
+    WRITE_LOCKER(_lock);
 
-  if (it == _runningTransactions.end()) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "transaction not found"); // TODO: fix code and message
+    auto it = _runningTransactions.find(id);
+
+    if (it == _runningTransactions.end()) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
+    }
+
+    transaction = (*it).second;
   }
-
-  auto transaction = (*it).second;
-  // still hold the write-lock while calling setAborted()
-  // this ensures that the transaction object cannot be invalidated by other threads
-  // while we are using it
-  transaction->setAborted();
+  
+  // TODO: assert that the transaction does not have any active subtransactions, or cancel them
+  transaction->rollback();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -162,7 +168,7 @@ void LocalTransactionManager::abortTransaction (TransactionId::IdType id) {
   auto it = _runningTransactions.find(id);
 
   if (it == _runningTransactions.end()) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "transaction not found"); // TODO: fix code and message
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
   }
 
   auto transaction = (*it).second;
