@@ -114,7 +114,7 @@ void DistributedTransactionManager::abortTransaction (TransactionId::IdType id) 
 /// @brief get a list of all running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<TransactionId::IdType> DistributedTransactionManager::runningTransactions (TRI_vocbase_t* vocbase) {
+std::vector<TransactionInfo> DistributedTransactionManager::runningTransactions (TRI_vocbase_t* vocbase) {
   // TODO
   TRI_ASSERT(false);
 }

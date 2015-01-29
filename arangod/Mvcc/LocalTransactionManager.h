@@ -114,7 +114,7 @@ namespace triagens {
 /// @brief get a list of all running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::vector<TransactionId::IdType> runningTransactions (struct TRI_vocbase_s*) override final;
+        std::vector<TransactionInfo> runningTransactions (struct TRI_vocbase_s*) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state

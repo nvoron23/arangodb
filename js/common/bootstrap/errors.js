@@ -196,6 +196,7 @@
     "ERROR_TRANSACTION_ABORTED"    : { "code" : 1654, "message" : "transaction aborted" },
     "ERROR_TRANSACTION_ID_OVERFLOW" : { "code" : 1655, "message" : "transaction id overflow" },
     "ERROR_TRANSACTION_NOT_FOUND"  : { "code" : 1656, "message" : "transaction not found" },
+    "ERROR_TRANSACTION_NOT_IN_SCOPE" : { "code" : 1657, "message" : "transaction not in scope" },
     "ERROR_USER_INVALID_NAME"      : { "code" : 1700, "message" : "invalid user name" },
     "ERROR_USER_INVALID_PASSWORD"  : { "code" : 1701, "message" : "invalid password" },
     "ERROR_USER_DUPLICATE"         : { "code" : 1702, "message" : "duplicate user" },

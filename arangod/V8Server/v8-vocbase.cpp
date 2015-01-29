@@ -176,12 +176,18 @@ static void JS_ListTransactionsDatabase (const v8::FunctionCallbackInfo<v8::Valu
   }
 
   auto&& transactions = triagens::mvcc::TransactionManager::instance()->runningTransactions(vocbase);
-  std::sort(transactions.begin(), transactions.end());
+  std::sort(transactions.begin(), transactions.end(), [] (triagens::mvcc::TransactionInfo const& lhs, triagens::mvcc::TransactionInfo const& rhs) {
+    return lhs.id < rhs.id;
+  });
 
   v8::Handle<v8::Array> result = v8::Array::New(isolate, transactions.size());
   uint32_t i = 0;
   for (auto it : transactions) {
-    result->Set(i++, V8TransactionId(isolate, it));
+    v8::Handle<v8::Object> trx = v8::Object::New(isolate);
+    trx->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, it.id));
+    trx->ForceSet(TRI_V8_STRING("startTime"), v8::Number::New(isolate, it.startTime));
+
+    result->Set(i++, trx);
   }
 
   TRI_V8_RETURN(result);
@@ -244,7 +250,7 @@ static void JS_CommitTransactionDatabase (const v8::FunctionCallbackInfo<v8::Val
     triagens::mvcc::TransactionStackAccessor accessor;
 
     if (! accessor.isOnStack(id)) {
-      THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_IN_SCOPE);
     }
 
     auto current = accessor.pop();
@@ -299,7 +305,7 @@ static void JS_RollbackTransactionDatabase (const v8::FunctionCallbackInfo<v8::V
     triagens::mvcc::TransactionStackAccessor accessor;
 
     if (! accessor.isOnStack(id)) {
-      THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_IN_SCOPE);
     }
 
     auto current = accessor.pop();
@@ -329,6 +335,7 @@ static void JS_RollbackTransactionDatabase (const v8::FunctionCallbackInfo<v8::V
 
   TRI_ASSERT(false);
 }
+
 
 
 ////////////////////////////////////////////////////////////////////////////////

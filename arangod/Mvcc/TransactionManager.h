@@ -115,7 +115,7 @@ namespace triagens {
 /// @brief get a list of all running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual std::vector<TransactionId::IdType> runningTransactions (struct TRI_vocbase_s*) = 0;
+        virtual std::vector<TransactionInfo> runningTransactions (struct TRI_vocbase_s*) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state

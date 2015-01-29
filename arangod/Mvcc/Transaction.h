@@ -47,6 +47,21 @@ namespace triagens {
     class TransactionManager;
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                            struct TransactionInfo
+// -----------------------------------------------------------------------------
+
+    struct TransactionInfo {
+      TransactionInfo (TransactionId::IdType id,
+                       double startTime) 
+        : id(id),
+          startTime(startTime) {
+      }
+
+      TransactionId::IdType  id;
+      double                 startTime;
+    };
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                                 class Transaction
 // -----------------------------------------------------------------------------
 
@@ -200,6 +215,14 @@ namespace triagens {
 
         inline struct TRI_vocbase_s* vocbase () const {
           return _vocbase;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the transaction start time
+////////////////////////////////////////////////////////////////////////////////
+
+        inline double startTime () const {
+          return _startTime;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -403,6 +426,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         struct TRI_vocbase_s* const _vocbase;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the transaction's start time
+////////////////////////////////////////////////////////////////////////////////
+
+        double const _startTime;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief the transaction's status
