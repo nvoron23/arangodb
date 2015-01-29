@@ -179,6 +179,28 @@ void LocalTransactionManager::abortTransaction (TransactionId::IdType id) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief get a list of all running transactions
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<TransactionId::IdType> LocalTransactionManager::runningTransactions (TRI_vocbase_t* vocbase) {
+  std::vector<TransactionId::IdType> result;
+  // already allocate some space
+  result.reserve(32);
+
+  {
+    READ_LOCKER(_lock);
+
+    for (auto const& it : _runningTransactions) {
+      if (vocbase == nullptr || vocbase == it.second->vocbase()) {
+        result.push_back(it.second->id()());
+      }
+    }
+  }
+
+  return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state
 ////////////////////////////////////////////////////////////////////////////////
 

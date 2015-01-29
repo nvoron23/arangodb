@@ -161,6 +161,36 @@ static inline v8::Handle<v8::Value> V8TransactionId (v8::Isolate* isolate,
 /// @brief begin an MVCC transaction
 ////////////////////////////////////////////////////////////////////////////////
 
+static void JS_ListTransactionsDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  if (args.Length() != 0) {
+    TRI_V8_THROW_EXCEPTION_USAGE("_listTransactions()");
+  }
+
+  TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
+
+  if (vocbase == nullptr) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+  }
+
+  auto&& transactions = triagens::mvcc::TransactionManager::instance()->runningTransactions(vocbase);
+  std::sort(transactions.begin(), transactions.end());
+
+  v8::Handle<v8::Array> result = v8::Array::New(isolate, transactions.size());
+  uint32_t i = 0;
+  for (auto it : transactions) {
+    result->Set(i++, V8TransactionId(isolate, it));
+  }
+
+  TRI_V8_RETURN(result);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief begin an MVCC transaction
+////////////////////////////////////////////////////////////////////////////////
+
 static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
@@ -2757,6 +2787,7 @@ void TRI_InitV8VocBridge (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_beginTransaction"), JS_BeginTransactionDatabase);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_commitTransaction"), JS_CommitTransactionDatabase);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_rollbackTransaction"), JS_RollbackTransactionDatabase);
+  TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_listTransactions"), JS_ListTransactionsDatabase);
 
   TRI_InitV8indexArangoDB(isolate, ArangoNS);
 
