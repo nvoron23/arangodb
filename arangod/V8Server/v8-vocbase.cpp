@@ -158,6 +158,117 @@ static inline v8::Handle<v8::Value> V8TransactionId (v8::Isolate* isolate,
 
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief execute a function in an MVCC transaction
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_TransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  if (args.Length() != 1 || ! args[0]->IsObject()) {
+    TRI_V8_THROW_EXCEPTION_USAGE("_transaction(<object>)");
+  }
+  
+  TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
+
+  if (vocbase == nullptr) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+  }
+  
+  // treat the argument as an object from now on
+  v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(args[0]);
+
+  // extract the "action" property
+  static const string actionErrorPrototype = "missing/invalid action definition for transaction";
+  string actionError = actionErrorPrototype;
+
+  if (! object->Has(TRI_V8_ASCII_STRING("action"))) {
+    TRI_V8_THROW_EXCEPTION_PARAMETER(actionError);
+  }
+
+  // function parameters
+  v8::Handle<v8::Value> params;
+
+  if (object->Has(TRI_V8_ASCII_STRING("params"))) {
+    params = v8::Handle<v8::Array>::Cast(object->Get(TRI_V8_ASCII_STRING("params")));
+  }
+  else {
+    params = v8::Undefined(isolate);
+  }
+
+  if (params.IsEmpty()) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  v8::Handle<v8::Object> current = isolate->GetCurrentContext()->Global();
+
+  // callback function
+  v8::Handle<v8::Function> action;
+
+  if (object->Get(TRI_V8_ASCII_STRING("action"))->IsFunction()) {
+    action = v8::Handle<v8::Function>::Cast(object->Get(TRI_V8_ASCII_STRING("action")));
+  }
+  else if (object->Get(TRI_V8_ASCII_STRING("action"))->IsString()) {
+    v8::TryCatch tryCatch;
+    // get built-in Function constructor (see ECMA-262 5th edition 15.3.2)
+    v8::Local<v8::Function> ctor = v8::Local<v8::Function>::Cast(current->Get(TRI_V8_ASCII_STRING("Function")));
+
+    // Invoke Function constructor to create function with the given body and no arguments
+    string body = TRI_ObjectToString(object->Get(TRI_V8_ASCII_STRING("action"))->ToString());
+    body = "return (" + body + "\n)(params);";
+    v8::Handle<v8::Value> args[2] = { TRI_V8_ASCII_STRING("params"), TRI_V8_STD_STRING(body) };
+    v8::Local<v8::Object> function = ctor->NewInstance(2, args);
+
+    action = v8::Local<v8::Function>::Cast(function);
+    if (tryCatch.HasCaught()) {
+      actionError += " - ";
+      actionError += *v8::String::Utf8Value(tryCatch.Message()->Get());
+      actionError += " - ";
+      actionError += *v8::String::Utf8Value(tryCatch.StackTrace());
+      
+      TRI_CreateErrorObject(isolate, TRI_ERROR_BAD_PARAMETER, actionError);
+      tryCatch.ReThrow();
+      return;
+    }
+  }
+  else {
+    TRI_V8_THROW_EXCEPTION_PARAMETER(actionError);
+  }
+
+  if (action.IsEmpty()) {
+    TRI_V8_THROW_EXCEPTION_PARAMETER(actionError);
+  }
+
+  v8::Handle<v8::Value> result;
+  {
+    triagens::mvcc::TransactionScope transactionScope(vocbase);
+    auto* transaction = transactionScope.transaction();
+
+    v8::TryCatch tryCatch;
+    v8::Handle<v8::Value> arguments = params;
+    result = action->Call(current, 1, &arguments);
+
+    if (tryCatch.HasCaught()) {
+      transaction->rollback();
+
+      if (tryCatch.CanContinue()) {
+        tryCatch.ReThrow();
+        return;
+      }
+      else {
+        TRI_GET_GLOBALS();
+        v8g->_canceled = true;
+        TRI_V8_RETURN(result);
+      }
+    }
+
+    transaction->commit();
+  }
+
+  TRI_V8_RETURN(result);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief begin an MVCC transaction
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2791,6 +2902,7 @@ void TRI_InitV8VocBridge (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_listDatabases"), JS_ListDatabases);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_useDatabase"), JS_UseDatabase);
   
+  TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_transaction"), JS_TransactionDatabase);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_beginTransaction"), JS_BeginTransactionDatabase);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_commitTransaction"), JS_CommitTransactionDatabase);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_rollbackTransaction"), JS_RollbackTransactionDatabase);
