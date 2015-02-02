@@ -74,17 +74,29 @@ namespace triagens {
       public:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a top-level transaction
+/// @brief create a top-level transaction and lease it
 ////////////////////////////////////////////////////////////////////////////////
 
         Transaction* createTransaction (struct TRI_vocbase_s*) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a sub-transaction
+/// @brief create a sub-transaction and lease it
 ////////////////////////////////////////////////////////////////////////////////
 
         Transaction* createSubTransaction (struct TRI_vocbase_s*,
                                            Transaction*) override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief lease a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        Transaction* leaseTransaction (TransactionId::IdType) override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief unlease a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+        void unleaseTransaction (Transaction*) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief unregister a transaction
@@ -105,10 +117,10 @@ namespace triagens {
         void rollbackTransaction (TransactionId::IdType) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief abort a transaction
+/// @brief kill a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void abortTransaction (TransactionId::IdType) override final;
+        void killTransaction (TransactionId::IdType) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief get a list of all running transactions
@@ -153,16 +165,18 @@ namespace triagens {
         void removeRunningTransaction (Transaction*);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief push the transaction onto the thread-local stack
+/// @brief kill long-running transactions if they are older than maxAge
+/// seconds. this only sets the transactions' kill bit, but does not physically
+/// remove them
 ////////////////////////////////////////////////////////////////////////////////
 
-        void pushOnThreadStack (Transaction*);
+        void killRunningTransactions (double);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief pop the transaction from the thread-local stack
+/// @brief physically remove killed transactions
 ////////////////////////////////////////////////////////////////////////////////
-
-        void popFromThreadStack (Transaction*);
+        
+        void deleteKilledTransactions ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
@@ -189,10 +203,12 @@ namespace triagens {
         std::unordered_set<TransactionId::IdType> _failedTransactions;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief thread-local vector of started top-level transactions
+/// @brief list of all currently leased transactions
+/// a least transaction is exclusively given to a specific thread and must not
+/// be modified by another
 ////////////////////////////////////////////////////////////////////////////////
-    
-        static thread_local std::vector<Transaction*> _threadTransactions;
+
+        std::unordered_set<TransactionId::IdType> _leasedTransactions;
 
     };
 

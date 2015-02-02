@@ -49,7 +49,9 @@ using namespace triagens::mvcc;
 LocalTransactionManager::LocalTransactionManager () 
   : TransactionManager(),
     _lock(),
-    _runningTransactions() {
+    _runningTransactions(),
+    _failedTransactions(),
+    _leasedTransactions() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +67,7 @@ LocalTransactionManager::~LocalTransactionManager () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a top-level transaction
+/// @brief create a top-level transaction and lease it
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
@@ -81,7 +83,7 @@ std::cout << "CREATING " << transaction.get() << "\n";
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a sub-transaction
+/// @brief create a sub-transaction and lease it
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocbase,
@@ -99,6 +101,39 @@ std::cout << "CREATING " << transaction.get() << "\n";
   insertRunningTransaction(transaction.get());
 
   return transaction.release();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief lease a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+Transaction* LocalTransactionManager::leaseTransaction (TransactionId::IdType id) {
+  WRITE_LOCKER(_lock);
+
+  auto it = _runningTransactions.find(id);
+
+  if (it == _runningTransactions.end()) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
+  }
+
+  auto found = _leasedTransactions.insert(id);
+
+  if (! found.second) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "trying to lease an already leased transaction");
+  }
+
+  return (*it).second;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief unlease a transaction
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::unleaseTransaction (Transaction* transaction) {
+  auto id = transaction->id()();
+
+  WRITE_LOCKER(_lock);
+  _leasedTransactions.erase(id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,11 +194,11 @@ void LocalTransactionManager::rollbackTransaction (TransactionId::IdType id) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief abort a transaction
+/// @brief kill a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::abortTransaction (TransactionId::IdType id) {
-  WRITE_LOCKER(_lock);
+void LocalTransactionManager::killTransaction (TransactionId::IdType id) {
+  READ_LOCKER(_lock);
 
   auto it = _runningTransactions.find(id);
 
@@ -172,10 +207,10 @@ void LocalTransactionManager::abortTransaction (TransactionId::IdType id) {
   }
 
   auto transaction = (*it).second;
-  // still hold the write-lock while calling setAborted()
+  // still hold the lock while calling killed()
   // this ensures that the transaction object cannot be invalidated by other threads
   // while we are using it
-  transaction->setAborted();
+  transaction->killed(true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -246,7 +281,19 @@ void LocalTransactionManager::insertRunningTransaction (Transaction* transaction
   auto id = transaction->id()();
 
   WRITE_LOCKER(_lock); 
-  _runningTransactions.emplace(std::make_pair(id, transaction));
+  auto it = _runningTransactions.emplace(std::make_pair(id, transaction));
+
+  // must have inserted!
+  TRI_ASSERT_EXPENSIVE(it.second);
+
+  try {
+    // if inserting into second list fails, we must rollback the insert!
+    _leasedTransactions.emplace(id);
+  }
+  catch (...) {
+    _runningTransactions.erase(it.second);
+    throw;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -257,14 +304,92 @@ void LocalTransactionManager::removeRunningTransaction (Transaction* transaction
   auto id = transaction->id()();
 
   WRITE_LOCKER(_lock); 
-  _runningTransactions.erase(id);
 
   if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
+    // if this fails and throws, no harm will be done
     _failedTransactions.insert(id);
   }
+
   for (auto it : transaction->_subTransactions) {
     if (it.second == Transaction::StatusType::ROLLED_BACK) {
+      // TODO: implement proper cleanup if this fails somewhere in the middle
       _failedTransactions.insert(id);
+    }
+  }
+  
+  // delete from both lists
+  _runningTransactions.erase(id);
+  _leasedTransactions.erase(id);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief kill long-running transactions if they are older than maxAge
+/// seconds. this only sets the transactions' kill bit, but does not physically
+/// remove them
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::killRunningTransactions (double maxAge) {
+  double const now = TRI_microtime();
+
+  READ_LOCKER(_lock);
+
+  for (auto it : _runningTransactions) {
+    if (it.second->startTime() + maxAge < now) {
+      it.second->killed(true);
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief physically remove killed transactions
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::deleteKilledTransactions () {
+  std::vector<Transaction*> transactionsToDelete;
+  transactionsToDelete.reserve(32);
+
+  {
+    WRITE_LOCKER(_lock);
+    // create a full copy of the current state in local variables
+    // so we can safely swap later
+    std::unordered_map<TransactionId::IdType, Transaction*> runningTransactions(_runningTransactions);
+    
+    for (auto it : runningTransactions) {
+      auto transaction = it.second;
+
+      if (transaction->killed()) {
+        // we found a killed transaction
+        auto id = transaction->id()();
+
+        auto it2 = _leasedTransactions.find(id);
+  
+        if (it2 == _leasedTransactions.end()) {
+          // the transaction is killed and not currently leased
+          // this means it is a candidate for deletion
+           
+          // remove from list of currently running transactions so it cannot
+          // be found anymore
+          runningTransactions.erase(id);
+
+          transactionsToDelete.emplace_back(transaction);
+        }
+      }
+    }
+
+    // we're done with modifications to the local variables
+    // now do a swap
+    _runningTransactions = runningTransactions;
+  }
+
+  // now the transactions we want to delete are not present in neither
+  // _runningTransactions nor _leasedTransactions
+  // no one else can access them, and we can delete them without holding the lock
+
+  for (auto it : transactionsToDelete) {
+    try {
+      delete it;
+    }
+    catch (...) {
     }
   }
 }

@@ -141,7 +141,7 @@ namespace triagens {
       private:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief thread-local vector of started top-level transactions
+/// @brief thread-local vector of started transactions
 ////////////////////////////////////////////////////////////////////////////////
     
         static thread_local std::vector<Transaction*>* _threadTransactions;

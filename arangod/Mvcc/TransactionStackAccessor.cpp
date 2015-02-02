@@ -39,6 +39,10 @@ using namespace triagens::mvcc;
 // --SECTION--                                            thread local variables
 // -----------------------------------------------------------------------------
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief thread-local vector of started transactions
+////////////////////////////////////////////////////////////////////////////////
+
 thread_local std::vector<Transaction*>* TransactionStackAccessor::_threadTransactions = nullptr;
 
 // -----------------------------------------------------------------------------

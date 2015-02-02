@@ -29,8 +29,6 @@
 
 #include "Transaction.h"
 #include "Basics/logging.h"
-#include "Basics/ReadLocker.h"
-#include "Basics/WriteLocker.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
@@ -60,9 +58,8 @@ Transaction::Transaction (TransactionManager* transactionManager,
     _startTime(TRI_microtime()),
     _status(Transaction::StatusType::ONGOING),
     _flags(),
-    _lock(),
     _stats(),
-    _aborted(false) {
+    _killed(false) {
 
   TRI_ASSERT(_transactionManager != nullptr);
   TRI_ASSERT(_vocbase != nullptr);
@@ -177,21 +174,19 @@ void Transaction::updateSubTransaction (Transaction* transaction) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief set the aborted flag
+/// @brief set the killed flag
 ////////////////////////////////////////////////////////////////////////////////
 
-void Transaction::setAborted () {
-  WRITE_LOCKER(_lock);
-  _aborted = true;
+void Transaction::killed (bool) {
+  _killed = true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief check the aborted flag
+/// @brief check the killed flag
 ////////////////////////////////////////////////////////////////////////////////
 
-bool Transaction::isAborted () {
-  READ_LOCKER(_lock);
-  return _aborted;
+bool Transaction::killed () {
+  return _killed;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

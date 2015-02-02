@@ -32,7 +32,6 @@
 
 #include "Basics/Common.h"
 #include "Basics/FlagsType.h"
-#include "Basics/ReadWriteLock.h"
 #include "Mvcc/CollectionStats.h"
 #include "Mvcc/TransactionId.h"
 #include "VocBase/voc-types.h"
@@ -392,16 +391,16 @@ namespace triagens {
         void updateSubTransaction (Transaction*);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief set the aborted flag
+/// @brief set the killed flag
 ////////////////////////////////////////////////////////////////////////////////
 
-        void setAborted ();
+        void killed (bool);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief check the aborted flag
+/// @brief check the killed flag
 ////////////////////////////////////////////////////////////////////////////////
 
-        bool isAborted ();
+        bool killed ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                               protected variables
@@ -446,12 +445,6 @@ namespace triagens {
         TransactionFlags _flags;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief lock for _aborted and other things
-////////////////////////////////////////////////////////////////////////////////
-
-        triagens::basics::ReadWriteLock _lock;
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief collection modification statistics
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -464,10 +457,10 @@ namespace triagens {
         std::vector<std::pair<TransactionId::IdType, StatusType>> _subTransactions; 
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the transaction was aborted by another thread
+/// @brief whether or not the transaction was killed by another thread
 ////////////////////////////////////////////////////////////////////////////////
 
-        bool _aborted;
+        bool _killed;
 
     };
   }
