@@ -51,6 +51,13 @@ namespace triagens {
       
       public:
 
+        struct Element {
+          TRI_doc_mptr_t*  _document;
+          TRI_shaped_sub_t _subObjects[];
+        };
+
+        typedef std::vector<TRI_shaped_json_t> Key;
+
         HashIndex (TRI_idx_iid_t id,
                    struct TRI_document_collection_t*,
                    std::vector<std::string> const& fields,
@@ -80,7 +87,7 @@ namespace triagens {
         void cleanup () override final;
 
         // give index a hint about the expected size
-        void sizeHint (size_t) override final {
+        void sizeHint (size_t size) override final {
           int res = _theHash->resize(3 * size + 1);  
             // Take into account old revisions
           if (res == TRI_ERROR_OUT_OF_MEMORY) {
@@ -134,25 +141,13 @@ namespace triagens {
         int insertMulti (struct TRI_hash_index_element_multi_s*, bool);
         int removeMulti (struct TRI_hash_index_element_multi_s*);
 
-      public:
-
-        struct Element {
-          TRI_doc_mptr_t*    _document;
-          TRI_shaped_sub_t[] _subObjects;
-        };
-
-        typedef std::vector<TRI_shaped_json_t> Key;
-
-      private:
-
         Element* allocAndFillElement(TRI_doc_mptr_t* doc);
 
         void deleteElement(Element*);
 
         std::vector<TRI_shape_pid_t> const  _paths;
 
-        typedef triagens::basics::AssocMulti<Key, Element, uint32_t>
-                HashIndexHash_t;
+        typedef triagens::basics::AssocMulti<Key, Element, uint32_t> Hash_t;
 
         Hash_t* _theHash;
 

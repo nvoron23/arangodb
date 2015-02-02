@@ -28,10 +28,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "HashIndex.h"
+#include "Basics/WriteLocker.h"
 #include "HashIndex/hash-index.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
 
 using namespace triagens::basics;
 using namespace triagens::mvcc;
@@ -110,9 +113,8 @@ HashIndex::HashIndex (TRI_idx_iid_t id,
     _sparse(sparse) {
   
   try {
-    _theHash = new HashIndexHash_t(hashKey, hashElement,
-                                   compareKeyElement,
-                                   compareElementElement);
+    _theHash = new Hash_t(hashKey, hashElement, compareKeyElement,
+                          compareElementElement);
   }
   catch (...) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -145,10 +147,10 @@ void HashIndex::insert (TransactionCollection* transColl,
   // we can skip this check in the non-unique case.
 
   if (! _unique) {
-    WRITE_LOCK(_lock);
+    WRITE_LOCKER(_lock);
     Element* hashElement = allocAndFillElement(doc);
     try {
-      Element* old = _theHash->insert(doc, false, false);
+      _theHash->insert(hashElement, false, false);
     }
     catch (...) {
       deleteElement(hashElement);
@@ -158,8 +160,8 @@ void HashIndex::insert (TransactionCollection* transColl,
   else {  // _unique == true
     // See whether or not we find any revision that is in conflict with us.
     // Note that this could be a revision which we are not allowed to see!
-    WRITE_LOCK(_lock);
-    str::unique_ptr<Element>(hashElement(allocElement(doc)));
+    WRITE_LOCKER(_lock);
+    std::unique_ptr<Element> hashElement(allocAndFillElement(doc));
     std::unique_ptr<std::vector<Element*>> revisions 
         (_theHash->lookupWithElementByKey(hashElement));
     Transaction* trans = transColl->getTransaction();
@@ -169,13 +171,13 @@ void HashIndex::insert (TransactionCollection* transColl,
     // either empty or not committed before we started. Note that the from()
     // entry does not matter at all:
     for (auto p : *(revisions.get())) {
-      TransactionId to = p->document->to();
-      if (to == 0) {
+      TransactionId to = p->_document->to();
+      if (to() == 0) {
         THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
       }
       Transaction::VisibilityType visibility = trans->visibility(to);
       if (visibility != Transaction::VisibilityType::VISIBLE) {
-        visibility = trans->visibility(p->document->from());
+        visibility = trans->visibility(p->_document->from());
         if (visibility == Transaction::VisibilityType::VISIBLE) {
           THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
         }
@@ -184,8 +186,8 @@ void HashIndex::insert (TransactionCollection* transColl,
         }
       }
     }
-    Element* old = _theHash->insert(doc.get(), false, false);
-    doc.reset(nullptr);  // safely stored in hash table
+    _theHash->insert(hashElement.get(), false, false);
+    hashElement.reset(nullptr);  // safely stored in hash table
   }
 }
 
