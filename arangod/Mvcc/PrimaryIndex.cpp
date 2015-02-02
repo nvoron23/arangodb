@@ -303,14 +303,12 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
                             std::string const& key,
                             Transaction::VisibilityType& visibility) {
   // Get all available revisions:
-  std::cout << "FIND REVISION KEY: '" << key << "'\n";
   std::unique_ptr<std::vector<TRI_doc_mptr_t*>> revisions(_theHash->lookupByKey(&key));
 
   // Now look through them and find "the right one":
   Transaction* trans = transColl->getTransaction();
 
   for (auto p : *(revisions.get())) {
-    std::cout << "FIND RELEVANT\n";
     if (trans->visibility(p->from()) == Transaction::VisibilityType::VISIBLE) {
       TransactionId to = p->to();
       if (to() == 0) {

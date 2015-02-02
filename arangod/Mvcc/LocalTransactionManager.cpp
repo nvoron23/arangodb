@@ -141,7 +141,6 @@ Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase)
   std::unique_ptr<Transaction> transaction(new TopLevelTransaction(this, nextId(), vocbase));
 
   // we do have a transaction now
-std::cout << "CREATING " << transaction.get() << "\n";
 
   // insert into list of currently running transactions  
   insertRunningTransaction(transaction.get());
@@ -159,8 +158,6 @@ Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocba
   TRI_ASSERT(vocbase == parent->vocbase());
 
   std::unique_ptr<Transaction> transaction(new SubTransaction(parent));
-
-std::cout << "CREATING " << transaction.get() << "\n";
 
   // we do have a transaction now
 
@@ -325,21 +322,17 @@ void LocalTransactionManager::removeRunningTransaction (Transaction* transaction
 
   auto id = transaction->id()();
 
-std::cout << "REMOVING RUNNING TRANSACTION: " << id << "\n";
-
   WRITE_LOCKER(_lock); 
 
   if (transactionContainsModification) {
     if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
       // if this fails and throws, no harm will be done
-std::cout << "SETTING TO FAILED: " << id << "\n";
       _failedTransactions.insert(id);
     }
 
     for (auto it : transaction->_subTransactions) {
       if (it.second == Transaction::StatusType::ROLLED_BACK) {
         // TODO: implement proper cleanup if this fails somewhere in the middle
-std::cout << "SETTING TO FAILED2: " << id << "\n";
         _failedTransactions.insert(id);
       }
     }
@@ -370,8 +363,6 @@ TransactionId LocalTransactionManager::nextId () {
 
 void LocalTransactionManager::insertRunningTransaction (Transaction* transaction) {
   auto id = transaction->id()();
-
-std::cout << "INSERTING RUNNING TRANSACTION: " << id << "\n";
 
   WRITE_LOCKER(_lock); 
   auto it = _runningTransactions.emplace(std::make_pair(id, transaction));
@@ -409,10 +400,6 @@ bool LocalTransactionManager::killRunningTransactions (double maxAge) {
       }
     }
   }
-
-if (found) {
-std::cout << "CLEANUP THREAD RESULT: " << found << "\n";
-}
 
   return found;
 }

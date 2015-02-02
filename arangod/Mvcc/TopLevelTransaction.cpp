@@ -68,8 +68,6 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
 TopLevelTransaction::~TopLevelTransaction () {
   LOG_TRACE("destroying %s", toString().c_str());
 
-std::cout << "DELETING " << this << "\n";
-
   if (_status == Transaction::StatusType::ONGOING) {
     try {
       rollback();
@@ -101,15 +99,12 @@ int TopLevelTransaction::commit () {
   // TODO: implement locking here in case multiple threads access the same transaction
   LOG_TRACE("committing transaction %s", toString().c_str());
 
-std::cout << "COMMITTING " << this << "\n";
-
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
   }
 
   // killed flag was set. must not commit!
   if (killed()) {
-    std::cout << "TRANSACTION WAS KILLED!\n";
     return rollback();
   }
 
@@ -130,7 +125,6 @@ std::cout << "COMMITTING " << this << "\n";
       // write a commit marker
       triagens::wal::CommitTransactionMarker commitMarker(_vocbase->_id, _id());
 
-std::cout << "WRITING COMMIT MARKER FOR " << this << "\n";    
       auto logfileManager = triagens::wal::LogfileManager::instance();
       int res = logfileManager->allocateAndWrite(commitMarker, waitForSync).errorCode;
       
@@ -164,8 +158,6 @@ std::cout << "WRITING COMMIT MARKER FOR " << this << "\n";
   _status = StatusType::COMMITTED;
   _transactionManager->removeRunningTransaction(this, transactionContainsModification);
 
-std::cout << "COMMITTING " << this << " DONE\n";
-
   return TRI_ERROR_NO_ERROR;
 }
 
@@ -176,8 +168,6 @@ std::cout << "COMMITTING " << this << " DONE\n";
 int TopLevelTransaction::rollback () {
   // TODO: implement locking here in case multiple threads access the same transaction
   LOG_TRACE("rolling back transaction %s", toString().c_str());
-
-std::cout << "ROLLING BACK " << this << "\n";
 
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
@@ -203,7 +193,6 @@ std::cout << "ROLLING BACK " << this << "\n";
     try {
       // write an abort marker
       triagens::wal::AbortTransactionMarker abortMarker(_vocbase->_id, _id());
-std::cout << "WRITING COMMIT MARKER FOR " << this << "\n";    
     
       auto logfileManager = triagens::wal::LogfileManager::instance();
       logfileManager->allocateAndWrite(abortMarker, false).errorCode;

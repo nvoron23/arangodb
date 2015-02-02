@@ -67,7 +67,6 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
   }
   
   if (forceNew) {
-    std::cout << "CREATING TRANSACTION IN SCOPE\n";
     // start our own transaction
     if (canBeSubTransaction && hasThreadTransactions) {
       // start a sub transaction
@@ -109,7 +108,6 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
 
 TransactionScope::~TransactionScope () {
   if (_isOur) {
-    std::cout << "DESTROYING TRANSACTION CREATED IN SCOPE\n";
     TRI_ASSERT(_transaction != nullptr);
     if (_pushedOnThreadStack) {
       // remove the transaction from the stack
@@ -139,7 +137,6 @@ TransactionScope::~TransactionScope () {
 
 void TransactionScope::commit () {
   if (_isOur) {
-    std::cout << "COMMITTING TRANSACTION CREATED IN SCOPE\n";
     _transaction->commit();
   }
 }
