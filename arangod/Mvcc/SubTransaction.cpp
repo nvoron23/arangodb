@@ -91,7 +91,7 @@ int SubTransaction::commit () {
 
   _status = StatusType::COMMITTED;
   _parentTransaction->updateSubTransaction(this);
-  _transactionManager->unregisterTransaction(this);
+  _transactionManager->removeRunningTransaction(this, false /* TODO */);
 
   return TRI_ERROR_NO_ERROR;
 }
@@ -110,9 +110,8 @@ int SubTransaction::rollback () {
 
   _status = StatusType::ROLLED_BACK;
   _parentTransaction->updateSubTransaction(this);
-  _transactionManager->unregisterTransaction(this);
+  _transactionManager->removeRunningTransaction(this, false /* TODO */);
   
-
   return TRI_ERROR_NO_ERROR;
 }
 

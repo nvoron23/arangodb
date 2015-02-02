@@ -136,7 +136,8 @@ MasterpointerManager* TransactionCollection::masterpointerManager () {
 
 void TransactionCollection::updateDocumentCounter (int64_t value) {
   TRI_ASSERT(value != 0);
- 
+
+std::cout << "UPDATING COUNTER BY " << value << "\n"; 
   _collection->_collection->updateDocumentCounter(value); 
 }
 
@@ -145,6 +146,7 @@ void TransactionCollection::updateDocumentCounter (int64_t value) {
 ////////////////////////////////////////////////////////////////////////////////
 
 int64_t TransactionCollection::documentCounter () {
+std::cout << "COUNTER IS NOW " << _collection->_collection->documentCounter() << "\n";
   return _collection->_collection->documentCounter(); 
 }
 

@@ -29,6 +29,7 @@
 
 #include "MasterpointerManager.h"
 #include "Basics/MutexLocker.h"
+#include "Mvcc/PrimaryIndex.h"
 #include "VocBase/document-collection.h"
 
 using namespace triagens::basics;
@@ -173,6 +174,11 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
   // TODO: properly initialize the master pointer
   mptr->setDataPtr(data);
   mptr->_rid = TRI_EXTRACT_MARKER_RID(static_cast<TRI_df_marker_t const*>(data));
+
+  size_t keyLength;
+  char const* key = TRI_EXTRACT_MARKER_KEY(static_cast<TRI_df_marker_t const*>(data), keyLength);
+  mptr->setHash(triagens::mvcc::PrimaryIndex::hashKeyString(key, keyLength));
+
   // mptr->_from = transactionId;
   // mptr->_to   = 0;
   mptr->_prev = nullptr;

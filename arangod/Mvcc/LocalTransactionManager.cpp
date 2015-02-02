@@ -39,6 +39,54 @@
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
+// --SECTION--                              LocalTransactionManagerCleanupThread
+// -----------------------------------------------------------------------------
+
+LocalTransactionManagerCleanupThread::LocalTransactionManagerCleanupThread (LocalTransactionManager* manager)
+  : Thread("transaction-manager"),
+    _manager(manager),
+    _stopped(false) {
+}
+
+LocalTransactionManagerCleanupThread::~LocalTransactionManagerCleanupThread () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initialize the thread
+////////////////////////////////////////////////////////////////////////////////
+
+bool LocalTransactionManagerCleanupThread::init () {
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief stop the thread
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManagerCleanupThread::stop () {
+  _stopped = true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief thread main loop
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManagerCleanupThread::run () {
+  while (! _stopped) {
+    if (_manager->killRunningTransactions(5)) {
+      _manager->deleteKilledTransactions();
+    }
+    else {
+      usleep(1000 * 200);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                     class LocalTransactionManager
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
 
@@ -51,7 +99,14 @@ LocalTransactionManager::LocalTransactionManager ()
     _lock(),
     _runningTransactions(),
     _failedTransactions(),
-    _leasedTransactions() {
+    _leasedTransactions(),
+    _cleanupThread(nullptr) {
+
+  _cleanupThread = new LocalTransactionManagerCleanupThread(this);
+
+  if (! _cleanupThread->init() || ! _cleanupThread->start()) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "could not start cleanup thread");
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +115,18 @@ LocalTransactionManager::LocalTransactionManager ()
 
 LocalTransactionManager::~LocalTransactionManager () {
   // TODO: abort all open transactions on shutdown!
+  if (_cleanupThread) {
+    _cleanupThread->join();
+  }
+
+  delete _cleanupThread;
+
+  try {
+    killRunningTransactions(0.0);
+    deleteKilledTransactions();
+  }
+  catch (...) {
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -137,23 +204,12 @@ void LocalTransactionManager::unleaseTransaction (Transaction* transaction) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unregister a transaction
-////////////////////////////////////////////////////////////////////////////////
-
-void LocalTransactionManager::unregisterTransaction (Transaction* transaction) {
-  // transaction must have already finished
-  TRI_ASSERT(! transaction->isOngoing());
-
-  removeRunningTransaction(transaction);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief commit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::commitTransaction (TransactionId::IdType id) {
   Transaction* transaction = nullptr;
-
+    
   {
     WRITE_LOCKER(_lock);
 
@@ -259,6 +315,41 @@ Transaction::StatusType LocalTransactionManager::statusTransaction (TransactionI
   return Transaction::StatusType::COMMITTED;  // FIXME: do something sensible
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove the transaction from the list of running transactions
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::removeRunningTransaction (Transaction* transaction,
+                                                        bool transactionContainsModification) {
+  TRI_ASSERT(! transaction->isOngoing());
+
+  auto id = transaction->id()();
+
+std::cout << "REMOVING RUNNING TRANSACTION: " << id << "\n";
+
+  WRITE_LOCKER(_lock); 
+
+  if (transactionContainsModification) {
+    if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
+      // if this fails and throws, no harm will be done
+std::cout << "SETTING TO FAILED: " << id << "\n";
+      _failedTransactions.insert(id);
+    }
+
+    for (auto it : transaction->_subTransactions) {
+      if (it.second == Transaction::StatusType::ROLLED_BACK) {
+        // TODO: implement proper cleanup if this fails somewhere in the middle
+std::cout << "SETTING TO FAILED2: " << id << "\n";
+        _failedTransactions.insert(id);
+      }
+    }
+  }
+  
+  // delete from both lists
+  _runningTransactions.erase(id);
+  _leasedTransactions.erase(id);
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
 // -----------------------------------------------------------------------------
@@ -280,6 +371,8 @@ TransactionId LocalTransactionManager::nextId () {
 void LocalTransactionManager::insertRunningTransaction (Transaction* transaction) {
   auto id = transaction->id()();
 
+std::cout << "INSERTING RUNNING TRANSACTION: " << id << "\n";
+
   WRITE_LOCKER(_lock); 
   auto it = _runningTransactions.emplace(std::make_pair(id, transaction));
 
@@ -297,47 +390,31 @@ void LocalTransactionManager::insertRunningTransaction (Transaction* transaction
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief remove the transaction from the list of running transactions
-////////////////////////////////////////////////////////////////////////////////
-
-void LocalTransactionManager::removeRunningTransaction (Transaction* transaction) {
-  auto id = transaction->id()();
-
-  WRITE_LOCKER(_lock); 
-
-  if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
-    // if this fails and throws, no harm will be done
-    _failedTransactions.insert(id);
-  }
-
-  for (auto it : transaction->_subTransactions) {
-    if (it.second == Transaction::StatusType::ROLLED_BACK) {
-      // TODO: implement proper cleanup if this fails somewhere in the middle
-      _failedTransactions.insert(id);
-    }
-  }
-  
-  // delete from both lists
-  _runningTransactions.erase(id);
-  _leasedTransactions.erase(id);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief kill long-running transactions if they are older than maxAge
 /// seconds. this only sets the transactions' kill bit, but does not physically
 /// remove them
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::killRunningTransactions (double maxAge) {
+bool LocalTransactionManager::killRunningTransactions (double maxAge) {
   double const now = TRI_microtime();
+  bool found = false;
 
-  READ_LOCKER(_lock);
+  {
+    READ_LOCKER(_lock);
 
-  for (auto it : _runningTransactions) {
-    if (it.second->startTime() + maxAge < now) {
-      it.second->killed(true);
+    for (auto it : _runningTransactions) {
+      if (it.second->startTime() + maxAge < now) {
+        it.second->killed(true);
+        found = true;
+      }
     }
   }
+
+if (found) {
+std::cout << "CLEANUP THREAD RESULT: " << found << "\n";
+}
+
+  return found;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -91,16 +91,6 @@ void DistributedTransactionManager::unleaseTransaction (Transaction* transaction
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unregister a transaction
-////////////////////////////////////////////////////////////////////////////////
-
-void DistributedTransactionManager::unregisterTransaction (Transaction* transaction) {
-  // TODO
-  TRI_ASSERT(! transaction->isOngoing());
-  TRI_ASSERT(false);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief commit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -142,7 +132,6 @@ std::vector<TransactionInfo> DistributedTransactionManager::runningTransactions 
 
 void DistributedTransactionManager::initializeTransaction (Transaction* transaction) {
   // TODO
-  TRI_ASSERT(transaction->isOngoing());
   TRI_ASSERT(false);
 }
 
@@ -153,6 +142,16 @@ void DistributedTransactionManager::initializeTransaction (Transaction* transact
 Transaction::StatusType DistributedTransactionManager::statusTransaction (TransactionId::IdType) {
   // TODO
   return Transaction::StatusType::COMMITTED;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove the transaction from the list of running transactions
+////////////////////////////////////////////////////////////////////////////////
+
+void DistributedTransactionManager::removeRunningTransaction (Transaction*, 
+                                                              bool) {
+  // TODO
+  TRI_ASSERT(false);
 }
 
 // -----------------------------------------------------------------------------

@@ -68,6 +68,8 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
 TopLevelTransaction::~TopLevelTransaction () {
   LOG_TRACE("destroying %s", toString().c_str());
 
+std::cout << "DELETING " << this << "\n";
+
   if (_status == Transaction::StatusType::ONGOING) {
     try {
       rollback();
@@ -103,6 +105,12 @@ std::cout << "COMMITTING " << this << "\n";
 
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
+  }
+
+  // killed flag was set. must not commit!
+  if (killed()) {
+    std::cout << "TRANSACTION WAS KILLED!\n";
+    return rollback();
   }
 
   // loop over all statistics to check if there were any data modifications during 
@@ -152,9 +160,11 @@ std::cout << "WRITING COMMIT MARKER FOR " << this << "\n";
       }
     }
   }
-  
+    
   _status = StatusType::COMMITTED;
-  _transactionManager->unregisterTransaction(this);
+  _transactionManager->removeRunningTransaction(this, transactionContainsModification);
+
+std::cout << "COMMITTING " << this << " DONE\n";
 
   return TRI_ERROR_NO_ERROR;
 }
@@ -174,7 +184,6 @@ std::cout << "ROLLING BACK " << this << "\n";
   }
 
   _status = StatusType::ROLLED_BACK;
-
 
   // mark all subtransactions as failed, too
   for (auto& it : _subTransactions) {
@@ -204,7 +213,7 @@ std::cout << "WRITING COMMIT MARKER FOR " << this << "\n";
     }
   }
 
-  _transactionManager->unregisterTransaction(this);
+  _transactionManager->removeRunningTransaction(this, transactionContainsModification);
   
   return TRI_ERROR_NO_ERROR;
 }
@@ -307,6 +316,7 @@ void TopLevelTransaction::setStartState (std::unordered_map<TransactionId::IdTyp
   if (! transactions.empty()) {
     _runningTransactions = new std::unordered_set<TransactionId::IdType>();
     _runningTransactions->reserve(transactions.size());
+
     for (auto it : transactions) {
       _runningTransactions->emplace(it.first);
     }

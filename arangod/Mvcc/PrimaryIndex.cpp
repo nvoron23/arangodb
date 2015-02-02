@@ -188,26 +188,18 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
 TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
                                       std::string const& key,
                                       TransactionId::IdType& originalTransactionId) {
+  Transaction::VisibilityType visibility;
+  
   WRITE_LOCKER(_lock);
 
-  Transaction::VisibilityType visibility;
-
   TRI_doc_mptr_t* previous = findRelevantRevision(transColl, key, visibility);
+
   if (visibility == Transaction::VisibilityType::CONCURRENT) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
   }
   else if (visibility == Transaction::VisibilityType::INVISIBLE) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
   }
-
-  // TODO: check revision
-  /*
-  int revisionCheckResult = checkRevision(previous);
-
-  if (revisionCheckResult != TRI_ERROR_NO_ERROR) {
-    THROW_ARANGO_EXCEPTION(revisionCheckResult);
-  }
-  */
 
   // store original _to value so we can restore it later
   originalTransactionId = previous->to()();
@@ -226,6 +218,7 @@ void PrimaryIndex::forget (TransactionCollection*,
   TRI_doc_mptr_t const* old;
 
   old = _theHash->remove(doc);
+
   if (old == nullptr) {
     // This is serious and unexpected, this revision was not found!
     THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
@@ -310,12 +303,14 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
                             std::string const& key,
                             Transaction::VisibilityType& visibility) {
   // Get all available revisions:
+  std::cout << "FIND REVISION KEY: '" << key << "'\n";
   std::unique_ptr<std::vector<TRI_doc_mptr_t*>> revisions(_theHash->lookupByKey(&key));
 
   // Now look through them and find "the right one":
   Transaction* trans = transColl->getTransaction();
 
   for (auto p : *(revisions.get())) {
+    std::cout << "FIND RELEVANT\n";
     if (trans->visibility(p->from()) == Transaction::VisibilityType::VISIBLE) {
       TransactionId to = p->to();
       if (to() == 0) {

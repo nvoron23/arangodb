@@ -131,6 +131,10 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         static inline bool IsEmpty () {
+          if (_threadTransactions == nullptr) {
+            return true;
+          }
+
           return _threadTransactions->empty();
         }
 

@@ -32,6 +32,7 @@
 
 #include "Basics/Common.h"
 #include "Basics/ReadWriteLock.h"
+#include "Basics/Thread.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionId.h"
 #include "Mvcc/TransactionManager.h"
@@ -41,13 +42,44 @@ struct TRI_vocbase_s;
 namespace triagens {
   namespace mvcc {
 
+    class LocalTransactionManager;
     class TopLevelTransaction;
+
+// -----------------------------------------------------------------------------
+// --SECTION--                              LocalTransactionManagerCleanupThread
+// -----------------------------------------------------------------------------
+
+    class LocalTransactionManagerCleanupThread : public basics::Thread {
+
+      public:
+
+        LocalTransactionManagerCleanupThread (LocalTransactionManager*);
+        
+        ~LocalTransactionManagerCleanupThread ();
+
+        bool init ();
+      
+        void stop ();
+
+      protected:
+
+        void run ();
+
+      private:
+
+        LocalTransactionManager* const _manager;
+
+        std::atomic<bool> _stopped;
+    };
+
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                     class LocalTransactionManager
 // -----------------------------------------------------------------------------
 
     class LocalTransactionManager final : public TransactionManager {
+
+      friend LocalTransactionManagerCleanupThread;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -99,12 +131,6 @@ namespace triagens {
         void unleaseTransaction (Transaction*) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief unregister a transaction
-////////////////////////////////////////////////////////////////////////////////
-
-        void unregisterTransaction (Transaction*) override final;
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief commit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -140,6 +166,13 @@ namespace triagens {
 
         Transaction::StatusType statusTransaction (TransactionId::IdType) override final;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove the transaction from the list of running transactions
+////////////////////////////////////////////////////////////////////////////////
+
+        void removeRunningTransaction (Transaction*,
+                                       bool) override final;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
 // -----------------------------------------------------------------------------
@@ -159,18 +192,12 @@ namespace triagens {
         void insertRunningTransaction (Transaction*);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief remove the transaction from the list of running transactions
-////////////////////////////////////////////////////////////////////////////////
-
-        void removeRunningTransaction (Transaction*);
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief kill long-running transactions if they are older than maxAge
 /// seconds. this only sets the transactions' kill bit, but does not physically
 /// remove them
 ////////////////////////////////////////////////////////////////////////////////
 
-        void killRunningTransactions (double);
+        bool killRunningTransactions (double);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief physically remove killed transactions
@@ -209,6 +236,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         std::unordered_set<TransactionId::IdType> _leasedTransactions;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief a cleanup thread for killing and deleting abandoned transactions
+////////////////////////////////////////////////////////////////////////////////
+
+        LocalTransactionManagerCleanupThread* _cleanupThread;
 
     };
 
