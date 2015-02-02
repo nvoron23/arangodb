@@ -115,8 +115,10 @@ namespace triagens {
                            // list of all items with the same key
         };
 
-        IndexType _nrAlloc;     // the size of the table
-        IndexType _nrUsed;      // the number of used entries
+        IndexType _nrAlloc;      // the size of the table
+        IndexType _nrUsed;       // the number of used entries
+        IndexType _nrCollisions; // the number of entries that have
+                                 // a key that was previously in the table
 
         Entry* _table;         // the table itself
 
@@ -155,6 +157,7 @@ namespace triagens {
                     IndexType initialSize = 64) 
           : _nrAlloc(initialSize),
             _nrUsed(0),
+            _nrCollisions(0),
             _table(nullptr),
 #ifdef TRI_INTERNAL_STATS
             _nrFinds(0), _nrAdds(0), _nrRems(0), _nrResizes(0),
@@ -260,6 +263,7 @@ namespace triagens {
             _table[i].next = INVALID_INDEX;
             _table[i].prev = INVALID_INDEX;
             _nrUsed++;
+            // no collision generated here!
 #ifdef TRI_CHECK_MULTI_POINTER_HASH
             check(true, true);
 #endif
@@ -285,6 +289,7 @@ namespace triagens {
             _table[i].next = INVALID_INDEX;
             _table[i].prev = INVALID_INDEX;
             _nrUsed++;
+            // no collision generated here either!
 #ifdef TRI_CHECK_MULTI_POINTER_HASH
             check(true, true);
 #endif
@@ -332,6 +337,7 @@ namespace triagens {
             _table[_table[j].next].prev = j;
           }
           _nrUsed++;
+          _nrCollisions++;
 
 #ifdef TRI_CHECK_MULTI_POINTER_HASH
           check(true, true);
@@ -432,6 +438,7 @@ namespace triagens {
               check(false, false);
 #endif
               healHole(i);
+              // this element did not create a collision
             }
             else {
               // There is at least one successor in position j.
@@ -441,6 +448,7 @@ namespace triagens {
               check(false, false);
 #endif
               healHole(j);
+              _nrCollisions--;   // one collision less
             }
           }
           else {
@@ -457,6 +465,7 @@ namespace triagens {
             check(false, false);
 #endif
             healHole(i);
+            _nrCollisions--;
           }
           _nrUsed--;
 #ifdef TRI_CHECK_MULTI_POINTER_HASH
@@ -482,6 +491,19 @@ namespace triagens {
             return TRI_ERROR_OUT_OF_MEMORY;
           }
           return TRI_ERROR_NO_ERROR;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return selectivity, this is a number s with 0.0 < s <= 1.0. If
+/// s == 1.0 this means that every document is identified uniquely by its
+/// key. It is computed as 
+///    (number of different keys/number of elements in table
+////////////////////////////////////////////////////////////////////////////////
+
+        double selectivity () {
+          return _nrUsed > 0 ?
+                 (_nrUsed - _nrCollisions) / _nrUsed :
+                 1.0;
         }
 
 // -----------------------------------------------------------------------------
