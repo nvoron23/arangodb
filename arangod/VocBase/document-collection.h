@@ -122,7 +122,9 @@ namespace triagens {
 struct TRI_doc_mptr_t {
     TRI_voc_rid_t          _rid;     // this is the revision identifier
     TRI_voc_fid_t          _fid;     // this is the datafile identifier
+  protected:
     uint64_t               _hash;    // the pre-calculated hash value of the key
+  public:
     TRI_doc_mptr_t*        _prev;    // previous master pointer
     TRI_doc_mptr_t*        _next;    // next master pointer
   protected:
@@ -143,6 +145,14 @@ struct TRI_doc_mptr_t {
     }
 
     virtual ~TRI_doc_mptr_t () {
+    }
+
+    uint64_t getHash () const {
+      return _hash;
+    }
+
+    void setHash (uint64_t hash) {
+      _hash = hash;
     }
 
     void clear () {

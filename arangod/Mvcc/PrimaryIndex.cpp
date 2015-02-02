@@ -57,9 +57,13 @@ static inline uint64_t hashKey (std::string const* key) {
 ////////////////////////////////////////////////////////////////////////////////
 
 static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
-  size_t len;
-  char const* keyString = TRI_EXTRACT_MARKER_KEY(elm, len);
-  uint64_t hash = PrimaryIndex::hashKeyString(keyString, len);
+  // We use the precomputed entry in the master pointer:
+  uint64_t hash = elm->getHash();
+  /* This would have amounted to:
+      size_t len;
+      char const* keyString = TRI_EXTRACT_MARKER_KEY(elm, len);
+      uint64_t hash = PrimaryIndex::hashKeyString(keyString, len);
+  */
   if (byKey) {
     return hash;
   }
@@ -72,6 +76,12 @@ static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
 
 static bool compareKeyElement(std::string const* key,
                               TRI_doc_mptr_t const* elm) {
+  // Maybe the hash alone can decide inequality:
+  uint64_t hash = PrimaryIndex::hashKeyString(key->c_str(), key->size());
+  if (hash != elm->getHash()) {
+    return false;
+  }
+  // No, so we have to compare and actually look at the _key:
   char const* elmKey = TRI_EXTRACT_MARKER_KEY(elm);
   return strcmp(key->c_str(), elmKey) == 0;
 }
@@ -83,6 +93,11 @@ static bool compareKeyElement(std::string const* key,
 static bool compareElementElement(TRI_doc_mptr_t const* left,
                                   TRI_doc_mptr_t const* right,
                                   bool byKey) {
+  // Does the hash tell us inequality?
+  if (left->getHash() != right->getHash()) {
+    return false;
+  }
+
   char const* leftKey = TRI_EXTRACT_MARKER_KEY(left);
   char const* rightKey = TRI_EXTRACT_MARKER_KEY(right);
   

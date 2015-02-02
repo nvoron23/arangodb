@@ -1132,7 +1132,7 @@ namespace triagens {
               if (*ptr) {
                 TRI_doc_mptr_t const* d = (TRI_doc_mptr_t const*) *ptr;
 
-                if (d->_hash % numberOfPartitions == partitionId) {
+                if (d->getHash() % numberOfPartitions == partitionId) {
                   // correct partition
                   docs.emplace_back(*d);
                 }

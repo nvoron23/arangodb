@@ -517,7 +517,7 @@ static int CreateHeader (TRI_document_collection_t* document,
   header->setDataPtr(marker);  // ONLY IN OPENITERATOR
   size_t len;
   char const* key = TRI_EXTRACT_MARKER_KEY(header, len);
-  header->_hash   = triagens::mvcc::PrimaryIndex::hashKeyString(key, len);
+  header->setHash(triagens::mvcc::PrimaryIndex::hashKeyString(key, len));
   *result = header;
 
   return TRI_ERROR_NO_ERROR;
@@ -5176,7 +5176,7 @@ int TRI_InsertShapedJsonDocumentCollection (TRI_transaction_collection_t* trxCol
     void* mem = operation.marker->mem();
     header->_rid  = rid;
     header->setDataPtr(mem);  // PROTECTED by trx in trxCollection
-    header->_hash = hash;
+    header->setHash(hash);
 
     // insert into indexes
     res = InsertDocument(trxCollection, header, operation, mptr, forceSync);

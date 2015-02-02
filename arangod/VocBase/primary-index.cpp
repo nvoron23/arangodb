@@ -81,7 +81,7 @@ static bool ResizePrimaryIndex (TRI_primary_index_t* idx,
       TRI_doc_mptr_t const* element = static_cast<TRI_doc_mptr_t const*>(oldTable[j]);
 
       if (element != nullptr) {
-        uint64_t const hash = element->_hash;
+        uint64_t const hash = element->getHash();
         uint64_t i, k;
 
         i = k = hash % targetSize;
@@ -113,7 +113,7 @@ static inline bool IsDifferentKeyElement (TRI_doc_mptr_t const* header,
   TRI_doc_mptr_t const* e = static_cast<TRI_doc_mptr_t const*>(element);
 
   // only after that compare actual keys
-  return (header->_hash != e->_hash || strcmp(TRI_EXTRACT_MARKER_KEY(header), TRI_EXTRACT_MARKER_KEY(e)) != 0);  // ONLY IN INDEX, PROTECTED by RUNTIME
+  return (header->getHash() != e->getHash() || strcmp(TRI_EXTRACT_MARKER_KEY(header), TRI_EXTRACT_MARKER_KEY(e)) != 0);  // ONLY IN INDEX, PROTECTED by RUNTIME
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +123,7 @@ static inline bool IsDifferentKeyElement (TRI_doc_mptr_t const* header,
 static inline bool IsDifferentHashElement (char const* key, uint64_t hash, void const* element) {
   TRI_doc_mptr_t const* e = static_cast<TRI_doc_mptr_t const*>(element);
 
-  return (hash != e->_hash || strcmp(key, TRI_EXTRACT_MARKER_KEY(e)) != 0);  // ONLY IN INDEX, PROTECTED by RUNTIME
+  return (hash != e->getHash() || strcmp(key, TRI_EXTRACT_MARKER_KEY(e)) != 0);  // ONLY IN INDEX, PROTECTED by RUNTIME
 }
 
 // -----------------------------------------------------------------------------
@@ -217,7 +217,7 @@ int TRI_InsertKeyPrimaryIndex (TRI_primary_index_t* idx,
 
   TRI_ASSERT_EXPENSIVE(n > 0);
 
-  i = k = header->_hash % n;
+  i = k = header->getHash() % n;
 
   for (; i < n && idx->_table[i] != nullptr && IsDifferentKeyElement(header, idx->_table[i]); ++i);
   if (i == n) {
@@ -276,7 +276,7 @@ void* TRI_RemoveKeyPrimaryIndex (TRI_primary_index_t* idx,
   k = TRI_IncModU64(i, n);
 
   while (idx->_table[k] != nullptr) {
-    uint64_t j = (static_cast<TRI_doc_mptr_t const*>(idx->_table[k])->_hash) % n;
+    uint64_t j = (static_cast<TRI_doc_mptr_t const*>(idx->_table[k])->getHash()) % n;
 
     if ((i < k && ! (i < j && j <= k)) || (k < i && ! (i < j || j <= k))) {
       idx->_table[i] = idx->_table[k];
