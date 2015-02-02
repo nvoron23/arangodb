@@ -39,7 +39,7 @@ using namespace triagens::mvcc;
 // --SECTION--                                            thread local variables
 // -----------------------------------------------------------------------------
 
-thread_local std::vector<Transaction*> TransactionStackAccessor::_threadTransactions;
+thread_local std::vector<Transaction*>* TransactionStackAccessor::_threadTransactions = nullptr;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -50,6 +50,10 @@ thread_local std::vector<Transaction*> TransactionStackAccessor::_threadTransact
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionStackAccessor::TransactionStackAccessor () {
+  // this is not prone to race conditions as this is a thread-local variable
+  if (_threadTransactions == nullptr) {
+    _threadTransactions = new std::vector<Transaction*>();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

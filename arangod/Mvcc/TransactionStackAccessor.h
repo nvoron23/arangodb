@@ -74,7 +74,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         inline bool isEmpty () const {
-          return _threadTransactions.empty();
+          return _threadTransactions->empty();
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ namespace triagens {
             return nullptr;
           }
 
-          return _threadTransactions.back();
+          return _threadTransactions->back();
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +94,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         void push (Transaction* transaction) {
-          _threadTransactions.push_back(transaction);
+          _threadTransactions->push_back(transaction);
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -106,8 +106,8 @@ namespace triagens {
             return nullptr;
           }
 
-          auto result = _threadTransactions.back();
-          _threadTransactions.pop_back();
+          auto result = _threadTransactions->back();
+          _threadTransactions->pop_back();
           return result;
         }
 
@@ -116,10 +116,10 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         bool isOnStack (TransactionId::IdType id) const {
-          size_t i = _threadTransactions.size();
+          size_t i = _threadTransactions->size();
           while (i > 0) {
             --i;
-            if (_threadTransactions[i]->id()() == id) {
+            if ((* _threadTransactions)[i]->id()() == id) {
               return true;
             }
           }
@@ -131,7 +131,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         static inline bool IsEmpty () {
-          return _threadTransactions.empty();
+          return _threadTransactions->empty();
         }
 
 // -----------------------------------------------------------------------------
@@ -144,7 +144,7 @@ namespace triagens {
 /// @brief thread-local vector of started top-level transactions
 ////////////////////////////////////////////////////////////////////////////////
     
-        static thread_local std::vector<Transaction*> _threadTransactions;
+        static thread_local std::vector<Transaction*>* _threadTransactions;
 
     };
   }
