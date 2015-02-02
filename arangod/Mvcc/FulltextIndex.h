@@ -73,6 +73,14 @@ namespace triagens {
 
         virtual void preCommit (class TransactionCollection*) override final;
 
+        bool hasSelectivity () const override final {
+          return false;
+        }
+
+        double getSelectivity () const override final {
+          return -1.0;
+        }
+
         void cleanup () override final;
         size_t memory () override final;
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;

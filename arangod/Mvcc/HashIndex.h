@@ -78,6 +78,14 @@ namespace triagens {
         // give index a hint about the expected size
         void sizeHint (size_t) override final;
   
+        bool hasSelectivity () const override final {
+          return true;
+        }
+
+        double getSelectivity () const override final {
+          return 1.0;  // TODO
+        }
+
         size_t memory () override final;
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
