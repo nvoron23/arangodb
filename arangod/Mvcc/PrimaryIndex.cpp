@@ -187,7 +187,7 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
 
 TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
                                       std::string const& key,
-                                      TransactionId::IdType& originalTransactionId) {
+                                      TransactionId& originalTransactionId) {
   Transaction::VisibilityType visibility;
   
   WRITE_LOCKER(_lock);
@@ -202,10 +202,10 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
   }
 
   // store original _to value so we can restore it later
-  originalTransactionId = previous->to()();
+  originalTransactionId = previous->to();
 
   // modify _to attribute so the revision becomes invisible
-  previous->setTo(transColl->getTransaction()->id()());
+  previous->setTo(transColl->getTransaction()->id());
   return previous;
 }        
 
@@ -311,7 +311,7 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
   for (auto p : *(revisions.get())) {
     if (trans->visibility(p->from()) == Transaction::VisibilityType::VISIBLE) {
       TransactionId to = p->to();
-      if (to() == 0) {
+      if (to == 0) {
         visibility = Transaction::VisibilityType::VISIBLE;
         return p;
       }

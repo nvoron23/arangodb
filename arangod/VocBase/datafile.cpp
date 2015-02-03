@@ -1149,6 +1149,12 @@ char const* TRI_NameMarkerDatafile (TRI_df_marker_t const* marker) {
       return "edge (wal)";
     case TRI_WAL_MARKER_REMOVE:
       return "deletion (wal)";
+    case TRI_WAL_MARKER_MVCC_DOCUMENT:
+      return "mvcc document (wal)";
+    case TRI_WAL_MARKER_MVCC_EDGE:
+      return "mvcc edge (wal)";
+    case TRI_WAL_MARKER_MVCC_REMOVE:
+      return "mvcc deletion (wal)";
     case TRI_WAL_MARKER_BEGIN_TRANSACTION:
       return "begin transaction (wal)";
     case TRI_WAL_MARKER_COMMIT_TRANSACTION:
@@ -1161,6 +1167,12 @@ char const* TRI_NameMarkerDatafile (TRI_df_marker_t const* marker) {
       return "commit remote transaction (wal)";
     case TRI_WAL_MARKER_ABORT_REMOTE_TRANSACTION:
       return "abort remote transaction (wal)";
+    case TRI_WAL_MARKER_MVCC_BEGIN_TRANSACTION:
+      return "begin mvcc transaction (wal)";
+    case TRI_WAL_MARKER_MVCC_COMMIT_TRANSACTION:
+      return "commit mvcc transaction (wal)";
+    case TRI_WAL_MARKER_MVCC_ABORT_TRANSACTION:
+      return "abort mvcc transaction (wal)";
     case TRI_WAL_MARKER_CREATE_COLLECTION:
       return "create collection (wal)";
     case TRI_WAL_MARKER_DROP_COLLECTION:

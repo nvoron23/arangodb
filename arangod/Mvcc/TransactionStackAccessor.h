@@ -115,11 +115,11 @@ namespace triagens {
 /// @brief check if a transaction is present on the stack
 ////////////////////////////////////////////////////////////////////////////////
 
-        bool isOnStack (TransactionId::IdType id) const {
+        bool isOnStack (TransactionId::InternalType id) const {
           size_t i = _threadTransactions->size();
           while (i > 0) {
             --i;
-            if ((* _threadTransactions)[i]->id()() == id) {
+            if ((* _threadTransactions)[i]->id().ownTransaction() == id) {
               return true;
             }
           }

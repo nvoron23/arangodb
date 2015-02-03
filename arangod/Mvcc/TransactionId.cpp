@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC transaction class
+/// @brief MVCC transaction id struct
 ///
 /// @file
 ///
@@ -39,24 +39,48 @@ using namespace triagens::mvcc;
 // --SECTION--                                          non-class friend methods
 // -----------------------------------------------------------------------------
 
+namespace triagens {
+  namespace mvcc {
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief compare two transaction ids
+////////////////////////////////////////////////////////////////////////////////
+
+    bool operator== (TransactionId const& lhs,
+                     TransactionId const& rhs) {
+      return lhs.ownTransactionId == rhs.ownTransactionId;
+    }
+    
+    bool operator== (TransactionId const& lhs,
+                     TransactionId::InternalType rhs) {
+      return lhs.ownTransactionId == rhs;
+    }
+
+    bool operator!= (TransactionId const& lhs,
+                     TransactionId const& rhs) {
+      return lhs.ownTransactionId != rhs.ownTransactionId;
+    }
+
+    bool operator< (TransactionId const& lhs,
+                    TransactionId const& rhs) {
+      return lhs.ownTransactionId < rhs.ownTransactionId;
+    }
+  
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief append the transaction id to an output stream
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace triagens {
-  namespace mvcc {
-
-     std::ostream& operator<< (std::ostream& stream,
-                               TransactionId const* id) {
-       stream << (*id)();
-       return stream;
-     }
+    std::ostream& operator<< (std::ostream& stream,
+                              TransactionId const* id) {
+      stream << id->toString();
+      return stream;
+    }
      
-     std::ostream& operator<< (std::ostream& stream,
-                               TransactionId const& id) {
-       stream << id();
-       return stream;
-     }
+    std::ostream& operator<< (std::ostream& stream,
+                              TransactionId const& id) {
+      stream << id.toString();
+      return stream;
+    }
 
   }
 }

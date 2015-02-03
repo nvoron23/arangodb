@@ -128,10 +128,9 @@ struct TRI_doc_mptr_t {
     TRI_doc_mptr_t*        _prev;    // previous master pointer
     TRI_doc_mptr_t*        _next;    // next master pointer
   protected:
-    std::atomic<void const*> _dataptr; 
-                   // this is the pointer to the beginning of the raw marker
-    triagens::mvcc::TransactionId::IdType              _from;
-    std::atomic<triagens::mvcc::TransactionId::IdType> _to;
+    std::atomic<void const*> _dataptr; // pointer to the beginning of the raw marker
+    triagens::mvcc::TransactionId  _from;
+    triagens::mvcc::TransactionId  _to;
 
   public:
     TRI_doc_mptr_t () : _rid(0), 
@@ -140,8 +139,8 @@ struct TRI_doc_mptr_t {
                         _prev(nullptr),
                         _next(nullptr),
                         _dataptr(nullptr),
-                        _from(0),
-                        _to(0) {
+                        _from(),
+                        _to() {
     }
 
     virtual ~TRI_doc_mptr_t () {
@@ -156,14 +155,14 @@ struct TRI_doc_mptr_t {
     }
 
     void clear () {
-      _rid = 0;
-      _fid = 0;
-      setDataPtr(nullptr);
+      _rid  = 0;
+      _fid  = 0;
       _hash = 0;
       _prev = nullptr;
       _next = nullptr;
-      _from = 0;
-      _to = 0;
+      _from = triagens::mvcc::TransactionId(); 
+      _to   = triagens::mvcc::TransactionId();
+      setDataPtr(nullptr);
     }
 
     void copy (TRI_doc_mptr_t const& that) {
@@ -174,8 +173,8 @@ struct TRI_doc_mptr_t {
       _hash = that._hash;
       _prev = that._prev;
       _next = that._next;
-      _from = that._from;
-      _to.store(that._to.load());
+      _from = that._from; // TODO: make atomic
+      _to   = that._to;   // TODO: make atomic
     }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -234,25 +233,32 @@ struct TRI_doc_mptr_t {
     TRI_doc_mptr_t(TRI_doc_mptr_t const&) = delete;
 
     inline triagens::mvcc::TransactionId from () const {
-      return triagens::mvcc::TransactionId(_from);
+      // TODO: make atomic
+      return _from;
     }
 
-    inline void setFrom (triagens::mvcc::TransactionId::IdType from) {
-      _from = from;
+    inline void setFrom (triagens::mvcc::TransactionId const& value) {
+      // TODO: make atomic
+      _from = value;
     }
 
     inline triagens::mvcc::TransactionId to () const {
-      return triagens::mvcc::TransactionId(_to.load());
+      // TODO: make atomic
+      return _to; 
     }
 
-    inline void setTo (triagens::mvcc::TransactionId::IdType to) {
-      _to.store(to);
+    inline void setTo (triagens::mvcc::TransactionId const& value) {
+      // TODO: make atomic
+      _to = value;
     }
 
-    inline void changeTo (triagens::mvcc::TransactionId::IdType original,
-                          triagens::mvcc::TransactionId::IdType to) {
-      _to.compare_exchange_strong(original, to,
-          std::memory_order_release, std::memory_order_relaxed);
+    inline void changeTo (triagens::mvcc::TransactionId const& original,
+                          triagens::mvcc::TransactionId const& to) {
+
+      // TODO: fix and make atomic
+      if (_to == original) {
+        _to = to;
+      }
     }
 
 };

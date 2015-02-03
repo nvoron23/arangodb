@@ -34,6 +34,7 @@
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
+#include "VocBase/server.h"
 
 using namespace triagens::mvcc;
 
@@ -50,7 +51,7 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 SubTransaction::SubTransaction (Transaction* parent)
-  : Transaction(parent->transactionManager(), parent->topLevelTransaction()->nextSubId(), parent->vocbase()),
+  : Transaction(parent->transactionManager(), TransactionId(TRI_NewTickServer(), parent->id().ownTransaction()), parent->vocbase()),
     _topLevelTransaction(parent->topLevelTransaction()),
     _parentTransaction(parent) {
  
@@ -162,9 +163,7 @@ TransactionCollection* SubTransaction::collection (TRI_voc_cid_t cid) {
 
 std::string SubTransaction::toString () const {
   std::string result("SubTransaction ");
-  result += std::to_string(_id());
-  result += ", parent: ";
-  result += _topLevelTransaction->toString();
+  result += _id.toString();
 
   return result;
 }

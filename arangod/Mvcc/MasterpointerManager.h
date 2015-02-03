@@ -119,7 +119,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         MasterpointerContainer create (void const*,
-                                       triagens::mvcc::TransactionId::IdType);
+                                       triagens::mvcc::TransactionId const&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief link the master pointer
@@ -234,7 +234,7 @@ namespace triagens {
         TRI_ASSERT(limit > 0);
 
         while (current != nullptr && limit > 0 && batchSize > 0) {
-          bool isVisible = transaction->isVisibleForRead(current->from()(), current->to()());
+          bool isVisible = transaction->isVisibleForRead(current->from(), current->to());
 
           if (isVisible) {
             if (skip > 0) {

@@ -87,7 +87,7 @@ namespace triagens {
 /// @brief lease a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* leaseTransaction (TransactionId::IdType) override final;
+        Transaction* leaseTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief unlease a transaction
@@ -99,19 +99,19 @@ namespace triagens {
 /// @brief commit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void commitTransaction (TransactionId::IdType) override final;
+        void commitTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief roll back a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void rollbackTransaction (TransactionId::IdType) override final;
+        void rollbackTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief kill a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void killTransaction (TransactionId::IdType) override final;
+        void killTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief get a list of all running transactions
@@ -129,7 +129,7 @@ namespace triagens {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction::StatusType statusTransaction (TransactionId::IdType) override final;
+        Transaction::StatusType statusTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove the transaction from the list of running transactions

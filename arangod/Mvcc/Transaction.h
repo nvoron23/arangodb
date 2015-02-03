@@ -50,14 +50,25 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     struct TransactionInfo {
-      TransactionInfo (TransactionId::IdType id,
+      TransactionInfo (TransactionId const& id,
                        double startTime) 
         : id(id),
           startTime(startTime) {
       }
+      
+      TransactionInfo (TransactionInfo const& other) 
+        : id(other.id),
+          startTime(other.startTime) {
+      }
+      
+      TransactionInfo& operator= (TransactionInfo const& other) {
+        id = other.id;
+        startTime = other.startTime;
+        return *this;
+      }
 
-      TransactionId::IdType  id;
-      double                 startTime;
+      TransactionId id;
+      double        startTime;
     };
 
 // -----------------------------------------------------------------------------
@@ -340,21 +351,17 @@ namespace triagens {
 /// "visibility(other) < VISIBLE" legally.
 ////////////////////////////////////////////////////////////////////////////////
     
-         inline VisibilityType visibility (TransactionId::IdType other) {
-           return visibility(TransactionId(other));
-         }
-
          VisibilityType visibility (TransactionId const& other);
 
-         bool isVisibleForRead (TransactionId::IdType from, 
-                                TransactionId::IdType to);
+         bool isVisibleForRead (TransactionId const& from,
+                                TransactionId const& to);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief wasOngoingAtStart, check whether or not another transaction was
 /// ongoing when this one started
 ////////////////////////////////////////////////////////////////////////////////
 
-         bool wasOngoingAtStart (TransactionId other);
+         bool wasOngoingAtStart (TransactionId const& other);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief isNotAborted, this is a pure optimisation method. It checks
@@ -368,7 +375,7 @@ namespace triagens {
 /// filter.
 ////////////////////////////////////////////////////////////////////////////////
 
-         bool isNotAborted(TransactionId other) {
+         bool isNotAborted(TransactionId const& other) {
            return false;  // Optimise later
          }
 
@@ -454,7 +461,7 @@ namespace triagens {
 /// @brief list of all sub-transactions with their statuses
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::vector<std::pair<TransactionId::IdType, StatusType>> _subTransactions; 
+        std::vector<std::pair<TransactionId::InternalType, StatusType>> _subTransactions; 
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief whether or not the transaction was killed by another thread

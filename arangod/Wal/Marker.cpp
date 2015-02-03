@@ -755,6 +755,168 @@ void DropIndexMarker::dump () const {
 #endif
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                        MvccBeginTransactionMarker
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      constructors and destructors
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccBeginTransactionMarker::MvccBeginTransactionMarker (TRI_voc_tick_t databaseId,
+                                                        triagens::mvcc::TransactionId const& transactionId)
+  : Marker(TRI_WAL_MARKER_MVCC_BEGIN_TRANSACTION, sizeof(transaction_mvcc_begin_marker_t)) {
+
+  auto* m = reinterpret_cast<transaction_mvcc_begin_marker_t*>(begin());
+
+  m->_databaseId    = databaseId;
+  m->_transactionIdOwn = transactionId.ownTransaction();
+  m->_transactionIdParent = transactionId.parentTransaction();
+
+#ifdef DEBUG_WAL
+  dump();
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccBeginTransactionMarker::~MvccBeginTransactionMarker () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dump marker
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_WAL
+void MvccBeginTransactionMarker::dump () const {
+  auto* m = reinterpret_cast<transaction_mvcc_begin_marker_t*>(begin());
+
+  std::cout << "WAL MVCC TRANSACTION BEGIN MARKER FOR DB " << m->_databaseId
+            << ", TRANSACTION OWN: " << m->_transactionIdOwn
+            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", SIZE: " << size()
+            << "\n";
+
+#ifdef DEBUG_WAL_DETAIL
+  dumpBinary();
+#endif
+}
+#endif
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                       MvccCommitTransactionMarker
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      constructors and destructors
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccCommitTransactionMarker::MvccCommitTransactionMarker (TRI_voc_tick_t databaseId,
+                                                          triagens::mvcc::TransactionId const& transactionId)
+  : Marker(TRI_WAL_MARKER_MVCC_COMMIT_TRANSACTION, sizeof(transaction_mvcc_commit_marker_t)) {
+
+  auto* m = reinterpret_cast<transaction_mvcc_commit_marker_t*>(begin());
+
+  m->_databaseId    = databaseId;
+  m->_transactionIdOwn = transactionId.ownTransaction();
+  m->_transactionIdParent = transactionId.parentTransaction();
+
+#ifdef DEBUG_WAL
+  dump();
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccCommitTransactionMarker::~MvccCommitTransactionMarker () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dump marker
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_WAL
+void MvccCommitTransactionMarker::dump () const {
+  auto* m = reinterpret_cast<transaction_mvcc_commit_marker_t*>(begin());
+
+  std::cout << "WAL MVCC TRANSACTION COMMIT MARKER FOR DB " << m->_databaseId
+            << ", TRANSACTION OWN: " << m->_transactionIdOwn
+            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", SIZE: " << size()
+            << "\n";
+
+#ifdef DEBUG_WAL_DETAIL
+  dumpBinary();
+#endif
+}
+#endif
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        MvccAbortTransactionMarker
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      constructors and destructors
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccAbortTransactionMarker::MvccAbortTransactionMarker (TRI_voc_tick_t databaseId,
+                                                        triagens::mvcc::TransactionId const& transactionId)
+  : Marker(TRI_WAL_MARKER_MVCC_ABORT_TRANSACTION, sizeof(transaction_mvcc_abort_marker_t)) {
+
+  auto* m = reinterpret_cast<transaction_mvcc_abort_marker_t*>(begin());
+
+  m->_databaseId    = databaseId;
+  m->_transactionIdOwn = transactionId.ownTransaction();
+  m->_transactionIdParent = transactionId.parentTransaction();
+
+#ifdef DEBUG_WAL
+  dump();
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccAbortTransactionMarker::~MvccAbortTransactionMarker () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dump marker
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_WAL
+void MvccAbortTransactionMarker::dump () const {
+  auto* m = reinterpret_cast<transaction_mvcc_abort_marker_t*>(begin());
+
+  std::cout << "WAL MVCC TRANSACTION ABORT MARKER FOR DB " << m->_databaseId
+            << ", TRANSACTION OWN: " << m->_transactionIdOwn
+            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", SIZE: " << size()
+            << "\n";
+
+#ifdef DEBUG_WAL_DETAIL
+  dumpBinary();
+#endif
+}
+#endif
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                            BeginTransactionMarker
 // -----------------------------------------------------------------------------
 
@@ -1067,6 +1229,277 @@ void AbortRemoteTransactionMarker::dump () const {
             << ", TRANSACTION " << m->_transactionId
             << ", EXTERNAL ID " << m->_externalId
             << ", SIZE: " << size()
+            << "\n";
+
+#ifdef DEBUG_WAL_DETAIL
+  dumpBinary();
+#endif
+}
+#endif
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                MvccDocumentMarker
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      constructors and destructors
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccDocumentMarker::MvccDocumentMarker (TRI_voc_tick_t databaseId,
+                                        TRI_voc_cid_t collectionId,
+                                        TRI_voc_rid_t revisionId,
+                                        triagens::mvcc::TransactionId const& transactionId,
+                                        std::string const& key,
+                                        size_t legendSize,
+                                        TRI_shaped_json_t const* shapedJson)
+  : Marker(TRI_WAL_MARKER_MVCC_DOCUMENT,
+    sizeof(mvcc_document_marker_t) + alignedSize(key.size() + 1) + legendSize + shapedJson->_data.length) {
+  auto* m = reinterpret_cast<mvcc_document_marker_t*>(begin());
+  m->_databaseId          = databaseId;
+  m->_collectionId        = collectionId;
+  m->_revisionId          = revisionId;
+  m->_transactionIdOwn    = transactionId.ownTransaction();
+  m->_transactionIdParent = transactionId.parentTransaction();
+  m->_shape               = shapedJson->_sid;
+
+  m->_offsetKey     = sizeof(mvcc_document_marker_t); // start position of key
+  m->_offsetLegend  = static_cast<uint16_t>(m->_offsetKey + alignedSize(key.size() + 1));
+  m->_offsetJson    = static_cast<uint32_t>(m->_offsetLegend + alignedSize(legendSize));
+
+  storeSizedString(m->_offsetKey, key);
+
+  // store legend
+  {
+    TRI_ASSERT(legendSize >= 8);
+
+    char* p = static_cast<char*>(begin()) + m->_offsetLegend;
+    memset(p, 0, 8); // initialise initial bytes of legend with 0s
+  }
+
+  // store shapedJson
+  {
+    char* p = static_cast<char*>(begin()) + m->_offsetJson;
+    memcpy(p, shapedJson->_data.data, static_cast<size_t>(shapedJson->_data.length));
+  }
+
+#ifdef DEBUG_WAL
+  dump();
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccDocumentMarker::~MvccDocumentMarker () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief store legend in marker
+////////////////////////////////////////////////////////////////////////////////
+
+void MvccDocumentMarker::storeLegend (triagens::basics::JsonLegend& legend) {
+  legend.dump((void*) this->legend());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dump marker
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_WAL
+void MvccDocumentMarker::dump () const {
+  auto* m = reinterpret_cast<mvcc_document_marker_t*>(begin());
+
+  std::cout << "WAL MVCC DOCUMENT MARKER FOR DB " << m->_databaseId
+            << ", COLLECTION " << m->_collectionId
+            << ", REV: " << m->_revisionId
+            << ", TRANSACTION OWN: " << m->_transactionIdOwn
+            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", KEY: " << key()
+            << ", OFFSETKEY: " << m->_offsetKey
+            << ", OFFSETLEGEND: " << m->_offsetLegend
+            << ", OFFSETJSON: " << m->_offsetJson
+            << ", SIZE: " << size()
+            << "\n";
+
+#ifdef DEBUG_WAL_DETAIL
+  std::cout << "JSON:       '" << stringifyPart(json(), jsonLength()) << "'\n";
+  std::cout << "JSON HEX:   '" << hexifyPart(json(), jsonLength()) << "'\n";
+
+  dumpBinary();
+#endif
+}
+#endif
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    MvccEdgeMarker
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      constructors and destructors
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccEdgeMarker::MvccEdgeMarker (TRI_voc_tick_t databaseId,
+                                TRI_voc_cid_t collectionId,
+                                TRI_voc_rid_t revisionId,
+                                triagens::mvcc::TransactionId const& transactionId,
+                                std::string const& key,
+                                TRI_document_edge_t const* edge,
+                                size_t legendSize,
+                                TRI_shaped_json_t const* shapedJson)
+  : Marker(TRI_WAL_MARKER_MVCC_EDGE,
+    sizeof(mvcc_edge_marker_t) + alignedSize(key.size() + 1) + alignedSize(strlen(edge->_fromKey) + 1) + alignedSize(strlen(edge->_toKey) + 1) + legendSize + shapedJson->_data.length) {
+
+  auto* m = reinterpret_cast<mvcc_edge_marker_t*>(begin());
+
+  m->_databaseId          = databaseId;
+  m->_collectionId        = collectionId;
+  m->_revisionId          = revisionId;
+  m->_transactionIdOwn    = transactionId.ownTransaction();
+  m->_transactionIdParent = transactionId.parentTransaction();
+  m->_shape               = shapedJson->_sid;
+  m->_offsetKey           = sizeof(mvcc_edge_marker_t); // start position of key
+  m->_toCid               = edge->_toCid;
+  m->_fromCid             = edge->_fromCid;
+  m->_offsetToKey         = static_cast<uint16_t>(m->_offsetKey + alignedSize(key.size() + 1));
+  m->_offsetFromKey       = static_cast<uint16_t>(m->_offsetToKey + alignedSize(strlen(edge->_toKey) + 1));
+  m->_offsetLegend        = static_cast<uint16_t>(m->_offsetFromKey + alignedSize(strlen(edge->_fromKey) + 1));
+  m->_offsetJson          = static_cast<uint32_t>(m->_offsetLegend + alignedSize(legendSize));
+
+  // store keys
+  storeSizedString(m->_offsetKey, key.c_str());
+  storeSizedString(m->_offsetFromKey, edge->_fromKey, strlen(edge->_fromKey));
+  storeSizedString(m->_offsetToKey, edge->_toKey, strlen(edge->_toKey));
+
+  // store legend
+  {
+    TRI_ASSERT(legendSize >= 8);
+    char* p = static_cast<char*>(begin()) + m->_offsetLegend;
+    memset(p, 0, 8); // initialise initial bytes of legend with 0s
+  }
+
+  // store shapedJson
+  {
+    char* p = static_cast<char*>(begin()) + m->_offsetJson;
+    memcpy(p, shapedJson->_data.data, static_cast<size_t>(shapedJson->_data.length));
+  }
+
+#ifdef DEBUG_WAL
+  dump();
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccEdgeMarker::~MvccEdgeMarker () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief store legend in marker
+////////////////////////////////////////////////////////////////////////////////
+
+void MvccEdgeMarker::storeLegend (triagens::basics::JsonLegend& legend) {
+  legend.dump((void*) this->legend());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dump marker
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_WAL
+void MvccEdgeMarker::dump () const {
+  auto* m = reinterpret_cast<mvcc_edge_marker_t*>(begin());
+
+  std::cout << "WAL EDGE MARKER FOR DB " << m->_databaseId
+            << ", COLLECTION " << m->_collectionId
+            << ", REV: " << m->_revisionId
+            << ", TRANSACTION OWN: " << m->_transactionIdOwn
+            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", KEY: " << key()
+            << ", FROMCID " << m->_fromCid
+            << ", TOCID " << m->_toCid
+            << ", FROMKEY: " << fromKey()
+            << ", TOKEY: " << toKey()
+            << ", OFFSETKEY: " << m->_offsetKey
+            << ", OFFSETFROM: " << m->_offsetFromKey
+            << ", OFFSETTO: " << m->_offsetToKey
+            << ", OFFSETLEGEND: " << m->_offsetLegend
+            << ", OFFSETJSON: " << m->_offsetJson
+            << ", SIZE: " << size()
+            << "\n";
+
+#ifdef DEBUG_WAL_DETAIL
+  std::cout << "JSON:       '" << stringifyPart(json(), jsonLength()) << "'\n";
+  std::cout << "JSON HEX:   '" << hexifyPart(json(), jsonLength()) << "'\n";
+
+  dumpBinary();
+#endif
+}
+#endif
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                  MvccRemoveMarker
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      constructors and destructors
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccRemoveMarker::MvccRemoveMarker (TRI_voc_tick_t databaseId,
+                                    TRI_voc_cid_t collectionId,
+                                    TRI_voc_rid_t revisionId,
+                                    triagens::mvcc::TransactionId const& transactionId,
+                                    std::string const& key)
+  : Marker(TRI_WAL_MARKER_MVCC_REMOVE, sizeof(mvcc_remove_marker_t) + alignedSize(key.size() + 1)) {
+  auto* m = reinterpret_cast<mvcc_remove_marker_t*>(begin());
+  m->_databaseId          = databaseId;
+  m->_collectionId        = collectionId;
+  m->_revisionId          = revisionId;
+  m->_transactionIdOwn    = transactionId.ownTransaction();
+  m->_transactionIdParent = transactionId.parentTransaction();
+
+  storeSizedString(sizeof(mvcc_remove_marker_t), key);
+
+#ifdef DEBUG_WAL
+  dump();
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy marker
+////////////////////////////////////////////////////////////////////////////////
+
+MvccRemoveMarker::~MvccRemoveMarker () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dump marker
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef DEBUG_WAL
+void MvccRemoveMarker::dump () const {
+  auto* m = reinterpret_cast<mvcc_remove_marker_t*>(begin());
+
+  std::cout << "WAL MVCC REMOVE MARKER FOR DB " << m->_databaseId
+            << ", COLLECTION " << m->_collectionId
+            << ", REV: " << m->_revisionId
+            << ", TRANSACTION OWN: " << m->_transactionIdOwn
+            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", KEY: " << key()
             << "\n";
 
 #ifdef DEBUG_WAL_DETAIL

@@ -32,90 +32,108 @@
 
 #include "Basics/Common.h"
 #include "Utils/Exception.h"
+#include "VocBase/voc-types.h"
 
 namespace triagens {
   namespace mvcc {
 
-// -----------------------------------------------------------------------------
-// --SECTION--                                                      public types
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief transaction id
-/// a transaction id is a 64 bit unsigned integer that is internally split into
-/// two components: 
-/// - the upper 56 bits contain the top-level transaction id
-/// - the lower 8 bits contain the sub-transaction id within the top-level
-///   transaction
-/// the 56 bits should be enough to run approx. 114M transactions per second 
-/// about 20 years: (1 << (64 - 8)) / (20 * 365 * 24 * 60 * 60)
-////////////////////////////////////////////////////////////////////////////////
-
     struct TransactionId {
-      typedef uint64_t IdType;
+
+      typedef TRI_voc_tid_t InternalType;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create a transaction id from an existing integer value
+/// @brief create a transaction id from two integer components
 ////////////////////////////////////////////////////////////////////////////////
-
-      explicit TransactionId (IdType id)
-        : _id(id) {
+      
+      TransactionId () 
+        : ownTransactionId(0),
+          parentTransactionId(0) {
       }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a transaction id from two integer components
-/// this will throw if the sub-transaction value is too high
 ////////////////////////////////////////////////////////////////////////////////
       
-      TransactionId (IdType mainPart,
-                     IdType sequencePart)
-        : TransactionId(MainPart(mainPart) | SequencePart(sequencePart)) {
-        // check if the sub-transaction part got too high
-        if (sequencePart > SequenceMask) {
-          THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_ID_OVERFLOW);
-        }
+      TransactionId (InternalType ownTransactionId,
+                     InternalType parentTransactionId)
+        : ownTransactionId(ownTransactionId),
+          parentTransactionId(parentTransactionId) {
       }
 
-      IdType operator () () const {
-        return _id;
-      }
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a transaction id from another
+////////////////////////////////////////////////////////////////////////////////
       
-      inline IdType mainPart () const {
-        return MainPart(_id);
-      }
-      
-      inline IdType sequencePart () const {
-        return SequencePart(_id);
-      }
-      
-      inline bool isSameTransaction (IdType other) const {
-        return isSameTransaction(_id, other);
-      }
-      
-      inline bool isSameTransaction (TransactionId const& other) const {
-        return isSameTransaction(_id, other._id);
+      TransactionId (TransactionId const& other) 
+        : ownTransactionId(other.ownTransactionId),
+          parentTransactionId(other.parentTransactionId) {
       }
 
-      static inline IdType MainPart (IdType id) {
-        return (id & MainMask);
-      }
-
-      static inline IdType SequencePart (IdType id) {
-        return (id & SequenceMask);
-      }
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a transaction id from another
+////////////////////////////////////////////////////////////////////////////////
       
-      static inline bool isSameTransaction (IdType lhs, IdType rhs) {
-        return (MainPart(lhs) == MainPart(rhs));
+      TransactionId& operator= (TransactionId const& other) {
+        ownTransactionId = other.ownTransactionId;
+        parentTransactionId = other.parentTransactionId;
+        return *this;
       }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the own transaction id
+////////////////////////////////////////////////////////////////////////////////
+
+      inline InternalType ownTransaction () const {
+        return ownTransactionId;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the parent transaction id
+////////////////////////////////////////////////////////////////////////////////
+      
+      inline InternalType parentTransaction () const {
+        return parentTransactionId;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief reset the ids
+////////////////////////////////////////////////////////////////////////////////
+
+      inline void reset () {
+        ownTransactionId = 0;
+        parentTransactionId = 0;
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief get a string representation of the id
+////////////////////////////////////////////////////////////////////////////////
+
+      std::string toString () const {
+        return std::to_string(ownTransactionId) + " (" + std::to_string(parentTransactionId) + ")";
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief compare two transaction ids
+////////////////////////////////////////////////////////////////////////////////
+
+      friend bool operator== (TransactionId const&,
+                              TransactionId const&);
+
+      friend bool operator== (TransactionId const&,
+                              InternalType);
+
+      friend bool operator!= (TransactionId const&,
+                              TransactionId const&);
+
+      friend bool operator< (TransactionId const&,
+                             TransactionId const&);
+  
       friend std::ostream& operator<< (std::ostream&, TransactionId const*);
     
       friend std::ostream& operator<< (std::ostream&, TransactionId const&);
 
-      IdType const _id;
-
-      static IdType const MainMask      = 0xffffffffffffff00ULL;
-      static IdType const SequenceMask  = 0x00000000000000ffULL;
+      InternalType mutable ownTransactionId;
+      InternalType mutable parentTransactionId;
     };
 
   }
@@ -127,15 +145,15 @@ namespace triagens {
 
 namespace std {
   template<> struct hash<triagens::mvcc::TransactionId> {
-    size_t operator () (triagens::mvcc::TransactionId const& value) const {
-      return std::hash<triagens::mvcc::TransactionId::IdType>()(value._id);
+    size_t operator () (triagens::mvcc::TransactionId const& id) const {
+      return std::hash<TRI_voc_tid_t>()(id.ownTransactionId);
     }
   };
 
   template<> struct equal_to<triagens::mvcc::TransactionId> {
     bool operator () (triagens::mvcc::TransactionId const& lhs,
                       triagens::mvcc::TransactionId const& rhs) const {
-      return lhs._id == rhs._id;
+      return (lhs.ownTransactionId == rhs.ownTransactionId);
     }
   };
 

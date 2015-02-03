@@ -129,7 +129,7 @@ MasterpointerManager::~MasterpointerManager () {
 ////////////////////////////////////////////////////////////////////////////////
 
 MasterpointerContainer MasterpointerManager::create (void const* data,
-                                                     triagens::mvcc::TransactionId::IdType transactionId) {
+                                                     triagens::mvcc::TransactionId const& transactionId) {
   TRI_doc_mptr_t* mptr = nullptr;
 
   {
@@ -179,8 +179,9 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
   char const* key = TRI_EXTRACT_MARKER_KEY(static_cast<TRI_df_marker_t const*>(data), keyLength);
   mptr->setHash(triagens::mvcc::PrimaryIndex::hashKeyString(key, keyLength));
 
-  // mptr->_from = transactionId;
-  // mptr->_to   = 0;
+  mptr->setFrom(transactionId);
+  mptr->setTo(triagens::mvcc::TransactionId());
+
   mptr->_prev = nullptr;
   mptr->_next = nullptr;
   
@@ -216,8 +217,7 @@ void MasterpointerManager::link (TRI_doc_mptr_t* mptr) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void MasterpointerManager::recycle (TRI_doc_mptr_t* mptr) {
-  mptr->setFrom(0);
-  mptr->setTo(0);
+  mptr->clear();
 
   MUTEX_LOCKER(_lock);
   TRI_ASSERT_EXPENSIVE(_head != mptr);

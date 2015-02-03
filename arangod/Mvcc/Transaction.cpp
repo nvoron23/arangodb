@@ -166,10 +166,10 @@ void Transaction::initializeState () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void Transaction::updateSubTransaction (Transaction* transaction) {
-  auto const id = transaction->id()();
+  auto const id = transaction->id();
   auto const status = transaction->status();
 
-  _subTransactions.emplace_back(std::make_pair(id, status));
+  _subTransactions.emplace_back(std::make_pair(id.ownTransaction(), status));
 
   if (status == StatusType::COMMITTED) { 
     // sub-transaction has committed, now copy their stats into our stats
@@ -199,6 +199,9 @@ void Transaction::updateSubTransaction (Transaction* transaction) {
 ////////////////////////////////////////////////////////////////////////////////
     
 Transaction::VisibilityType Transaction::visibility (TransactionId const& other) {
+  // TODO: needs full rewrite 
+  return VisibilityType::INVISIBLE; 
+  /*
   if (_id.isSameTransaction(other)) {   // same top level transaction?
     if (other.sequencePart() > _id.sequencePart()) {
       return VisibilityType::INVISIBLE;
@@ -234,10 +237,11 @@ Transaction::VisibilityType Transaction::visibility (TransactionId const& other)
          ? VisibilityType::VISIBLE
          : VisibilityType::INVISIBLE;
   }
+  */
 }
          
-bool Transaction::isVisibleForRead (TransactionId::IdType from, 
-                                    TransactionId::IdType to) {
+bool Transaction::isVisibleForRead (TransactionId const& from, 
+                                    TransactionId const& to) {
   if (visibility(from) == Transaction::VisibilityType::VISIBLE) {
     if (to == 0 || visibility(to) != Transaction::VisibilityType::VISIBLE) {
       return true;
@@ -251,7 +255,7 @@ bool Transaction::isVisibleForRead (TransactionId::IdType from,
 /// ongoing when this one started
 ////////////////////////////////////////////////////////////////////////////////
 
-bool Transaction::wasOngoingAtStart (TransactionId other) {
+bool Transaction::wasOngoingAtStart (TransactionId const& other) {
   return false;   // FIXME: do something sensible
 }
 

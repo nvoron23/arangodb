@@ -172,16 +172,16 @@ Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocba
 /// @brief lease a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* LocalTransactionManager::leaseTransaction (TransactionId::IdType id) {
+Transaction* LocalTransactionManager::leaseTransaction (TransactionId const& id) {
   WRITE_LOCKER(_lock);
 
-  auto it = _runningTransactions.find(id);
+  auto it = _runningTransactions.find(id.ownTransaction());
 
   if (it == _runningTransactions.end()) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
   }
 
-  auto found = _leasedTransactions.insert(id);
+  auto found = _leasedTransactions.insert(id.ownTransaction());
 
   if (! found.second) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "trying to lease an already leased transaction");
@@ -195,23 +195,23 @@ Transaction* LocalTransactionManager::leaseTransaction (TransactionId::IdType id
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::unleaseTransaction (Transaction* transaction) {
-  auto id = transaction->id()();
+  auto id = transaction->id();
 
   WRITE_LOCKER(_lock);
-  _leasedTransactions.erase(id);
+  _leasedTransactions.erase(id.ownTransaction());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief commit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::commitTransaction (TransactionId::IdType id) {
+void LocalTransactionManager::commitTransaction (TransactionId const& id) {
   Transaction* transaction = nullptr;
     
   {
     WRITE_LOCKER(_lock);
 
-    auto it = _runningTransactions.find(id);
+    auto it = _runningTransactions.find(id.ownTransaction());
 
     if (it == _runningTransactions.end()) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
@@ -228,13 +228,13 @@ void LocalTransactionManager::commitTransaction (TransactionId::IdType id) {
 /// @brief rollback a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::rollbackTransaction (TransactionId::IdType id) {
+void LocalTransactionManager::rollbackTransaction (TransactionId const& id) {
   Transaction* transaction = nullptr;
 
   {
     WRITE_LOCKER(_lock);
 
-    auto it = _runningTransactions.find(id);
+    auto it = _runningTransactions.find(id.ownTransaction());
 
     if (it == _runningTransactions.end()) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
@@ -251,10 +251,10 @@ void LocalTransactionManager::rollbackTransaction (TransactionId::IdType id) {
 /// @brief kill a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::killTransaction (TransactionId::IdType id) {
+void LocalTransactionManager::killTransaction (TransactionId const& id) {
   READ_LOCKER(_lock);
 
-  auto it = _runningTransactions.find(id);
+  auto it = _runningTransactions.find(id.ownTransaction());
 
   if (it == _runningTransactions.end()) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
@@ -281,7 +281,7 @@ std::vector<TransactionInfo> LocalTransactionManager::runningTransactions (TRI_v
 
     for (auto const& it : _runningTransactions) {
       if (vocbase == nullptr || vocbase == it.second->vocbase()) {
-        result.emplace_back(TransactionInfo(it.second->id()(), it.second->startTime()));
+        result.emplace_back(TransactionInfo(it.second->id(), it.second->startTime()));
       }
     }
   }
@@ -309,7 +309,7 @@ void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction::StatusType LocalTransactionManager::statusTransaction (TransactionId::IdType id) {
+Transaction::StatusType LocalTransactionManager::statusTransaction (TransactionId const& id) {
   return Transaction::StatusType::COMMITTED;  // FIXME: do something sensible
 }
 
@@ -321,28 +321,28 @@ void LocalTransactionManager::removeRunningTransaction (Transaction* transaction
                                                         bool transactionContainsModification) {
   TRI_ASSERT(! transaction->isOngoing());
 
-  auto id = transaction->id()();
+  auto id = transaction->id();
 
   WRITE_LOCKER(_lock); 
 
   if (transactionContainsModification) {
     if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
       // if this fails and throws, no harm will be done
-      _failedTransactions.insert(id);
+      _failedTransactions.insert(id.ownTransaction());
     }
 
     // all subtransactions will be set to failed, too
     for (auto it : transaction->_subTransactions) {
       if (it.second == Transaction::StatusType::ROLLED_BACK) {
         // TODO: implement proper cleanup if this fails somewhere in the middle
-        _failedTransactions.insert(id);
+        _failedTransactions.insert(id.ownTransaction());
       }
     }
   }
   
   // delete from both lists
-  _runningTransactions.erase(id);
-  _leasedTransactions.erase(id);
+  _runningTransactions.erase(id.ownTransaction());
+  _leasedTransactions.erase(id.ownTransaction());
 }
 
 // -----------------------------------------------------------------------------
@@ -354,9 +354,8 @@ void LocalTransactionManager::removeRunningTransaction (Transaction* transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionId LocalTransactionManager::nextId () {
-  // TODO: top-level transactions must have the lowest 8 bits of their id
-  // set to 0. FIXME
-  return TransactionId(TransactionId::MainPart(TRI_NewTickServer()));
+  auto id = TRI_NewTickServer();
+ return TransactionId(id, id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -364,17 +363,17 @@ TransactionId LocalTransactionManager::nextId () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::insertRunningTransaction (Transaction* transaction) {
-  auto id = transaction->id()();
+  auto id = transaction->id();
 
   WRITE_LOCKER(_lock); 
-  auto it = _runningTransactions.emplace(std::make_pair(id, transaction));
+  auto it = _runningTransactions.emplace(std::make_pair(id.ownTransaction(), transaction));
 
   // must have inserted!
   TRI_ASSERT_EXPENSIVE(it.second);
 
   try {
     // if inserting into second list fails, we must rollback the insert!
-    _leasedTransactions.emplace(id);
+    _leasedTransactions.emplace(id.ownTransaction());
   }
   catch (...) {
     _runningTransactions.erase(it.second);
@@ -420,16 +419,16 @@ void LocalTransactionManager::deleteKilledTransactions () {
     WRITE_LOCKER(_lock);
     // create a full copy of the current state in local variables
     // so we can safely swap later
-    std::unordered_map<TransactionId::IdType, Transaction*> runningTransactions(_runningTransactions);
+    std::unordered_map<TransactionId::InternalType, Transaction*> runningTransactions(_runningTransactions);
     
     for (auto it : runningTransactions) {
       auto transaction = it.second;
 
       if (transaction->killed()) {
         // we found a killed transaction
-        auto id = transaction->id()();
+        auto id = transaction->id();
 
-        auto it2 = _leasedTransactions.find(id);
+        auto it2 = _leasedTransactions.find(id.ownTransaction());
   
         if (it2 == _leasedTransactions.end()) {
           // the transaction is killed and not currently leased
@@ -437,7 +436,7 @@ void LocalTransactionManager::deleteKilledTransactions () {
            
           // remove from list of currently running transactions so it cannot
           // be found anymore
-          runningTransactions.erase(id);
+          runningTransactions.erase(id.ownTransaction());
 
           transactionsToDelete.emplace_back(transaction);
         }

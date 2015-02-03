@@ -349,7 +349,7 @@ OperationResult CollectionOperations::RemoveDocument (TransactionScope* transact
   // while the remove operation is ongoing
   IndexUser indexUser(collection);
 
-  TransactionId::IdType originalTransactionId;
+  TransactionId originalTransactionId;
   auto result = RemoveDocumentWorker(transactionScope, collection, indexUser, document, options, originalTransactionId);
 
   if (result.code == TRI_ERROR_NO_ERROR) {
@@ -377,7 +377,7 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
   IndexUser indexUser(collection);
 
   // first remove the document...
-  TransactionId::IdType originalTransactionId;
+  TransactionId originalTransactionId;
   auto removeResult = RemoveDocumentWorker(transactionScope, collection, indexUser, document, options, originalTransactionId);
 
   if (removeResult.code != TRI_ERROR_NO_ERROR) {
@@ -458,7 +458,7 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
   IndexUser indexUser(collection);
 
   // first remove the document...
-  TransactionId::IdType originalTransactionId;
+  TransactionId originalTransactionId;
   auto removeResult = RemoveDocumentWorker(transactionScope, collection, indexUser, document, options, originalTransactionId);
 
   if (removeResult.code != TRI_ERROR_NO_ERROR) {
@@ -522,7 +522,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
                                                             OperationOptions const& options) {
 
   auto* transaction = transactionScope->transaction();
-  auto const transactionId = transaction->id()();
+  auto const transactionId = transaction->id();
 
   // create a revision for the document
   if (document.revision == 0) {
@@ -538,14 +538,14 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
   
   // create a temporary marker for the document on the heap
   // the marker memory will be freed automatically when we leave this method
-  std::unique_ptr<triagens::wal::DocumentMarker> marker(
-    new triagens::wal::DocumentMarker(transaction->vocbase()->_id,
-                                      collection->id(),
-                                      document.revision,
-                                      transactionId,
-                                      document.key,
-                                      8, /* legendSize */
-                                      document.shaped)
+  std::unique_ptr<triagens::wal::MvccDocumentMarker> marker(
+    new triagens::wal::MvccDocumentMarker(transaction->vocbase()->_id,
+                                          collection->id(),
+                                          document.revision,
+                                          transactionId,
+                                          document.key,
+                                          8, /* legendSize */
+                                          document.shaped)
   );
   
   // create a master pointer which will hold the marker
@@ -645,16 +645,16 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
                                                             IndexUser& indexUser,
                                                             Document const& document,
                                                             OperationOptions const& options,
-                                                            TransactionId::IdType& originalTransactionId) {
+                                                            TransactionId& originalTransactionId) {
   auto* transaction = transactionScope->transaction();
-  auto const transactionId = transaction->id()();
+  auto const transactionId = transaction->id();
 
   // remove document from primary index
   // this fetches the master pointer of the to-be-deleted revision
   // and sets its _to value to our transaction id
 
   auto primaryIndex = indexUser.primaryIndex();
-  originalTransactionId = 0;
+  originalTransactionId.reset();
 
   // this throws on error
   auto mptr = primaryIndex->remove(collection, document.key, originalTransactionId);
@@ -684,12 +684,12 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
 
     // create a temporary remove marker on the heap
     // the marker memory will be freed automatically when we leave this method
-    std::unique_ptr<triagens::wal::RemoveMarker> marker(
-      new triagens::wal::RemoveMarker(transaction->vocbase()->_id,
-                                      collection->id(),
-                                      actualRevision,
-                                      transactionId,
-                                      document.key)
+    std::unique_ptr<triagens::wal::MvccRemoveMarker> marker(
+      new triagens::wal::MvccRemoveMarker(transaction->vocbase()->_id,
+                                          collection->id(),
+                                          actualRevision,
+                                          transactionId,
+                                          document.key)
     );
 
     // now append the marker to the WAL

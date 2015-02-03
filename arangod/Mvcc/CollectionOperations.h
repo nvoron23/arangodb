@@ -327,7 +327,7 @@ namespace triagens {
                                                      IndexUser&,
                                                      Document const&,
                                                      OperationOptions const&,
-                                                     TransactionId::IdType&);
+                                                     TransactionId&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief validate the revision of the document found

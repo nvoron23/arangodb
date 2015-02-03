@@ -139,12 +139,6 @@ namespace triagens {
 
         std::string toString () const override final;
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return the next sub-transaction id
-////////////////////////////////////////////////////////////////////////////////
-
-        TransactionId nextSubId ();
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
@@ -155,7 +149,7 @@ namespace triagens {
 /// @brief sets the start state (e.g. list of running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        void setStartState (std::unordered_map<TransactionId::IdType, Transaction*> const&);
+        void setStartState (std::unordered_map<TransactionId::InternalType, Transaction*> const&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief registers a collection inside the transaction
@@ -176,13 +170,7 @@ namespace triagens {
 /// @brief transactions active at start
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::unordered_set<TransactionId::IdType>* _runningTransactions;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief last assigned sub-transaction id
-////////////////////////////////////////////////////////////////////////////////
-
-        TransactionId::IdType _lastUsedSubId;
+        std::unordered_set<TransactionId::InternalType>* _runningTransactions;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief lookup cache for collection names

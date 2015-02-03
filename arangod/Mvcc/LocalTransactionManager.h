@@ -122,7 +122,7 @@ namespace triagens {
 /// @brief lease a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* leaseTransaction (TransactionId::IdType) override final;
+        Transaction* leaseTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief unlease a transaction
@@ -134,19 +134,19 @@ namespace triagens {
 /// @brief commit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void commitTransaction (TransactionId::IdType) override final;
+        void commitTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief roll back a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void rollbackTransaction (TransactionId::IdType) override final;
+        void rollbackTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief kill a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        void killTransaction (TransactionId::IdType) override final;
+        void killTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief get a list of all running transactions
@@ -164,7 +164,7 @@ namespace triagens {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction::StatusType statusTransaction (TransactionId::IdType) override final;
+        Transaction::StatusType statusTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief remove the transaction from the list of running transactions
@@ -221,13 +221,13 @@ namespace triagens {
 /// @brief list of all currently running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::unordered_map<TransactionId::IdType, Transaction*> _runningTransactions;
+        std::unordered_map<TransactionId::InternalType, Transaction*> _runningTransactions;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief list of all failed transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::unordered_set<TransactionId::IdType> _failedTransactions;
+        std::unordered_set<TransactionId::InternalType> _failedTransactions;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief list of all currently leased transactions
@@ -235,7 +235,7 @@ namespace triagens {
 /// be modified by another
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::unordered_set<TransactionId::IdType> _leasedTransactions;
+        std::unordered_set<TransactionId::InternalType> _leasedTransactions;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief a cleanup thread for killing and deleting abandoned transactions

@@ -77,7 +77,7 @@ Transaction* DistributedTransactionManager::createSubTransaction (TRI_vocbase_t*
 /// @brief lease a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* DistributedTransactionManager::leaseTransaction (TransactionId::IdType) {
+Transaction* DistributedTransactionManager::leaseTransaction (TransactionId const&) {
   TRI_ASSERT(false);
   return nullptr;
 }
@@ -94,7 +94,7 @@ void DistributedTransactionManager::unleaseTransaction (Transaction* transaction
 /// @brief commit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void DistributedTransactionManager::commitTransaction (TransactionId::IdType id) {
+void DistributedTransactionManager::commitTransaction (TransactionId const&) {
   // TODO
   TRI_ASSERT(false);
 }
@@ -103,7 +103,7 @@ void DistributedTransactionManager::commitTransaction (TransactionId::IdType id)
 /// @brief roll back a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void DistributedTransactionManager::rollbackTransaction (TransactionId::IdType id) {
+void DistributedTransactionManager::rollbackTransaction (TransactionId const&) {
   // TODO
   TRI_ASSERT(false);
 }
@@ -112,7 +112,7 @@ void DistributedTransactionManager::rollbackTransaction (TransactionId::IdType i
 /// @brief kill a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void DistributedTransactionManager::killTransaction (TransactionId::IdType id) {
+void DistributedTransactionManager::killTransaction (TransactionId const&) {
   // TODO
   TRI_ASSERT(false);
 }
@@ -139,7 +139,7 @@ void DistributedTransactionManager::initializeTransaction (Transaction* transact
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction::StatusType DistributedTransactionManager::statusTransaction (TransactionId::IdType) {
+Transaction::StatusType DistributedTransactionManager::statusTransaction (TransactionId const&) {
   // TODO
   return Transaction::StatusType::COMMITTED;
 }

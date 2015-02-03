@@ -32,6 +32,7 @@
 
 #include "Basics/Common.h"
 #include "Basics/tri-strings.h"
+#include "Mvcc/TransactionId.h"
 #include "ShapedJson/Legends.h"
 #include "ShapedJson/shaped-json.h"
 #include "VocBase/datafile.h"
@@ -201,6 +202,94 @@ namespace triagens {
       TRI_voc_tick_t  _databaseId;
       TRI_voc_tid_t   _transactionId;
       TRI_voc_tid_t   _externalId;
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wal mvcc transaction begin marker
+////////////////////////////////////////////////////////////////////////////////
+
+    struct transaction_mvcc_begin_marker_t : TRI_df_marker_t {
+      TRI_voc_tick_t  _databaseId;
+      TRI_voc_tid_t   _transactionIdOwn;
+      TRI_voc_tid_t   _transactionIdParent;
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wal mvcc transaction commit marker
+////////////////////////////////////////////////////////////////////////////////
+
+    struct transaction_mvcc_commit_marker_t : TRI_df_marker_t {
+      TRI_voc_tick_t  _databaseId;
+      TRI_voc_tid_t   _transactionIdOwn;
+      TRI_voc_tid_t   _transactionIdParent;
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wal mvcc transaction abort marker
+////////////////////////////////////////////////////////////////////////////////
+
+    struct transaction_mvcc_abort_marker_t : TRI_df_marker_t {
+      TRI_voc_tick_t  _databaseId;
+      TRI_voc_tid_t   _transactionIdOwn;
+      TRI_voc_tid_t   _transactionIdParent;
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wal mvcc document marker
+////////////////////////////////////////////////////////////////////////////////
+
+    struct mvcc_document_marker_t : TRI_df_marker_t {
+      TRI_voc_tick_t  _databaseId;
+      TRI_voc_cid_t   _collectionId;
+
+      TRI_voc_rid_t   _revisionId;        // this is the tick for a create and update
+      TRI_voc_tid_t   _transactionIdOwn;
+      TRI_voc_tid_t   _transactionIdParent;
+
+      TRI_shape_sid_t _shape;
+
+      uint16_t        _offsetKey;
+      uint16_t        _offsetLegend;
+      uint32_t        _offsetJson;
+
+      // char* key
+      // char* shapedJson
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wal mvcc edge marker
+////////////////////////////////////////////////////////////////////////////////
+
+    struct mvcc_edge_marker_t : mvcc_document_marker_t {
+      TRI_voc_cid_t   _toCid;
+      TRI_voc_cid_t   _fromCid;
+
+      uint16_t        _offsetToKey;
+      uint16_t        _offsetFromKey;
+
+#ifdef TRI_PADDING_32
+      char            _padding_df_marker[4];
+#endif
+
+      // char* key
+      // char* toKey
+      // char* fromKey
+      // char* shapedJson
+    };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wal mvcc remove marker
+////////////////////////////////////////////////////////////////////////////////
+
+    struct mvcc_remove_marker_t : TRI_df_marker_t {
+      TRI_voc_tick_t  _databaseId;
+      TRI_voc_cid_t   _collectionId;
+
+      TRI_voc_rid_t   _revisionId;   // this is the tick for the deletion
+      TRI_voc_tid_t   _transactionIdOwn;
+      TRI_voc_tid_t   _transactionIdParent;
+
+      // char* key
     };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -646,6 +735,61 @@ namespace triagens {
     };
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                        MvccBeginTransactionMarker
+// -----------------------------------------------------------------------------
+
+    class MvccBeginTransactionMarker : public Marker {
+
+      public:
+
+        MvccBeginTransactionMarker (TRI_voc_tick_t,
+                                    triagens::mvcc::TransactionId const&);
+
+        ~MvccBeginTransactionMarker ();
+
+      public:
+
+        void dump () const;
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                       MvccCommitTransactionMarker
+// -----------------------------------------------------------------------------
+
+    class MvccCommitTransactionMarker : public Marker {
+
+      public:
+
+        MvccCommitTransactionMarker (TRI_voc_tick_t,
+                                     triagens::mvcc::TransactionId const&);
+
+        ~MvccCommitTransactionMarker ();
+
+      public:
+
+        void dump () const;
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        MvccAbortTransactionMarker
+// -----------------------------------------------------------------------------
+
+    class MvccAbortTransactionMarker : public Marker {
+
+      public:
+
+        MvccAbortTransactionMarker (TRI_voc_tick_t,
+                                    triagens::mvcc::TransactionId const&);
+
+        ~MvccAbortTransactionMarker ();
+
+      public:
+
+        void dump () const;
+    };
+
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                            BeginTransactionMarker
 // -----------------------------------------------------------------------------
 
@@ -756,6 +900,177 @@ namespace triagens {
         void dump () const;
     };
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                MvccDocumentMarker
+// -----------------------------------------------------------------------------
+
+    class MvccDocumentMarker : public Marker {
+
+      public:
+
+        MvccDocumentMarker (TRI_voc_tick_t,
+                            TRI_voc_cid_t,
+                            TRI_voc_rid_t,
+                            triagens::mvcc::TransactionId const&,
+                            std::string const&,
+                            size_t,
+                            TRI_shaped_json_t const*);
+        
+        ~MvccDocumentMarker ();
+
+      public:
+
+        inline TRI_voc_rid_t revisionId () const {
+          auto* m = reinterpret_cast<mvcc_document_marker_t const*>(begin());
+          return m->_revisionId;
+        }
+
+        inline triagens::mvcc::TransactionId transactionId () const {
+          auto* m = reinterpret_cast<mvcc_document_marker_t const*>(begin());
+          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdParent);
+        }
+
+        inline char* key () const {
+          // pointer to key
+          return begin() + sizeof(mvcc_document_marker_t);
+        }
+
+        inline char const* legend () const {
+          // pointer to legend
+          auto* m = reinterpret_cast<mvcc_document_marker_t const*>(begin());
+          return begin() + m->_offsetLegend;
+        }
+
+        inline size_t legendLength () const {
+          auto* m = reinterpret_cast<mvcc_document_marker_t const*>(begin());
+          return static_cast<size_t>(m->_offsetJson - m->_offsetLegend);
+        }
+
+        inline char const* json () const {
+          // pointer to json
+          auto* m = reinterpret_cast<mvcc_document_marker_t const*>(begin());
+          return begin() + m->_offsetJson;
+        }
+
+        inline size_t jsonLength () const {
+          auto* m = reinterpret_cast<mvcc_document_marker_t const*>(begin());
+          return static_cast<size_t>(size() - m->_offsetJson);
+        }
+
+        void storeLegend (triagens::basics::JsonLegend&);
+
+        void dump () const;
+
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    MvccEdgeMarker
+// -----------------------------------------------------------------------------
+
+    class MvccEdgeMarker : public Marker {
+
+      public:
+
+        MvccEdgeMarker (TRI_voc_tick_t,
+                        TRI_voc_cid_t,
+                        TRI_voc_rid_t,
+                        triagens::mvcc::TransactionId const&,
+                        std::string const&,
+                        TRI_document_edge_t const*,
+                        size_t,
+                        TRI_shaped_json_t const*);
+        
+        ~MvccEdgeMarker ();
+
+        inline TRI_voc_rid_t revisionId () const {
+          auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
+          return m->_revisionId;
+        }
+
+        inline triagens::mvcc::TransactionId transactionId () const {
+          auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
+          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdParent);
+        }
+
+        inline char const* key () const {
+          // pointer to key
+          return begin() + sizeof(mvcc_edge_marker_t);
+        }
+
+        inline char const* fromKey () const {
+          // pointer to _from key
+          auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
+          return begin() + m->_offsetFromKey;
+        }
+
+        inline char const* toKey () const {
+          // pointer to _to key
+          auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
+          return begin() + m->_offsetToKey;
+        }
+
+        inline char const* legend () const {
+          // pointer to legend
+          auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
+          return begin() + m->_offsetLegend;
+        }
+
+        inline size_t legendLength () const {
+          auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
+          return static_cast<size_t>(m->_offsetJson - m->_offsetLegend);
+        }
+
+        inline char const* json () const {
+          // pointer to json
+          auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
+          return begin() + m->_offsetJson;
+        }
+
+        inline size_t jsonLength () const {
+          auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
+          return static_cast<size_t>(size() - m->_offsetJson);
+        }
+        
+        void storeLegend (triagens::basics::JsonLegend&);
+
+        void dump () const;
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                  MvccRemoveMarker
+// -----------------------------------------------------------------------------
+
+    class MvccRemoveMarker : public Marker {
+
+      public:
+
+        MvccRemoveMarker (TRI_voc_tick_t,
+                      TRI_voc_cid_t,
+                      TRI_voc_rid_t,
+                      triagens::mvcc::TransactionId const&,
+                      std::string const&);
+
+        ~MvccRemoveMarker ();
+
+      public:
+
+        inline char const* key () const {
+          // pointer to key
+          return begin() + sizeof(mvcc_remove_marker_t);
+        }
+
+        inline triagens::mvcc::TransactionId transactionId () const {
+          auto* m = reinterpret_cast<mvcc_remove_marker_t const*>(begin());
+          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdParent);
+        }
+
+        inline TRI_voc_rid_t revisionId () const {
+          auto* m = reinterpret_cast<mvcc_remove_marker_t const*>(begin());
+          return m->_revisionId;
+        }
+
+        void dump () const;
+    };
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    DocumentMarker
@@ -851,7 +1166,7 @@ namespace triagens {
           return m->_revisionId;
         }
 
-        inline TRI_voc_rid_t transactionId () const {
+        inline TRI_voc_tid_t transactionId () const {
           edge_marker_t const* m = reinterpret_cast<edge_marker_t const*>(begin());
           return m->_transactionId;
         }

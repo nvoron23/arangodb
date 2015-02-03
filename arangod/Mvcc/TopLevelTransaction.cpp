@@ -53,11 +53,8 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
                                           TransactionId const& id,
                                           TRI_vocbase_t* vocbase)
   : Transaction(transactionManager, id, vocbase),
-    _runningTransactions(nullptr),
-    _lastUsedSubId(0) {
+    _runningTransactions(nullptr) {
 
-  TRI_ASSERT_EXPENSIVE(id.mainPart() == id());
-  TRI_ASSERT_EXPENSIVE(id.sequencePart() == 0);
   LOG_TRACE("creating %s", toString().c_str());
 }
 
@@ -123,7 +120,7 @@ int TopLevelTransaction::commit () {
   if (transactionContainsModification) {
     try {
       // write a commit marker
-      triagens::wal::CommitTransactionMarker commitMarker(_vocbase->_id, _id());
+      triagens::wal::MvccCommitTransactionMarker commitMarker(_vocbase->_id, _id);
 
       auto logfileManager = triagens::wal::LogfileManager::instance();
       int res = logfileManager->allocateAndWrite(commitMarker, waitForSync).errorCode;
@@ -192,7 +189,7 @@ int TopLevelTransaction::rollback () {
   if (transactionContainsModification) {
     try {
       // write an abort marker
-      triagens::wal::AbortTransactionMarker abortMarker(_vocbase->_id, _id());
+      triagens::wal::MvccAbortTransactionMarker abortMarker(_vocbase->_id, _id);
     
       auto logfileManager = triagens::wal::LogfileManager::instance();
       logfileManager->allocateAndWrite(abortMarker, false).errorCode;
@@ -278,17 +275,9 @@ TransactionCollection* TopLevelTransaction::collection (TRI_voc_cid_t id) {
 
 std::string TopLevelTransaction::toString () const {
   std::string result("TopLevelTransaction ");
-  result += std::to_string(_id());
+  result += _id.toString();
 
   return result;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief provide the next id for a sub-transaction
-////////////////////////////////////////////////////////////////////////////////
-
-TransactionId TopLevelTransaction::nextSubId () {
-  return TransactionId(_id(), ++_lastUsedSubId);
 }
 
 // -----------------------------------------------------------------------------
@@ -299,11 +288,11 @@ TransactionId TopLevelTransaction::nextSubId () {
 /// @brief sets the start state (e.g. list of running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-void TopLevelTransaction::setStartState (std::unordered_map<TransactionId::IdType, Transaction*> const& transactions) {
+void TopLevelTransaction::setStartState (std::unordered_map<TransactionId::InternalType, Transaction*> const& transactions) {
   TRI_ASSERT(_runningTransactions == nullptr);
 
   if (! transactions.empty()) {
-    _runningTransactions = new std::unordered_set<TransactionId::IdType>();
+    _runningTransactions = new std::unordered_set<TransactionId::InternalType>();
     _runningTransactions->reserve(transactions.size());
 
     for (auto it : transactions) {
