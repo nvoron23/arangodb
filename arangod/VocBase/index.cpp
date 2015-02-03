@@ -931,8 +931,8 @@ static size_t MemoryEdge (TRI_index_t const* idx) {
 
 static double SelectivityEstimateEdge (TRI_index_t const* idx) {
   // return average selectivity of the two index parts
-  return (TRI_SelectivityEstimateMultiPointer(&(((TRI_edge_index_t*) idx)->_edges_from)) +
-          TRI_SelectivityEstimateMultiPointer(&(((TRI_edge_index_t*) idx)->_edges_to))) * 0.5;
+  return (((TRI_edge_index_t*) idx)->_edges_from->selectivity() +
+          ((TRI_edge_index_t*) idx)->_edges_to->selectivity()) * 0.5;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
