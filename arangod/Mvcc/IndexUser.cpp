@@ -50,7 +50,8 @@ using namespace triagens::mvcc;
 
 IndexUser::IndexUser (TransactionCollection* collection)
   : _collection(collection),
-    _indexes() {
+    _indexes(),
+    _mustClick(false) {
 
   _collection->documentCollection()->readLockIndexes();
   _indexes = _collection->documentCollection()->indexes();

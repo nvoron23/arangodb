@@ -3395,10 +3395,9 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
   
   // set document key
   std::unique_ptr<char[]> key;
-  int res;
 
   if (args[0]->IsObject() && ! args[0]->IsArray()) {
-    res = ExtractDocumentKey(isolate, v8g, args[0]->ToObject(), key);
+    int res = ExtractDocumentKey(isolate, v8g, args[0]->ToObject(), key);
 
     if (res != TRI_ERROR_NO_ERROR && res != TRI_ERROR_ARANGO_DOCUMENT_KEY_MISSING) {
       TRI_V8_THROW_EXCEPTION(res);
