@@ -205,13 +205,13 @@ void LocalTransactionManager::unleaseTransaction (Transaction* transaction) {
 /// @brief commit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::commitTransaction (TransactionId const& id) {
+void LocalTransactionManager::commitTransaction (TransactionId::InternalType id) {
   Transaction* transaction = nullptr;
     
   {
     WRITE_LOCKER(_lock);
 
-    auto it = _runningTransactions.find(id.ownTransaction());
+    auto it = _runningTransactions.find(id);
 
     if (it == _runningTransactions.end()) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
@@ -228,13 +228,13 @@ void LocalTransactionManager::commitTransaction (TransactionId const& id) {
 /// @brief rollback a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::rollbackTransaction (TransactionId const& id) {
+void LocalTransactionManager::rollbackTransaction (TransactionId::InternalType id) {
   Transaction* transaction = nullptr;
 
   {
     WRITE_LOCKER(_lock);
 
-    auto it = _runningTransactions.find(id.ownTransaction());
+    auto it = _runningTransactions.find(id);
 
     if (it == _runningTransactions.end()) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
@@ -251,10 +251,10 @@ void LocalTransactionManager::rollbackTransaction (TransactionId const& id) {
 /// @brief kill a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::killTransaction (TransactionId const& id) {
+void LocalTransactionManager::killTransaction (TransactionId::InternalType id) {
   READ_LOCKER(_lock);
 
-  auto it = _runningTransactions.find(id.ownTransaction());
+  auto it = _runningTransactions.find(id);
 
   if (it == _runningTransactions.end()) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);

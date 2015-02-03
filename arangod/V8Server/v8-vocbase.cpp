@@ -149,13 +149,21 @@ static v8::Handle<v8::Object> WrapClass (v8::Isolate *isolate,
 ////////////////////////////////////////////////////////////////////////////////
 
 static inline v8::Handle<v8::Value> V8TransactionId (v8::Isolate* isolate, 
-                                                     triagens::mvcc::TransactionId const& id) {
+                                                     triagens::mvcc::TransactionId::InternalType id) {
   char buffer[21];
-  size_t len = TRI_StringUInt64InPlace((uint64_t) id.ownTransaction(), (char*) &buffer);
+  size_t len = TRI_StringUInt64InPlace((uint64_t) id, (char*) &buffer);
 
   return TRI_V8_PAIR_STRING((const char*) buffer, (int) len);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a v8 transaction id value from the internal transaction id
+////////////////////////////////////////////////////////////////////////////////
+
+static inline v8::Handle<v8::Value> V8TransactionId (v8::Isolate* isolate, 
+                                                     triagens::mvcc::TransactionId const& id) {
+  return V8TransactionId(isolate, id.ownTransaction());
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief execute a function in an MVCC transaction
@@ -288,15 +296,17 @@ static void JS_ListTransactionsDatabase (const v8::FunctionCallbackInfo<v8::Valu
 
   auto&& transactions = triagens::mvcc::TransactionManager::instance()->runningTransactions(vocbase);
   std::sort(transactions.begin(), transactions.end(), [] (triagens::mvcc::TransactionInfo const& lhs, triagens::mvcc::TransactionInfo const& rhs) {
-    return lhs.id.ownTransaction() < rhs.id.ownTransaction();
+    return lhs.ownTransactionId < rhs.ownTransactionId;
   });
+
+  double const now = TRI_microtime();
 
   v8::Handle<v8::Array> result = v8::Array::New(isolate, transactions.size());
   uint32_t i = 0;
   for (auto it : transactions) {
     v8::Handle<v8::Object> trx = v8::Object::New(isolate);
-    trx->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, it.id));
-    trx->ForceSet(TRI_V8_STRING("startTime"), v8::Number::New(isolate, it.startTime));
+    trx->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, it.ownTransactionId));
+    trx->ForceSet(TRI_V8_STRING("runTime"), v8::Number::New(isolate, now - it.startTime));
 
     result->Set(i++, trx);
   }
@@ -368,7 +378,7 @@ static void JS_CommitTransactionDatabase (const v8::FunctionCallbackInfo<v8::Val
     TRI_ASSERT(current != nullptr);
 
     while (current != nullptr) {
-      auto currentId = current->id();
+      auto currentId = current->ownTransactionId();
 
       if (currentId == id) {
         // we found ourselves
@@ -384,7 +394,7 @@ static void JS_CommitTransactionDatabase (const v8::FunctionCallbackInfo<v8::Val
     TRI_ASSERT(current != nullptr);
     TRI_ASSERT(current->id() == id);
         
-    transactionManager->commitTransaction(triagens::mvcc::TransactionId(id, id));
+    transactionManager->commitTransaction(id);
 
     TRI_V8_RETURN_TRUE();
   }
@@ -424,7 +434,7 @@ static void JS_RollbackTransactionDatabase (const v8::FunctionCallbackInfo<v8::V
     TRI_ASSERT(current != nullptr);
 
     while (current != nullptr) {
-      auto currentId = current->id();
+      auto currentId = current->ownTransactionId();
       // abort any transaction on the stack until we find ourselves
       transactionManager->rollbackTransaction(currentId);
 

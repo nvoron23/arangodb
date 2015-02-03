@@ -52,23 +52,29 @@ namespace triagens {
     struct TransactionInfo {
       TransactionInfo (TransactionId const& id,
                        double startTime) 
-        : id(id),
+        : ownTransactionId(id.ownTransaction()),
+          startTime(startTime) {
+      }
+      
+      TransactionInfo (TransactionId::InternalType id,
+                       double startTime) 
+        : ownTransactionId(id),
           startTime(startTime) {
       }
       
       TransactionInfo (TransactionInfo const& other) 
-        : id(other.id),
+        : ownTransactionId(other.ownTransactionId),
           startTime(other.startTime) {
       }
       
       TransactionInfo& operator= (TransactionInfo const& other) {
-        id = other.id;
+        ownTransactionId = other.ownTransactionId;
         startTime = other.startTime;
         return *this;
       }
 
-      TransactionId id;
-      double        startTime;
+      TransactionId::InternalType  ownTransactionId;
+      double                       startTime;
     };
 
 // -----------------------------------------------------------------------------
@@ -217,6 +223,14 @@ namespace triagens {
 
         inline TransactionId const& id () const {
           return _id;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the transaction's own id
+////////////////////////////////////////////////////////////////////////////////
+
+        inline TransactionId::InternalType ownTransactionId () const {
+          return _id.ownTransaction();
         }
 
 ////////////////////////////////////////////////////////////////////////////////

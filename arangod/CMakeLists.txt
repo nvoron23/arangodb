@@ -91,7 +91,6 @@ add_executable(
     IndexOperators/index-operator.cpp
     Mvcc/CapConstraint.cpp
     Mvcc/CollectionOperations.cpp
-    Mvcc/DistributedTransactionManager.cpp
     Mvcc/EdgeIndex.cpp
     Mvcc/FulltextIndex.cpp
     Mvcc/GeoIndex2.cpp

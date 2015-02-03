@@ -29,7 +29,6 @@
 
 #include "TransactionManager.h"
 #include "Basics/logging.h"
-#include "Mvcc/DistributedTransactionManager.h"
 #include "Mvcc/LocalTransactionManager.h"
 #include "Cluster/ServerState.h"
 
@@ -70,7 +69,8 @@ void TransactionManager::initialize () {
   TRI_ASSERT(Instance == nullptr);
   if (triagens::arango::ServerState::instance()->isCoordinator()) {
     // TODO
-    Instance = new DistributedTransactionManager();
+    Instance = nullptr;
+    TRI_ASSERT(false);
   }
   else {
     // TODO
@@ -85,10 +85,8 @@ void TransactionManager::initialize () {
 void TransactionManager::shutdown () {
   LOG_TRACE("shutting down transaction manager");
 
-  if (Instance != nullptr) {
-    delete Instance;
-    Instance = nullptr;
-  }
+  delete Instance;
+  Instance = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

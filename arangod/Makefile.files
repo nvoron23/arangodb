@@ -72,7 +72,6 @@ arangod_libarangod_a_SOURCES = \
 	arangod/IndexOperators/index-operator.cpp \
 	arangod/Mvcc/CapConstraint.cpp \
 	arangod/Mvcc/CollectionOperations.cpp \
-	arangod/Mvcc/DistributedTransactionManager.cpp \
 	arangod/Mvcc/EdgeIndex.cpp \
 	arangod/Mvcc/FulltextIndex.cpp \
 	arangod/Mvcc/GeoIndex2.cpp \
