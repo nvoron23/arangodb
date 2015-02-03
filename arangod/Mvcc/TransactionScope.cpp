@@ -95,6 +95,10 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
     if (vocbase != existing->vocbase()) {
       THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot change database for nested operation");
     }
+
+    if (existing->killed()) {
+      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_ABORTED, "transaction already killed");
+    }
     
     _transaction = existing;
   }

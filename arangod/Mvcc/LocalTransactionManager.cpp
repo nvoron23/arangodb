@@ -116,6 +116,7 @@ LocalTransactionManager::LocalTransactionManager ()
 LocalTransactionManager::~LocalTransactionManager () {
   // TODO: abort all open transactions on shutdown!
   if (_cleanupThread) {
+    _cleanupThread->stop();
     _cleanupThread->join();
   }
 
@@ -330,6 +331,7 @@ void LocalTransactionManager::removeRunningTransaction (Transaction* transaction
       _failedTransactions.insert(id);
     }
 
+    // all subtransactions will be set to failed, too
     for (auto it : transaction->_subTransactions) {
       if (it.second == Transaction::StatusType::ROLLED_BACK) {
         // TODO: implement proper cleanup if this fails somewhere in the middle
@@ -395,8 +397,10 @@ bool LocalTransactionManager::killRunningTransactions (double maxAge) {
 
     for (auto it : _runningTransactions) {
       if (it.second->startTime() + maxAge < now) {
-        it.second->killed(true);
-        found = true;
+        if (! it.second->killed()) {
+          it.second->killed(true);
+          found = true;
+        }
       }
     }
   }

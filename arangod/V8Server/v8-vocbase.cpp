@@ -375,7 +375,8 @@ static void JS_CommitTransactionDatabase (const v8::FunctionCallbackInfo<v8::Val
         break;
       }
         
-      // we found some other transaction on the stack first. we must abort this
+      // we found some other transaction on the stack first. we must abort 
+      // that
       transactionManager->rollbackTransaction(currentId);
       current = accessor.pop();
     }

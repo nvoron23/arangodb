@@ -133,6 +133,22 @@ Transaction::StatusType Transaction::status () const {
   return _status;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief set the killed flag
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::killed (bool) {
+  _killed = true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief check the killed flag
+////////////////////////////////////////////////////////////////////////////////
+
+bool Transaction::killed () {
+  return _killed;
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
@@ -150,11 +166,12 @@ void Transaction::initializeState () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void Transaction::updateSubTransaction (Transaction* transaction) {
-  auto id = transaction->id()();
+  auto const id = transaction->id()();
+  auto const status = transaction->status();
 
-  _subTransactions.emplace_back(std::make_pair(id, transaction->status()));
+  _subTransactions.emplace_back(std::make_pair(id, status));
 
-  if (transaction->status() == StatusType::COMMITTED) { 
+  if (status == StatusType::COMMITTED) { 
     // sub-transaction has committed, now copy their stats into our stats
     for (auto const& it : transaction->_stats) {
       auto it2 = _stats.find(it.first);
@@ -171,22 +188,6 @@ void Transaction::updateSubTransaction (Transaction* transaction) {
   
   // now delete the stats of the sub-transaction as they are not needed anymore
   transaction->_stats.clear();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief set the killed flag
-////////////////////////////////////////////////////////////////////////////////
-
-void Transaction::killed (bool) {
-  _killed = true;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief check the killed flag
-////////////////////////////////////////////////////////////////////////////////
-
-bool Transaction::killed () {
-  return _killed;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
