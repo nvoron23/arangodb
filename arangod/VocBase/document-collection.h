@@ -589,7 +589,8 @@ size_t TRI_DocumentIteratorDocumentCollection (triagens::arango::TransactionBase
 
 static inline bool TRI_IS_EDGE_MARKER (TRI_df_marker_t const* marker) {
   return (marker->_type == TRI_DOC_MARKER_KEY_EDGE ||
-          marker->_type == TRI_WAL_MARKER_EDGE);
+          marker->_type == TRI_WAL_MARKER_EDGE ||
+          marker->_type == TRI_WAL_MARKER_MVCC_EDGE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -602,6 +603,9 @@ static inline char const* TRI_EXTRACT_MARKER_FROM_KEY (TRI_df_marker_t const* ma
   }
   else if (marker->_type == TRI_WAL_MARKER_EDGE) {
     return ((char const*) marker) + ((triagens::wal::edge_marker_t const*) marker)->_offsetFromKey; 
+  }
+  else if (marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+    return ((char const*) marker) + ((triagens::wal::mvcc_edge_marker_t const*) marker)->_offsetFromKey; 
   }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
@@ -623,6 +627,9 @@ static inline char const* TRI_EXTRACT_MARKER_TO_KEY (TRI_df_marker_t const* mark
   else if (marker->_type == TRI_WAL_MARKER_EDGE) {
     return ((char const*) marker) + ((triagens::wal::edge_marker_t const*) marker)->_offsetToKey; 
   }
+  else if (marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+    return ((char const*) marker) + ((triagens::wal::mvcc_edge_marker_t const*) marker)->_offsetToKey; 
+  }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
   // invalid marker type
@@ -642,6 +649,9 @@ static inline TRI_voc_cid_t TRI_EXTRACT_MARKER_FROM_CID (TRI_df_marker_t const* 
   }
   else if (marker->_type == TRI_WAL_MARKER_EDGE) {
     return ((triagens::wal::edge_marker_t const*) marker)->_fromCid;
+  }
+  else if (marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+    return ((triagens::wal::mvcc_edge_marker_t const*) marker)->_fromCid;
   }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
@@ -663,6 +673,9 @@ static inline TRI_voc_cid_t TRI_EXTRACT_MARKER_TO_CID (TRI_df_marker_t const* ma
   else if (marker->_type == TRI_WAL_MARKER_EDGE) {
     return ((triagens::wal::edge_marker_t const*) marker)->_toCid;
   }
+  else if (marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+    return ((triagens::wal::mvcc_edge_marker_t const*) marker)->_toCid;
+  }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
   // invalid marker type
@@ -682,6 +695,9 @@ static inline TRI_voc_rid_t TRI_EXTRACT_MARKER_RID (TRI_df_marker_t const* marke
   }
   else if (marker->_type == TRI_WAL_MARKER_DOCUMENT || marker->_type == TRI_WAL_MARKER_EDGE) {
     return ((triagens::wal::document_marker_t const*) marker)->_revisionId; 
+  }
+  else if (marker->_type == TRI_WAL_MARKER_MVCC_DOCUMENT || marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+    return ((triagens::wal::mvcc_document_marker_t const*) marker)->_revisionId; 
   }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
@@ -708,6 +724,11 @@ static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_df_marker_t const* marker)
     auto m = reinterpret_cast<triagens::wal::document_marker_t const*>(marker);
     return ((char const*) marker) + m->_offsetKey;
   }
+  else if (marker->_type == TRI_WAL_MARKER_MVCC_DOCUMENT || 
+           marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+    auto m = reinterpret_cast<triagens::wal::mvcc_document_marker_t const*>(marker);
+    return ((char const*) marker) + m->_offsetKey;
+  }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
   // invalid marker type
@@ -730,6 +751,14 @@ static inline char const* TRI_EXTRACT_MARKER_KEY (TRI_df_marker_t const* marker,
   else if (marker->_type == TRI_WAL_MARKER_DOCUMENT || 
            marker->_type == TRI_WAL_MARKER_EDGE) {
     auto m = reinterpret_cast<triagens::wal::document_marker_t const*>(marker);
+    len = strlen((char const*) marker + m->_offsetKey);
+    // key is padded with 0 bytes so the following does not always work
+    // len = m->_offsetLegend - m->_offsetKey - 1;
+    return ((char const*) marker) + m->_offsetKey;
+  }
+  else if (marker->_type == TRI_WAL_MARKER_MVCC_DOCUMENT || 
+           marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+    auto m = reinterpret_cast<triagens::wal::mvcc_document_marker_t const*>(marker);
     len = strlen((char const*) marker + m->_offsetKey);
     // key is padded with 0 bytes so the following does not always work
     // len = m->_offsetLegend - m->_offsetKey - 1;
