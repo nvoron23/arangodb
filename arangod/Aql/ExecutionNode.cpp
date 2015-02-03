@@ -101,10 +101,10 @@ void ExecutionNode::validateType (int type) {
   }
 }
 
-void ExecutionNode::getSortElements(SortElementVector& elements,
-                                    ExecutionPlan* plan,
-                                    triagens::basics::Json const& oneNode,
-                                    char const* which) {
+void ExecutionNode::getSortElements (SortElementVector& elements,
+                                     ExecutionPlan* plan,
+                                     triagens::basics::Json const& oneNode,
+                                     char const* which) {
   triagens::basics::Json jsonElements = oneNode.get("elements");
   if (! jsonElements.isArray()){
     std::string error = std::string("unexpected value for ") +
@@ -117,7 +117,7 @@ void ExecutionNode::getSortElements(SortElementVector& elements,
     triagens::basics::Json oneJsonElement = jsonElements.at(static_cast<int>(i));
     bool ascending = JsonHelper::checkAndGetBooleanValue(oneJsonElement.json(), "ascending");
     Variable *v = varFromJson(plan->getAst(), oneJsonElement, "inVariable");
-    elements.push_back(std::make_pair(v, ascending));
+    elements.emplace_back(std::make_pair(v, ascending));
   }
 }
 
@@ -463,13 +463,28 @@ void ExecutionNode::appendAsString (std::string& st, int indent) {
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief inspect one index; only skiplist indexes which match attrs in sequence.
-/// @returns a qualification how good they match;
-///      match->index==nullptr means no match at all.
+/// returns a qualification how good they match;
+/// match->index == nullptr means no match at all.
 ////////////////////////////////////////////////////////////////////////////////
 
-ExecutionNode::IndexMatch ExecutionNode::CompareIndex (Index const* idx,
+ExecutionNode::IndexMatch ExecutionNode::CompareIndex (ExecutionNode const* node,
+                                                       Index const* idx,
                                                        ExecutionNode::IndexMatchVec const& attrs) {
   IndexMatch match;
+
+  if (node->getType() == INDEX_RANGE) {
+    // found an index range node...
+    // now check, regardless of the type of index, if the index ranges are only
+    // equality lookups and include all sort critieria. in this case, we can optimize
+    // away the sort completely
+    if (IndexRangeNode::SortCoveredByEqualityLookup(static_cast<IndexRangeNode const*>(node), idx, attrs)) {
+      match.doesMatch = true;
+
+      // when we get here we will be able to optimize away the sort
+      return match;
+    }
+  }
+
 
   if (idx->type != TRI_IDX_TYPE_SKIPLIST_INDEX || 
       attrs.empty()) {
@@ -527,6 +542,7 @@ ExecutionNode::IndexMatch ExecutionNode::CompareIndex (Index const* idx,
       match.doesMatch = false;
     }
   }
+
   return match;
 }
 
@@ -1188,7 +1204,7 @@ std::vector<EnumerateCollectionNode::IndexMatch>
   std::vector<IndexMatch> out;
   auto&& indexes = _collection->getIndexes();
   for (auto idx : indexes) {
-    IndexMatch match = CompareIndex(idx, attrs);
+    IndexMatch match = CompareIndex(this, idx, attrs);
     if (match.index != nullptr) {
       out.push_back(match);
     }
@@ -1424,8 +1440,12 @@ IndexRangeNode::IndexRangeNode (ExecutionPlan* plan,
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief check whether the pattern matches this node's index
+////////////////////////////////////////////////////////////////////////////////
+
 ExecutionNode::IndexMatch IndexRangeNode::matchesIndex (IndexMatchVec const& pattern) const {
-  return CompareIndex(_index, pattern);
+  return CompareIndex(this, _index, pattern);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1444,32 +1464,52 @@ double IndexRangeNode::estimateCost (size_t& nrItems) const {
   
   if (_index->type == TRI_IDX_TYPE_PRIMARY_INDEX) {
     // always an equality lookup
+
+    // selectivity of primary index is always 1
     nrItems = incoming * _ranges.size();
     return dependencyCost + nrItems;
   }
   
   if (_index->type == TRI_IDX_TYPE_EDGE_INDEX) {
     // always an equality lookup
-    nrItems = incoming * _ranges.size() * docCount / static_cast<size_t>(EqualityReductionFactor);
+    
+    // check if the index can provide a selectivity estimate
+    if (! estimateItemsWithIndexSelectivity(incoming, nrItems)) {
+      // use hard-coded heuristic
+      nrItems = incoming * _ranges.size() * docCount / static_cast<size_t>(EqualityReductionFactor);
+    }
+        
+    nrItems = (std::max)(nrItems, static_cast<size_t>(1));
+
     return dependencyCost + nrItems;
   }
-  
+
   if (_index->type == TRI_IDX_TYPE_HASH_INDEX) {
     // always an equality lookup
-    if (_index->unique) {
-      nrItems = incoming * _ranges.size();
-      return dependencyCost + nrItems;
-    }
 
-    double cost = static_cast<double>(docCount) * incoming * _ranges.size();
-    // the more attributes are contained in the index, the more specific the lookup will be
-    for (size_t i = 0; i < _ranges.at(0).size(); ++i) { 
-      cost /= EqualityReductionFactor; 
-    }
+    // check if the index can provide a selectivity estimate
+    if (! estimateItemsWithIndexSelectivity(incoming, nrItems)) {
+      // use hard-coded heuristic
+      if (_index->unique) {
+        nrItems = incoming * _ranges.size();
+      }
+      else {
+        double cost = static_cast<double>(docCount) * incoming * _ranges.size();
+        // the more attributes are contained in the index, the more specific the lookup will be
+        for (size_t i = 0; i < _ranges.at(0).size(); ++i) { 
+          cost /= EqualityReductionFactor; 
+        }
     
-    nrItems = static_cast<size_t>(cost);
-    cost *= 0.9999995; // this is to prefer the hash index over skiplists if everything else is equal
-    return dependencyCost + cost;
+        nrItems = static_cast<size_t>(cost);
+      }
+    }
+        
+    nrItems = (std::max)(nrItems, static_cast<size_t>(1));
+    // the more attributes an index matches, the better it is
+    double matchLengthFactor = _ranges.at(0).size() * 0.01;
+
+    // this is to prefer the hash index over skiplists if everything else is equal
+    return dependencyCost + ((static_cast<double>(nrItems) - matchLengthFactor) * 0.9999995);
   }
 
   if (_index->type == TRI_IDX_TYPE_SKIPLIST_INDEX) {
@@ -1551,7 +1591,10 @@ double IndexRangeNode::estimateCost (size_t& nrItems) const {
       totalCost += cost;
     }
 
+    totalCost = (std::max)(static_cast<size_t>(totalCost), static_cast<size_t>(1)); 
+
     nrItems = static_cast<size_t>(totalCost);
+
     return dependencyCost + totalCost;
   }
 
@@ -1589,10 +1632,77 @@ std::vector<Variable const*> IndexRangeNode::getVariablesUsedHere () const {
   }
 
   // Copy set elements into vector:
+  v.reserve(s.size());
+
   for (auto vv : s) {
     v.push_back(vv);
   }
   return v;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief check whether the index range node uses only equality lookups only, 
+/// and that the sort only consists of these same attributes.
+/// in this special case, the sort can be optimized away because the index 
+/// will only produce constant values (wrt to the sort criterion)
+////////////////////////////////////////////////////////////////////////////////
+
+bool IndexRangeNode::SortCoveredByEqualityLookup (IndexRangeNode const* node,
+                                                  Index const* idx,
+                                                  ExecutionNode::IndexMatchVec const& attrs) {
+
+  auto ranges = node->ranges();
+
+  // check for OR
+  if (ranges.size() != 1) {
+    return false; 
+  }
+
+  // check for non-equality ranges or different attributes used
+  std::unordered_set<std::string> used;
+  for (auto const& r : ranges[0]) {
+    if (! r.is1ValueRangeInfo()) {
+      return false;
+    }
+
+    used.insert(r._attr);
+  }
+ 
+  for (auto const& attr : attrs) {
+    if (used.find(attr.first) == used.end()) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief provide an estimate for the number of items, using the index
+/// selectivity info (if present)
+////////////////////////////////////////////////////////////////////////////////
+
+bool IndexRangeNode::estimateItemsWithIndexSelectivity (size_t incoming,
+                                                        size_t& nrItems) const {
+  // check if the index can provide a selectivity estimate
+  if (! _index->hasSelectivityEstimate()) {
+    return false; 
+  }
+
+  // use index selectivity estimate
+  double estimate = _index->selectivityEstimate();
+
+  if (estimate <= 0.0) {
+    // avoid DIV0
+    return false;
+  }
+
+  nrItems = static_cast<size_t>(incoming * _ranges.size() * (1.0 / estimate));
+  return true;
 }
 
 // -----------------------------------------------------------------------------

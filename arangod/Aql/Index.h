@@ -105,6 +105,10 @@ namespace triagens {
             ("id", triagens::basics::Json(triagens::basics::StringUtils::itoa(id))) 
             ("unique", triagens::basics::Json(unique));
 
+        if (hasSelectivityEstimate()) {
+          json("selectivityEstimate", triagens::basics::Json(selectivityEstimate()));
+        }
+
         triagens::basics::Json f(triagens::basics::Json::Array);
         for (auto& field : fields) {
           f.add(triagens::basics::Json(field));
@@ -115,25 +119,23 @@ namespace triagens {
       }
 
       bool hasSelectivityEstimate () const {
-        if (type == TRI_IDX_TYPE_PRIMARY_INDEX ||
-            type == TRI_IDX_TYPE_HASH_INDEX) {
-          return true;
+        if (! hasInternals()) { 
+          return false;
         }
 
-        return false;
+        return getInternals()->_hasSelectivityEstimate;
       }
 
       double selectivityEstimate () const {
-        TRI_ASSERT_EXPENSIVE(hasSelectivityEstimate());
+        TRI_index_t* internals = getInternals();
 
-        if (type == TRI_IDX_TYPE_PRIMARY_INDEX) {
-          return 1.0;
-        }
-        if (type == TRI_IDX_TYPE_HASH_INDEX) {
-          return TRI_SelectivityHashIndex(getInternals());
-        }
+        TRI_ASSERT(internals->_hasSelectivityEstimate);
 
-        TRI_ASSERT(false);
+        return internals->selectivityEstimate(internals);
+      }
+      
+      inline bool hasInternals () const {
+        return (internals != nullptr);
       }
 
       TRI_index_t* getInternals () const {

@@ -229,8 +229,15 @@ namespace triagens {
 
         typedef std::vector<std::pair<std::string, bool>> IndexMatchVec;
 
-        static IndexMatch CompareIndex (Index const* idx,
-                                        IndexMatchVec const& attrs);
+////////////////////////////////////////////////////////////////////////////////
+/// @brief inspect one index; only skiplist indexes which match attrs in sequence.
+/// @returns a qualification how good they match;
+///      match->index==nullptr means no match at all.
+////////////////////////////////////////////////////////////////////////////////
+
+        static IndexMatch CompareIndex (ExecutionNode const*,
+                                        Index const*,
+                                        IndexMatchVec const&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief replace a dependency, returns true if the pointer was found and 
@@ -1219,6 +1226,31 @@ namespace triagens {
         Index const* getIndex () {
           return _index;
         }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief check whether the index range node uses only equality lookups only, 
+/// and that the sort only consists of these same attributes.
+/// in this special case, the sort can be optimized away because the index 
+/// will only produce constant values (wrt to the sort criterion)
+////////////////////////////////////////////////////////////////////////////////
+
+        static bool SortCoveredByEqualityLookup (IndexRangeNode const*,
+                                                 Index const*,
+                                                 ExecutionNode::IndexMatchVec const&);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
+      private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief provide an estimate for the number of items, using the index
+/// selectivity info (if present)
+////////////////////////////////////////////////////////////////////////////////
+
+        bool estimateItemsWithIndexSelectivity (size_t,
+                                                size_t&) const;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
