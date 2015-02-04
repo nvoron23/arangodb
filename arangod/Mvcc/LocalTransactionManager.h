@@ -167,10 +167,18 @@ namespace triagens {
         Transaction::StatusType statusTransaction (TransactionId const&) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief remove the transaction from the list of running transactions
+/// @brief adds the transactions from the parameter to the list of failed
+/// transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        void removeRunningTransaction (Transaction*,
+        void addFailedTransactions (std::unordered_set<TransactionId::InternalType> const&) override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief removes the transaction from the list of running transactions and
+/// deletes the transaction object
+////////////////////////////////////////////////////////////////////////////////
+
+        void deleteRunningTransaction (Transaction*,
                                        bool) override final;
 
 // -----------------------------------------------------------------------------

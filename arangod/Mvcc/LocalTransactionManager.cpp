@@ -297,9 +297,23 @@ void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
   TRI_ASSERT(transaction->isOngoing());
 
   if (transaction->isTopLevel()) {
-    // copy the list of currently running transactions into the transaction
-    READ_LOCKER(_lock);
-    static_cast<TopLevelTransaction*>(transaction)->setStartState(_runningTransactions);
+    std::unique_ptr<std::unordered_set<TransactionId::InternalType>> runningTransactions(new std::unordered_set<TransactionId::InternalType>());
+    auto set = runningTransactions.get();
+
+    set->reserve(16);
+
+    {
+      // copy the list of currently running transactions into the transaction
+      READ_LOCKER(_lock);
+      set->reserve(_runningTransactions.size());
+
+      for (auto it : _runningTransactions) {
+        set->emplace(it.first);
+      }
+    }
+
+    // outside the lock
+    static_cast<TopLevelTransaction*>(transaction)->setStartState(runningTransactions);
   }
 
   transaction->_flags.initialized();
@@ -310,14 +324,38 @@ void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction::StatusType LocalTransactionManager::statusTransaction (TransactionId const& id) {
-  return Transaction::StatusType::COMMITTED;  // FIXME: do something sensible
+  READ_LOCKER(_lock); 
+
+  if (_failedTransactions.find(id.own()) != _failedTransactions.end()) {
+    // transaction has failed
+    return Transaction::StatusType::ROLLED_BACK;
+  }
+  
+  if (_runningTransactions.find(id.own()) != _runningTransactions.end()) {
+    // transaction is still running
+    return Transaction::StatusType::ONGOING;
+  }
+
+  return Transaction::StatusType::COMMITTED;  
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief remove the transaction from the list of running transactions
+/// @brief adds the transactions from the parameter to the list of failed
+/// transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::removeRunningTransaction (Transaction* transaction,
+void LocalTransactionManager::addFailedTransactions (std::unordered_set<TransactionId::InternalType> const& transactions) {
+  WRITE_LOCKER(_lock); 
+
+  _failedTransactions.insert(transactions.begin(), transactions.end());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief removes the transaction from the list of running transactions and
+/// deletes the transaction object
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::deleteRunningTransaction (Transaction* transaction,
                                                         bool transactionContainsModification) {
   TRI_ASSERT(! transaction->isOngoing());
 
@@ -328,21 +366,15 @@ void LocalTransactionManager::removeRunningTransaction (Transaction* transaction
   if (transactionContainsModification) {
     if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
       // if this fails and throws, no harm will be done
-      _failedTransactions.insert(id.own());
-    }
-
-    // all subtransactions will be set to failed, too
-    for (auto it : transaction->_subTransactions) {
-      if (it.second == Transaction::StatusType::ROLLED_BACK) {
-        // TODO: implement proper cleanup if this fails somewhere in the middle
-        _failedTransactions.insert(id.own());
-      }
+      _failedTransactions.emplace(id.own());
     }
   }
   
   // delete from both lists
   _runningTransactions.erase(id.own());
   _leasedTransactions.erase(id.own());
+
+  delete transaction;
 }
 
 // -----------------------------------------------------------------------------

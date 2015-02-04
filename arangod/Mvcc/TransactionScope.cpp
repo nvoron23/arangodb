@@ -111,21 +111,10 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionScope::~TransactionScope () {
-  if (_isOur) {
-    TRI_ASSERT(_transaction != nullptr);
-    if (_pushedOnThreadStack) {
-      // remove the transaction from the stack
-      TransactionStackAccessor accessor;
-      auto popped = accessor.pop();
-      TRI_ASSERT(popped == _transaction);
-    }
+  if (_isOur && _transaction != nullptr) {
+    removeFromStack();
 
-    try {
-      delete _transaction;
-    }
-    catch (...) {
-      // destructor must not fail
-    }
+    _transaction->rollback();
   }
 }
 
@@ -142,6 +131,27 @@ TransactionScope::~TransactionScope () {
 void TransactionScope::commit () {
   if (_isOur) {
     _transaction->commit();
+    removeFromStack();
+
+    // clear the pointer so we don't double-delete
+    _transaction = nullptr;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove the transaction from the stack
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionScope::removeFromStack () {
+  if (_pushedOnThreadStack) {
+    // remove the transaction from the stack
+    TransactionStackAccessor accessor;
+    auto popped = accessor.pop();
+    TRI_ASSERT(popped == _transaction);
   }
 }
 

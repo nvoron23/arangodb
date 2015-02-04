@@ -40,6 +40,10 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     struct CollectionStats {
+      inline bool hasOperations () const {
+        return (numInserted > 0 || numRemoved > 0); 
+      }
+
       void merge (CollectionStats const& other) {
         numInserted += other.numInserted;
         numRemoved  += other.numRemoved;

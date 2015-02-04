@@ -63,17 +63,6 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
 ////////////////////////////////////////////////////////////////////////////////
 
 TopLevelTransaction::~TopLevelTransaction () {
-  LOG_TRACE("destroying %s", toString().c_str());
-
-  if (_status == Transaction::StatusType::ONGOING) {
-    try {
-      rollback();
-    }
-    catch (...) {
-      // destructors better not throw
-    }
-  }
-  
   if (_runningTransactions != nullptr) {
     delete _runningTransactions;
   }
@@ -92,10 +81,7 @@ TopLevelTransaction::~TopLevelTransaction () {
 /// @brief commit the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-int TopLevelTransaction::commit () {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  LOG_TRACE("committing transaction %s", toString().c_str());
-
+void TopLevelTransaction::commit () {
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
   }
@@ -104,6 +90,10 @@ int TopLevelTransaction::commit () {
   if (killed()) {
     return rollback();
   }
+  
+  if (_ongoingSubTransaction != nullptr) {
+    _ongoingSubTransaction->rollback();
+  }
 
   // loop over all statistics to check if there were any data modifications during 
   // the transaction
@@ -111,7 +101,7 @@ int TopLevelTransaction::commit () {
   bool waitForSync = false;
 
   for (auto const& it : _stats) {
-    transactionContainsModification |= (it.second.numInserted >0 || it.second.numRemoved > 0);
+    transactionContainsModification |= it.second.hasOperations();
 
     // check if we must sync
     waitForSync |= it.second.waitForSync;
@@ -153,34 +143,29 @@ int TopLevelTransaction::commit () {
   }
     
   _status = StatusType::COMMITTED;
-  _transactionManager->removeRunningTransaction(this, transactionContainsModification);
-
-  return TRI_ERROR_NO_ERROR;
+  _transactionManager->deleteRunningTransaction(this, transactionContainsModification);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief roll back the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-int TopLevelTransaction::rollback () {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  LOG_TRACE("rolling back transaction %s", toString().c_str());
-
+void TopLevelTransaction::rollback () {
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
   }
+  
+  if (_ongoingSubTransaction != nullptr) {
+    _ongoingSubTransaction->rollback();
 
-  _status = StatusType::ROLLED_BACK;
-
-  // mark all subtransactions as failed, too
-  for (auto& it : _subTransactions) {
-    it.second = StatusType::ROLLED_BACK;
+    _transactionManager->addFailedTransactions(_committedSubTransactions);
+    _committedSubTransactions.clear();
   }
   
   bool transactionContainsModification = false;
 
   for (auto const& it : _stats) {
-    if (it.second.numInserted >0 || it.second.numRemoved > 0) {
+    if (it.second.hasOperations()) {
       transactionContainsModification = true;
       break;
     }
@@ -199,9 +184,8 @@ int TopLevelTransaction::rollback () {
     }
   }
 
-  _transactionManager->removeRunningTransaction(this, transactionContainsModification);
-  
-  return TRI_ERROR_NO_ERROR;
+  _status = StatusType::ROLLED_BACK;
+  _transactionManager->deleteRunningTransaction(this, transactionContainsModification);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -280,25 +264,36 @@ std::string TopLevelTransaction::toString () const {
   return result;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wasOngoingAtStart, check whether or not another transaction was
+/// ongoing when this one started
+////////////////////////////////////////////////////////////////////////////////
+
+bool TopLevelTransaction::wasOngoingAtStart (TransactionId::InternalType other) {
+  if (_runningTransactions == nullptr) {
+    return false;
+  }
+
+  if (_runningTransactions->find(other) == _runningTransactions->end()) {
+    return false;
+  }
+
+  return true;
+}
+
 // -----------------------------------------------------------------------------
-// --SECTION--                                                   private methods
+// --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief sets the start state (e.g. list of running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-void TopLevelTransaction::setStartState (std::unordered_map<TransactionId::InternalType, Transaction*> const& transactions) {
+void TopLevelTransaction::setStartState (std::unique_ptr<std::unordered_set<TransactionId::InternalType>>& runningTransactions) {
   TRI_ASSERT(_runningTransactions == nullptr);
 
-  if (! transactions.empty()) {
-    _runningTransactions = new std::unordered_set<TransactionId::InternalType>();
-    _runningTransactions->reserve(transactions.size());
-
-    for (auto it : transactions) {
-      _runningTransactions->emplace(it.first);
-    }
-  }
+  // we now take ownership of the set
+  _runningTransactions = runningTransactions.release();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

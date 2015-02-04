@@ -81,13 +81,13 @@ namespace triagens {
 /// @brief commit the transaction
 ////////////////////////////////////////////////////////////////////////////////
    
-        int commit () override final;
+        void commit () override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief roll back the transaction
 ////////////////////////////////////////////////////////////////////////////////
    
-        int rollback () override final;
+        void rollback () override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns aggregated transaction statistics
@@ -139,6 +139,13 @@ namespace triagens {
 
         std::string toString () const override final;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief wasOngoingAtStart, check whether or not another transaction was
+/// ongoing when this one started
+////////////////////////////////////////////////////////////////////////////////
+
+        bool wasOngoingAtStart (TransactionId::InternalType);
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
@@ -149,7 +156,7 @@ namespace triagens {
 /// @brief sets the start state (e.g. list of running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        void setStartState (std::unordered_map<TransactionId::InternalType, Transaction*> const&);
+        void setStartState (std::unique_ptr<std::unordered_set<TransactionId::InternalType>>&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief registers a collection inside the transaction

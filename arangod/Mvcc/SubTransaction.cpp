@@ -55,6 +55,7 @@ SubTransaction::SubTransaction (Transaction* parent)
     _topLevelTransaction(parent->topLevelTransaction()),
     _parentTransaction(parent) {
  
+  _parentTransaction->_ongoingSubTransaction = this;
   LOG_TRACE("creating %s", toString().c_str());
 }
 
@@ -63,16 +64,7 @@ SubTransaction::SubTransaction (Transaction* parent)
 ////////////////////////////////////////////////////////////////////////////////
 
 SubTransaction::~SubTransaction () {
-  if (_status == Transaction::StatusType::ONGOING) {
-    try {
-      rollback();
-    }
-    catch (...) {
-      // destructors better not throw
-    }
-  }
-  
-  LOG_TRACE("destroying %s", toString().c_str());
+  _parentTransaction->_ongoingSubTransaction = nullptr;
 }
 
 // -----------------------------------------------------------------------------
@@ -83,37 +75,46 @@ SubTransaction::~SubTransaction () {
 /// @brief commit the transaction
 ////////////////////////////////////////////////////////////////////////////////
    
-int SubTransaction::commit () {
+void SubTransaction::commit () {
   LOG_TRACE("committing transaction %s", toString().c_str());
 
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
   }
+  
+  // killed flag was set. must not commit!
+  if (killed()) {
+    return rollback();
+  }
+
+  if (_ongoingSubTransaction != nullptr) {
+    _ongoingSubTransaction->rollback();
+  }
 
   _status = StatusType::COMMITTED;
-  _parentTransaction->updateSubTransaction(this);
-  _transactionManager->removeRunningTransaction(this, false /* TODO */);
-
-  return TRI_ERROR_NO_ERROR;
+  _parentTransaction->subTransactionFinished(this);
+  _transactionManager->deleteRunningTransaction(this, false /* TODO */);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief roll back the transaction
 ////////////////////////////////////////////////////////////////////////////////
    
-int SubTransaction::rollback () {
+void SubTransaction::rollback () {
   // TODO: implement locking here in case multiple threads access the same transaction
   LOG_TRACE("rolling back transaction %s", toString().c_str());
 
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
   }
+  
+  if (_ongoingSubTransaction != nullptr) {
+    _ongoingSubTransaction->rollback();
+  }
 
   _status = StatusType::ROLLED_BACK;
-  _parentTransaction->updateSubTransaction(this);
-  _transactionManager->removeRunningTransaction(this, false /* TODO */);
-  
-  return TRI_ERROR_NO_ERROR;
+  _parentTransaction->subTransactionFinished(this);
+  _transactionManager->deleteRunningTransaction(this, false /* TODO */);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

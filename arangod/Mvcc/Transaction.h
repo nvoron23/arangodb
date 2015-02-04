@@ -305,13 +305,13 @@ namespace triagens {
 /// @brief commit the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual int commit () = 0;
+        virtual void commit () = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief roll back the transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual int rollback () = 0;
+        virtual void rollback () = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns aggregated transaction statistics
@@ -384,13 +384,6 @@ namespace triagens {
                                 TransactionId const& to);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief wasOngoingAtStart, check whether or not another transaction was
-/// ongoing when this one started
-////////////////////////////////////////////////////////////////////////////////
-
-         bool wasOngoingAtStart (TransactionId::InternalType);
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief returns the status of a sub-transaction of us
 /// will only be called if sub is an iterated sub-transaction of us and us
 /// is still ongoing
@@ -444,7 +437,7 @@ namespace triagens {
 /// @brief this is called when a subtransaction is finished
 ////////////////////////////////////////////////////////////////////////////////
 
-        void updateSubTransaction (Transaction*);
+        void subTransactionFinished (Transaction*);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                               protected variables
@@ -505,12 +498,6 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         std::unordered_map<TRI_voc_cid_t, CollectionStats> _stats;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief list of all sub-transactions with their statuses
-////////////////////////////////////////////////////////////////////////////////
-
-        std::vector<std::pair<TransactionId::InternalType, StatusType>> _subTransactions; 
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief whether or not the transaction was killed by another thread

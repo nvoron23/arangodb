@@ -74,7 +74,6 @@ Transaction::Transaction (TransactionManager* transactionManager,
 
 Transaction::~Transaction () {
   TRI_ASSERT(_ongoingSubTransaction == nullptr);
-  // note: automatic rollback is called from the destructors of the derived classes
 }
 
 // -----------------------------------------------------------------------------
@@ -169,15 +168,21 @@ void Transaction::initializeState () {
 /// @brief this is called when a subtransaction is finished
 ////////////////////////////////////////////////////////////////////////////////
 
-void Transaction::updateSubTransaction (Transaction* transaction) {
+void Transaction::subTransactionFinished (Transaction* transaction) {
   auto const id = transaction->id();
   auto const status = transaction->status();
 
-  _subTransactions.emplace_back(std::make_pair(id.own(), status));
-
   if (status == StatusType::COMMITTED) { 
-    // sub-transaction has committed, now copy their stats into our stats
+    bool hasAnyOperation = false;
+
+    // sub-transaction has committed, now copy its stats into our stats
     for (auto const& it : transaction->_stats) {
+      if (! it.second.hasOperations()) {
+        continue;
+      }
+
+      hasAnyOperation = true;
+
       auto it2 = _stats.find(it.first);
       if (it2 != _stats.end()) {
         // merge our own stats with the sub-transaction's stats
@@ -185,8 +190,14 @@ void Transaction::updateSubTransaction (Transaction* transaction) {
       }
       else {
         // take over the stats from the sub-transaction
-        _stats.insert(std::make_pair(it.first, it.second));
+        _stats.emplace(std::make_pair(it.first, it.second));
       }
+    }
+    
+    // track the id of the transaction, but only if the transaction has actually
+    // modified data
+    if (hasAnyOperation) { 
+      _committedSubTransactions.emplace(id.own());
     }
   }
   
@@ -287,15 +298,6 @@ Transaction::StatusType Transaction::statusSubTransaction (TransactionId const& 
   // we should never get here
   TRI_ASSERT(false);
   return Transaction::StatusType::ROLLED_BACK;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief wasOngoingAtStart, check whether or not another transaction was
-/// ongoing when this one started
-////////////////////////////////////////////////////////////////////////////////
-
-bool Transaction::wasOngoingAtStart (TransactionId::InternalType other) {
-  return false;   // FIXME: do something sensible
 }
 
 // -----------------------------------------------------------------------------
