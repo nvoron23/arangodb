@@ -378,6 +378,7 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
 
   // first remove the document...
   TransactionId originalTransactionId;
+
   auto removeResult = RemoveDocumentWorker(transactionScope, collection, indexUser, document, options, originalTransactionId);
 
   if (removeResult.code != TRI_ERROR_NO_ERROR) {
