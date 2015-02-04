@@ -29,6 +29,7 @@
 
 #include "Transaction.h"
 #include "Basics/logging.h"
+#include "Mvcc/TopLevelTransaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
@@ -58,6 +59,8 @@ Transaction::Transaction (TransactionManager* transactionManager,
     _startTime(TRI_microtime()),
     _status(Transaction::StatusType::ONGOING),
     _flags(),
+    _ongoingSubTransaction(nullptr),
+    _committedSubTransactions(),
     _stats(),
     _killed(false) {
 
@@ -70,6 +73,7 @@ Transaction::Transaction (TransactionManager* transactionManager,
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction::~Transaction () {
+  TRI_ASSERT(_ongoingSubTransaction == nullptr);
   // note: automatic rollback is called from the destructors of the derived classes
 }
 
@@ -193,64 +197,96 @@ void Transaction::updateSubTransaction (Transaction* transaction) {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief visibility, this implements the MVCC logic of what this transaction
 /// can see, returns the visibility of the other transaction for this one.
-/// The result can be INVISIBLE, INCONFLICT or VISIBLE. We guarantee
-/// INVISIBLE < INCONFLICT < VISIBLE, such that one can do things like
+/// The result can be INVISIBLE, CONCURRENT or VISIBLE. We guarantee
+/// INVISIBLE < CONCURRENT < VISIBLE, such that one can do things like
 /// "visibility(other) < VISIBLE" legally.
 ////////////////////////////////////////////////////////////////////////////////
     
 Transaction::VisibilityType Transaction::visibility (TransactionId const& other) {
-  // TODO: needs full rewrite 
-  return VisibilityType::INVISIBLE; 
-  /*
-  if (_id.isSameTransaction(other)) {   // same top level transaction?
-    if (other.sequencePart() > _id.sequencePart()) {
-      return VisibilityType::INVISIBLE;
-    }
-    else if (other.sequencePart() < _id.sequencePart()) {
-      return _transactionManager->statusTransaction(other) == 
-             StatusType::COMMITTED
-           ? VisibilityType::VISIBLE
-           : VisibilityType::INVISIBLE;
-    }
-    else {
-      return VisibilityType::VISIBLE;
-    }
+  if (other.own() == 0) {
+    return VisibilityType::INVISIBLE;
   }
-  else {
-    // Other top level transaction
-    if (other.mainPart() > _id.mainPart()) {
-      // Started after us
-      return VisibilityType::INVISIBLE;
-    }
+  if (other.own() == 1) {
+    return VisibilityType::VISIBLE;
+  }
 
-    if (wasOngoingAtStart(other)) {
+  if (_id.top() == other.top()) {   // same top level transaction?
+    if (other.own() > _id.own()) {
+      if (_transactionManager->statusTransaction(other) == StatusType::ROLLED_BACK) {
+        return VisibilityType::INVISIBLE;
+      }
+      if (statusSubTransaction(other) == StatusType::COMMITTED) {
+        return VisibilityType::VISIBLE;
+      }
       return VisibilityType::CONCURRENT;
     }
 
-    // Optimisation:
-    if (isNotAborted(other)) {
+    if (other.own() < _id.own()) {
+      if (_transactionManager->statusTransaction(other) == StatusType::ROLLED_BACK) {
+        return VisibilityType::INVISIBLE;
+      }
       return VisibilityType::VISIBLE;
     }
 
-    return _transactionManager->statusTransaction(other) == 
-           StatusType::COMMITTED
-         ? VisibilityType::VISIBLE
-         : VisibilityType::INVISIBLE;
+    // same transaction!
+    return VisibilityType::VISIBLE;
   }
-  */
+
+  if (other.top() > _id.top() || 
+      topLevelTransaction()->wasOngoingAtStart(other.top())) {
+    if (_transactionManager->statusTransaction(other) == StatusType::ROLLED_BACK) {
+      return VisibilityType::INVISIBLE;
+    }
+    
+    return VisibilityType::CONCURRENT;
+  }
+
+  TRI_ASSERT(other.top() < _id.top());
+    
+  if (_transactionManager->statusTransaction(other) == StatusType::ROLLED_BACK) {
+    return VisibilityType::INVISIBLE;
+  }
+
+  return VisibilityType::VISIBLE;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief checks if another document revision (identified by its _from and _to 
+/// values) is visible to the current transaction for read-only purposes
+////////////////////////////////////////////////////////////////////////////////
          
 bool Transaction::isVisibleForRead (TransactionId const& from, 
                                     TransactionId const& to) {
-  return false;
-  /*
-  if (visibility(from) == Transaction::VisibilityType::VISIBLE) {
-    if (to == 0 || visibility(to) != Transaction::VisibilityType::VISIBLE) {
-      return true;
-    }
+  if (visibility(from) != Transaction::VisibilityType::VISIBLE) {
+    return false;
   }
-  return false;
-  */
+
+  if (visibility(to) == Transaction::VisibilityType::VISIBLE) {
+    return false;
+  }
+
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns the status of a sub-transaction of us
+/// will only be called if sub is an iterated sub-transaction of us and we
+/// are still ongoing
+////////////////////////////////////////////////////////////////////////////////
+      
+Transaction::StatusType Transaction::statusSubTransaction (TransactionId const& sub) {
+  if (_committedSubTransactions.find(sub.own()) != _committedSubTransactions.end()) {
+    // sub transaction has committed
+    return Transaction::StatusType::COMMITTED;
+  }
+
+  if (hasOngoingSubTransaction()) {
+    return Transaction::StatusType::ONGOING;
+  }
+
+  // we should never get here
+  TRI_ASSERT(false);
+  return Transaction::StatusType::ROLLED_BACK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -258,7 +294,7 @@ bool Transaction::isVisibleForRead (TransactionId const& from,
 /// ongoing when this one started
 ////////////////////////////////////////////////////////////////////////////////
 
-bool Transaction::wasOngoingAtStart (TransactionId const& other) {
+bool Transaction::wasOngoingAtStart (TransactionId::InternalType other) {
   return false;   // FIXME: do something sensible
 }
 
