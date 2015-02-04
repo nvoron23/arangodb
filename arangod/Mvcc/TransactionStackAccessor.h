@@ -119,7 +119,7 @@ namespace triagens {
           size_t i = _threadTransactions->size();
           while (i > 0) {
             --i;
-            if ((* _threadTransactions)[i]->id().ownTransaction() == id) {
+            if ((* _threadTransactions)[i]->id().own() == id) {
               return true;
             }
           }

@@ -47,7 +47,7 @@ namespace triagens {
       
       TransactionId () 
         : ownTransactionId(0),
-          parentTransactionId(0) {
+          topTransactionId(0) {
       }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,9 +55,9 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
       
       TransactionId (InternalType ownTransactionId,
-                     InternalType parentTransactionId)
+                     InternalType topTransactionId)
         : ownTransactionId(ownTransactionId),
-          parentTransactionId(parentTransactionId) {
+          topTransactionId(topTransactionId) {
       }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +66,7 @@ namespace triagens {
       
       TransactionId (TransactionId const& other) 
         : ownTransactionId(other.ownTransactionId),
-          parentTransactionId(other.parentTransactionId) {
+          topTransactionId(other.topTransactionId) {
       }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -75,7 +75,7 @@ namespace triagens {
       
       TransactionId& operator= (TransactionId const& other) {
         ownTransactionId = other.ownTransactionId;
-        parentTransactionId = other.parentTransactionId;
+        topTransactionId = other.topTransactionId;
         return *this;
       }
 
@@ -83,16 +83,16 @@ namespace triagens {
 /// @brief return the own transaction id
 ////////////////////////////////////////////////////////////////////////////////
 
-      inline InternalType ownTransaction () const {
+      inline InternalType own () const {
         return ownTransactionId;
       }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief return the parent transaction id
+/// @brief return the top transaction id
 ////////////////////////////////////////////////////////////////////////////////
       
-      inline InternalType parentTransaction () const {
-        return parentTransactionId;
+      inline InternalType top () const {
+        return topTransactionId;
       }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -101,7 +101,7 @@ namespace triagens {
 
       inline void reset () {
         ownTransactionId = 0;
-        parentTransactionId = 0;
+        topTransactionId = 0;
       }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -109,31 +109,19 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
       std::string toString () const {
-        return std::to_string(ownTransactionId) + " (" + std::to_string(parentTransactionId) + ")";
+        return std::to_string(ownTransactionId) + " (" + std::to_string(topTransactionId) + ")";
       }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief compare two transaction ids
+/// @brief append the transaction id to an output stream
 ////////////////////////////////////////////////////////////////////////////////
 
-      friend bool operator== (TransactionId const&,
-                              TransactionId const&);
-
-      friend bool operator== (TransactionId const&,
-                              InternalType);
-
-      friend bool operator!= (TransactionId const&,
-                              TransactionId const&);
-
-      friend bool operator< (TransactionId const&,
-                             TransactionId const&);
-  
       friend std::ostream& operator<< (std::ostream&, TransactionId const*);
     
       friend std::ostream& operator<< (std::ostream&, TransactionId const&);
 
       InternalType mutable ownTransactionId;
-      InternalType mutable parentTransactionId;
+      InternalType mutable topTransactionId;
     };
 
   }
@@ -142,7 +130,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief hash function for TransactionId objects
 ////////////////////////////////////////////////////////////////////////////////
-
+/*
 namespace std {
   template<> struct hash<triagens::mvcc::TransactionId> {
     size_t operator () (triagens::mvcc::TransactionId const& id) const {
@@ -158,6 +146,7 @@ namespace std {
   };
 
 }
+*/
 
 #endif
 

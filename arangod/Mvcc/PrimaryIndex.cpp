@@ -205,7 +205,10 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
   originalTransactionId = previous->to();
 
   // modify _to attribute so the revision becomes invisible
-  previous->setTo(transColl->getTransaction()->id());
+  if (! previous->changeTo(originalTransactionId, transColl->getTransaction()->id())) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+  }
+
   return previous;
 }        
 
@@ -310,7 +313,8 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
 
   for (auto p : *(revisions.get())) {
     if (trans->visibility(p->from()) == Transaction::VisibilityType::VISIBLE) {
-      TransactionId to = p->to();
+      // TransactionId to = p->to();
+      /* TODO
       if (to == 0) {
         visibility = Transaction::VisibilityType::VISIBLE;
         return p;
@@ -327,6 +331,7 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
         visibility = Transaction::VisibilityType::VISIBLE;
         return p;
       }
+      */
     }
   }
   visibility = Transaction::VisibilityType::INVISIBLE;

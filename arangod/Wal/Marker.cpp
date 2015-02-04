@@ -773,8 +773,8 @@ MvccBeginTransactionMarker::MvccBeginTransactionMarker (TRI_voc_tick_t databaseI
   auto* m = reinterpret_cast<transaction_mvcc_begin_marker_t*>(begin());
 
   m->_databaseId    = databaseId;
-  m->_transactionIdOwn = transactionId.ownTransaction();
-  m->_transactionIdParent = transactionId.parentTransaction();
+  m->_transactionIdOwn = transactionId.own();
+  m->_transactionIdTop = transactionId.top();
 
 #ifdef DEBUG_WAL
   dump();
@@ -798,7 +798,7 @@ void MvccBeginTransactionMarker::dump () const {
 
   std::cout << "WAL MVCC TRANSACTION BEGIN MARKER FOR DB " << m->_databaseId
             << ", TRANSACTION OWN: " << m->_transactionIdOwn
-            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", TRANSACTION TOP: " << m->_transactionIdTop
             << ", SIZE: " << size()
             << "\n";
 
@@ -827,8 +827,8 @@ MvccCommitTransactionMarker::MvccCommitTransactionMarker (TRI_voc_tick_t databas
   auto* m = reinterpret_cast<transaction_mvcc_commit_marker_t*>(begin());
 
   m->_databaseId    = databaseId;
-  m->_transactionIdOwn = transactionId.ownTransaction();
-  m->_transactionIdParent = transactionId.parentTransaction();
+  m->_transactionIdOwn = transactionId.own();
+  m->_transactionIdTop = transactionId.top();
 
 #ifdef DEBUG_WAL
   dump();
@@ -852,7 +852,7 @@ void MvccCommitTransactionMarker::dump () const {
 
   std::cout << "WAL MVCC TRANSACTION COMMIT MARKER FOR DB " << m->_databaseId
             << ", TRANSACTION OWN: " << m->_transactionIdOwn
-            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", TRANSACTION TOP: " << m->_transactionIdTop
             << ", SIZE: " << size()
             << "\n";
 
@@ -881,8 +881,8 @@ MvccAbortTransactionMarker::MvccAbortTransactionMarker (TRI_voc_tick_t databaseI
   auto* m = reinterpret_cast<transaction_mvcc_abort_marker_t*>(begin());
 
   m->_databaseId    = databaseId;
-  m->_transactionIdOwn = transactionId.ownTransaction();
-  m->_transactionIdParent = transactionId.parentTransaction();
+  m->_transactionIdOwn = transactionId.own();
+  m->_transactionIdTop = transactionId.top();
 
 #ifdef DEBUG_WAL
   dump();
@@ -906,7 +906,7 @@ void MvccAbortTransactionMarker::dump () const {
 
   std::cout << "WAL MVCC TRANSACTION ABORT MARKER FOR DB " << m->_databaseId
             << ", TRANSACTION OWN: " << m->_transactionIdOwn
-            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", TRANSACTION TOP: " << m->_transactionIdTop
             << ", SIZE: " << size()
             << "\n";
 
@@ -1262,8 +1262,8 @@ MvccDocumentMarker::MvccDocumentMarker (TRI_voc_tick_t databaseId,
   m->_databaseId          = databaseId;
   m->_collectionId        = collectionId;
   m->_revisionId          = revisionId;
-  m->_transactionIdOwn    = transactionId.ownTransaction();
-  m->_transactionIdParent = transactionId.parentTransaction();
+  m->_transactionIdOwn    = transactionId.own();
+  m->_transactionIdTop = transactionId.top();
   m->_shape               = shapedJson->_sid;
 
   m->_offsetKey     = sizeof(mvcc_document_marker_t); // start position of key
@@ -1318,7 +1318,7 @@ void MvccDocumentMarker::dump () const {
             << ", COLLECTION " << m->_collectionId
             << ", REV: " << m->_revisionId
             << ", TRANSACTION OWN: " << m->_transactionIdOwn
-            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", TRANSACTION TOP: " << m->_transactionIdTop
             << ", KEY: " << key()
             << ", OFFSETKEY: " << m->_offsetKey
             << ", OFFSETLEGEND: " << m->_offsetLegend
@@ -1363,8 +1363,8 @@ MvccEdgeMarker::MvccEdgeMarker (TRI_voc_tick_t databaseId,
   m->_databaseId          = databaseId;
   m->_collectionId        = collectionId;
   m->_revisionId          = revisionId;
-  m->_transactionIdOwn    = transactionId.ownTransaction();
-  m->_transactionIdParent = transactionId.parentTransaction();
+  m->_transactionIdOwn    = transactionId.own();
+  m->_transactionIdTop = transactionId.top();
   m->_shape               = shapedJson->_sid;
   m->_offsetKey           = sizeof(mvcc_edge_marker_t); // start position of key
   m->_toCid               = edge->_toCid;
@@ -1424,7 +1424,7 @@ void MvccEdgeMarker::dump () const {
             << ", COLLECTION " << m->_collectionId
             << ", REV: " << m->_revisionId
             << ", TRANSACTION OWN: " << m->_transactionIdOwn
-            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", TRANSACTION TOP: " << m->_transactionIdTop
             << ", KEY: " << key()
             << ", FROMCID " << m->_fromCid
             << ", TOCID " << m->_toCid
@@ -1469,8 +1469,8 @@ MvccRemoveMarker::MvccRemoveMarker (TRI_voc_tick_t databaseId,
   m->_databaseId          = databaseId;
   m->_collectionId        = collectionId;
   m->_revisionId          = revisionId;
-  m->_transactionIdOwn    = transactionId.ownTransaction();
-  m->_transactionIdParent = transactionId.parentTransaction();
+  m->_transactionIdOwn    = transactionId.own();
+  m->_transactionIdTop = transactionId.top();
 
   storeSizedString(sizeof(mvcc_remove_marker_t), key);
 
@@ -1498,7 +1498,7 @@ void MvccRemoveMarker::dump () const {
             << ", COLLECTION " << m->_collectionId
             << ", REV: " << m->_revisionId
             << ", TRANSACTION OWN: " << m->_transactionIdOwn
-            << ", TRANSACTION PARENT: " << m->_transactionIdParent
+            << ", TRANSACTION TOP: " << m->_transactionIdTop
             << ", KEY: " << key()
             << "\n";
 

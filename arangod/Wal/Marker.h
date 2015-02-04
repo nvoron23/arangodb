@@ -211,7 +211,7 @@ namespace triagens {
     struct transaction_mvcc_begin_marker_t : TRI_df_marker_t {
       TRI_voc_tick_t  _databaseId;
       TRI_voc_tid_t   _transactionIdOwn;
-      TRI_voc_tid_t   _transactionIdParent;
+      TRI_voc_tid_t   _transactionIdTop;
     };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -221,7 +221,7 @@ namespace triagens {
     struct transaction_mvcc_commit_marker_t : TRI_df_marker_t {
       TRI_voc_tick_t  _databaseId;
       TRI_voc_tid_t   _transactionIdOwn;
-      TRI_voc_tid_t   _transactionIdParent;
+      TRI_voc_tid_t   _transactionIdTop;
     };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -231,7 +231,7 @@ namespace triagens {
     struct transaction_mvcc_abort_marker_t : TRI_df_marker_t {
       TRI_voc_tick_t  _databaseId;
       TRI_voc_tid_t   _transactionIdOwn;
-      TRI_voc_tid_t   _transactionIdParent;
+      TRI_voc_tid_t   _transactionIdTop;
     };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -244,7 +244,7 @@ namespace triagens {
 
       TRI_voc_rid_t   _revisionId;        // this is the tick for a create and update
       TRI_voc_tid_t   _transactionIdOwn;
-      TRI_voc_tid_t   _transactionIdParent;
+      TRI_voc_tid_t   _transactionIdTop;
 
       TRI_shape_sid_t _shape;
 
@@ -287,7 +287,7 @@ namespace triagens {
 
       TRI_voc_rid_t   _revisionId;   // this is the tick for the deletion
       TRI_voc_tid_t   _transactionIdOwn;
-      TRI_voc_tid_t   _transactionIdParent;
+      TRI_voc_tid_t   _transactionIdTop;
 
       // char* key
     };
@@ -927,7 +927,7 @@ namespace triagens {
 
         inline triagens::mvcc::TransactionId transactionId () const {
           auto* m = reinterpret_cast<mvcc_document_marker_t const*>(begin());
-          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdParent);
+          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdTop);
         }
 
         inline char* key () const {
@@ -989,7 +989,7 @@ namespace triagens {
 
         inline triagens::mvcc::TransactionId transactionId () const {
           auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(begin());
-          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdParent);
+          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdTop);
         }
 
         inline char const* key () const {
@@ -1061,7 +1061,7 @@ namespace triagens {
 
         inline triagens::mvcc::TransactionId transactionId () const {
           auto* m = reinterpret_cast<mvcc_remove_marker_t const*>(begin());
-          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdParent);
+          return triagens::mvcc::TransactionId(m->_transactionIdOwn, m->_transactionIdTop);
         }
 
         inline TRI_voc_rid_t revisionId () const {

@@ -180,7 +180,6 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
   mptr->setHash(triagens::mvcc::PrimaryIndex::hashKeyString(key, keyLength));
 
   mptr->setFrom(transactionId);
-  mptr->setTo(triagens::mvcc::TransactionId());
 
   mptr->_prev = nullptr;
   mptr->_next = nullptr;

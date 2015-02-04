@@ -175,13 +175,13 @@ Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocba
 Transaction* LocalTransactionManager::leaseTransaction (TransactionId const& id) {
   WRITE_LOCKER(_lock);
 
-  auto it = _runningTransactions.find(id.ownTransaction());
+  auto it = _runningTransactions.find(id.own());
 
   if (it == _runningTransactions.end()) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
   }
 
-  auto found = _leasedTransactions.insert(id.ownTransaction());
+  auto found = _leasedTransactions.insert(id.own());
 
   if (! found.second) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "trying to lease an already leased transaction");
@@ -198,7 +198,7 @@ void LocalTransactionManager::unleaseTransaction (Transaction* transaction) {
   auto id = transaction->id();
 
   WRITE_LOCKER(_lock);
-  _leasedTransactions.erase(id.ownTransaction());
+  _leasedTransactions.erase(id.own());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -328,21 +328,21 @@ void LocalTransactionManager::removeRunningTransaction (Transaction* transaction
   if (transactionContainsModification) {
     if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
       // if this fails and throws, no harm will be done
-      _failedTransactions.insert(id.ownTransaction());
+      _failedTransactions.insert(id.own());
     }
 
     // all subtransactions will be set to failed, too
     for (auto it : transaction->_subTransactions) {
       if (it.second == Transaction::StatusType::ROLLED_BACK) {
         // TODO: implement proper cleanup if this fails somewhere in the middle
-        _failedTransactions.insert(id.ownTransaction());
+        _failedTransactions.insert(id.own());
       }
     }
   }
   
   // delete from both lists
-  _runningTransactions.erase(id.ownTransaction());
-  _leasedTransactions.erase(id.ownTransaction());
+  _runningTransactions.erase(id.own());
+  _leasedTransactions.erase(id.own());
 }
 
 // -----------------------------------------------------------------------------
@@ -366,14 +366,14 @@ void LocalTransactionManager::insertRunningTransaction (Transaction* transaction
   auto id = transaction->id();
 
   WRITE_LOCKER(_lock); 
-  auto it = _runningTransactions.emplace(std::make_pair(id.ownTransaction(), transaction));
+  auto it = _runningTransactions.emplace(std::make_pair(id.own(), transaction));
 
   // must have inserted!
   TRI_ASSERT_EXPENSIVE(it.second);
 
   try {
     // if inserting into second list fails, we must rollback the insert!
-    _leasedTransactions.emplace(id.ownTransaction());
+    _leasedTransactions.emplace(id.own());
   }
   catch (...) {
     _runningTransactions.erase(it.second);
@@ -428,7 +428,7 @@ void LocalTransactionManager::deleteKilledTransactions () {
         // we found a killed transaction
         auto id = transaction->id();
 
-        auto it2 = _leasedTransactions.find(id.ownTransaction());
+        auto it2 = _leasedTransactions.find(id.own());
   
         if (it2 == _leasedTransactions.end()) {
           // the transaction is killed and not currently leased
@@ -436,7 +436,7 @@ void LocalTransactionManager::deleteKilledTransactions () {
            
           // remove from list of currently running transactions so it cannot
           // be found anymore
-          runningTransactions.erase(id.ownTransaction());
+          runningTransactions.erase(id.own());
 
           transactionsToDelete.emplace_back(transaction);
         }

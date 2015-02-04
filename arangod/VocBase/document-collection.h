@@ -129,8 +129,10 @@ struct TRI_doc_mptr_t {
     TRI_doc_mptr_t*        _next;    // next master pointer
   protected:
     std::atomic<void const*> _dataptr; // pointer to the beginning of the raw marker
-    triagens::mvcc::TransactionId  _from;
-    triagens::mvcc::TransactionId  _to;
+    std::atomic<TRI_voc_tid_t> _from;
+    std::atomic<TRI_voc_tid_t> _fromTop;
+    std::atomic<TRI_voc_tid_t> _to;
+    std::atomic<TRI_voc_tid_t> _toTop;
 
   public:
     TRI_doc_mptr_t () : _rid(0), 
@@ -139,8 +141,10 @@ struct TRI_doc_mptr_t {
                         _prev(nullptr),
                         _next(nullptr),
                         _dataptr(nullptr),
-                        _from(),
-                        _to() {
+                        _from(0),
+                        _fromTop(0),
+                        _to(0),
+                        _toTop(0) {
     }
 
     virtual ~TRI_doc_mptr_t () {
@@ -155,13 +159,15 @@ struct TRI_doc_mptr_t {
     }
 
     void clear () {
-      _rid  = 0;
-      _fid  = 0;
-      _hash = 0;
-      _prev = nullptr;
-      _next = nullptr;
-      _from = triagens::mvcc::TransactionId(); 
-      _to   = triagens::mvcc::TransactionId();
+      _rid     = 0;
+      _fid     = 0;
+      _hash    = 0;
+      _prev    = nullptr;
+      _next    = nullptr;
+      _from    = 0;
+      _fromTop = 0;
+      _to      = 0;
+      _toTop   = 0;
       setDataPtr(nullptr);
     }
 
@@ -173,8 +179,11 @@ struct TRI_doc_mptr_t {
       _hash = that._hash;
       _prev = that._prev;
       _next = that._next;
-      _from = that._from; // TODO: make atomic
-      _to   = that._to;   // TODO: make atomic
+
+      _from    = that._from.load(); 
+      _fromTop = that._fromTop.load();
+      _to      = that._to.load();
+      _toTop   = that._toTop.load();
     }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -232,33 +241,104 @@ struct TRI_doc_mptr_t {
     TRI_doc_mptr_t& operator= (TRI_doc_mptr_t const&) = delete;
     TRI_doc_mptr_t(TRI_doc_mptr_t const&) = delete;
 
-    inline triagens::mvcc::TransactionId from () const {
-      // TODO: make atomic
-      return _from;
+////////////////////////////////////////////////////////////////////////////////
+/// @brief fetch the _from value
+////////////////////////////////////////////////////////////////////////////////
+
+    triagens::mvcc::TransactionId from () const {
+      TRI_voc_tid_t own = 0;
+      TRI_voc_tid_t top = 0;
+
+      while (true) {
+        own = _from.load(std::memory_order_acquire);
+        top = _fromTop.load(std::memory_order_acquire);
+
+        if (own == 0 && top == 0) {
+          break;
+        }
+        if (own != 0 && top != 0) {
+          break;
+        }
+      }
+
+      return triagens::mvcc::TransactionId(own, top);
     }
 
-    inline void setFrom (triagens::mvcc::TransactionId const& value) {
-      // TODO: make atomic
-      _from = value;
+////////////////////////////////////////////////////////////////////////////////
+/// @brief set the initial _from value
+/// the caller must ensure that the master pointer is not yet exposed to other
+/// readers when calling this method
+////////////////////////////////////////////////////////////////////////////////
+
+    void setFrom (triagens::mvcc::TransactionId const& value) {
+      _from.store(value.own(), std::memory_order_relaxed);
+      _fromTop.store(value.top(), std::memory_order_release);
     }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief change the two components of the _from value atomically to 1.
+////////////////////////////////////////////////////////////////////////////////
+
+    void changeFrom () {
+      _from.store(0, std::memory_order_relaxed);
+      _fromTop.store(0, std::memory_order_release);
+
+      _from.store(1, std::memory_order_release);
+      _fromTop.store(1, std::memory_order_release);
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief fetch the _to value
+////////////////////////////////////////////////////////////////////////////////
 
     inline triagens::mvcc::TransactionId to () const {
-      // TODO: make atomic
-      return _to; 
-    }
+      TRI_voc_tid_t own = 0;
+      TRI_voc_tid_t top = 0;
 
-    inline void setTo (triagens::mvcc::TransactionId const& value) {
-      // TODO: make atomic
-      _to = value;
-    }
+      while (true) {
+        own = _to.load(std::memory_order_acquire);
+        top = _toTop.load(std::memory_order_acquire);
 
-    inline void changeTo (triagens::mvcc::TransactionId const& original,
-                          triagens::mvcc::TransactionId const& to) {
-
-      // TODO: fix and make atomic
-      if (_to == original) {
-        _to = to;
+        if (own == 0 && top == 0) {
+          break;
+        }
+        if (own != 0 && top != 0) {
+          break;
+        }
       }
+
+      return triagens::mvcc::TransactionId(own, top);
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief change the two components of the _to value atomically.
+/// a return value of `true` means the operation succeeded. a return value of
+/// `false` means the operation has failed
+////////////////////////////////////////////////////////////////////////////////
+
+    bool changeTo (triagens::mvcc::TransactionId const& expected,
+                   triagens::mvcc::TransactionId const& to) {
+
+      TRI_voc_tid_t expectedOwn = expected.own();
+
+      if (expectedOwn != 0) {
+        if (! _to.compare_exchange_strong(expectedOwn, 0, std::memory_order_relaxed)) {
+          return false;
+        }
+
+        _toTop.store(0, std::memory_order_release);
+        expectedOwn = 0;
+      }
+
+      TRI_ASSERT_EXPENSIVE(expectedOwn == 0);
+
+      if (! _to.compare_exchange_strong(expectedOwn, to.own(), std::memory_order_acquire)) {
+        return false;
+      }
+
+      _toTop.store(to.top(), std::memory_order_release);
+
+      return true;
     }
 
 };

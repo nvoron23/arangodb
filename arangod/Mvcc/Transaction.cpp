@@ -169,7 +169,7 @@ void Transaction::updateSubTransaction (Transaction* transaction) {
   auto const id = transaction->id();
   auto const status = transaction->status();
 
-  _subTransactions.emplace_back(std::make_pair(id.ownTransaction(), status));
+  _subTransactions.emplace_back(std::make_pair(id.own(), status));
 
   if (status == StatusType::COMMITTED) { 
     // sub-transaction has committed, now copy their stats into our stats
@@ -242,12 +242,15 @@ Transaction::VisibilityType Transaction::visibility (TransactionId const& other)
          
 bool Transaction::isVisibleForRead (TransactionId const& from, 
                                     TransactionId const& to) {
+  return false;
+  /*
   if (visibility(from) == Transaction::VisibilityType::VISIBLE) {
     if (to == 0 || visibility(to) != Transaction::VisibilityType::VISIBLE) {
       return true;
     }
   }
   return false;
+  */
 }
 
 ////////////////////////////////////////////////////////////////////////////////

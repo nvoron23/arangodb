@@ -51,7 +51,7 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 SubTransaction::SubTransaction (Transaction* parent)
-  : Transaction(parent->transactionManager(), TransactionId(TRI_NewTickServer(), parent->id().ownTransaction()), parent->vocbase()),
+  : Transaction(parent->transactionManager(), TransactionId(TRI_NewTickServer(), parent->id().own()), parent->vocbase()),
     _topLevelTransaction(parent->topLevelTransaction()),
     _parentTransaction(parent) {
  

@@ -162,7 +162,7 @@ static inline v8::Handle<v8::Value> V8TransactionId (v8::Isolate* isolate,
 
 static inline v8::Handle<v8::Value> V8TransactionId (v8::Isolate* isolate, 
                                                      triagens::mvcc::TransactionId const& id) {
-  return V8TransactionId(isolate, id.ownTransaction());
+  return V8TransactionId(isolate, id.own());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -296,7 +296,7 @@ static void JS_ListTransactionsDatabase (const v8::FunctionCallbackInfo<v8::Valu
 
   auto&& transactions = triagens::mvcc::TransactionManager::instance()->runningTransactions(vocbase);
   std::sort(transactions.begin(), transactions.end(), [] (triagens::mvcc::TransactionInfo const& lhs, triagens::mvcc::TransactionInfo const& rhs) {
-    return lhs.ownTransactionId < rhs.ownTransactionId;
+    return lhs.own < rhs.own;
   });
 
   double const now = TRI_microtime();
@@ -305,7 +305,7 @@ static void JS_ListTransactionsDatabase (const v8::FunctionCallbackInfo<v8::Valu
   uint32_t i = 0;
   for (auto it : transactions) {
     v8::Handle<v8::Object> trx = v8::Object::New(isolate);
-    trx->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, it.ownTransactionId));
+    trx->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, it.own));
     trx->ForceSet(TRI_V8_STRING("runTime"), v8::Number::New(isolate, now - it.startTime));
 
     result->Set(i++, trx);
@@ -378,7 +378,7 @@ static void JS_CommitTransactionDatabase (const v8::FunctionCallbackInfo<v8::Val
     TRI_ASSERT(current != nullptr);
 
     while (current != nullptr) {
-      auto currentId = current->ownTransactionId();
+      auto currentId = current->own();
 
       if (currentId == id) {
         // we found ourselves
@@ -392,7 +392,7 @@ static void JS_CommitTransactionDatabase (const v8::FunctionCallbackInfo<v8::Val
     }
 
     TRI_ASSERT(current != nullptr);
-    TRI_ASSERT(current->id() == id);
+    TRI_ASSERT(current->id().own() == id);
         
     transactionManager->commitTransaction(id);
 
@@ -434,7 +434,7 @@ static void JS_RollbackTransactionDatabase (const v8::FunctionCallbackInfo<v8::V
     TRI_ASSERT(current != nullptr);
 
     while (current != nullptr) {
-      auto currentId = current->ownTransactionId();
+      auto currentId = current->own();
       // abort any transaction on the stack until we find ourselves
       transactionManager->rollbackTransaction(currentId);
 

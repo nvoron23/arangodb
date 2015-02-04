@@ -435,7 +435,7 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
   }
   catch (...) {
     // must revert the remove operation!
-    const_cast<TRI_doc_mptr_t*>(removeResult.mptr)->setTo(originalTransactionId);
+    const_cast<TRI_doc_mptr_t*>(removeResult.mptr)->changeTo(transaction->id(), originalTransactionId);
     throw;
   }
    
@@ -499,7 +499,7 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
   }
   catch (...) {
     // must revert the remove operation!
-    const_cast<TRI_doc_mptr_t*>(removeResult.mptr)->setTo(originalTransactionId);
+    const_cast<TRI_doc_mptr_t*>(removeResult.mptr)->changeTo(transaction->id(), originalTransactionId);
     throw;
   }
    
@@ -667,7 +667,11 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
   if (res != TRI_ERROR_NO_ERROR) {
     // conflict etc.
     // revert the value of the _to attribute
-    mptr->setTo(originalTransactionId);
+    if (! mptr->changeTo(transactionId, originalTransactionId)) {
+      // oops, should not happen
+      TRI_ASSERT(false);
+    }
+
     return OperationResult(res, actualRevision);
   }
 
@@ -702,7 +706,10 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
   }
   catch (...) {
     // revert the value of the _to attribute
-    mptr->setTo(originalTransactionId);
+    if (! mptr->changeTo(transactionId, originalTransactionId)) {
+      // oops, should not happen
+      TRI_ASSERT(false);
+    }
 
     // TODO: do we need to undo the remove() in the secondary indexes, too??
     throw;
