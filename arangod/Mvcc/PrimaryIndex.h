@@ -123,7 +123,7 @@ namespace triagens {
         TRI_doc_mptr_t* findRelevantRevision (
                     TransactionCollection* transColl,
                     std::string const& key,
-                    triagens::mvcc::Transaction::VisibilityType& visibility);
+                    bool& writeOk) const;
     };
 
   }
