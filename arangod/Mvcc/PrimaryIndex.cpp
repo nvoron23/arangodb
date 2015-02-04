@@ -153,16 +153,16 @@ void PrimaryIndex::insert (TransactionCollection* transColl,
 
   WRITE_LOCKER(_lock);
 
-  Transaction::VisibilityType visibility;
-  findRelevantRevision(transColl, key, visibility);
-  if (visibility == Transaction::VisibilityType::CONCURRENT) {
+  bool writeOk;
+  TRI_doc_mptr_t* old = findRelevantRevision(transColl, key, writeOk);
+  if (! writeOk) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
   }
-  else if (visibility == Transaction::VisibilityType::VISIBLE) {
+  else if (old != nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
   }
 
-  TRI_doc_mptr_t const* old = _theHash->insert(doc, false, true);
+  old = _theHash->insert(doc, false, true);
 
   if (old != nullptr) {
     // This is serious: a document with this exact key and revision already
@@ -188,16 +188,15 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
 TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
                                       std::string const& key,
                                       TransactionId& originalTransactionId) {
-  Transaction::VisibilityType visibility;
-  
   WRITE_LOCKER(_lock);
 
-  TRI_doc_mptr_t* previous = findRelevantRevision(transColl, key, visibility);
+  bool writeOk;
+  TRI_doc_mptr_t* previous = findRelevantRevision(transColl, key, writeOk);
 
-  if (visibility == Transaction::VisibilityType::CONCURRENT) {
+  if (! writeOk) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
   }
-  else if (visibility == Transaction::VisibilityType::INVISIBLE) {
+  else if (previous == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
   }
 
@@ -283,7 +282,8 @@ TRI_doc_mptr_t* PrimaryIndex::lookup (TransactionCollection* transColl,
                         std::string const& key,
                         Transaction::VisibilityType& visibility) {
 
-  return findRelevantRevision(transColl, key, visibility);
+  bool writeOk;
+  return findRelevantRevision(transColl, key, writeOk);
 }
 
 // -----------------------------------------------------------------------------
@@ -291,50 +291,76 @@ TRI_doc_mptr_t* PrimaryIndex::lookup (TransactionCollection* transColl,
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief findRelevantRevision, this gets a key and a transaction (via 
-/// transColl). It looks up all revisions for that key in the primary
-/// index and looks for the relevant one. This is the one the transaction
-/// in transColl may see or nullptr if there is no such revision. In addition
-/// the variable visibility is set to VISIBLE, if the found revision is
-/// not yet obsolete, and to CONCURRENT, if another concurrent transaction
-/// has already removed this revision, and to INVISIBLE, if no relevant
-/// revision was found.
+/// @brief findRelevantRevision, this gets a key and a transaction
+/// (via transColl). It looks up all revisions for that key in the
+/// primary index and looks for the relevant one. This is the one the
+/// transaction in transColl may see or one that witnesses a write
+/// conflict or nullptr if there is no such revision. The flag writeOk
+/// is set, if a write to that revision would be OK. Since everything
+/// happens under the lock, this information is valid as long as the
+/// lock is held.
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
                             TransactionCollection* transColl,
                             std::string const& key,
-                            Transaction::VisibilityType& visibility) {
+                            bool& writeOk) const {
+  // We assume that we already have the lock!
+
   // Get all available revisions:
   std::unique_ptr<std::vector<TRI_doc_mptr_t*>> revisions(_theHash->lookupByKey(&key));
 
   // Now look through them and find "the right one":
   Transaction* trans = transColl->getTransaction();
 
+  TransactionId from;
+  TransactionId to;
+  Transaction::VisibilityType fromVis;
+  Transaction::VisibilityType toVis;
+
   for (auto p : *(revisions.get())) {
-    if (trans->visibility(p->from()) == Transaction::VisibilityType::VISIBLE) {
-      // TransactionId to = p->to();
-      /* TODO
-      if (to == 0) {
-        visibility = Transaction::VisibilityType::VISIBLE;
+    from = p->from();
+    fromVis = trans->visibility(from);
+    if (fromVis == Transaction::VisibilityType::VISIBLE) {
+      to = p->to();
+      toVis = trans->visibility(to);
+      if (toVis == Transaction::VisibilityType::INVISIBLE) {
+        writeOk = true;
         return p;
       }
-      Transaction::VisibilityType v = trans->visibility(to);
-      if (v == Transaction::VisibilityType::VISIBLE) {
+      else if (toVis == Transaction::VisibilityType::VISIBLE) {
         continue;
       }
-      else if (v == Transaction::VisibilityType::CONCURRENT) {
-        visibility = Transaction::VisibilityType::CONCURRENT;
+      else {  // toVis is CONCURRENT
+        writeOk = false;
         return p;
       }
-      else {  // _to is INVISIBLE
-        visibility = Transaction::VisibilityType::VISIBLE;
+    }
+    else if (fromVis == Transaction::VisibilityType::INVISIBLE) {
+      continue;
+    }
+    else {  // fromVis == CONCURRENT
+      to = p->to();
+      toVis = trans->visibility(to);
+      if (toVis == Transaction::VisibilityType::INVISIBLE) {
+        writeOk = false;
         return p;
       }
-      */
+      else if (toVis == Transaction::VisibilityType::CONCURRENT) {
+        // this revision is created concurrently but also deleted
+        // concurrently, this revision is not the reason for a
+        // write conflict and it is not the one we want to overwrite
+        continue;
+      }
+      else {  // toVis is CONCURRENT
+        // How odd, T(O.fromSub) was VISIBLE to T(O.toSub) and T(O.toSub) is
+        // VISIBLE to S, but T(O.fromSub) was CONCURRENT to S.
+        // This is impossible, isn't it?
+        TRI_ASSERT(false);
+      }
     }
   }
-  visibility = Transaction::VisibilityType::INVISIBLE;
+  writeOk = true;
   return nullptr;
 }
 
