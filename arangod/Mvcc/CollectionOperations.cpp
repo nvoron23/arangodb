@@ -371,7 +371,6 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
                                                       TRI_json_t const* update,
                                                       OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
-  std::cout << "UpdateDocument mit Transaction " << transaction->id() << std::endl;
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the update operation is ongoing
@@ -651,8 +650,6 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
                                                             TransactionId& originalTransactionId) {
   auto* transaction = transactionScope->transaction();
   auto const transactionId = transaction->id();
-
-  std::cout << "RemoveDocumentWorker " << transaction->id() << std::endl;
 
   // remove document from primary index
   // this fetches the master pointer of the to-be-deleted revision

@@ -73,7 +73,6 @@ Transaction::Transaction (TransactionManager* transactionManager,
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction::~Transaction () {
-  std::cout << "Ich sterbe: " << _id << std::endl;
   TRI_ASSERT(_ongoingSubTransaction == nullptr);
 }
 
