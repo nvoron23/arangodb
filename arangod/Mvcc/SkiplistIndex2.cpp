@@ -87,6 +87,7 @@ SkiplistIndex2::~SkiplistIndex2 () {
 ////////////////////////////////////////////////////////////////////////////////
         
 void SkiplistIndex2::insert (TransactionCollection*,
+                             Transaction*,
                              TRI_doc_mptr_t* doc) {
   // ...........................................................................
   // Allocate storage to shaped json objects stored as a simple list.
@@ -155,6 +156,7 @@ void SkiplistIndex2::insert (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
         
 TRI_doc_mptr_t* SkiplistIndex2::remove (TransactionCollection*,
+                                        Transaction*,
                                         std::string const&,
                                         TRI_doc_mptr_t const* doc) {
   // ...........................................................................
@@ -223,6 +225,7 @@ TRI_doc_mptr_t* SkiplistIndex2::remove (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
         
 void SkiplistIndex2::forget (TransactionCollection*,
+                             Transaction*,
                              TRI_doc_mptr_t const* doc) {
 }
 
@@ -230,7 +233,7 @@ void SkiplistIndex2::forget (TransactionCollection*,
 /// @brief post-insert (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-void SkiplistIndex2::preCommit (TransactionCollection*) {
+void SkiplistIndex2::preCommit (TransactionCollection*, Transaction*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -92,6 +92,7 @@ HashIndex::~HashIndex () {
 ////////////////////////////////////////////////////////////////////////////////
         
 void HashIndex::insert (TransactionCollection*,
+                        Transaction*,
                         TRI_doc_mptr_t* doc) {
   int res;
 
@@ -143,6 +144,7 @@ void HashIndex::insert (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* HashIndex::remove (TransactionCollection*,
+                                   Transaction*,
                                    std::string const&,
                                    TRI_doc_mptr_t const* doc) {
   int res;
@@ -191,6 +193,7 @@ TRI_doc_mptr_t* HashIndex::remove (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 void HashIndex::forget (TransactionCollection*,
+                        Transaction*,
                         TRI_doc_mptr_t const* doc) {
 }
 
@@ -198,7 +201,8 @@ void HashIndex::forget (TransactionCollection*,
 /// @brief post insert (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
         
-void HashIndex::preCommit (TransactionCollection*) {
+void HashIndex::preCommit (TransactionCollection*,
+                           Transaction*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -47,6 +47,9 @@ namespace triagens {
 // --SECTION--                                                       class Index
 // -----------------------------------------------------------------------------
 
+    class TransactionCollection;
+    class Transaction;
+
     class Index {
 
       protected:
@@ -64,16 +67,20 @@ namespace triagens {
 
       public:
 
-        virtual void insert (class TransactionCollection*, 
+        virtual void insert (TransactionCollection*,
+                             Transaction*,
                              struct TRI_doc_mptr_t*) = 0;
         virtual struct TRI_doc_mptr_t* remove (
-                         class TransactionCollection*,
+                         TransactionCollection*,
+                         Transaction*,
                          std::string const&,
                          struct TRI_doc_mptr_t const*) = 0;
-        virtual void forget (class TransactionCollection*,
+        virtual void forget (TransactionCollection*,
+                             Transaction*,
                              struct TRI_doc_mptr_t const*) = 0;
 
-        virtual void preCommit (class TransactionCollection*) = 0;
+        virtual void preCommit (TransactionCollection*,
+                                Transaction*) = 0;
 
         virtual size_t memory () = 0;
         virtual TRI_idx_type_e type () const = 0;

@@ -52,11 +52,9 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
-                                              TRI_voc_cid_t cid,
-                                              Transaction* transaction)
+                                              TRI_voc_cid_t cid)
   : _vocbase(vocbase),
     _collection(nullptr),
-    _transaction(transaction),
     _barrier(nullptr) {
 
   _collection = TRI_UseCollectionByIdVocBase(_vocbase, cid);
@@ -74,11 +72,9 @@ TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
-                                              std::string const& name,
-                                              Transaction* transaction)
+                                              std::string const& name) 
   : _vocbase(vocbase),
-    _collection(nullptr),
-    _transaction(transaction) {
+    _collection(nullptr) {
 
   _collection = TRI_UseCollectionByNameVocBase(_vocbase, name.c_str());
 

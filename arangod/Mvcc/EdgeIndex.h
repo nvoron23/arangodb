@@ -42,6 +42,7 @@ namespace triagens {
   namespace mvcc {
 
     class TransactionCollection;
+    class Transaction;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   class EdgeIndex
@@ -60,15 +61,19 @@ namespace triagens {
 
       public:
   
-        void insert (class TransactionCollection*, 
+        void insert (TransactionCollection*,
+                     Transaction*,
                      struct TRI_doc_mptr_t*);
-        struct TRI_doc_mptr_t* remove (class TransactionCollection*,
+        struct TRI_doc_mptr_t* remove (TransactionCollection*,
+                                       Transaction*,
                                        std::string const&,
                                        struct TRI_doc_mptr_t const*);
-        void forget (class TransactionCollection*,
+        void forget (TransactionCollection*,
+                     Transaction*,
                      struct TRI_doc_mptr_t const*);
 
-        void preCommit (class TransactionCollection*);
+        void preCommit (TransactionCollection*,
+                        Transaction*);
 
         // give index a hint about the expected size
         void sizeHint (size_t) override final;

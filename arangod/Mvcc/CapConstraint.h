@@ -59,15 +59,19 @@ namespace triagens {
 
       public:
   
-        void insert (class TransactionCollection*, 
+        void insert (TransactionCollection*, 
+                     Transaction*,
                      struct TRI_doc_mptr_t*) = 0;
-        struct TRI_doc_mptr_t* remove (class TransactionCollection*,
+        struct TRI_doc_mptr_t* remove (TransactionCollection*,
+                                       Transaction*,
                                        std::string const&,
                                        struct TRI_doc_mptr_t const*) = 0;
-        void forget (class TransactionCollection*,
+        void forget (TransactionCollection*,
+                     Transaction*,
                      struct TRI_doc_mptr_t const*) = 0;
 
-        void preCommit (class TransactionCollection*) = 0;
+        void preCommit (TransactionCollection*,
+                        Transaction*) = 0;
 
         bool hasSelectivity () const override final {
           return false;

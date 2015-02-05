@@ -36,9 +36,8 @@
 #include "Basics/fasthash.h"
 
 #include "Mvcc/Index.h"
-#include "Mvcc/Transaction.h"
-#include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionId.h"
+#include "Mvcc/Transaction.h"
 
 struct TRI_doc_mptr_t;
 struct TRI_document_collection_t;
@@ -61,24 +60,30 @@ namespace triagens {
 
       public:
   
-        virtual void insert (class TransactionCollection*, 
+        virtual void insert (TransactionCollection*, 
+                             Transaction*,
                              struct TRI_doc_mptr_t*) override final;
         virtual struct TRI_doc_mptr_t* remove (
-                  class TransactionCollection*,
+                  TransactionCollection*,
+                  Transaction*,
                   std::string const&,
                   struct TRI_doc_mptr_t const*) override final;
         
         struct TRI_doc_mptr_t* remove (
-                class TransactionCollection*,
+                TransactionCollection*,
+                Transaction*,
                 std::string const&,
                 TransactionId&);
 
-        virtual void forget (class TransactionCollection*,
+        virtual void forget (TransactionCollection*,
+                             Transaction*,
                              struct TRI_doc_mptr_t const*) override final;
 
-        virtual void preCommit (class TransactionCollection*) override final;
+        virtual void preCommit (TransactionCollection*,
+                                Transaction*) override final;
 
-        struct TRI_doc_mptr_t* lookup (class TransactionCollection*,
+        struct TRI_doc_mptr_t* lookup (TransactionCollection*,
+                                       Transaction*,
                                        std::string const& key,
                                        Transaction::VisibilityType&);
 
@@ -122,6 +127,7 @@ namespace triagens {
 
         TRI_doc_mptr_t* findRelevantRevision (
                     TransactionCollection* transColl,
+                    Transaction*,
                     std::string const& key,
                     bool& writeOk) const;
     };

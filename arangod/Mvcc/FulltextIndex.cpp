@@ -94,6 +94,7 @@ FulltextIndex::~FulltextIndex () {
 ////////////////////////////////////////////////////////////////////////////////
         
 void FulltextIndex::insert (TransactionCollection*,
+                            Transaction*,
                             TRI_doc_mptr_t* doc) {
   TRI_fulltext_wordlist_t* wordlist = getWordlist(doc);
 
@@ -122,7 +123,8 @@ void FulltextIndex::insert (TransactionCollection*,
 /// @brief remove a document from the index
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_doc_mptr_t* FulltextIndex::remove (TransactionCollection*, 
+TRI_doc_mptr_t* FulltextIndex::remove (TransactionCollection*,
+                                       Transaction*,
                                        std::string const&,
                                        TRI_doc_mptr_t const* doc) {
   TRI_DeleteDocumentFulltextIndex(_fulltextIndex, (TRI_fulltext_doc_t) ((uintptr_t) doc));
@@ -134,6 +136,7 @@ TRI_doc_mptr_t* FulltextIndex::remove (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 void FulltextIndex::forget (TransactionCollection*, 
+                            Transaction*,
                             TRI_doc_mptr_t const* doc) {
 }
 
@@ -141,7 +144,8 @@ void FulltextIndex::forget (TransactionCollection*,
 /// @brief post-insert operation (does nothing for this index type)
 ////////////////////////////////////////////////////////////////////////////////
 
-void FulltextIndex::preCommit (TransactionCollection*) {
+void FulltextIndex::preCommit (TransactionCollection*,
+                               Transaction*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -33,6 +33,8 @@
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 
+#include "Mvcc/TransactionCollection.h"
+
 using namespace triagens::basics;
 using namespace triagens::mvcc;
 
@@ -146,6 +148,7 @@ PrimaryIndex::~PrimaryIndex () {
 ////////////////////////////////////////////////////////////////////////////////
         
 void PrimaryIndex::insert (TransactionCollection* transColl,
+                           Transaction* trans,
                            TRI_doc_mptr_t* doc) {
   size_t len;
   char const* keyPtr = TRI_EXTRACT_MARKER_KEY(doc, len);
@@ -154,7 +157,7 @@ void PrimaryIndex::insert (TransactionCollection* transColl,
   WRITE_LOCKER(_lock);
 
   bool writeOk;
-  TRI_doc_mptr_t* old = findRelevantRevision(transColl, key, writeOk);
+  TRI_doc_mptr_t* old = findRelevantRevision(transColl, trans, key, writeOk);
   if (! writeOk) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
   }
@@ -176,6 +179,7 @@ void PrimaryIndex::insert (TransactionCollection* transColl,
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
+                                      Transaction*,
                                       std::string const& key,
                                       TRI_doc_mptr_t const* mptr) {
   THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "should not call this method");
@@ -186,12 +190,13 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
+                                      Transaction* trans,
                                       std::string const& key,
                                       TransactionId& originalTransactionId) {
   WRITE_LOCKER(_lock);
 
   bool writeOk;
-  TRI_doc_mptr_t* previous = findRelevantRevision(transColl, key, writeOk);
+  TRI_doc_mptr_t* previous = findRelevantRevision(transColl, trans, key, writeOk);
 
   if (! writeOk) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
@@ -204,7 +209,7 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
   originalTransactionId = previous->to();
 
   // modify _to attribute so the revision becomes invisible
-  if (! previous->changeTo(originalTransactionId, transColl->getTransaction()->id())) {
+  if (! previous->changeTo(originalTransactionId, trans->id())) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
   }
 
@@ -216,6 +221,7 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
 ////////////////////////////////////////////////////////////////////////////////
 
 void PrimaryIndex::forget (TransactionCollection*,
+                           Transaction*,
                            TRI_doc_mptr_t const* doc) {
   TRI_doc_mptr_t const* old;
 
@@ -231,7 +237,7 @@ void PrimaryIndex::forget (TransactionCollection*,
 /// @brief post insert (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
         
-void PrimaryIndex::preCommit (TransactionCollection*) {
+void PrimaryIndex::preCommit (TransactionCollection*, Transaction*) {
   // This is a no op, since the primary index is not used for pre commit
   // cleanup.
 }
@@ -279,11 +285,12 @@ Json PrimaryIndex::toJson (TRI_memory_zone_t* zone) const {
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* PrimaryIndex::lookup (TransactionCollection* transColl,
+                        Transaction* trans,
                         std::string const& key,
                         Transaction::VisibilityType& visibility) {
 
   bool writeOk;
-  return findRelevantRevision(transColl, key, writeOk);
+  return findRelevantRevision(transColl, trans, key, writeOk);
 }
 
 // -----------------------------------------------------------------------------
@@ -303,6 +310,7 @@ TRI_doc_mptr_t* PrimaryIndex::lookup (TransactionCollection* transColl,
 
 TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
                             TransactionCollection* transColl,
+                            Transaction* trans,
                             std::string const& key,
                             bool& writeOk) const {
   // We assume that we already have the lock!
@@ -311,8 +319,6 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
   std::unique_ptr<std::vector<TRI_doc_mptr_t*>> revisions(_theHash->lookupByKey(&key));
 
   // Now look through them and find "the right one":
-  Transaction* trans = transColl->getTransaction();
-
   TransactionId from;
   TransactionId to;
   Transaction::VisibilityType fromVis;

@@ -371,6 +371,7 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
                                                       TRI_json_t const* update,
                                                       OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
+  std::cout << "UpdateDocument mit Transaction " << transaction->id() << std::endl;
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the update operation is ongoing
@@ -426,7 +427,7 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
       // revert the insert operation!
       auto indexes = indexUser.indexes();
       for (size_t i = 0; i < indexes.size(); ++i) {
-        indexes[i]->forget(collection, result.mptr);
+        indexes[i]->forget(collection, transaction, result.mptr);
       }
       
       throw;
@@ -490,7 +491,7 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
       // revert the insert operation!
       auto indexes = indexUser.indexes();
       for (size_t i = 0; i < indexes.size(); ++i) {
-        indexes[i]->forget(collection, result.mptr);
+        indexes[i]->forget(collection, transaction, result.mptr);
       }
       
       throw;
@@ -561,7 +562,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
   for (size_t i = 0; i < indexes.size(); ++i) {
     // and call insert for each index
     try {
-      indexes[i]->insert(collection, *mptr);
+      indexes[i]->insert(collection, transaction, *mptr);
       indexUser.mustClick();
     }
     catch (...) {
@@ -570,7 +571,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
       while (i > 0) {
         --i;
         try {
-          indexes[i]->forget(collection, const_cast<TRI_doc_mptr_t const*>(*mptr));
+          indexes[i]->forget(collection, transaction, const_cast<TRI_doc_mptr_t const*>(*mptr));
         }
         catch (...) {
         }
@@ -618,7 +619,8 @@ OperationResult CollectionOperations::ReadDocumentWorker (TransactionScope* tran
   auto primaryIndex = indexUser.primaryIndex();
  
   auto visibility = Transaction::VisibilityType::VISIBLE;
-  auto mptr = primaryIndex->lookup(collection, document.key, visibility);
+  auto* transaction = transactionScope->transaction();
+  auto mptr = primaryIndex->lookup(collection, transaction, document.key, visibility);
 
   if (mptr == nullptr) {
     return OperationResult(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);
@@ -650,6 +652,8 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
   auto* transaction = transactionScope->transaction();
   auto const transactionId = transaction->id();
 
+  std::cout << "RemoveDocumentWorker " << transaction->id() << std::endl;
+
   // remove document from primary index
   // this fetches the master pointer of the to-be-deleted revision
   // and sets its _to value to our transaction id
@@ -658,7 +662,7 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
   originalTransactionId.reset();
 
   // this throws on error
-  auto mptr = primaryIndex->remove(collection, document.key, originalTransactionId);
+  auto mptr = primaryIndex->remove(collection, transaction, document.key, originalTransactionId);
   TRI_ASSERT(mptr != nullptr);
   indexUser.mustClick();
 
@@ -682,7 +686,7 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
 
     for (size_t i = 1; i < indexes.size(); ++i) {
       // call remove for each secondary indexes
-      indexes[i]->remove(collection, document.key, mptr);
+      indexes[i]->remove(collection, transaction, document.key, mptr);
     }
     
     // when we are here, the document has been removed from all indexes 

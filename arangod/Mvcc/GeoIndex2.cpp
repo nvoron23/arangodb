@@ -116,6 +116,7 @@ GeoIndex2::~GeoIndex2 () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void GeoIndex2::insert (TransactionCollection*,
+                        Transaction*,
                         TRI_doc_mptr_t* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
@@ -188,6 +189,7 @@ void GeoIndex2::insert (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
+                                   Transaction*,
                                    std::string const&,
                                    TRI_doc_mptr_t const* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
@@ -228,6 +230,7 @@ TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 void GeoIndex2::forget (TransactionCollection*,
+                        Transaction*,
                         TRI_doc_mptr_t const* doc) {
 }
 
@@ -235,7 +238,8 @@ void GeoIndex2::forget (TransactionCollection*,
 /// @brief post insert (does nothing) 
 ////////////////////////////////////////////////////////////////////////////////
 
-void GeoIndex2::preCommit (TransactionCollection*) {
+void GeoIndex2::preCommit (TransactionCollection*,
+                           Transaction*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

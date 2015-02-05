@@ -62,16 +62,20 @@ namespace triagens {
 
       public:
   
-        virtual void insert (class TransactionCollection*, 
+        virtual void insert (TransactionCollection*, 
+                             Transaction*,
                              struct TRI_doc_mptr_t*) override final;
         virtual struct TRI_doc_mptr_t* remove (
-                  class TransactionCollection*,
+                  TransactionCollection*,
+                  Transaction*,
                   std::string const&,
                   struct TRI_doc_mptr_t const*) override final;
-        virtual void forget (class TransactionCollection*,
+        virtual void forget (TransactionCollection*,
+                             Transaction*,
                              struct TRI_doc_mptr_t const*) override final;
 
-        virtual void preCommit (class TransactionCollection*) override final;
+        virtual void preCommit (TransactionCollection*,
+                                Transaction*) override final;
 
         bool hasSelectivity () const override final {
           return false;

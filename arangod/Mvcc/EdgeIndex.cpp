@@ -368,7 +368,7 @@ EdgeIndex::~EdgeIndex () {
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
  
-void EdgeIndex::insert (TransactionCollection*, TRI_doc_mptr_t* doc) {
+void EdgeIndex::insert (TransactionCollection*, Transaction*, TRI_doc_mptr_t* doc) {
   
   _from->insert(CONST_CAST(doc), true, false); // OUT
   _to->insert(CONST_CAST(doc), true, false);   // IN
@@ -379,6 +379,7 @@ void EdgeIndex::insert (TransactionCollection*, TRI_doc_mptr_t* doc) {
 ////////////////////////////////////////////////////////////////////////////////
         
 TRI_doc_mptr_t* EdgeIndex::remove (TransactionCollection*,
+                                   Transaction*,
                                    std::string const& key,
                                    TRI_doc_mptr_t const* doc) {
   _from->remove(doc);  // OUT
@@ -390,14 +391,15 @@ TRI_doc_mptr_t* EdgeIndex::remove (TransactionCollection*,
 /// @brief forget document in index
 ////////////////////////////////////////////////////////////////////////////////
         
-void EdgeIndex::forget (TransactionCollection*, TRI_doc_mptr_t const* doc) {
+void EdgeIndex::forget (TransactionCollection*,
+                        Transaction*, TRI_doc_mptr_t const* doc) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief post insert (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-void EdgeIndex::preCommit (TransactionCollection*) {
+void EdgeIndex::preCommit (TransactionCollection*, Transaction*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

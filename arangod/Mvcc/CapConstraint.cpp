@@ -76,7 +76,8 @@ CapConstraint::~CapConstraint () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void CapConstraint::insert (TransactionCollection* traColl,
-                           TRI_doc_mptr_t* doc) {
+                            Transaction*,
+                            TRI_doc_mptr_t* doc) {
   if (_size > 0) {
     // there is a size restriction
     auto marker = static_cast<TRI_df_marker_t const*>(doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME
@@ -93,6 +94,7 @@ void CapConstraint::insert (TransactionCollection* traColl,
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* CapConstraint::remove (TransactionCollection*, 
+                                       Transaction*,
                                        std::string const&,
                                        TRI_doc_mptr_t const*) {
   return nullptr;  // FIXME: this is nonsense
@@ -102,14 +104,15 @@ TRI_doc_mptr_t* CapConstraint::remove (TransactionCollection*,
 /// @brief forget a document (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-void CapConstraint::forget (TransactionCollection*, TRI_doc_mptr_t const*) {
+void CapConstraint::forget (TransactionCollection*, Transaction*,
+                            TRI_doc_mptr_t const*) {
 }  
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief preCommit a document (does nothing so far)
 ////////////////////////////////////////////////////////////////////////////////
 
-void CapConstraint::preCommit (TransactionCollection*) {
+void CapConstraint::preCommit (TransactionCollection*, Transaction*) {
 }  
 
 ////////////////////////////////////////////////////////////////////////////////
