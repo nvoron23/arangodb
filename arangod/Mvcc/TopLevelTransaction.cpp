@@ -51,8 +51,9 @@ using namespace triagens::mvcc;
 
 TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager,
                                           TransactionId const& id,
-                                          TRI_vocbase_t* vocbase)
-  : Transaction(transactionManager, id, vocbase),
+                                          TRI_vocbase_t* vocbase,
+                                          double ttl)
+  : Transaction(transactionManager, id, vocbase, ttl),
     _runningTransactions(nullptr) {
 
   LOG_TRACE("creating %s", toString().c_str());

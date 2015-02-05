@@ -52,7 +52,8 @@ using namespace triagens::mvcc;
 
 Transaction::Transaction (TransactionManager* transactionManager,
                           TransactionId const& id,
-                          TRI_vocbase_t* vocbase)
+                          TRI_vocbase_t* vocbase,
+                          double ttl)
   : _transactionManager(transactionManager),
     _id(id),
     _vocbase(vocbase),
@@ -62,7 +63,13 @@ Transaction::Transaction (TransactionManager* transactionManager,
     _ongoingSubTransaction(nullptr),
     _committedSubTransactions(),
     _stats(),
+    _expireTime(0.0),
     _killed(false) {
+
+  // avoid expensive time call if no ttl was specified
+  if (ttl > 0.0) {
+    _expireTime = TRI_microtime() + ttl;
+  }
 
   TRI_ASSERT(_transactionManager != nullptr);
   TRI_ASSERT(_vocbase != nullptr);

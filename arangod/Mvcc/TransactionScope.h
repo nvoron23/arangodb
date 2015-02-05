@@ -63,7 +63,8 @@ namespace triagens {
 
         TransactionScope (struct TRI_vocbase_s*, 
                           bool forceNew = false,
-                          bool canBeSubTransaction = true);
+                          bool canBeSubTransaction = true,
+                          double ttl = 0.0);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief destroy the transaction scope

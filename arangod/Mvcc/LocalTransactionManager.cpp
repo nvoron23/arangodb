@@ -42,9 +42,11 @@ using namespace triagens::mvcc;
 // --SECTION--                              LocalTransactionManagerCleanupThread
 // -----------------------------------------------------------------------------
 
-LocalTransactionManagerCleanupThread::LocalTransactionManagerCleanupThread (LocalTransactionManager* manager)
+LocalTransactionManagerCleanupThread::LocalTransactionManagerCleanupThread (LocalTransactionManager* manager,
+                                                                            double defaultTtl)
   : Thread("transaction-manager"),
     _manager(manager),
+    _defaultTtl(defaultTtl),
     _stopped(false) {
 }
 
@@ -73,7 +75,7 @@ void LocalTransactionManagerCleanupThread::stop () {
 
 void LocalTransactionManagerCleanupThread::run () {
   while (! _stopped) {
-    if (_manager->killRunningTransactions(5)) {
+    if (_manager->killRunningTransactions(_defaultTtl)) {
       _manager->deleteKilledTransactions();
     }
     else {
@@ -85,6 +87,12 @@ void LocalTransactionManagerCleanupThread::run () {
 // -----------------------------------------------------------------------------
 // --SECTION--                                     class LocalTransactionManager
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief default transaction expiration time
+////////////////////////////////////////////////////////////////////////////////
+
+double const LocalTransactionManager::DefaultTtl = 5.0;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -102,7 +110,7 @@ LocalTransactionManager::LocalTransactionManager ()
     _leasedTransactions(),
     _cleanupThread(nullptr) {
 
-  _cleanupThread = new LocalTransactionManagerCleanupThread(this);
+  _cleanupThread = new LocalTransactionManagerCleanupThread(this, DefaultTtl);
 
   if (! _cleanupThread->init() || ! _cleanupThread->start()) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "could not start cleanup thread");
@@ -138,8 +146,9 @@ LocalTransactionManager::~LocalTransactionManager () {
 /// @brief create a top-level transaction and lease it
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase) {
-  std::unique_ptr<Transaction> transaction(new TopLevelTransaction(this, nextId(), vocbase));
+Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase,
+                                                         double ttl) {
+  std::unique_ptr<Transaction> transaction(new TopLevelTransaction(this, nextId(), vocbase, ttl));
 
   // we do have a transaction now
 
@@ -154,11 +163,12 @@ Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase)
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocbase,
-                                                            Transaction* parent) {
+                                                            Transaction* parent,
+                                                            double ttl) {
   TRI_ASSERT(parent != nullptr);
   TRI_ASSERT(vocbase == parent->vocbase());
 
-  std::unique_ptr<Transaction> transaction(new SubTransaction(parent));
+  std::unique_ptr<Transaction> transaction(new SubTransaction(parent, ttl));
 
   // we do have a transaction now
 
@@ -427,7 +437,10 @@ bool LocalTransactionManager::killRunningTransactions (double maxAge) {
     READ_LOCKER(_lock);
 
     for (auto it : _runningTransactions) {
-      if (it.second->startTime() + maxAge < now) {
+      // kill a transaction if its expiration time has come
+      // or, if this is not set, after the specified amount of seconds
+      if (it.second->expireTime() > now ||
+          it.second->startTime() + maxAge < now) {
         if (! it.second->killed()) {
           it.second->killed(true);
           found = true;

@@ -53,7 +53,8 @@ namespace triagens {
 
       public:
 
-        LocalTransactionManagerCleanupThread (LocalTransactionManager*);
+        LocalTransactionManagerCleanupThread (LocalTransactionManager*,
+                                              double);
         
         ~LocalTransactionManagerCleanupThread ();
 
@@ -68,6 +69,8 @@ namespace triagens {
       private:
 
         LocalTransactionManager* const _manager;
+        
+        double _defaultTtl;
 
         std::atomic<bool> _stopped;
     };
@@ -109,14 +112,16 @@ namespace triagens {
 /// @brief create a top-level transaction and lease it
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* createTransaction (struct TRI_vocbase_s*) override final;
+        Transaction* createTransaction (struct TRI_vocbase_s*,
+                                        double) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a sub-transaction and lease it
 ////////////////////////////////////////////////////////////////////////////////
 
         Transaction* createSubTransaction (struct TRI_vocbase_s*,
-                                           Transaction*) override final;
+                                           Transaction*,
+                                           double) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief lease a transaction
@@ -251,6 +256,11 @@ namespace triagens {
 
         LocalTransactionManagerCleanupThread* _cleanupThread;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief default transaction expiration time
+////////////////////////////////////////////////////////////////////////////////
+
+        static double const DefaultTtl;
     };
 
   }

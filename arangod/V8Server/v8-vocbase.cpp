@@ -363,6 +363,7 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
   }
  
   bool top = false;
+  double ttl = 0.0;
 
   if (args.Length() > 0) {
     if (! args[0]->IsObject()) {
@@ -372,6 +373,9 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
     auto obj = args[0]->ToObject();
     if (obj->Has(TRI_V8_ASCII_STRING("top"))) {
       top = TRI_ObjectToBoolean(obj->Get(TRI_V8_ASCII_STRING("top")));
+    }
+    if (obj->Has(TRI_V8_ASCII_STRING("ttl"))) {
+      ttl = TRI_ObjectToDouble(obj->Get(TRI_V8_ASCII_STRING("ttl")));
     }
   }
 
@@ -385,7 +389,7 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
   // per se, as the transaction manager still knows the transaction and can delete it
   try {
     bool canBeSubTransaction = ! top;
-    auto transactionScope = new triagens::mvcc::TransactionScope(vocbase, true, canBeSubTransaction);
+    auto transactionScope = new triagens::mvcc::TransactionScope(vocbase, true, canBeSubTransaction, ttl);
 
     v8::Handle<v8::Object> result = v8::Object::New(isolate);
     result->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, transactionScope->transaction()->id()));

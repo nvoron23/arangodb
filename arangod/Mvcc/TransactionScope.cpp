@@ -51,7 +51,8 @@ using namespace triagens::mvcc;
 
 TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
                                     bool forceNew,
-                                    bool canBeSubTransaction) 
+                                    bool canBeSubTransaction,
+                                    double ttl) 
   : _transactionManager(triagens::mvcc::TransactionManager::instance()),
     _transaction(nullptr),
     _isOur(false),
@@ -73,11 +74,11 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
       auto parent = accessor.peek();
       TRI_ASSERT(parent != nullptr);
 
-      _transaction = _transactionManager->createSubTransaction(vocbase, parent);
+      _transaction = _transactionManager->createSubTransaction(vocbase, parent, ttl);
     }
     else {
       // start a top-level transaction
-      _transaction = _transactionManager->createTransaction(vocbase);
+      _transaction = _transactionManager->createTransaction(vocbase, ttl);
     }
     _isOur = true;
     
