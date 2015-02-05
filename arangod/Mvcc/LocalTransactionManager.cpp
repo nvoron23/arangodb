@@ -172,16 +172,16 @@ Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocba
 /// @brief lease a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction* LocalTransactionManager::leaseTransaction (TransactionId const& id) {
+Transaction* LocalTransactionManager::leaseTransaction (TransactionId::InternalType id) {
   WRITE_LOCKER(_lock);
 
-  auto it = _runningTransactions.find(id.own());
+  auto it = _runningTransactions.find(id);
 
   if (it == _runningTransactions.end()) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
   }
 
-  auto found = _leasedTransactions.insert(id.own());
+  auto found = _leasedTransactions.insert(id);
 
   if (! found.second) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "trying to lease an already leased transaction");

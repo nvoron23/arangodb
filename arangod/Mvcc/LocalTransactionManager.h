@@ -122,7 +122,7 @@ namespace triagens {
 /// @brief lease a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction* leaseTransaction (TransactionId const&) override final;
+        Transaction* leaseTransaction (TransactionId::InternalType) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief unlease a transaction

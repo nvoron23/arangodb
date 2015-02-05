@@ -91,7 +91,7 @@ namespace triagens {
 /// @brief lease a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual Transaction* leaseTransaction (TransactionId const&) = 0;
+        virtual Transaction* leaseTransaction (TransactionId::InternalType) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief unlease a transaction
