@@ -371,20 +371,23 @@ void LocalTransactionManager::deleteRunningTransaction (Transaction* transaction
 
   auto id = transaction->id();
 
-  WRITE_LOCKER(_lock); 
+  {
+    WRITE_LOCKER(_lock); 
 
-  if (transactionContainsModification) {
-    if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
-      // if this fails and throws, no harm will be done
-      _failedTransactions.emplace(id.own());
+    if (transactionContainsModification) {
+      if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
+        // if this fails and throws, no harm will be done
+        _failedTransactions.emplace(id.own());
+      }
     }
-  }
   
-  // delete from both lists
-  _runningTransactions.erase(id.own());
-  _leasedTransactions.erase(id.own());
-
-  delete transaction;
+    // delete from both lists
+    _runningTransactions.erase(id.own());
+    _leasedTransactions.erase(id.own());
+  
+    // must still hold this lock for deletion
+    delete transaction;
+  }
 }
 
 // -----------------------------------------------------------------------------

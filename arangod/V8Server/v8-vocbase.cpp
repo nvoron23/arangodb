@@ -556,9 +556,9 @@ static void JS_PopTransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>
     TRI_ASSERT(current != nullptr);
 
     while (current != nullptr) {
-      transactionManager->unleaseTransaction(current);
-
       auto currentId = current->own();
+      
+      transactionManager->unleaseTransaction(current);
 
       if (currentId == id) {
         // found the requested transaction
