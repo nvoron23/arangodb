@@ -127,6 +127,24 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief get the ids of all transactions currently on the stack
+////////////////////////////////////////////////////////////////////////////////
+
+        std::vector<TransactionInfo> stack () const {
+          std::vector<TransactionInfo> result;
+
+          if (_threadTransactions != nullptr) {
+            result.reserve(_threadTransactions->size());
+
+            for (auto it : *_threadTransactions) {
+              result.emplace_back(TransactionInfo(it->id(), it->startTime()));
+            }
+          }
+
+          return result;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief check if the stack is empty
 ////////////////////////////////////////////////////////////////////////////////
 

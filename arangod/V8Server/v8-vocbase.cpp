@@ -277,7 +277,7 @@ static void JS_TransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& a
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief begin an MVCC transaction
+/// @brief list all ongoing MVCC transactions
 ////////////////////////////////////////////////////////////////////////////////
 
 static void JS_ListTransactionsDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -300,6 +300,42 @@ static void JS_ListTransactionsDatabase (const v8::FunctionCallbackInfo<v8::Valu
   });
 
   double const now = TRI_microtime();
+
+  v8::Handle<v8::Array> result = v8::Array::New(isolate, transactions.size());
+  uint32_t i = 0;
+  for (auto it : transactions) {
+    v8::Handle<v8::Object> trx = v8::Object::New(isolate);
+    trx->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, it.own));
+    trx->ForceSet(TRI_V8_STRING("runTime"), v8::Number::New(isolate, now - it.startTime));
+
+    result->Set(i++, trx);
+  }
+
+  TRI_V8_RETURN(result);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief list all ongoing MVCC transactions on the stack
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_StackTransactionsDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  if (args.Length() != 0) {
+    TRI_V8_THROW_EXCEPTION_USAGE("_stackTransactions()");
+  }
+
+  TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
+
+  if (vocbase == nullptr) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+  }
+
+  double const now = TRI_microtime();
+    
+  triagens::mvcc::TransactionStackAccessor accessor;
+  auto&& transactions = accessor.stack();
 
   v8::Handle<v8::Array> result = v8::Array::New(isolate, transactions.size());
   uint32_t i = 0;
@@ -2918,6 +2954,7 @@ void TRI_InitV8VocBridge (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_commitTransaction"), JS_CommitTransactionDatabase);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_rollbackTransaction"), JS_RollbackTransactionDatabase);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_listTransactions"), JS_ListTransactionsDatabase);
+  TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_stackTransactions"), JS_StackTransactionsDatabase);
 
   TRI_InitV8indexArangoDB(isolate, ArangoNS);
 
