@@ -61,6 +61,15 @@ describe("MVCC", function () {
   });
 
   afterEach(function () {
+    // Cleanup any mess that could have been left:
+    while (true) {
+      try {
+        db._popTransaction();
+      }
+      catch (e) {
+        break;
+      }
+    }
     db._drop(cn);
   });
 
@@ -107,7 +116,7 @@ describe("MVCC", function () {
   });
       
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief test implicitly committed transactions
+/// @brief test explicitly committed transactions
 ////////////////////////////////////////////////////////////////////////////////
 
   it("should implement the MVCC logic correctly for explicit transactions",
@@ -262,6 +271,8 @@ describe("MVCC", function () {
     expect(d.Hallo).toEqual(3);
     db._rollbackTransaction(trx.id);
     
+    expect(db._stackTransactions()).toEqual([]);
+    
     // Read with an implicit transaction:
     d = c.mvccDocument("doc1");
     expect(d._key).toEqual("doc1");
@@ -279,6 +290,8 @@ describe("MVCC", function () {
     expect(c.mvccRemove("doc1")).toEqual(true);
     db._rollbackTransaction(trx.id);
 
+    expect(db._stackTransactions()).toEqual([]);
+    
     // Read with an implicit transaction:
     d = c.mvccDocument("doc1");
     expect(d._key).toEqual("doc1");
@@ -292,6 +305,185 @@ describe("MVCC", function () {
     expect(d.Hallo).toEqual(1);
 
   });
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test a second observing top level transaction
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should implement the MVCC logic correctly for a separate observing top level transaction",
+     function () {
+    var c = db[cn];
+    var d;
+    var t1,     // started before trx
+        t2,     // started after trx but before operation
+        t3,     // started after operation but during trx
+        t4;     // started after trx committed
+
+    function testVisibilityForTransaction (t, key, value, visibility) {
+      db._pushTransaction(t.id);
+      var d;
+      try {
+        d = c.document(key);
+      }
+      catch (e) {
+        d = {};
+      }
+      if (visibility === "VISIBLE") {
+        expect(d._key).toEqual(key);
+        expect(d.Hallo).toEqual(value);
+      }
+      else if (visibility === "INVISIBLE") {
+        expect(d).toEqual({});
+      }
+      db._popTransaction(t.id);
+    }
+
+    expect(db._stackTransactions()).toEqual([]);
+
+    t1 = db._beginTransaction({top: true}); db._popTransaction();
+
+    expect(db._stackTransactions()).toEqual([]);
+
+    // Create a document, explicit transaction:
+    var trx = db._beginTransaction();
+
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+
+    c.mvccInsert({_key: "doc1", Hallo: 1});
+    // Read within the same transaction:
+    d = c.mvccDocument("doc1");
+    expect(d._key).toEqual("doc1");
+    expect(d.Hallo).toEqual(1);
+
+    t3 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", null, "INVISIBLE");
+    testVisibilityForTransaction(t2, "doc1", null, "INVISIBLE");
+    testVisibilityForTransaction(t3, "doc1", null, "INVISIBLE");
+
+    db._commitTransaction(trx.id);
+
+    expect(db._stackTransactions()).toEqual([]);
+    
+    t4 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", null, "INVISIBLE");
+    testVisibilityForTransaction(t2, "doc1", null, "INVISIBLE");
+    testVisibilityForTransaction(t3, "doc1", null, "INVISIBLE");
+    testVisibilityForTransaction(t4, "doc1", 1, "VISIBLE");
+
+    db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
+    db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
+    db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
+    db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
+
+    // Replace a document, explicit transaction:
+
+    t1 = db._beginTransaction({top: true}); db._popTransaction();
+
+    trx = db._beginTransaction();
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+
+    c.mvccReplace("doc1", {Hallo: 2});
+    t3 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+    testVisibilityForTransaction(t3, "doc1", 1, "VISIBLE");
+
+    // Read in the same transaction:
+    d = c.mvccDocument("doc1");
+    expect(d._key).toEqual("doc1");
+    expect(d.Hallo).toEqual(2);
+    db._commitTransaction(trx.id);
+    t4 = db._beginTransaction({top: true}); db._popTransaction();
+    
+    expect(db._stackTransactions()).toEqual([]);
+    
+    testVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+    testVisibilityForTransaction(t3, "doc1", 1, "VISIBLE");
+    testVisibilityForTransaction(t4, "doc1", 2, "VISIBLE");
+
+    db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
+    db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
+    db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
+    db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
+
+    // Update a document, explicit transaction:
+
+    t1 = db._beginTransaction({top: true}); db._popTransaction();
+    trx = db._beginTransaction();
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+
+    c.mvccUpdate("doc1", {Hallo: 3});
+    t3 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+    testVisibilityForTransaction(t3, "doc1", 2, "VISIBLE");
+
+    // Read in the same transaction:
+    d = c.mvccDocument("doc1");
+    expect(d._key).toEqual("doc1");
+    expect(d.Hallo).toEqual(3);
+    db._commitTransaction(trx.id);
+    
+    expect(db._stackTransactions()).toEqual([]);
+
+    t4 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+    testVisibilityForTransaction(t3, "doc1", 2, "VISIBLE");
+    testVisibilityForTransaction(t4, "doc1", 3, "VISIBLE");
+
+    db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
+    db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
+    db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
+    db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
+
+    // Remove a document, explicit transactions:
+    t1 = db._beginTransaction({top: true}); db._popTransaction();
+    trx = db._beginTransaction();
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+
+    expect(c.mvccRemove("doc1")).toEqual(true);
+
+    t3 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+    testVisibilityForTransaction(t3, "doc1", 3, "VISIBLE");
+
+    db._commitTransaction(trx.id);
+
+    expect(db._stackTransactions()).toEqual([]);
+
+    t4 = db._beginTransaction({top: true}); db._popTransaction();
+
+    testVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    testVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+    testVisibilityForTransaction(t3, "doc1", 3, "VISIBLE");
+    testVisibilityForTransaction(t4, "doc1", null, "INVISIBLE");
+
+    db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
+    db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
+    db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
+    db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
+
+    expect(db._stackTransactions()).toEqual([]);
+  });
+
 });
 
 // Local Variables:
