@@ -36,7 +36,7 @@ jasmine.getGlobal().setTimeout = function (func) {
 };
 
 jasmine.getGlobal().clearTimeout = function (timeoutId) {
-  tasks.unregister(timeoutId);
+  // tasks.unregister(timeoutId);
 };
 
 exports.executeTestSuite = function (specFileNames, options) {
