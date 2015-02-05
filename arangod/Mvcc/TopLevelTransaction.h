@@ -63,7 +63,8 @@ namespace triagens {
 
         TopLevelTransaction (TransactionManager*,
                              TransactionId const&,
-                             struct TRI_vocbase_s*);
+                             struct TRI_vocbase_s*,
+                             double);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief destroy the transaction

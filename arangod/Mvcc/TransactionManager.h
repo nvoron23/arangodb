@@ -78,14 +78,16 @@ namespace triagens {
 /// @brief create a top-level transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual Transaction* createTransaction (struct TRI_vocbase_s*) = 0;
+        virtual Transaction* createTransaction (struct TRI_vocbase_s*,
+                                                double ttl) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a sub-transaction
 ////////////////////////////////////////////////////////////////////////////////
 
         virtual Transaction* createSubTransaction (struct TRI_vocbase_s*, 
-                                                   Transaction*) = 0;
+                                                   Transaction*,
+                                                   double ttl) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief lease a transaction

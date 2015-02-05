@@ -50,8 +50,9 @@ using namespace triagens::mvcc;
 /// @brief create a new sub transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-SubTransaction::SubTransaction (Transaction* parent)
-  : Transaction(parent->transactionManager(), TransactionId(TRI_NewTickServer(), parent->id().own()), parent->vocbase()),
+SubTransaction::SubTransaction (Transaction* parent,
+                                double ttl)
+  : Transaction(parent->transactionManager(), TransactionId(TRI_NewTickServer(), parent->id().own()), parent->vocbase(), ttl),
     _topLevelTransaction(parent->topLevelTransaction()),
     _parentTransaction(parent) {
  
