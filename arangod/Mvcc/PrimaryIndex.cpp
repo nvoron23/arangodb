@@ -30,6 +30,7 @@
 #include "PrimaryIndex.h"
 #include "Basics/fasthash.h"
 #include "Basics/WriteLocker.h"
+#include "Basics/ReadLocker.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 
@@ -157,7 +158,7 @@ void PrimaryIndex::insert (TransactionCollection* transColl,
   WRITE_LOCKER(_lock);
 
   bool writeOk;
-  TRI_doc_mptr_t* old = findRelevantRevision(transColl, trans, key, writeOk);
+  TRI_doc_mptr_t* old = findRelevantRevisionForWrite(transColl, trans, key, writeOk);
   if (! writeOk) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
   }
@@ -196,7 +197,7 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
   WRITE_LOCKER(_lock);
 
   bool writeOk;
-  TRI_doc_mptr_t* previous = findRelevantRevision(transColl, trans, key, writeOk);
+  TRI_doc_mptr_t* previous = findRelevantRevisionForWrite(transColl, trans, key, writeOk);
 
   if (! writeOk) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
@@ -286,11 +287,9 @@ Json PrimaryIndex::toJson (TRI_memory_zone_t* zone) const {
 
 TRI_doc_mptr_t* PrimaryIndex::lookup (TransactionCollection* transColl,
                         Transaction* trans,
-                        std::string const& key,
-                        Transaction::VisibilityType& visibility) {
-
-  bool writeOk;
-  return findRelevantRevision(transColl, trans, key, writeOk);
+                        std::string const& key) {
+  READ_LOCKER(_lock);
+  return findVisibleRevision(transColl, trans, key);
 }
 
 // -----------------------------------------------------------------------------
@@ -300,15 +299,15 @@ TRI_doc_mptr_t* PrimaryIndex::lookup (TransactionCollection* transColl,
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief findRelevantRevision, this gets a key and a transaction
 /// (via transColl). It looks up all revisions for that key in the
-/// primary index and looks for the relevant one. This is the one the
-/// transaction in transColl may see or one that witnesses a write
-/// conflict or nullptr if there is no such revision. The flag writeOk
-/// is set, if a write to that revision would be OK. Since everything
-/// happens under the lock, this information is valid as long as the
-/// lock is held.
+/// primary index and looks for the relevant one for a write operation
+/// (remove or insert). This is the one the transaction in transColl
+/// may see or one that witnesses a write conflict or nullptr if there
+/// is no such revision. The flag writeOk is set, if a write to that
+/// revision would be OK. Since everything happens under the lock, this
+/// information is valid as long as the lock is held.
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
+TRI_doc_mptr_t* PrimaryIndex::findRelevantRevisionForWrite (
                             TransactionCollection* transColl,
                             Transaction* trans,
                             std::string const& key,
@@ -367,6 +366,38 @@ TRI_doc_mptr_t* PrimaryIndex::findRelevantRevision (
     }
   }
   writeOk = true;
+  return nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief findVisibleRevision, this gets a key and a transaction
+/// (via transColl). It looks up all revisions for that key in the
+/// primary index and looks for the visible one. It returns a pointer
+/// to its master pointer or nullptr if there is no such revision.
+/// Since everything happens under the lock, this information is valid
+/// as long as the lock is held.
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* PrimaryIndex::findVisibleRevision (
+                            TransactionCollection* transColl,
+                            Transaction* trans,
+                            std::string const& key) const {
+  // We assume that we already have the lock!
+
+  // Get all available revisions:
+  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> revisions(_theHash->lookupByKey(&key));
+
+  // Now look through them and find "the right one":
+  TransactionId from;
+  TransactionId to;
+
+  for (auto p : *(revisions.get())) {
+    from = p->from();
+    to = p->to();
+    if (trans->isVisibleForRead(from, to)) {
+      return p;
+    }
+  }
   return nullptr;
 }
 

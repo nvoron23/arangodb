@@ -617,9 +617,8 @@ OperationResult CollectionOperations::ReadDocumentWorker (TransactionScope* tran
   
   auto primaryIndex = indexUser.primaryIndex();
  
-  auto visibility = Transaction::VisibilityType::VISIBLE;
   auto* transaction = transactionScope->transaction();
-  auto mptr = primaryIndex->lookup(collection, transaction, document.key, visibility);
+  auto mptr = primaryIndex->lookup(collection, transaction, document.key);
 
   if (mptr == nullptr) {
     return OperationResult(TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND);

@@ -77,7 +77,7 @@ describe("MVCC", function () {
 /// @brief test implicitly committed transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-  it("should correctly implement logic for implicit transactions", function () {
+  it("should MVCC implicit transactions correctly", function () {
     var c = db[cn];
     var d;
 
@@ -119,7 +119,7 @@ describe("MVCC", function () {
 /// @brief test explicitly committed transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-  it("should implement the MVCC logic correctly for explicit transactions",
+  it("should MVCC explicit transactions correctly ",
      function () {
     var c = db[cn];
     var d;
@@ -212,7 +212,7 @@ describe("MVCC", function () {
 /// @brief test implicitly committed transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-  it("should implement the MVCC logic correctly for explicitly aborted transactions",
+  it("should MVCC explicitly aborted transactions correctly",
      function () {
     var c = db[cn];
     var d;
@@ -310,7 +310,7 @@ describe("MVCC", function () {
 /// @brief test a second observing top level transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-  it("should implement the MVCC logic correctly for a separate observing top level transaction",
+  it("should MVCC separate observing top level transactions correctly",
      function () {
     var c = db[cn];
     var d;
@@ -323,11 +323,12 @@ describe("MVCC", function () {
       db._pushTransaction(t.id);
       var d;
       try {
-        d = c.document(key);
+        d = c.mvccDocument(key);
       }
       catch (e) {
         d = {};
       }
+      print("d is",d);
       if (visibility === "VISIBLE") {
         expect(d._key).toEqual(key);
         expect(d.Hallo).toEqual(value);

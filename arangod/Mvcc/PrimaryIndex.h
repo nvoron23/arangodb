@@ -84,8 +84,7 @@ namespace triagens {
 
         struct TRI_doc_mptr_t* lookup (TransactionCollection*,
                                        Transaction*,
-                                       std::string const& key,
-                                       Transaction::VisibilityType&);
+                                       std::string const& key);
 
         // a garbage collection function for the index
         void cleanup () override final;
@@ -125,11 +124,16 @@ namespace triagens {
 
         PrimaryIndexHash_t* _theHash;
 
-        TRI_doc_mptr_t* findRelevantRevision (
+        TRI_doc_mptr_t* findRelevantRevisionForWrite (
                     TransactionCollection* transColl,
                     Transaction*,
                     std::string const& key,
                     bool& writeOk) const;
+
+        TRI_doc_mptr_t* findVisibleRevision (
+                    TransactionCollection* transColl,
+                    Transaction*,
+                    std::string const& key) const;
     };
 
   }
