@@ -680,6 +680,271 @@ describe("MVCC", function () {
     verifyTransactionStack([]);
   });
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test explicitly committed subtransaction from the perspective
+/// of the parent transaction.
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should MVCC explicit subtransactions correctly from the parent perspective",
+     function () {
+    var c = db[cn];
+    verifyTransactionStack([]);
+
+    var par = db._beginTransaction();
+    verifyTransactionStack([par]);
+
+    // Create a document, explicit transaction:
+    var trx = db._beginTransaction();
+    c.mvccInsert({_key: "doc1", Hallo: 1});
+    // Read within the same transaction:
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+    // Now let the parent have a look:
+    db._popTransaction(trx.id);
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+    db._pushTransaction(trx.id);
+    verifyTransactionStack([par, trx]);
+
+    db._commitTransaction(trx.id);
+    
+    // Read with in the context of the parent:
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+
+    // Read with an explicit subtransaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Replace a document, explicit subtransaction:
+    trx = db._beginTransaction();
+    c.mvccReplace("doc1", {Hallo: 2});
+    // Read in the same transaction:
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+    // Now let the parent have a look:
+    db._popTransaction(trx.id);
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+    db._pushTransaction(trx.id);
+    verifyTransactionStack([par, trx]);
+
+    db._commitTransaction(trx.id);
+    
+    // Read in the context of the parent:
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+    
+    // Read with an explicit subtransaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Update a document, explicit transaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    c.mvccUpdate("doc1", {Hallo: 3});
+
+    // Read within same transaction:
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+    // Now let the parent have a look:
+    db._popTransaction(trx.id);
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+    db._pushTransaction(trx.id);
+    verifyTransactionStack([par, trx]);
+
+    db._commitTransaction(trx.id);
+    
+    // Read in the context of the parent:
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+    
+    // Read with an explicit subtransaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Try to find a non-existing document, explicit transaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc2", null, "INVISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Remove a document, explicit subtransactions:
+    trx = db._beginTransaction();
+    expect(c.mvccRemove("doc1")).toEqual(true);
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+    // Now let the parent have a look:
+    db._popTransaction(trx.id);
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+    db._pushTransaction(trx.id);
+    verifyTransactionStack([par, trx]);
+
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Check in the context of the parent:
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+
+    // Read with an explicit subtransaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // End main transaction:
+    db._commitTransaction(par.id);
+    verifyTransactionStack([]);
+  });
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test explicitly aborted subtransaction from the perspective
+/// of the parent transaction.
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should MVCC explicit aborted subtransactions correctly from the parent perspective",
+     function () {
+    var c = db[cn];
+    verifyTransactionStack([]);
+
+    var par = db._beginTransaction();
+    verifyTransactionStack([par]);
+
+    // Create a document, explicit transaction:
+    var trx = db._beginTransaction();
+    c.mvccInsert({_key: "doc1", Hallo: 1});
+    // Read within the same transaction:
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+    // Now let the parent have a look:
+    db._popTransaction(trx.id);
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+    db._pushTransaction(trx.id);
+    verifyTransactionStack([par, trx]);
+
+    db._rollbackTransaction(trx.id);
+    
+    // Read with in the context of the parent:
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+
+    // Read with an explicit subtransaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Not really insert the document:
+    c.mvccInsert({_key: "doc1", Hallo: 1});
+
+    // Replace a document, explicit subtransaction:
+    trx = db._beginTransaction();
+    c.mvccReplace("doc1", {Hallo: 2});
+    // Read in the same transaction:
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+    // Now let the parent have a look:
+    db._popTransaction(trx.id);
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+    db._pushTransaction(trx.id);
+    verifyTransactionStack([par, trx]);
+
+    db._rollbackTransaction(trx.id);
+    
+    // Read in the context of the parent:
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+    
+    // Read with an explicit subtransaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Now really replace it:
+    c.mvccReplace("doc1", {Hallo: 2});
+
+    // Update a document, explicit transaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    c.mvccUpdate("doc1", {Hallo: 3});
+
+    // Read within same transaction:
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+    // Now let the parent have a look:
+    db._popTransaction(trx.id);
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+    db._pushTransaction(trx.id);
+    verifyTransactionStack([par, trx]);
+
+    db._rollbackTransaction(trx.id);
+    
+    // Read in the context of the parent:
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+    
+    // Read with an explicit subtransaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Now really update the document:
+    c.mvccUpdate("doc1", {Hallo: 3});
+
+    // Remove a document, explicit subtransactions:
+    trx = db._beginTransaction();
+    expect(c.mvccRemove("doc1")).toEqual(true);
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+    // Now let the parent have a look:
+    db._popTransaction(trx.id);
+    verifyTransactionStack([par]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+    db._pushTransaction(trx.id);
+    verifyTransactionStack([par, trx]);
+
+    db._rollbackTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Check in the context of the parent:
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+
+    // Read with an explicit subtransaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([par, trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([par]);
+
+    // Now really remove it:
+    expect(c.mvccRemove("doc1")).toEqual(true);
+
+    // End main transaction:
+    db._commitTransaction(par.id);
+    verifyTransactionStack([]);
+  });
+
 });
 
 // Local Variables:
