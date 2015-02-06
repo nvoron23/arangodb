@@ -363,6 +363,7 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
   }
  
   bool top = false;
+  bool pop = false;
   double ttl = 0.0;
 
   if (args.Length() > 0) {
@@ -373,6 +374,9 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
     auto obj = args[0]->ToObject();
     if (obj->Has(TRI_V8_ASCII_STRING("top"))) {
       top = TRI_ObjectToBoolean(obj->Get(TRI_V8_ASCII_STRING("top")));
+    }
+    if (obj->Has(TRI_V8_ASCII_STRING("pop"))) {
+      pop = TRI_ObjectToBoolean(obj->Get(TRI_V8_ASCII_STRING("pop")));
     }
     if (obj->Has(TRI_V8_ASCII_STRING("ttl"))) {
       ttl = TRI_ObjectToDouble(obj->Get(TRI_V8_ASCII_STRING("ttl")));
@@ -388,11 +392,21 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
   // not capturing the result transaction is intentional. this is not a mem-leak
   // per se, as the transaction manager still knows the transaction and can delete it
   try {
-    bool canBeSubTransaction = ! top;
+    bool const canBeSubTransaction = ! top;
     auto transactionScope = new triagens::mvcc::TransactionScope(vocbase, true, canBeSubTransaction, ttl);
 
+    auto transaction = transactionScope->transaction();
+    auto id = transaction->id();
+
+    if (pop) {
+      // the just-created transaction must be at the top of the stack
+      triagens::mvcc::TransactionStackAccessor accessor;
+      TRI_ASSERT_EXPENSIVE(accessor.peek() == transaction);
+      accessor.pop();
+    }
+
     v8::Handle<v8::Object> result = v8::Object::New(isolate);
-    result->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, transactionScope->transaction()->id()));
+    result->ForceSet(TRI_V8_STRING("id"), V8TransactionId(isolate, id));
 
     TRI_V8_RETURN(result);
   }
