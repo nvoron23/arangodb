@@ -94,7 +94,7 @@ void SubTransaction::commit () {
 
   _status = StatusType::COMMITTED;
   _parentTransaction->subTransactionFinished(this);
-  _transactionManager->deleteRunningTransaction(this, false /* TODO */);
+  _transactionManager->deleteRunningTransaction(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -115,7 +115,7 @@ void SubTransaction::rollback () {
 
   _status = StatusType::ROLLED_BACK;
   _parentTransaction->subTransactionFinished(this);
-  _transactionManager->deleteRunningTransaction(this, false /* TODO */);
+  _transactionManager->deleteRunningTransaction(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -177,8 +177,7 @@ namespace triagens {
 /// deletes the transaction object
 ////////////////////////////////////////////////////////////////////////////////
 
-        void deleteRunningTransaction (Transaction*,
-                                       bool) override final;
+        void deleteRunningTransaction (Transaction*) override final;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods

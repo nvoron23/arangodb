@@ -59,7 +59,6 @@ Transaction::Transaction (TransactionManager* transactionManager,
     _vocbase(vocbase),
     _startTime(TRI_microtime()),
     _status(Transaction::StatusType::ONGOING),
-    _flags(),
     _ongoingSubTransaction(nullptr),
     _committedSubTransactions(),
     _stats(),
@@ -86,6 +85,34 @@ Transaction::~Transaction () {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the transaction contains successful data-modifying 
+/// operations (failed operations are not included)
+////////////////////////////////////////////////////////////////////////////////
+
+bool Transaction::hasModifications () const {
+  for (auto const& it : _stats) {
+    if (it.second.hasModifications()) {
+      return true;
+    }
+  }
+  return false;
+} 
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the transaction must sync on commit
+////////////////////////////////////////////////////////////////////////////////
+
+bool Transaction::hasWaitForSync () const {
+  for (auto const& it : _stats) {
+    // check if we must sync
+    if (it.second.waitForSync) {
+      return true;
+    }
+  }
+  return false;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief update the number of inserted documents
@@ -172,15 +199,15 @@ void Transaction::subTransactionFinished (Transaction* transaction) {
   auto const status = transaction->status();
 
   if (status == StatusType::COMMITTED) { 
-    bool hasAnyOperation = false;
+    bool hasAnyModifications = false;
 
     // sub-transaction has committed, now copy its stats into our stats
     for (auto const& it : transaction->_stats) {
-      if (! it.second.hasOperations()) {
+      if (! it.second.hasModifications()) {
         continue;
       }
 
-      hasAnyOperation = true;
+      hasAnyModifications = true;
 
       auto it2 = _stats.find(it.first);
       if (it2 != _stats.end()) {
@@ -195,9 +222,18 @@ void Transaction::subTransactionFinished (Transaction* transaction) {
     
     // track the id of the transaction, but only if the transaction has actually
     // modified data
-    if (hasAnyOperation) { 
+    if (hasAnyModifications) { 
       _committedSubTransactions.emplace(id.own());
     }
+
+    // copy all committed sub-transactions of other into ourselves
+    auto const& cst = transaction->_committedSubTransactions;
+    _committedSubTransactions.insert(cst.begin(), cst.end());
+  }
+  else {
+    // remove the transaction from the list of already committed 
+    // sub-transactions, as it might be in there!
+    _committedSubTransactions.erase(id.own());
   }
   
   // now delete the stats of the sub-transaction as they are not needed anymore
@@ -294,7 +330,6 @@ Transaction::StatusType Transaction::statusSubTransaction (TransactionId const& 
     return Transaction::StatusType::ONGOING;
   }
 
-  // we should never get here
   return Transaction::StatusType::ROLLED_BACK;
 }
 
@@ -332,6 +367,23 @@ namespace triagens {
           break;
         case Transaction::VisibilityType::VISIBLE:
           stream << "VISIBLE";
+          break;
+       }
+
+       return stream;
+     }
+
+     std::ostream& operator<< (std::ostream& stream,
+                               Transaction::StatusType status) {
+       switch (status) {
+        case Transaction::StatusType::ONGOING:
+          stream << "ONGOING";
+          break;
+        case Transaction::StatusType::COMMITTED:
+          stream << "COMMITTED";
+          break;
+        case Transaction::StatusType::ROLLED_BACK:
+          stream << "ROLLED BACK";
           break;
        }
 

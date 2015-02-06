@@ -849,7 +849,7 @@ describe("MVCC", function () {
     db._commitTransaction(trx.id);
     verifyTransactionStack([par]);
 
-    // Not really insert the document:
+    // Now really insert the document:
     c.mvccInsert({_key: "doc1", Hallo: 1});
 
     // Replace a document, explicit subtransaction:

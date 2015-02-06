@@ -40,21 +40,21 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     struct CollectionStats {
-      inline bool hasOperations () const {
-        return (numInserted > 0 || numRemoved > 0); 
+      inline bool hasModifications () const {
+        return (numInserted > 0 || numRemoved > 0);
       }
 
       void merge (CollectionStats const& other) {
-        numInserted += other.numInserted;
-        numRemoved  += other.numRemoved;
+        numInserted      += other.numInserted;
+        numRemoved       += other.numRemoved;
 
         waitForSync |= other.waitForSync;
       }
 
-      size_t numInserted   = 0;
-      size_t numRemoved    = 0;
+      size_t numInserted      = 0;
+      size_t numRemoved       = 0;
 
-      bool   waitForSync   = false;
+      bool   waitForSync      = false;
     };
 
   }
