@@ -43,15 +43,37 @@ describe("MVCC", function () {
 
   var cn = "UnitTestsMvcc";
 
-  function verifyDocumentNotFound (key) {
+  function verifyVisibilityForTransaction (t, key, value, visibility) {
     var c = db[cn];
-
-    try {
-      var d = c.mvccDocument(key);
-      expect("should throw").toEqual("document not found");
-    } catch (e) {
-      expect(e.errorNum).toEqual(1202);
+    if (t !== null) {
+      db._pushTransaction(t.id);
     }
+    var d;
+    var error;
+    try {
+      d = c.mvccDocument(key);
+      error = {};
+    }
+    catch (e) {
+      d = {};
+      error = e;
+    }
+    if (visibility === "VISIBLE") {
+      expect(d._key).toEqual(key);
+      expect(d.Hallo).toEqual(value);
+    }
+    else if (visibility === "INVISIBLE") {
+      expect(d).toEqual({});
+      expect(error.errorNum).toEqual(1202);
+    }
+    if (t != null) {
+      db._popTransaction(t.id);
+    }
+  }
+
+  function verifyTransactionStack (stack) {
+    expect(db._stackTransactions().map(function(t) { return t.id; }))
+       .toEqual(stack.map(function(t) { return t.id; }));
   }
 
   beforeEach(function () {
@@ -79,39 +101,34 @@ describe("MVCC", function () {
 
   it("should MVCC implicit transactions correctly", function () {
     var c = db[cn];
-    var d;
-
-    expect(db._stackTransactions()).toEqual([]);
+    verifyTransactionStack([]);
 
     // Create a document, implicit transactions:
     c.mvccInsert({_key: "doc1", Hallo: 1});
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
 
     // Replace a document, implicit transactions:
     c.mvccReplace("doc1", {Hallo: 2});
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(2);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
     
     // Update a document, implicit transactions:
     c.mvccUpdate("doc1", {Hallo: 3});
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(3);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
     
     // Try to find a non-existing document:
-    verifyDocumentNotFound("doc2");
-    try {
-      d = c.mvccDocument("doc2");
-      expect("should throw").toEqual("document not found");
-    } catch (e1) {
-      expect(e1.errorNum).toEqual(1202);
-    }
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc2", null, "INVISIBLE");
 
     // Remove a document, implicit transactions:
     expect(c.mvccRemove("doc1")).toEqual(true);
+
+    // See if it is gone:
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
+
     expect(db._stackTransactions()).toEqual([]);
   });
       
@@ -122,188 +139,176 @@ describe("MVCC", function () {
   it("should MVCC explicit transactions correctly ",
      function () {
     var c = db[cn];
-    var d;
-
-    expect(db._stackTransactions()).toEqual([]);
+    verifyTransactionStack([]);
 
     // Create a document, explicit transaction:
     var trx = db._beginTransaction();
     c.mvccInsert({_key: "doc1", Hallo: 1});
     // Read within the same transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
-    db._commitTransaction(trx.id);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
 
-    expect(db._stackTransactions()).toEqual([]);
+    db._commitTransaction(trx.id);
     
     // Read with an implicit transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
 
     // Read with an explicit transaction:
     trx = db._beginTransaction();
-    d = c.mvccDocument("doc1");
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
     db._commitTransaction(trx.id);
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
+    verifyTransactionStack([]);
 
     // Replace a document, explicit transaction:
     trx = db._beginTransaction();
     c.mvccReplace("doc1", {Hallo: 2});
     // Read in the same transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(2);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+
     db._commitTransaction(trx.id);
     
-    expect(db._stackTransactions()).toEqual([]);
-    
     // Read with an implicit transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(2);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
     
     // Read with an explicit transaction:
     trx = db._beginTransaction();
-    d = c.mvccDocument("doc1");
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
     db._commitTransaction(trx.id);
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(2);
 
     // Update a document, explicit transaction:
     trx = db._beginTransaction();
     c.mvccUpdate("doc1", {Hallo: 3});
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(3);
+
+    // Read within same transaction:
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
     db._commitTransaction(trx.id);
     
     // Read with an implicit transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(3);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
     
     // Read with an explicit transaction:
     trx = db._beginTransaction();
-    d = c.mvccDocument("doc1");
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
     db._commitTransaction(trx.id);
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(3);
 
     // Try to find a non-existing document, explicit transaction:
-    try {
-      trx = db._beginTransaction();
-      d = c.mvccDocument("doc2");
-      expect("to throw").toEqual("document not found");
-    } catch (e1) {
-      db._commitTransaction(trx.id);
-      expect(e1.errorNum).toEqual(1202);
-    }
+    trx = db._beginTransaction();
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc2", null, "INVISIBLE");
+    db._commitTransaction(trx.id);
 
     // Remove a document, explicit transactions:
     trx = db._beginTransaction();
     expect(c.mvccRemove("doc1")).toEqual(true);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
     db._commitTransaction(trx.id);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
   });
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief test implicitly committed transactions
+/// @brief test explicitly aborted transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-  it("should MVCC explicitly aborted transactions correctly",
+  it("should MVCC explicitly aborted transactions correctly ",
      function () {
     var c = db[cn];
-    var d;
-
-    expect(db._stackTransactions()).toEqual([]);
+    verifyTransactionStack([]);
 
     // Create a document, explicit transaction:
     var trx = db._beginTransaction();
     c.mvccInsert({_key: "doc1", Hallo: 1});
     // Read within the same transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
-    db._rollbackTransaction(trx.id);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
 
-    expect(db._stackTransactions()).toEqual([]);
+    db._rollbackTransaction(trx.id);
     
     // Read with an implicit transaction:
-    verifyDocumentNotFound("doc1");
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
 
     // Read with an explicit transaction:
     trx = db._beginTransaction();
-    verifyDocumentNotFound("doc1");
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
     db._commitTransaction(trx.id);
+    verifyTransactionStack([]);
 
+    // Create it after all:
     c.mvccInsert({_key: "doc1", Hallo: 1});
 
-    // Replace a document, explicitly aborted transaction:
+    // Replace a document, explicit transaction:
     trx = db._beginTransaction();
     c.mvccReplace("doc1", {Hallo: 2});
     // Read in the same transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(2);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+
     db._rollbackTransaction(trx.id);
     
-    expect(db._stackTransactions()).toEqual([]);
-    
     // Read with an implicit transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
     
     // Read with an explicit transaction:
     trx = db._beginTransaction();
-    d = c.mvccDocument("doc1");
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
     db._commitTransaction(trx.id);
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
 
-    // Update a document, explicitly aborted transaction:
+    // Now actuall replace it:
+    c.mvccReplace("doc1", {Hallo: 2});
+
+    // Update a document, explicit transaction:
     trx = db._beginTransaction();
     c.mvccUpdate("doc1", {Hallo: 3});
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(3);
+
+    // Read within same transaction:
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+
     db._rollbackTransaction(trx.id);
     
-    expect(db._stackTransactions()).toEqual([]);
-    
     // Read with an implicit transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
     
     // Read with an explicit transaction:
     trx = db._beginTransaction();
-    d = c.mvccDocument("doc1");
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
     db._commitTransaction(trx.id);
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
+
+    // Now really update:
+    c.mvccUpdate("doc1", {Hallo: 3});
+
+    // Try to find a non-existing document, explicit transaction:
+    trx = db._beginTransaction();
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc2", null, "INVISIBLE");
+    db._commitTransaction(trx.id);
 
     // Remove a document, explicit transactions:
     trx = db._beginTransaction();
     expect(c.mvccRemove("doc1")).toEqual(true);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", null, "INVISIBLE");
     db._rollbackTransaction(trx.id);
+    verifyTransactionStack([]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
 
-    expect(db._stackTransactions()).toEqual([]);
-    
-    // Read with an implicit transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
-    
-    // Read with an explicit transaction:
-    trx = db._beginTransaction();
-    d = c.mvccDocument("doc1");
-    db._commitTransaction(trx.id);
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
-
+    // Now really remove it:
+    expect(c.mvccRemove("doc1")).toEqual(true);
   });
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -319,59 +324,41 @@ describe("MVCC", function () {
         t3,     // started after operation but during trx
         t4;     // started after trx committed
 
-    function testVisibilityForTransaction (t, key, value, visibility) {
-      db._pushTransaction(t.id);
-      var d;
-      try {
-        d = c.mvccDocument(key);
-      }
-      catch (e) {
-        d = {};
-      }
-      print("d is",d);
-      if (visibility === "VISIBLE") {
-        expect(d._key).toEqual(key);
-        expect(d.Hallo).toEqual(value);
-      }
-      else if (visibility === "INVISIBLE") {
-        expect(d).toEqual({});
-      }
-      db._popTransaction(t.id);
-    }
-
-    expect(db._stackTransactions()).toEqual([]);
+    verifyTransactionStack([]);
 
     t1 = db._beginTransaction({top: true}); db._popTransaction();
 
-    expect(db._stackTransactions()).toEqual([]);
+    verifyTransactionStack([]);
 
     // Create a document, explicit transaction:
     var trx = db._beginTransaction();
 
+    verifyTransactionStack([trx]);
     t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
 
     c.mvccInsert({_key: "doc1", Hallo: 1});
     // Read within the same transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(1);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
 
     t3 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
 
-    testVisibilityForTransaction(t1, "doc1", null, "INVISIBLE");
-    testVisibilityForTransaction(t2, "doc1", null, "INVISIBLE");
-    testVisibilityForTransaction(t3, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t1, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", null, "INVISIBLE");
 
     db._commitTransaction(trx.id);
+    verifyTransactionStack([]);
 
-    expect(db._stackTransactions()).toEqual([]);
-    
     t4 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
 
-    testVisibilityForTransaction(t1, "doc1", null, "INVISIBLE");
-    testVisibilityForTransaction(t2, "doc1", null, "INVISIBLE");
-    testVisibilityForTransaction(t3, "doc1", null, "INVISIBLE");
-    testVisibilityForTransaction(t4, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t1, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t4, "doc1", 1, "VISIBLE");
 
     db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
     db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
@@ -381,33 +368,38 @@ describe("MVCC", function () {
     // Replace a document, explicit transaction:
 
     t1 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
 
     trx = db._beginTransaction();
-    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
 
-    testVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
 
     c.mvccReplace("doc1", {Hallo: 2});
     t3 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
 
-    testVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
-    testVisibilityForTransaction(t3, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 1, "VISIBLE");
 
     // Read in the same transaction:
-    d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(2);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+
     db._commitTransaction(trx.id);
+    verifyTransactionStack([]);
     t4 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
     
-    expect(db._stackTransactions()).toEqual([]);
-    
-    testVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
-    testVisibilityForTransaction(t3, "doc1", 1, "VISIBLE");
-    testVisibilityForTransaction(t4, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t4, "doc1", 2, "VISIBLE");
 
     db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
     db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
@@ -417,33 +409,39 @@ describe("MVCC", function () {
     // Update a document, explicit transaction:
 
     t1 = db._beginTransaction({top: true}); db._popTransaction();
-    trx = db._beginTransaction();
-    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
 
-    testVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+    trx = db._beginTransaction();
+    verifyTransactionStack([trx]);
+
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
 
     c.mvccUpdate("doc1", {Hallo: 3});
     t3 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
 
-    testVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
-    testVisibilityForTransaction(t3, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 2, "VISIBLE");
 
     // Read in the same transaction:
     d = c.mvccDocument("doc1");
-    expect(d._key).toEqual("doc1");
-    expect(d.Hallo).toEqual(3);
-    db._commitTransaction(trx.id);
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
     
-    expect(db._stackTransactions()).toEqual([]);
+    db._commitTransaction(trx.id);
+    verifyTransactionStack([]);
 
     t4 = db._beginTransaction({top: true}); db._popTransaction();
 
-    testVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
-    testVisibilityForTransaction(t3, "doc1", 2, "VISIBLE");
-    testVisibilityForTransaction(t4, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t4, "doc1", 3, "VISIBLE");
 
     db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
     db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
@@ -452,37 +450,234 @@ describe("MVCC", function () {
 
     // Remove a document, explicit transactions:
     t1 = db._beginTransaction({top: true}); db._popTransaction();
-    trx = db._beginTransaction();
-    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
 
-    testVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+    trx = db._beginTransaction();
+    verifyTransactionStack([trx]);
+
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
 
     expect(c.mvccRemove("doc1")).toEqual(true);
 
     t3 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
 
-    testVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
-    testVisibilityForTransaction(t3, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 3, "VISIBLE");
 
     db._commitTransaction(trx.id);
-
-    expect(db._stackTransactions()).toEqual([]);
+    verifyTransactionStack([]);
 
     t4 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
 
-    testVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
-    testVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
-    testVisibilityForTransaction(t3, "doc1", 3, "VISIBLE");
-    testVisibilityForTransaction(t4, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t4, "doc1", null, "INVISIBLE");
 
     db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
     db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
     db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
     db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
 
-    expect(db._stackTransactions()).toEqual([]);
+    verifyTransactionStack([]);
+  });
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test a second observing top level transaction
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should MVCC separate observing top level transactions correctly (abort)",
+     function () {
+    var c = db[cn];
+    var d;
+    var t1,     // started before trx
+        t2,     // started after trx but before operation
+        t3,     // started after operation but during trx
+        t4;     // started after trx committed
+
+    verifyTransactionStack([]);
+
+    t1 = db._beginTransaction({top: true}); db._popTransaction();
+
+    verifyTransactionStack([]);
+
+    // Create a document, explicit transaction:
+    var trx = db._beginTransaction();
+
+    verifyTransactionStack([trx]);
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    c.mvccInsert({_key: "doc1", Hallo: 1});
+    // Read within the same transaction:
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 1, "VISIBLE");
+
+    t3 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", null, "INVISIBLE");
+
+    db._rollbackTransaction(trx.id);
+    verifyTransactionStack([]);
+
+    t4 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
+
+    verifyVisibilityForTransaction(t1, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", null, "INVISIBLE");
+    verifyVisibilityForTransaction(t4, "doc1", null, "INVISIBLE");
+
+    db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
+    db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
+    db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
+    db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
+
+    // Really insert it after all:
+    c.mvccInsert({_key: "doc1", Hallo: 1});
+
+    // Replace a document, explicit transaction:
+
+    t1 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
+
+    trx = db._beginTransaction();
+    verifyTransactionStack([trx]);
+
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+
+    c.mvccReplace("doc1", {Hallo: 2});
+    t3 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 1, "VISIBLE");
+
+    // Read in the same transaction:
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 2, "VISIBLE");
+
+    db._rollbackTransaction(trx.id);
+    verifyTransactionStack([]);
+    t4 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
+    
+    verifyVisibilityForTransaction(t1, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 1, "VISIBLE");
+    verifyVisibilityForTransaction(t4, "doc1", 1, "VISIBLE");
+
+    db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
+    db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
+    db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
+    db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
+
+    // Replace it after all:
+    c.mvccReplace("doc1", {Hallo: 2});
+
+    // Update a document, explicit transaction:
+
+    t1 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
+
+    trx = db._beginTransaction();
+    verifyTransactionStack([trx]);
+
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+
+    c.mvccUpdate("doc1", {Hallo: 3});
+    t3 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 2, "VISIBLE");
+
+    // Read in the same transaction:
+    d = c.mvccDocument("doc1");
+    verifyTransactionStack([trx]);
+    verifyVisibilityForTransaction(null, "doc1", 3, "VISIBLE");
+    
+    db._rollbackTransaction(trx.id);
+    verifyTransactionStack([]);
+
+    t4 = db._beginTransaction({top: true}); db._popTransaction();
+
+    verifyVisibilityForTransaction(t1, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 2, "VISIBLE");
+    verifyVisibilityForTransaction(t4, "doc1", 2, "VISIBLE");
+
+    db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
+    db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
+    db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
+    db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
+
+    // Update it after all:
+    c.mvccUpdate("doc1", {Hallo: 3});
+
+    // Remove a document, explicit transactions:
+    t1 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
+
+    trx = db._beginTransaction();
+    verifyTransactionStack([trx]);
+
+    t2 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+
+    expect(c.mvccRemove("doc1")).toEqual(true);
+
+    t3 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([trx]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 3, "VISIBLE");
+
+    db._rollbackTransaction(trx.id);
+    verifyTransactionStack([]);
+
+    t4 = db._beginTransaction({top: true}); db._popTransaction();
+    verifyTransactionStack([]);
+
+    verifyVisibilityForTransaction(t1, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t2, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t3, "doc1", 3, "VISIBLE");
+    verifyVisibilityForTransaction(t4, "doc1", 3, "VISIBLE");
+
+    db._pushTransaction(t4.id); db._rollbackTransaction(t4.id);
+    db._pushTransaction(t3.id); db._rollbackTransaction(t3.id);
+    db._pushTransaction(t2.id); db._rollbackTransaction(t2.id);
+    db._pushTransaction(t1.id); db._rollbackTransaction(t1.id);
+
+    verifyTransactionStack([]);
+
+    // Now finally really remove it:
+    expect(c.mvccRemove("doc1")).toEqual(true);
+    verifyTransactionStack([]);
   });
 
 });
