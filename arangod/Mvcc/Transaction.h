@@ -373,6 +373,8 @@ namespace triagens {
         friend std::ostream& operator<< (std::ostream&, Transaction const*);
     
         friend std::ostream& operator<< (std::ostream&, Transaction const&);
+        
+        friend std::ostream& operator<< (std::ostream&, VisibilityType);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief visibility, this implements the MVCC logic of what this transaction

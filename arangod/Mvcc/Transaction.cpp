@@ -321,6 +321,22 @@ namespace triagens {
        return stream;
      }
 
+     std::ostream& operator<< (std::ostream& stream,
+                               Transaction::VisibilityType visibility) {
+       switch (visibility) {
+        case Transaction::VisibilityType::INVISIBLE:
+          stream << "INVISIBILE";
+          break;
+        case Transaction::VisibilityType::CONCURRENT:
+          stream << "CONCURRENT";
+          break;
+        case Transaction::VisibilityType::VISIBLE:
+          stream << "VISIBLE";
+          break;
+       }
+
+       return stream;
+     }
   }
 }
 
