@@ -64,9 +64,7 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
 ////////////////////////////////////////////////////////////////////////////////
 
 TopLevelTransaction::~TopLevelTransaction () {
-  if (_runningTransactions != nullptr) {
-    delete _runningTransactions;
-  }
+  delete _runningTransactions;
 
   // go through all the collections that have been registered and close them properly
   for (auto it : _collectionIds) {
