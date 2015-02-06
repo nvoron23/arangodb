@@ -295,7 +295,6 @@ Transaction::StatusType Transaction::statusSubTransaction (TransactionId const& 
   }
 
   // we should never get here
-  TRI_ASSERT(false);
   return Transaction::StatusType::ROLLED_BACK;
 }
 
