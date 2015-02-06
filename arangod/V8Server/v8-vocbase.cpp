@@ -166,6 +166,27 @@ static inline v8::Handle<v8::Value> V8TransactionId (v8::Isolate* isolate,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief extract a transaction id from a V8 value
+////////////////////////////////////////////////////////////////////////////////
+
+static bool ExtractTransactionId (v8::Isolate* isolate,
+                                  v8::Handle<v8::Value> const value, 
+                                  TRI_voc_tid_t& result) {
+
+  if (value->IsObject()) {
+    auto obj = value->ToObject();
+    if (! obj->Has(TRI_V8_ASCII_STRING("id"))) {
+      return false;
+    }
+    result = TRI_ObjectToUInt64(obj->Get(TRI_V8_ASCII_STRING("id")), true);
+  }
+  else {
+    result = TRI_ObjectToUInt64(value, true);
+  }
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief execute a function in an MVCC transaction
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -432,7 +453,11 @@ static void JS_CommitTransactionDatabase (const v8::FunctionCallbackInfo<v8::Val
     TRI_V8_THROW_EXCEPTION_USAGE("_commitTransaction(<id>)");
   }
 
-  auto id = TRI_ObjectToUInt64(args[0], true);
+  TRI_voc_tid_t id = 0;
+  if (! ExtractTransactionId(isolate, args[0], id)) {
+    TRI_V8_THROW_EXCEPTION_USAGE("_commitTransaction(<id>)");
+  }
+
   auto transactionManager = triagens::mvcc::TransactionManager::instance();
 
   try {
@@ -488,7 +513,11 @@ static void JS_RollbackTransactionDatabase (const v8::FunctionCallbackInfo<v8::V
     TRI_V8_THROW_EXCEPTION_USAGE("_rollbackTransaction(<id>)");
   }
 
-  auto id = TRI_ObjectToUInt64(args[0], true);
+  TRI_voc_tid_t id = 0;
+  if (! ExtractTransactionId(isolate, args[0], id)) {
+    TRI_V8_THROW_EXCEPTION_USAGE("_rollbackTransaction(<id>)");
+  }
+
   auto transactionManager = triagens::mvcc::TransactionManager::instance();
 
   try {
@@ -540,7 +569,9 @@ static void JS_PopTransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>
 
   TRI_voc_tid_t id = 0;
   if (args.Length() > 0) {
-    id = TRI_ObjectToUInt64(args[0], true);
+    if (! ExtractTransactionId(isolate, args[0], id)) {
+      TRI_V8_THROW_EXCEPTION_USAGE("_popTransaction(<id>)");
+    }
   }
 
   auto transactionManager = triagens::mvcc::TransactionManager::instance();
@@ -606,7 +637,10 @@ static void JS_PushTransactionDatabase (const v8::FunctionCallbackInfo<v8::Value
     TRI_V8_THROW_EXCEPTION_USAGE("_pushTransaction(<id>)");
   }
 
-  TRI_voc_tid_t id = TRI_ObjectToUInt64(args[0], true);
+  TRI_voc_tid_t id = 0;
+  if (! ExtractTransactionId(isolate, args[0], id)) {
+    TRI_V8_THROW_EXCEPTION_USAGE("_pushTransaction(<id>)");
+  }
 
   auto transactionManager = triagens::mvcc::TransactionManager::instance();
 
