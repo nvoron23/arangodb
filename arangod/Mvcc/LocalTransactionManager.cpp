@@ -300,36 +300,6 @@ std::vector<TransactionInfo> LocalTransactionManager::runningTransactions (TRI_v
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief initializes a transaction with state
-////////////////////////////////////////////////////////////////////////////////
-
-void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
-  TRI_ASSERT(transaction->isOngoing());
-
-  if (transaction->isTopLevel()) {
-    std::unique_ptr<std::unordered_set<TransactionId::InternalType>> runningTransactions(new std::unordered_set<TransactionId::InternalType>());
-    auto set = runningTransactions.get();
-
-    set->reserve(16);
-
-    {
-      // copy the list of currently running transactions into the transaction
-      READ_LOCKER(_lock);
-      set->reserve(_runningTransactions.size());
-
-      for (auto it : _runningTransactions) {
-        set->emplace(it.first);
-      }
-    }
-
-    // outside the lock
-    static_cast<TopLevelTransaction*>(transaction)->setStartState(runningTransactions);
-  }
-
-  transaction->_flags.initialized();
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -395,6 +365,37 @@ void LocalTransactionManager::deleteRunningTransaction (Transaction* transaction
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief initializes a transaction with state
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
+  TRI_ASSERT(transaction->isOngoing());
+
+  if (transaction->isTopLevel()) {
+    std::unique_ptr<std::unordered_set<TransactionId::InternalType>> runningTransactions(new std::unordered_set<TransactionId::InternalType>());
+    auto set = runningTransactions.get();
+
+    set->reserve(16);
+
+    {
+      // copy the list of currently running transactions into the transaction
+      set->reserve(_runningTransactions.size());
+
+      for (auto it : _runningTransactions) {
+        set->emplace(it.first);
+      }
+    }
+
+    // outside the lock
+    if (! runningTransactions.get()->empty()) {
+      static_cast<TopLevelTransaction*>(transaction)->setStartState(runningTransactions);
+    }
+  }
+
+  transaction->_flags.initialized();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief increment the transaction id counter and return it
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -424,6 +425,8 @@ void LocalTransactionManager::insertRunningTransaction (Transaction* transaction
     _runningTransactions.erase(it.second);
     throw;
   }
+
+  initializeTransaction(transaction);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
