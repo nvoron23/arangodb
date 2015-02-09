@@ -164,7 +164,7 @@ void HashIndex::insert (TransactionCollection*,
     WRITE_LOCKER(_lock);
     std::unique_ptr<Element> hashElement(allocAndFillElement(doc));
     std::unique_ptr<std::vector<Element*>> revisions 
-        (_theHash->lookupWithElementByKey(hashElement));
+        (_theHash->lookupWithElementByKey(hashElement.get()));
 
     // We need to check whether or not there is any document/revision
     // that is in conflict with the new one, that is, its to() entry is
