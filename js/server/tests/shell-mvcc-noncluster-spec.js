@@ -98,7 +98,7 @@ describe("MVCC", function () {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief test implicitly committed transactions
 ////////////////////////////////////////////////////////////////////////////////
-
+/*
   it("should MVCC implicit transactions correctly", function () {
     var c = db[cn];
     verifyTransactionStack([]);
@@ -942,6 +942,66 @@ describe("MVCC", function () {
 
     // End main transaction:
     db._commitTransaction(par.id);
+    verifyTransactionStack([]);
+  });
+*/
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test visibility of various other transactions in the same top
+/// level transaction.
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should MVCC other subtransactions of the same top level correctly",
+     function () {
+    var c = db[cn];
+    verifyTransactionStack([]);
+    
+    // We indicate the events of the subtransaction tree by indentation:
+    var t1 = db._beginTransaction();  // The top level transaction
+      verifyTransactionStack([t1]);
+      c.mvccInsert({_key:"A",Hallo:1});
+      var t2 = db._beginTransaction();   // will be committed
+        c.mvccInsert({_key:"B",Hallo:1});
+        var t3 = db._beginTransaction();   // will be committed
+          c.mvccInsert({_key:"C",Hallo:1});
+        db._commitTransaction(t3.id);
+        c.mvccInsert({_key:"D",Hallo:1});
+        var t4 = db._beginTransaction();   // will be aborted
+          c.mvccInsert({_key:"E",Hallo:1});
+        db._rollbackTransaction(t4.id);
+        c.mvccInsert({_key:"F",Hallo:1});
+      db._commitTransaction(t2.id);
+      c.mvccInsert({_key:"G",Hallo:1});
+      var t5 = db._beginTransaction();   // will be aborted
+        c.mvccInsert({_key:"H",Hallo:1});
+        var t6 = db._beginTransaction();   // will be committed
+          c.mvccInsert({_key:"I",Hallo:1});
+        db._commitTransaction(t6.id);
+        c.mvccInsert({_key:"J",Hallo:1});
+        var t7 = db._beginTransaction();   // will be aborted
+          c.mvccInsert({_key:"K",Hallo:1});
+        db._rollbackTransaction(t7.id);
+        c.mvccInsert({_key:"L",Hallo:1});
+      db._rollbackTransaction(t5.id);
+      c.mvccInsert({_key:"M",Hallo:1});
+      var trx = db._beginTransaction();   // this is the one we test!
+        c.mvccInsert({_key:"N",Hallo:1});
+        verifyVisibilityForTransaction(null, "A", 1, "VISIBLE");
+        verifyVisibilityForTransaction(null, "B", 1, "VISIBLE");
+        verifyVisibilityForTransaction(null, "C", 1, "VISIBLE");
+        verifyVisibilityForTransaction(null, "D", 1, "VISIBLE");
+        verifyVisibilityForTransaction(null, "E", 1, "INVISIBLE");
+        verifyVisibilityForTransaction(null, "F", 1, "VISIBLE");
+        verifyVisibilityForTransaction(null, "G", 1, "VISIBLE");
+        verifyVisibilityForTransaction(null, "H", 1, "INVISIBLE");
+        verifyVisibilityForTransaction(null, "I", 1, "INVISIBLE");
+        verifyVisibilityForTransaction(null, "J", 1, "INVISIBLE");
+        verifyVisibilityForTransaction(null, "K", 1, "INVISIBLE");
+        verifyVisibilityForTransaction(null, "L", 1, "INVISIBLE");
+        verifyVisibilityForTransaction(null, "M", 1, "VISIBLE");
+        verifyVisibilityForTransaction(null, "N", 1, "VISIBLE");
+      db._commitTransaction(trx.id);
+    db._commitTransaction(t1.id);
+
     verifyTransactionStack([]);
   });
 
