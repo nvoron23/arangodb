@@ -555,6 +555,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
   
   // set data pointer to point to the marker just created
   MasterpointerContainer mptr = collection->masterpointerManager()->create(marker.get()->mem(), transactionId);
+  mptr->setFrom(transactionId);
   
   // iterate over all indexes while holding the index read-lock
   auto indexes = indexUser.indexes();
@@ -592,7 +593,6 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
   // make the master pointer point to the WAL location
   TRI_ASSERT_EXPENSIVE(writeResult.mem != nullptr);
   mptr->setDataPtr(writeResult.mem);
-  mptr->setFrom(transactionId);
 
   // link the master pointer in the list of master pointers of the collection 
   mptr.link();
