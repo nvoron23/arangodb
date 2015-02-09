@@ -240,7 +240,7 @@ static std::map<std::string, bool> ExtractCollections (v8::Isolate* isolate,
         auto c = TRI_ObjectToString(collection);
         auto it = result.find(c);
         if (it == result.end()) {
-          result.emplace(std::make_pair(c, false));
+          result.emplace(std::make_pair(c, true));
         }
         else {
           (*it).second = true;
@@ -252,7 +252,7 @@ static std::map<std::string, bool> ExtractCollections (v8::Isolate* isolate,
       auto it = result.find(c);
 
       if (it == result.end()) {
-        result.emplace(std::make_pair(c, false));
+        result.emplace(std::make_pair(c, true));
       }
       else {
         (*it).second = true;
@@ -353,14 +353,13 @@ static void JS_TransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& a
     TRI_V8_THROW_EXCEPTION_PARAMETER(actionError);
   }
 
-  v8::Handle<v8::Value> result;
-  {
+  try {
     triagens::mvcc::TransactionScope transactionScope(vocbase, collections, false, true, ttl);
     auto* transaction = transactionScope.transaction();
 
     v8::TryCatch tryCatch;
     v8::Handle<v8::Value> arguments = params;
-    result = action->Call(current, 1, &arguments);
+    v8::Handle<v8::Value> result = action->Call(current, 1, &arguments);
 
     if (tryCatch.HasCaught()) {
       transaction->rollback();
@@ -377,9 +376,15 @@ static void JS_TransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& a
     }
 
     transaction->commit();
+  
+    TRI_V8_RETURN(result);
   }
-
-  TRI_V8_RETURN(result);
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -471,7 +476,6 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
   bool top = false;
   bool pop = false;
   double ttl = 0.0;
-  std::map<std::string, bool> collections;
 
   if (args.Length() > 0) {
     if (! args[0]->IsObject()) {
@@ -488,8 +492,6 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
     if (obj->Has(TRI_V8_ASCII_STRING("ttl"))) {
       ttl = TRI_ObjectToDouble(obj->Get(TRI_V8_ASCII_STRING("ttl")));
     }
-
-    collections = ExtractCollections(isolate, obj);
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -502,7 +504,7 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
   // per se, as the transaction manager still knows the transaction and can delete it
   try {
     bool const canBeSubTransaction = ! top;
-    auto transactionScope = new triagens::mvcc::TransactionScope(vocbase, collections, true, canBeSubTransaction, ttl);
+    auto transactionScope = new triagens::mvcc::TransactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections(), true, canBeSubTransaction, ttl);
 
     auto transaction = transactionScope->transaction();
     auto id = transaction->id();

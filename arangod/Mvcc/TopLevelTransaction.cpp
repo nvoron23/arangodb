@@ -58,6 +58,22 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
     _runningTransactions(nullptr) {
 
   LOG_TRACE("creating %s", toString().c_str());
+
+  // register and lock all collections
+  // note that this is not required for transactions, but it is a feature kept
+  // for compatibility with pre-MVCC transactions
+  if (! collections.empty()) {
+    for (auto const& it : collections) {
+      auto c = collection(it.first);
+      if (it.second) {
+        // write-lock
+        c->lockWrite();
+      }
+      else {
+        c->lockRead();
+      }
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

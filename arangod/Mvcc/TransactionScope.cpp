@@ -58,7 +58,7 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
                                     double ttl) 
   : _transactionManager(triagens::mvcc::TransactionManager::instance()),
     _transaction(nullptr),
-    _isOur(false),
+    _id(0),
     _pushedOnThreadStack(false) {
 
   TransactionStackAccessor accessor;
@@ -83,7 +83,7 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
       // start a top-level transaction
       _transaction = _transactionManager->createTransaction(vocbase, collections, ttl);
     }
-    _isOur = true;
+    _id = _transaction->id().own();
     
     // push transaction on the stack 
     accessor.push(_transaction); 
@@ -94,7 +94,7 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
     // reuse an existing transaction
     auto existing = accessor.peek();
     TRI_ASSERT(existing != nullptr);
-    
+   
     // check if the database is still the same
     if (vocbase != existing->vocbase()) {
       THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot change database for nested operation");
@@ -115,10 +115,14 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionScope::~TransactionScope () {
-  if (_isOur && _transaction != nullptr) {
+  if (isOur()) {
     removeFromStack();
-
-    _transaction->rollback();
+    try {
+      _transactionManager->rollbackTransaction(_id);
+    }
+    catch (...) {
+    }
+    _id = 0;
   }
 }
 
@@ -141,12 +145,14 @@ std::map<std::string, bool> const& TransactionScope::NoCollections () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TransactionScope::commit () {
-  if (_isOur) {
-    _transaction->commit();
+  if (isOur()) {
     removeFromStack();
-
-    // clear the pointer so we don't double-delete
-    _transaction = nullptr;
+    try {
+      _transactionManager->commitTransaction(_id);
+    }
+    catch (...) {
+    }
+    _id = 0;
   }
 }
 

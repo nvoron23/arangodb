@@ -55,7 +55,8 @@ TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
                                               TRI_voc_cid_t cid)
   : _vocbase(vocbase),
     _collection(nullptr),
-    _barrier(nullptr) {
+    _barrier(nullptr),
+    _locked(TransactionCollection::LockType::UNLOCKED) {
 
   _collection = TRI_UseCollectionByIdVocBase(_vocbase, cid);
 
@@ -74,7 +75,9 @@ TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
 TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
                                               std::string const& name) 
   : _vocbase(vocbase),
-    _collection(nullptr) {
+    _collection(nullptr),
+    _barrier(nullptr),
+    _locked(TransactionCollection::LockType::UNLOCKED) {
 
   _collection = TRI_UseCollectionByNameVocBase(_vocbase, name.c_str());
 
@@ -94,6 +97,7 @@ TransactionCollection::~TransactionCollection () {
   freeBarrier();
 
   if (_collection != nullptr) {
+    unlock();
     TRI_ReleaseCollectionVocBase(_vocbase, _collection);
   }
 }
@@ -101,6 +105,42 @@ TransactionCollection::~TransactionCollection () {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief read-lock the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::lockRead () {
+  TRI_ASSERT(_locked == TransactionCollection::LockType::UNLOCKED);
+
+  TRI_ReadLockReadWriteLock(&_collection->_collection->_lock);
+  _locked = TransactionCollection::LockType::LOCKED_READ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief write-lock the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::lockWrite () {
+  TRI_ASSERT(_locked == TransactionCollection::LockType::UNLOCKED);
+
+  TRI_WriteLockReadWriteLock(&_collection->_collection->_lock);
+  _locked = TransactionCollection::LockType::LOCKED_WRITE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief unlock the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::unlock () {
+  if (_locked == TransactionCollection::LockType::LOCKED_READ) {
+    TRI_ReadUnlockReadWriteLock(&_collection->_collection->_lock);
+  }
+  else if (_locked == TransactionCollection::LockType::LOCKED_WRITE) {
+    TRI_WriteUnlockReadWriteLock(&_collection->_collection->_lock);
+  }
+  _locked = TransactionCollection::LockType::UNLOCKED;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the collection's waitForSync flag
