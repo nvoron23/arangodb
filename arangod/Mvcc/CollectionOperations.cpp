@@ -64,6 +64,7 @@ Document::Document (TRI_shaper_t* shaper,
     shaped(shaped),
     key(key),
     revision(revision),
+    edge(nullptr),
     keySpecified(keySpecified),
     freeShape(freeShape) {
 
@@ -79,6 +80,7 @@ Document::Document (Document&& other)
     shaped(other.shaped),
     key(other.key),
     revision(other.revision),
+    edge(nullptr),
     keySpecified(other.keySpecified),
     freeShape(other.freeShape) {
 
@@ -539,15 +541,29 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
   
   // create a temporary marker for the document on the heap
   // the marker memory will be freed automatically when we leave this method
-  std::unique_ptr<triagens::wal::MvccDocumentMarker> marker(
-    new triagens::wal::MvccDocumentMarker(transaction->vocbase()->_id,
-                                          collection->id(),
-                                          document.revision,
-                                          transactionId,
-                                          document.key,
-                                          8, /* legendSize */
-                                          document.shaped)
-  );
+  std::unique_ptr<triagens::wal::Marker> marker;
+  
+  if (document.edge != nullptr) {
+    marker.reset(new triagens::wal::MvccEdgeMarker(transaction->vocbase()->_id,
+                                                   collection->id(),
+                                                   document.revision,
+                                                   transactionId,
+                                                   document.key,
+                                                   document.edge,
+                                                   8, /* legendSize */
+                                                   document.shaped)
+    );
+  }
+  else {
+    marker.reset(new triagens::wal::MvccDocumentMarker(transaction->vocbase()->_id,
+                                                       collection->id(),
+                                                       document.revision,
+                                                       transactionId,
+                                                       document.key,
+                                                       8, /* legendSize */
+                                                       document.shaped)
+    );
+  }
   
   // create a master pointer which will hold the marker
   // this will automatically release the master pointer when we leave this method 
@@ -793,14 +809,14 @@ int CollectionOperations::WriteMarker (triagens::wal::Marker const* marker,
   char* oldMarker = static_cast<char*>(marker->mem());
   auto genericMarker = reinterpret_cast<TRI_df_marker_t*>(oldMarker);
 
-  if ((genericMarker->_type == TRI_WAL_MARKER_DOCUMENT ||
-       genericMarker->_type == TRI_WAL_MARKER_EDGE) &&
+  if ((genericMarker->_type == TRI_WAL_MARKER_MVCC_DOCUMENT ||
+       genericMarker->_type == TRI_WAL_MARKER_MVCC_EDGE) &&
       ! logfileManager->suppressShapeInformation()) {
     // In this case we have to take care of the legend, we know that the
     // marker does not have a legend so far, so first try to get away 
     // with this:
     // (Note that the latter also works for edges!
-    auto oldm = reinterpret_cast<triagens::wal::document_marker_t*>(oldMarker);
+    auto oldm = reinterpret_cast<triagens::wal::mvcc_document_marker_t*>(oldMarker);
     TRI_voc_cid_t const cid   = oldm->_collectionId;
     TRI_shape_sid_t const sid = oldm->_shape;
     void* oldLegend;
@@ -832,7 +848,7 @@ int CollectionOperations::WriteMarker (triagens::wal::Marker const* marker,
       memcpy(newmarker + oldm->_offsetLegend + legend.getSize(), oldMarker + oldm->_offsetJson, oldm->_size - oldm->_offsetJson);
 
       // And fix its entries:
-      auto newm = reinterpret_cast<triagens::wal::document_marker_t*>(newmarker);
+      auto newm = reinterpret_cast<triagens::wal::mvcc_document_marker_t*>(newmarker);
       newm->_size = newMarkerSize;
       newm->_offsetJson = (uint32_t) (oldm->_offsetLegend + legend.getSize());
 

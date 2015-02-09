@@ -103,7 +103,7 @@ static v8::Handle<v8::Object> SetBasicDocumentAttributesJs (v8::Isolate* isolate
   char const* base = reinterpret_cast<char const*>(marker);
 
   if (type == TRI_DOC_MARKER_KEY_EDGE) {
-    TRI_doc_edge_key_marker_t const* m = reinterpret_cast<TRI_doc_edge_key_marker_t const*>(marker); 
+    auto* m = reinterpret_cast<TRI_doc_edge_key_marker_t const*>(marker); 
 
     // _from
     len = resolver->getCollectionNameCluster(buffer, m->_fromCid);
@@ -125,7 +125,29 @@ static v8::Handle<v8::Object> SetBasicDocumentAttributesJs (v8::Isolate* isolate
     result->ForceSet(_ToKey, TRI_V8_PAIR_STRING(buffer, (int) (len + keyLength + 1)));
   }
   else if (type == TRI_WAL_MARKER_EDGE) {
-    triagens::wal::edge_marker_t const* m = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);
+    auto* m = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);
+
+    // _from
+    len = resolver->getCollectionNameCluster(buffer, m->_fromCid);
+    keyLength = strlen(base + m->_offsetFromKey);
+    buffer[len] = '/';
+    memcpy(buffer + len + 1, base + m->_offsetFromKey, keyLength);
+    TRI_GET_GLOBAL_STRING(_FromKey);
+    result->ForceSet(_FromKey, TRI_V8_PAIR_STRING(buffer, (int) (len + keyLength + 1)));
+
+    // _to
+    if (m->_fromCid != m->_toCid) {
+      // only lookup collection name if we haven't done it yet
+      len = resolver->getCollectionNameCluster(buffer, m->_toCid);
+    }
+    keyLength = strlen(base + m->_offsetToKey);
+    buffer[len] = '/';
+    memcpy(buffer + len + 1, base + m->_offsetToKey, keyLength);
+    TRI_GET_GLOBAL_STRING(_ToKey);
+    result->ForceSet(_ToKey, TRI_V8_PAIR_STRING(buffer, (int) (len + keyLength + 1)));
+  }
+  else if (type == TRI_WAL_MARKER_MVCC_EDGE) {
+    auto* m = reinterpret_cast<triagens::wal::mvcc_edge_marker_t const*>(marker);
 
     // _from
     len = resolver->getCollectionNameCluster(buffer, m->_fromCid);
@@ -182,7 +204,7 @@ static v8::Handle<v8::Object> SetBasicDocumentAttributesShaped (v8::Isolate* iso
   char const* base = reinterpret_cast<char const*>(marker);
 
   if (type == TRI_DOC_MARKER_KEY_EDGE) {
-    TRI_doc_edge_key_marker_t const* m = reinterpret_cast<TRI_doc_edge_key_marker_t const*>(marker); 
+    auto* m = reinterpret_cast<TRI_doc_edge_key_marker_t const*>(marker); 
 
     // _from
     len = resolver->getCollectionNameCluster(buffer, m->_fromCid);
@@ -204,7 +226,7 @@ static v8::Handle<v8::Object> SetBasicDocumentAttributesShaped (v8::Isolate* iso
     result->ForceSet(_ToKey, TRI_V8_PAIR_STRING(buffer, (int) (len + keyLength + 1)));
   }
   else if (type == TRI_WAL_MARKER_EDGE) {
-    triagens::wal::edge_marker_t const* m = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);
+    auto* m = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);
 
     // _from
     len = resolver->getCollectionNameCluster(buffer, m->_fromCid);
@@ -225,6 +247,29 @@ static v8::Handle<v8::Object> SetBasicDocumentAttributesShaped (v8::Isolate* iso
     TRI_GET_GLOBAL_STRING(_ToKey);
     result->ForceSet(_ToKey, TRI_V8_PAIR_STRING(buffer, (int) (len + keyLength + 1)));
   }
+  else if (type == TRI_WAL_MARKER_MVCC_EDGE) {
+    auto* m = reinterpret_cast<triagens::wal::mvcc_edge_marker_t const*>(marker);
+
+    // _from
+    len = resolver->getCollectionNameCluster(buffer, m->_fromCid);
+    keyLength = strlen(base + m->_offsetFromKey);
+    buffer[len] = '/';
+    memcpy(buffer + len + 1, base + m->_offsetFromKey, keyLength);
+    TRI_GET_GLOBAL_STRING(_FromKey);
+    result->ForceSet(_FromKey, TRI_V8_PAIR_STRING(buffer, (int) (len + keyLength + 1)));
+
+    // _to
+    if (m->_fromCid != m->_toCid) {
+      // only lookup collection name if we haven't done it yet
+      len = resolver->getCollectionNameCluster(buffer, m->_toCid);
+    }
+    keyLength = strlen(base + m->_offsetToKey);
+    buffer[len] = '/';
+    memcpy(buffer + len + 1, base + m->_offsetToKey, keyLength);
+    TRI_GET_GLOBAL_STRING(_ToKey);
+    result->ForceSet(_ToKey, TRI_V8_PAIR_STRING(buffer, (int) (len + keyLength + 1)));
+  }
+
   return scope.Escape<v8::Object>(result);
 }
 

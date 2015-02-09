@@ -101,6 +101,7 @@ namespace triagens {
         struct TRI_shaped_json_s const* shaped;
         std::string key;
         TRI_voc_rid_t revision;
+        TRI_document_edge_t const* edge;
         bool keySpecified;
         bool freeShape;
     };

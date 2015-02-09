@@ -3361,25 +3361,20 @@ static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 
-static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void MvccInsert (TRI_vocbase_col_t const* collection,
+                        const v8::FunctionCallbackInfo<v8::Value>& args,
+                        uint32_t docArg,
+                        TRI_document_edge_t const* edge) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
   TRI_GET_GLOBALS();
 
-  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
-
-  if (collection == nullptr) {
-    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
-  }
-  
+  uint32_t const optArg = docArg + 1;
   uint32_t const argLength = args.Length();
-  if (argLength < 1 || argLength > 2) {
-    TRI_V8_THROW_EXCEPTION_USAGE("mvccInsert(<document>, <options>)");
-  }
 
   triagens::mvcc::OperationOptions options;
-  if (argLength > 1 && args[1]->IsObject()) {
-    v8::Handle<v8::Object> optionsObject = args[1].As<v8::Object>();
+  if (argLength > optArg && args[optArg]->IsObject()) {
+    v8::Handle<v8::Object> optionsObject = args[optArg].As<v8::Object>();
     TRI_GET_GLOBAL_STRING(WaitForSyncKey);
     if (optionsObject->Has(WaitForSyncKey)) {
       options.waitForSync = TRI_ObjectToBoolean(optionsObject->Get(WaitForSyncKey));
@@ -3390,14 +3385,14 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
   else {
-    options.waitForSync = ExtractWaitForSync(args, 2);
+    options.waitForSync = ExtractWaitForSync(args, optArg + 1);
   }
   
   // set document key
   std::unique_ptr<char[]> key;
 
-  if (args[0]->IsObject() && ! args[0]->IsArray()) {
-    int res = ExtractDocumentKey(isolate, v8g, args[0]->ToObject(), key);
+  if (args[docArg]->IsObject() && ! args[docArg]->IsArray()) {
+    int res = ExtractDocumentKey(isolate, v8g, args[docArg]->ToObject(), key);
 
     if (res != TRI_ERROR_NO_ERROR && res != TRI_ERROR_ARANGO_DOCUMENT_KEY_MISSING) {
       TRI_V8_THROW_EXCEPTION(res);
@@ -3418,8 +3413,9 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto* shaper = transactionCollection->shaper();
 
-    TRI_shaped_json_t* shaped = TRI_ShapedJsonV8Object(isolate, args[0], shaper, true);  // PROTECTED by trx from above
+    TRI_shaped_json_t* shaped = TRI_ShapedJsonV8Object(isolate, args[docArg], shaper, true);  // PROTECTED by trx from above
     auto document = triagens::mvcc::Document::CreateFromShapedJson(shaper, shaped, key.get(), true);
+    document.edge = edge; // may be a nullptr!
     auto insertResult = triagens::mvcc::CollectionOperations::InsertDocument(&transactionScope, transactionCollection, document, options);
    
     if (insertResult.code != TRI_ERROR_NO_ERROR) {
@@ -3456,6 +3452,64 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_ASSERT(false);
 }
 
+static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+
+  if ((TRI_col_type_e) collection->_type == TRI_COL_TYPE_DOCUMENT) {
+    // regular document
+    if (args.Length() < 1 || args.Length() > 2) {
+      TRI_V8_THROW_EXCEPTION_USAGE("mvccInsert(<document>, <options>)");
+    }
+    
+    MvccInsert(collection, args, 0, nullptr);
+  }
+  else {
+    // edge
+    if (args.Length() < 2 || args.Length() > 4) {
+      TRI_V8_THROW_EXCEPTION_USAGE("mvccInsert(<from>, <to>, <document>, <options>)");
+    }
+  
+    CollectionNameResolver resolver(collection->_vocbase); // TODO
+
+    // extract _from and _to
+    // ---------------------
+  
+    std::unique_ptr<char[]> fromKey;
+    std::unique_ptr<char[]> toKey;
+
+    // the following values are defaults that will be overridden below
+    TRI_document_edge_t edge = { 0, nullptr, 0, nullptr };
+
+    // extract from
+    {
+      int res = TRI_ParseVertex(args, &resolver, edge._fromCid, fromKey, args[0]);
+
+      if (res != TRI_ERROR_NO_ERROR) {
+        TRI_V8_THROW_EXCEPTION(res);
+      }
+      edge._fromKey = fromKey.get();
+    }
+
+    // extract to
+    {
+      int res = TRI_ParseVertex(args, &resolver, edge._toCid, toKey, args[1]);
+
+      if (res != TRI_ERROR_NO_ERROR) {
+        TRI_V8_THROW_EXCEPTION(res);
+      }
+      edge._toKey = toKey.get();
+    }
+
+    MvccInsert(collection, args, 2, &edge);
+  }
+}
 
 static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
