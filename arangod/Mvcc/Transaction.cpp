@@ -233,7 +233,8 @@ void Transaction::subTransactionFinished (Transaction* transaction) {
   else {
     // remove the transaction from the list of already committed 
     // sub-transactions, as it might be in there!
-    _committedSubTransactions.erase(id.own());
+    _transactionManager->addFailedTransactions(_committedSubTransactions);
+    _committedSubTransactions.clear();
   }
   
   // now delete the stats of the sub-transaction as they are not needed anymore
