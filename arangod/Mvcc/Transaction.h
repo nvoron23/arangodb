@@ -113,70 +113,6 @@ namespace triagens {
           VISIBLE    = 3
         };
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief transaction flags
-////////////////////////////////////////////////////////////////////////////////
-
-        struct TransactionFlags : triagens::basics::FlagsType<uint32_t> {
-          TransactionFlags ()
-            : FlagsType() {
-          }
-          
-          inline bool initialized () const {
-            return hasFlag(Initialized);
-          }
-
-          inline bool beginMarkerWritten () const {
-            return hasFlag(BeginMarkerWritten);
-          }
-
-          inline bool dataMarkerWritten () const {
-            return hasFlag(DataMarkerWritten);
-          }
-          
-          inline bool endMarkerWritten () const {
-            return hasFlag(EndMarkerWritten);
-          }
-
-          inline bool pushedOnThreadStack () const {
-            return hasFlag(PushedOnThreadStack);
-          }
-          
-          void initialized (bool value) {
-            TRI_ASSERT(! hasFlag(Initialized));
-            setFlag(Initialized);
-          }
-
-          void beginMarkerWritten (bool value) {
-            TRI_ASSERT(! hasFlag(BeginMarkerWritten));
-            TRI_ASSERT(! hasFlag(DataMarkerWritten));
-            TRI_ASSERT(! hasFlag(EndMarkerWritten));
-
-            setFlag(BeginMarkerWritten);
-          }
-          
-          void dataMarkerWritten (bool value) {
-            setFlag(DataMarkerWritten);
-          }
-          
-          void endMarkerWritten (bool value) {
-            TRI_ASSERT(hasFlag(BeginMarkerWritten));
-            TRI_ASSERT(! hasFlag(EndMarkerWritten));
-
-            setFlag(EndMarkerWritten);
-          }
-          
-          void pushedOnThreadStack (bool value) {
-            setFlag(PushedOnThreadStack, value);
-          }
-
-          static uint32_t const Initialized          = 0x01;
-          static uint32_t const BeginMarkerWritten   = 0x02;
-          static uint32_t const DataMarkerWritten    = 0x04;
-          static uint32_t const EndMarkerWritten     = 0x08;
-          static uint32_t const PushedOnThreadStack  = 0x10;
-        };
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -291,6 +227,19 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the transaction contains successful data-modifying 
+/// operations (failed operations are not included)
+////////////////////////////////////////////////////////////////////////////////
+
+        bool hasModifications () const;  
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the transaction must sync on commit
+////////////////////////////////////////////////////////////////////////////////
+
+        bool hasWaitForSync () const;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief update the number of inserted documents
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -375,6 +324,8 @@ namespace triagens {
         friend std::ostream& operator<< (std::ostream&, Transaction const&);
         
         friend std::ostream& operator<< (std::ostream&, VisibilityType);
+
+        friend std::ostream& operator<< (std::ostream&, StatusType);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief visibility, this implements the MVCC logic of what this transaction
@@ -479,12 +430,6 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         StatusType _status;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief various flags
-////////////////////////////////////////////////////////////////////////////////
-
-        TransactionFlags _flags;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief pointer to currently ongoing sub-transaction (might be null)

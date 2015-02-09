@@ -335,8 +335,7 @@ void LocalTransactionManager::addFailedTransactions (std::unordered_set<Transact
 /// deletes the transaction object
 ////////////////////////////////////////////////////////////////////////////////
 
-void LocalTransactionManager::deleteRunningTransaction (Transaction* transaction,
-                                                        bool transactionContainsModification) {
+void LocalTransactionManager::deleteRunningTransaction (Transaction* transaction) {
   TRI_ASSERT(! transaction->isOngoing());
 
   auto id = transaction->id();
@@ -344,11 +343,9 @@ void LocalTransactionManager::deleteRunningTransaction (Transaction* transaction
   {
     WRITE_LOCKER(_lock); 
 
-    if (transactionContainsModification) {
-      if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
-        // if this fails and throws, no harm will be done
-        _failedTransactions.emplace(id.own());
-      }
+    if (transaction->status() == Transaction::StatusType::ROLLED_BACK) {
+      // if this fails and throws, no harm will be done
+      _failedTransactions.emplace(id.own());
     }
   
     // delete from both lists
@@ -391,8 +388,6 @@ void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
       static_cast<TopLevelTransaction*>(transaction)->setStartState(runningTransactions);
     }
   }
-
-  transaction->_flags.initialized();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

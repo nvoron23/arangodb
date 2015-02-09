@@ -96,17 +96,10 @@ void TopLevelTransaction::commit () {
 
   // loop over all statistics to check if there were any data modifications during 
   // the transaction
-  bool transactionContainsModification = false;
-  bool waitForSync = false;
+  bool const hasModifications = this->hasModifications();
+  bool const waitForSync = this->hasWaitForSync();
 
-  for (auto const& it : _stats) {
-    transactionContainsModification |= it.second.hasOperations();
-
-    // check if we must sync
-    waitForSync |= it.second.waitForSync;
-  }
-
-  if (transactionContainsModification) {
+  if (hasModifications) {
     try {
       // write a commit marker
       triagens::wal::MvccCommitTransactionMarker commitMarker(_vocbase->_id, _id);
@@ -142,7 +135,7 @@ void TopLevelTransaction::commit () {
   }
     
   _status = StatusType::COMMITTED;
-  _transactionManager->deleteRunningTransaction(this, transactionContainsModification);
+  _transactionManager->deleteRunningTransaction(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -160,17 +153,10 @@ void TopLevelTransaction::rollback () {
     _transactionManager->addFailedTransactions(_committedSubTransactions);
     _committedSubTransactions.clear();
   }
-  
-  bool transactionContainsModification = false;
 
-  for (auto const& it : _stats) {
-    if (it.second.hasOperations()) {
-      transactionContainsModification = true;
-      break;
-    }
-  }
+  bool const hasModifications = this->hasModifications();
   
-  if (transactionContainsModification) {
+  if (hasModifications) {
     try {
       // write an abort marker
       triagens::wal::MvccAbortTransactionMarker abortMarker(_vocbase->_id, _id);
@@ -184,7 +170,7 @@ void TopLevelTransaction::rollback () {
   }
 
   _status = StatusType::ROLLED_BACK;
-  _transactionManager->deleteRunningTransaction(this, transactionContainsModification);
+  _transactionManager->deleteRunningTransaction(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

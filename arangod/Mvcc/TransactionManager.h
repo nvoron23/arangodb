@@ -148,8 +148,7 @@ namespace triagens {
 /// @brief remove the transaction from the list of running transactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual void deleteRunningTransaction (Transaction*,
-                                               bool) = 0;
+        virtual void deleteRunningTransaction (Transaction*) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initialize the transaction manager
