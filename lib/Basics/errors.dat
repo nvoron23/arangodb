@@ -258,6 +258,7 @@ ERROR_TRANSACTION_ABORTED,1654,"transaction aborted","Will be raised when a tran
 ERROR_TRANSACTION_ID_OVERFLOW,1655,"transaction id overflow","Will be raised when the transaction id overflows due to too many subtransactions."
 ERROR_TRANSACTION_NOT_FOUND,1656,"transaction not found","Will be raised when a transaction is not found."
 ERROR_TRANSACTION_NOT_IN_SCOPE,1657,"transaction not in scope","Will be raised when a transaction is accessed that is not in scope."
+ERROR_TRANSACTION_ALREADY_IN_SCOPE,1658,"transaction already in scope","Will be raised when a transaction is put into scope that was already in scope."
 
 ################################################################################
 ## User management

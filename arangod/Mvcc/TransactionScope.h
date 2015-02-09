@@ -62,6 +62,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         TransactionScope (struct TRI_vocbase_s*, 
+                          std::map<std::string, bool> const& collections,
                           bool forceNew = false,
                           bool canBeSubTransaction = true,
                           double ttl = 0.0);
@@ -75,6 +76,12 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns an empty list of collections
+////////////////////////////////////////////////////////////////////////////////
+
+        static std::map<std::string, bool> const& NoCollections ();
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the transaction manager

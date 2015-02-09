@@ -51,6 +51,7 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 SubTransaction::SubTransaction (Transaction* parent,
+                                std::map<std::string, bool> const& collections,
                                 double ttl)
   : Transaction(parent->transactionManager(), TransactionId(TRI_NewTickServer(), parent->id().top()), parent->vocbase(), ttl),
     _topLevelTransaction(parent->topLevelTransaction()),

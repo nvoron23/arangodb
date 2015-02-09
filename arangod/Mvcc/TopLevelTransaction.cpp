@@ -52,6 +52,7 @@ using namespace triagens::mvcc;
 TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager,
                                           TransactionId const& id,
                                           TRI_vocbase_t* vocbase,
+                                          std::map<std::string, bool> const& collections,
                                           double ttl)
   : Transaction(transactionManager, id, vocbase, ttl),
     _runningTransactions(nullptr) {

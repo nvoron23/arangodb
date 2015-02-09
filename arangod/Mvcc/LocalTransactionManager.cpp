@@ -147,8 +147,9 @@ LocalTransactionManager::~LocalTransactionManager () {
 ////////////////////////////////////////////////////////////////////////////////
 
 Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase,
+                                                         std::map<std::string, bool> const& collections,
                                                          double ttl) {
-  std::unique_ptr<Transaction> transaction(new TopLevelTransaction(this, nextId(), vocbase, ttl));
+  std::unique_ptr<Transaction> transaction(new TopLevelTransaction(this, nextId(), vocbase, collections, ttl));
 
   // we do have a transaction now
 
@@ -164,11 +165,12 @@ Transaction* LocalTransactionManager::createTransaction (TRI_vocbase_t* vocbase,
 
 Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocbase,
                                                             Transaction* parent,
+                                                            std::map<std::string, bool> const& collections,
                                                             double ttl) {
   TRI_ASSERT(parent != nullptr);
   TRI_ASSERT(vocbase == parent->vocbase());
 
-  std::unique_ptr<Transaction> transaction(new SubTransaction(parent, ttl));
+  std::unique_ptr<Transaction> transaction(new SubTransaction(parent, collections, ttl));
 
   // we do have a transaction now
 
@@ -440,8 +442,10 @@ bool LocalTransactionManager::killRunningTransactions (double maxAge) {
     for (auto it : _runningTransactions) {
       // kill a transaction if its expiration time has come
       // or, if this is not set, after the specified amount of seconds
-      if (it.second->expireTime() > now ||
-          it.second->startTime() + maxAge < now) {
+      auto expireTime = it.second->expireTime();
+
+      if ((expireTime > 0.0 && expireTime < now) ||
+          (expireTime <= 0.0 && it.second->startTime() + maxAge < now)) {
         if (! it.second->killed()) {
           it.second->killed(true);
           found = true;

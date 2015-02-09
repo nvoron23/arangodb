@@ -193,6 +193,7 @@ void TRI_InitialiseErrorMessages () {
   REG_ERROR(ERROR_TRANSACTION_ID_OVERFLOW, "transaction id overflow");
   REG_ERROR(ERROR_TRANSACTION_NOT_FOUND, "transaction not found");
   REG_ERROR(ERROR_TRANSACTION_NOT_IN_SCOPE, "transaction not in scope");
+  REG_ERROR(ERROR_TRANSACTION_ALREADY_IN_SCOPE, "transaction already in scope");
   REG_ERROR(ERROR_USER_INVALID_NAME, "invalid user name");
   REG_ERROR(ERROR_USER_INVALID_PASSWORD, "invalid password");
   REG_ERROR(ERROR_USER_DUPLICATE, "duplicate user");

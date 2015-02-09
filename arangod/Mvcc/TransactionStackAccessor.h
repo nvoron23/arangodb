@@ -94,6 +94,8 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         void push (Transaction* transaction) {
+          TRI_ASSERT_EXPENSIVE(! isOnStack(transaction->id().own()));
+
           _threadTransactions->push_back(transaction);
         }
 

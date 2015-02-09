@@ -79,6 +79,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         virtual Transaction* createTransaction (struct TRI_vocbase_s*,
+                                                std::map<std::string, bool> const& collections,
                                                 double ttl) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -87,6 +88,7 @@ namespace triagens {
 
         virtual Transaction* createSubTransaction (struct TRI_vocbase_s*, 
                                                    Transaction*,
+                                                   std::map<std::string, bool> const& collections,
                                                    double ttl) = 0;
 
 ////////////////////////////////////////////////////////////////////////////////

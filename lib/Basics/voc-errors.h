@@ -477,6 +477,9 @@
 ///   Will be raised when a transaction is not found.
 /// - 1657: @LIT{transaction not in scope}
 ///   Will be raised when a transaction is accessed that is not in scope.
+/// - 1658: @LIT{transaction already in scope}
+///   Will be raised when a transaction is put into scope that was already in
+///   scope.
 /// - 1700: @LIT{invalid user name}
 ///   Will be raised when an invalid user name is used.
 /// - 1701: @LIT{invalid password}
@@ -2579,6 +2582,17 @@ void TRI_InitialiseErrorMessages ();
 ////////////////////////////////////////////////////////////////////////////////
 
 #define TRI_ERROR_TRANSACTION_NOT_IN_SCOPE                                (1657)
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief 1658: ERROR_TRANSACTION_ALREADY_IN_SCOPE
+///
+/// transaction already in scope
+///
+/// Will be raised when a transaction is put into scope that was already in
+/// scope.
+////////////////////////////////////////////////////////////////////////////////
+
+#define TRI_ERROR_TRANSACTION_ALREADY_IN_SCOPE                            (1658)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief 1700: ERROR_USER_INVALID_NAME

@@ -187,6 +187,83 @@ static bool ExtractTransactionId (v8::Isolate* isolate,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief extract the list of collections for an MVCC transaction
+////////////////////////////////////////////////////////////////////////////////
+
+static std::map<std::string, bool> ExtractCollections (v8::Isolate* isolate,
+                                                       v8::Handle<v8::Object> const value) {
+  std::map<std::string, bool> result;
+
+  if (! value->Has(TRI_V8_ASCII_STRING("collections")) || ! value->Get(TRI_V8_ASCII_STRING("collections"))->IsObject()) {
+    // no collections specified
+    return result;
+  }
+
+  auto collections = v8::Handle<v8::Object>::Cast(value->Get(TRI_V8_ASCII_STRING("collections")));
+
+  if (collections.IsEmpty()) {
+    return result;
+  }
+  
+  // collections.read
+  auto read = TRI_V8_ASCII_STRING("read");
+  if (collections->Has(read)) {
+    if (collections->Get(read)->IsArray()) {
+      v8::Handle<v8::Array> names = v8::Handle<v8::Array>::Cast(collections->Get(read));
+
+      for (uint32_t i = 0 ; i < names->Length(); ++i) {
+        v8::Handle<v8::Value> collection = names->Get(i);
+        if (! collection->IsString() && ! collection->IsStringObject()) {
+          continue;
+        }
+
+        result.emplace(std::make_pair(TRI_ObjectToString(collection), false));
+      }
+    }
+    else if (collections->Get(read)->IsString() || collections->Get(read)->IsStringObject()) {
+      result.emplace(std::make_pair(TRI_ObjectToString(collections->Get(read)), false));
+    }
+  }
+  
+  // collections.write
+  auto write = TRI_V8_ASCII_STRING("write");
+  if (collections->Has(write)) {
+    if (collections->Get(write)->IsArray()) {
+      v8::Handle<v8::Array> names = v8::Handle<v8::Array>::Cast(collections->Get(write));
+
+      for (uint32_t i = 0 ; i < names->Length(); ++i) {
+        v8::Handle<v8::Value> collection = names->Get(i);
+        if (! collection->IsString() && ! collection->IsStringObject()) {
+          continue;
+        }
+
+        auto c = TRI_ObjectToString(collection);
+        auto it = result.find(c);
+        if (it == result.end()) {
+          result.emplace(std::make_pair(c, false));
+        }
+        else {
+          (*it).second = true;
+        }
+      }
+    }
+    else if (collections->Get(write)->IsString() || collections->Get(write)->IsStringObject()) {
+      auto c = TRI_ObjectToString(collections->Get(write));
+      auto it = result.find(c);
+
+      if (it == result.end()) {
+        result.emplace(std::make_pair(c, false));
+      }
+      else {
+        (*it).second = true;
+      }
+    }
+  }
+
+  return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief execute a function in an MVCC transaction
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -206,6 +283,13 @@ static void JS_TransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& a
   
   // treat the argument as an object from now on
   v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(args[0]);
+  
+  double ttl = 0.0;
+  if (object->Has(TRI_V8_ASCII_STRING("ttl"))) {
+    ttl = TRI_ObjectToDouble(object->Get(TRI_V8_ASCII_STRING("ttl")));
+  }
+  
+  auto collections = ExtractCollections(isolate, object);
 
   // extract the "action" property
   static const string actionErrorPrototype = "missing/invalid action definition for transaction";
@@ -214,6 +298,7 @@ static void JS_TransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& a
   if (! object->Has(TRI_V8_ASCII_STRING("action"))) {
     TRI_V8_THROW_EXCEPTION_PARAMETER(actionError);
   }
+    
 
   // function parameters
   v8::Handle<v8::Value> params;
@@ -270,7 +355,7 @@ static void JS_TransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& a
 
   v8::Handle<v8::Value> result;
   {
-    triagens::mvcc::TransactionScope transactionScope(vocbase);
+    triagens::mvcc::TransactionScope transactionScope(vocbase, collections, false, true, ttl);
     auto* transaction = transactionScope.transaction();
 
     v8::TryCatch tryCatch;
@@ -386,6 +471,7 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
   bool top = false;
   bool pop = false;
   double ttl = 0.0;
+  std::map<std::string, bool> collections;
 
   if (args.Length() > 0) {
     if (! args[0]->IsObject()) {
@@ -402,6 +488,8 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
     if (obj->Has(TRI_V8_ASCII_STRING("ttl"))) {
       ttl = TRI_ObjectToDouble(obj->Get(TRI_V8_ASCII_STRING("ttl")));
     }
+
+    collections = ExtractCollections(isolate, obj);
   }
 
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
@@ -414,7 +502,7 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
   // per se, as the transaction manager still knows the transaction and can delete it
   try {
     bool const canBeSubTransaction = ! top;
-    auto transactionScope = new triagens::mvcc::TransactionScope(vocbase, true, canBeSubTransaction, ttl);
+    auto transactionScope = new triagens::mvcc::TransactionScope(vocbase, collections, true, canBeSubTransaction, ttl);
 
     auto transaction = transactionScope->transaction();
     auto id = transaction->id();
@@ -651,6 +739,9 @@ static void JS_PushTransactionDatabase (const v8::FunctionCallbackInfo<v8::Value
 
     try {
       triagens::mvcc::TransactionStackAccessor accessor;
+      if (accessor.isOnStack(id)) {
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_TRANSACTION_ALREADY_IN_SCOPE);
+      }
       accessor.push(transaction);
     }
     catch (...) {

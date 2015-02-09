@@ -64,6 +64,7 @@ namespace triagens {
         TopLevelTransaction (TransactionManager*,
                              TransactionId const&,
                              struct TRI_vocbase_s*,
+                             std::map<std::string, bool> const& collections,
                              double);
 
 ////////////////////////////////////////////////////////////////////////////////

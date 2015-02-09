@@ -36,6 +36,8 @@
 
 using namespace triagens::mvcc;
 
+static std::map<std::string, bool> const EmptyCollections{};
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                            class TransactionScope
 // -----------------------------------------------------------------------------
@@ -50,6 +52,7 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
+                                    std::map<std::string, bool> const& collections,
                                     bool forceNew,
                                     bool canBeSubTransaction,
                                     double ttl) 
@@ -74,11 +77,11 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
       auto parent = accessor.peek();
       TRI_ASSERT(parent != nullptr);
 
-      _transaction = _transactionManager->createSubTransaction(vocbase, parent, ttl);
+      _transaction = _transactionManager->createSubTransaction(vocbase, parent, collections, ttl);
     }
     else {
       // start a top-level transaction
-      _transaction = _transactionManager->createTransaction(vocbase, ttl);
+      _transaction = _transactionManager->createTransaction(vocbase, collections, ttl);
     }
     _isOur = true;
     
@@ -122,6 +125,14 @@ TransactionScope::~TransactionScope () {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns an empty list of collections
+////////////////////////////////////////////////////////////////////////////////
+
+std::map<std::string, bool> const& TransactionScope::NoCollections () {
+  return EmptyCollections;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief commit the scoped transaction

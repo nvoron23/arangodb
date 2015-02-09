@@ -3278,7 +3278,7 @@ static void JS_MvccCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TransactionBase oldTrx(true);
 
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3335,7 +3335,7 @@ static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TransactionBase oldTrx(true);
 
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3412,7 +3412,7 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TransactionBase oldTrx(true);
 
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3515,7 +3515,7 @@ static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TransactionBase oldTrx(true);
 
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3626,7 +3626,7 @@ static void JS_MvccReplace (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TransactionBase oldTrx(true);
 
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3756,7 +3756,7 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TransactionBase oldTrx(true);
 
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3830,7 +3830,7 @@ static void JS_MvccAllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   CollectionNameResolver resolver(collection->_vocbase); // TODO
 
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase);
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);

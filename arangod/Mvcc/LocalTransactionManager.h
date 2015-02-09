@@ -113,6 +113,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         Transaction* createTransaction (struct TRI_vocbase_s*,
+                                        std::map<std::string, bool> const& collections,
                                         double) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -121,6 +122,7 @@ namespace triagens {
 
         Transaction* createSubTransaction (struct TRI_vocbase_s*,
                                            Transaction*,
+                                           std::map<std::string, bool> const& collections,
                                            double) override final;
 
 ////////////////////////////////////////////////////////////////////////////////
