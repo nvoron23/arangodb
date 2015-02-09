@@ -98,7 +98,7 @@ describe("MVCC", function () {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief test implicitly committed transactions
 ////////////////////////////////////////////////////////////////////////////////
-/*
+  
   it("should MVCC implicit transactions correctly", function () {
     var c = db[cn];
     verifyTransactionStack([]);
@@ -944,7 +944,7 @@ describe("MVCC", function () {
     db._commitTransaction(par.id);
     verifyTransactionStack([]);
   });
-*/
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief test visibility of various other transactions in the same top
 /// level transaction.
