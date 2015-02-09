@@ -1334,40 +1334,40 @@ describe("MVCC", function () {
 
     // Create a document, explicit transaction:
     var trx = db._beginTransaction();
-    expect(c.count()).toEqual(0);
+    expect(c.mvccCount()).toEqual(0);
     c.mvccInsert({_key: "doc1", Hallo: 1});
     // Count within the same transaction:
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     verifyTransactionStack([trx]);
     db._commitTransaction(trx.id);
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     
     // Check with an explicit transaction:
     trx = db._beginTransaction();
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     db._commitTransaction(trx.id);
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
 
     // Replace a document, explicit transaction:
     trx = db._beginTransaction();
     c.mvccReplace("doc1", {Hallo: 2});
     // Read in the same transaction:
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
 
     db._commitTransaction(trx.id);
     
     // Count with an implicit transaction:
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     
     // Count with an explicit transaction:
     trx = db._beginTransaction();
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     db._commitTransaction(trx.id);
 
     // Update a document, explicit transaction:
@@ -1376,28 +1376,28 @@ describe("MVCC", function () {
 
     // Read within same transaction:
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     db._commitTransaction(trx.id);
     
     // Read with an implicit transaction:
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     
     // Read with an explicit transaction:
     trx = db._beginTransaction();
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     db._commitTransaction(trx.id);
 
     // Remove a document, explicit transactions:
     trx = db._beginTransaction();
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     verifyTransactionStack([trx]);
     expect(c.mvccRemove("doc1")).toEqual(true);
-    expect(c.count()).toEqual(0);
+    expect(c.mvccCount()).toEqual(0);
     db._commitTransaction(trx.id);
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(0);
+    expect(c.mvccCount()).toEqual(0);
   });
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1411,43 +1411,43 @@ describe("MVCC", function () {
 
     // Create a document, explicit transaction:
     var trx = db._beginTransaction();
-    expect(c.count()).toEqual(0);
+    expect(c.mvccCount()).toEqual(0);
     c.mvccInsert({_key: "doc1", Hallo: 1});
     // Count within the same transaction:
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     verifyTransactionStack([trx]);
     db._rollbackTransaction(trx.id);
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(0);
+    expect(c.mvccCount()).toEqual(0);
     
     // Check with an explicit transaction:
     trx = db._beginTransaction();
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(0);
+    expect(c.mvccCount()).toEqual(0);
     db._commitTransaction(trx.id);
     verifyTransactionStack([]);
 
     // Now really insert the document:
     c.mvccInsert({_key: "doc1", Hallo: 1});
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
 
     // Replace a document, explicit transaction:
     trx = db._beginTransaction();
     c.mvccReplace("doc1", {Hallo: 2});
     // Read in the same transaction:
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
 
     db._rollbackTransaction(trx.id);
     
     // Count with an implicit transaction:
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     
     // Count with an explicit transaction:
     trx = db._beginTransaction();
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     db._commitTransaction(trx.id);
 
     // Update a document, explicit transaction:
@@ -1456,28 +1456,28 @@ describe("MVCC", function () {
 
     // Count within same transaction:
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     db._commitTransaction(trx.id);
     
     // Count with an implicit transaction:
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     
     // Read with an explicit transaction:
     trx = db._beginTransaction();
     verifyTransactionStack([trx]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     db._commitTransaction(trx.id);
 
     // Remove a document, explicit transactions:
     trx = db._beginTransaction();
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
     verifyTransactionStack([trx]);
     expect(c.mvccRemove("doc1")).toEqual(true);
-    expect(c.count()).toEqual(0);
+    expect(c.mvccCount()).toEqual(0);
     db._rollbackTransaction(trx.id);
     verifyTransactionStack([]);
-    expect(c.count()).toEqual(1);
+    expect(c.mvccCount()).toEqual(1);
 
     // Now really remove:
     expect(c.mvccRemove("doc1")).toEqual(true);
