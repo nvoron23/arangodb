@@ -406,6 +406,51 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up all elements with the same key as a given element
+////////////////////////////////////////////////////////////////////////////////
+
+        std::vector<Element*>* lookupWithElementByKey (
+                                    Element const* element) const {
+          std::unique_ptr<std::vector<Element*>> result(new std::vector<Element*>());
+
+          // compute the hash
+          IndexType hash = sizeof(IndexType) == 8 ?
+                             _hashElementKey(element, true) :
+                             TRI_64to32(_hashKey(element, true));
+          IndexType i = hash % _nrAlloc;
+
+#ifdef TRI_INTERNAL_STATS
+          // update statistics
+          _nrFinds++;
+#endif
+
+          // search the table
+          while (_table[i].ptr != nullptr &&
+                 (! _isEqualElementElement(element, _table[i].ptr, true) ||
+                  _table[i].prev != INVALID_INDEX)) {
+            i = incr(i);
+#ifdef TRI_INTERNAL_STATS
+            _nrProbesF++;
+#endif
+          }
+
+          if (_table[i].ptr != nullptr) {
+            // We found the beginning of the linked list:
+
+            // pre-initialize the result to save at least a few reallocs
+            result->reserve(4);
+            do {
+              result->push_back(_table[i].ptr);
+              i = _table[i].next;
+            } 
+            while (i != INVALID_INDEX);
+          }
+
+          // return whatever we found
+          return result.release();
+        }
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief removes an element from the array
 ////////////////////////////////////////////////////////////////////////////////
 
