@@ -537,15 +537,24 @@ static TRI_index_operator_t* SetupExampleSkiplist (v8::Isolate* isolate,
 
 static void DestroySearchValue (TRI_memory_zone_t* zone,
                                 TRI_index_search_value_t& value) {
-  size_t n;
-
-  n = value._length;
+  size_t n = value._length;
 
   for (size_t j = 0;  j < n;  ++j) {
     TRI_DestroyShapedJson(zone, &value._values[j]);
   }
 
   TRI_Free(TRI_CORE_MEM_ZONE, value._values);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroys the example object for a hash index
+////////////////////////////////////////////////////////////////////////////////
+
+static void DestroySearchValue (std::vector<TRI_shaped_json_t>& searchValue) {
+  for (auto& it : searchValue) {
+    TRI_DestroyShapedJson(TRI_UNKNOWN_MEM_ZONE, &it);
+  }
+  searchValue.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -619,9 +628,10 @@ static int SetupSearchValue (v8::Isolate* isolate,
                              TRI_shaper_t* shaper,
                              std::vector<TRI_shaped_json_t>& result) {
   TRI_ASSERT(result.size() == paths.size());
+  TRI_ASSERT(! paths.empty());
 
-  size_t i = 0;
-  for (auto const& pid : paths) {
+  for (size_t i = 0; i < paths.size(); ++i) {
+    auto pid = paths[i];
     TRI_ASSERT(pid != 0);
     char const* name = TRI_AttributeNameShapePid(shaper, pid);
 
@@ -633,9 +643,7 @@ static int SetupSearchValue (v8::Isolate* isolate,
     int res;
 
     if (example->HasOwnProperty(key)) {
-      v8::Handle<v8::Value> val = example->Get(key);
-
-      res = TRI_FillShapedJsonV8Object(isolate, val, &result[i], shaper, false);
+      res = TRI_FillShapedJsonV8Object(isolate, example->Get(key), &result[i], shaper, false);
     }
     else {
       res = TRI_FillShapedJsonV8Object(isolate, v8::Null(isolate), &result[i], shaper, false);
@@ -644,7 +652,6 @@ static int SetupSearchValue (v8::Isolate* isolate,
     if (res != TRI_ERROR_NO_ERROR) {
       return res;
     }
-    ++i;
   }
 
   return TRI_ERROR_NO_ERROR;
@@ -1781,24 +1788,27 @@ static void JS_MvccByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>
 
     auto hashIndex = static_cast<triagens::mvcc::HashIndex*>(index);
     auto const& paths = hashIndex->paths();
+
     std::vector<TRI_shaped_json_t> searchValue(paths.size());
 
-    TRI_shaper_t* shaper = transactionCollection->shaper(); // PROTECTED by trx from above
-    int res = SetupSearchValue(isolate, paths, example, shaper, searchValue);
+    int res = SetupSearchValue(isolate, paths, example, transactionCollection->shaper(), searchValue);
 
     if (res != TRI_ERROR_NO_ERROR) {
+      DestroySearchValue(searchValue);
+
       if (res == TRI_RESULT_ELEMENT_NOT_FOUND) {
         TRI_V8_RETURN(EmptyResult(isolate));
       }
       TRI_V8_THROW_EXCEPTION(res);
     }
-  
+
     // setup result
     v8::Handle<v8::Object> result = v8::Object::New(isolate);
     v8::Handle<v8::Array> documents = v8::Array::New(isolate);
     result->ForceSet(TRI_V8_ASCII_STRING("documents"), documents);
 
     std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(hashIndex->lookup(transactionCollection, transaction, &searchValue, limit)); 
+    DestroySearchValue(searchValue);
  
     if (indexResult.get() == nullptr) {
       TRI_V8_RETURN(result);
