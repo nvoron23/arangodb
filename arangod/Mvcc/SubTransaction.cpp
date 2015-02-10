@@ -28,7 +28,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "SubTransaction.h"
-#include "Basics/logging.h"
 #include "Mvcc/TopLevelTransaction.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
@@ -57,8 +56,8 @@ SubTransaction::SubTransaction (Transaction* parent,
     _topLevelTransaction(parent->topLevelTransaction()),
     _parentTransaction(parent) {
  
+  _parentTransaction->subTransactionStarted(this);
   _parentTransaction->_ongoingSubTransaction = this;
-  LOG_TRACE("creating %s", toString().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +65,6 @@ SubTransaction::SubTransaction (Transaction* parent,
 ////////////////////////////////////////////////////////////////////////////////
 
 SubTransaction::~SubTransaction () {
-  _parentTransaction->_ongoingSubTransaction = nullptr;
 }
 
 // -----------------------------------------------------------------------------
@@ -78,8 +76,6 @@ SubTransaction::~SubTransaction () {
 ////////////////////////////////////////////////////////////////////////////////
    
 void SubTransaction::commit () {
-  LOG_TRACE("committing transaction %s", toString().c_str());
-
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot commit finished transaction");
   }
@@ -90,7 +86,11 @@ void SubTransaction::commit () {
   }
 
   if (_ongoingSubTransaction != nullptr) {
-    _ongoingSubTransaction->rollback();
+    try {
+      _ongoingSubTransaction->rollback();
+    }
+    catch (...) {
+    }
   }
 
   _status = StatusType::COMMITTED;
@@ -103,15 +103,16 @@ void SubTransaction::commit () {
 ////////////////////////////////////////////////////////////////////////////////
    
 void SubTransaction::rollback () {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  LOG_TRACE("rolling back transaction %s", toString().c_str());
-
   if (_status != Transaction::StatusType::ONGOING) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TRANSACTION_INTERNAL, "cannot rollback finished transaction");
   }
   
   if (_ongoingSubTransaction != nullptr) {
-    _ongoingSubTransaction->rollback();
+    try {
+      _ongoingSubTransaction->rollback();
+    }
+    catch (...) {
+    }
   }
 
   _status = StatusType::ROLLED_BACK;
@@ -158,6 +159,22 @@ TransactionCollection* SubTransaction::collection (std::string const& name) {
         
 TransactionCollection* SubTransaction::collection (TRI_voc_cid_t cid) {
   return _topLevelTransaction->collection(cid);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief prepare the statistics so updating them later is guaranteed to
+/// succeed
+////////////////////////////////////////////////////////////////////////////////
+
+void SubTransaction::prepareStats (TransactionCollection const* collection) {
+  auto cid = collection->id();
+  auto it = _stats.find(cid);
+
+  if (it == _stats.end()) {
+    _stats.emplace(std::make_pair(cid, CollectionStats()));
+  }
+  
+  _parentTransaction->prepareStats(collection);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

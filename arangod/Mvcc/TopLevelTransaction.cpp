@@ -28,7 +28,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "TopLevelTransaction.h"
-#include "Basics/logging.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionManager.h"
 #include "Utils/Exception.h"
@@ -56,8 +55,6 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
                                           double ttl)
   : Transaction(transactionManager, id, vocbase, ttl),
     _runningTransactions(nullptr) {
-
-  LOG_TRACE("creating %s", toString().c_str());
 
   // register and lock all collections
   // note that this is not required for transactions, but it is a feature kept

@@ -162,12 +162,33 @@ void Transaction::incNumRemoved (TransactionCollection const* collection,
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief this is called when a subtransaction is finished
+/// @brief this is called when a sub-transaction is started
+/// this reserves enough space in the committedSubTransactions element so
+/// it will be able to capture the transaction id on commit 
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::subTransactionStarted (Transaction* transaction) {
+  size_t const n = _committedSubTransactions.size();
+  
+  // reserve enough space in the container so later commits won't fail with
+  // out of memory
+  _committedSubTransactions.reserve(n + 8);
+
+  // this will recursively inform all parent transactions
+  if (! isTopLevel()) {
+    parentTransaction()->subTransactionStarted(this);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief this is called when a sub-transaction is finished
 ////////////////////////////////////////////////////////////////////////////////
 
 void Transaction::subTransactionFinished (Transaction* transaction) {
   auto const id = transaction->id();
   auto const status = transaction->status();
+ 
+  _ongoingSubTransaction = nullptr;
 
   if (status == StatusType::COMMITTED) { 
     bool hasAnyModifications = false;
@@ -180,25 +201,23 @@ void Transaction::subTransactionFinished (Transaction* transaction) {
 
       hasAnyModifications = true;
 
+      // _stats entry must have been created earlier using prepareStats()
       auto it2 = _stats.find(it.first);
-      if (it2 != _stats.end()) {
-        // merge our own stats with the sub-transaction's stats
-        (*it2).second.merge(it.second);
-      }
-      else {
-        // take over the stats from the sub-transaction
-        _stats.emplace(std::make_pair(it.first, it.second));
-      }
+      TRI_ASSERT(it2 != _stats.end());
+      // merge our own stats with the sub-transaction's stats
+      (*it2).second.merge(it.second);
     }
     
     // track the id of the transaction, but only if the transaction has actually
     // modified data
-    if (hasAnyModifications) { 
+    if (hasAnyModifications) {
+      // this shouldn't fail as we explicitly increated the capacity before 
       _committedSubTransactions.emplace(id.own());
     }
 
     // copy all committed sub-transactions of other into ourselves
     auto const& cst = transaction->_committedSubTransactions;
+    // this shouldn't fail as we explicitly increated the capacity before 
     _committedSubTransactions.insert(cst.begin(), cst.end());
   }
   else {
