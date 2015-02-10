@@ -111,7 +111,7 @@ gitjslint:
 	if test "`git status  |grep 'js$$' |wc -l`" -eq 0; then \
 		exit 0; \
 	fi
-	for file in ` git status  |grep 'js$$' |sed "s;.*:;;"`; do \
+	for file in ` git status  |grep ':.*js$$' |sed "s;.*:;;"`; do \
 	        bin/arangosh --jslint $$file || exit 1; \
 	 done
 
