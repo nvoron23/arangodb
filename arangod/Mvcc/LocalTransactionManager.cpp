@@ -305,7 +305,7 @@ std::vector<TransactionInfo> LocalTransactionManager::runningTransactions (TRI_v
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-Transaction::StatusType LocalTransactionManager::statusTransaction (TransactionId const& id) {
+Transaction::StatusType LocalTransactionManager::statusTransaction (TransactionId const& id) const {
   READ_LOCKER(_lock); 
 
   if (_failedTransactions.find(id.own()) != _failedTransactions.end()) {

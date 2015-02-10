@@ -165,7 +165,7 @@ namespace triagens {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction::StatusType statusTransaction (TransactionId const&) override final;
+        Transaction::StatusType statusTransaction (TransactionId const&) const override final;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief adds the transactions from the parameter to the list of failed
@@ -229,7 +229,7 @@ namespace triagens {
 /// @brief lock for _runningTransactions
 ////////////////////////////////////////////////////////////////////////////////
 
-        triagens::basics::ReadWriteLock _lock;
+        triagens::basics::ReadWriteLock mutable _lock;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief list of all currently running transactions

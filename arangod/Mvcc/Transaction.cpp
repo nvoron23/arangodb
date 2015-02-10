@@ -220,7 +220,7 @@ void Transaction::subTransactionFinished (Transaction* transaction) {
 /// "visibility(other) < VISIBLE" legally.
 ////////////////////////////////////////////////////////////////////////////////
     
-Transaction::VisibilityType Transaction::visibility (TransactionId const& other) {
+Transaction::VisibilityType Transaction::visibility (TransactionId const& other) const {
   if (other.own() == 0) {
     return VisibilityType::INVISIBLE;
   }
@@ -274,7 +274,7 @@ Transaction::VisibilityType Transaction::visibility (TransactionId const& other)
 ////////////////////////////////////////////////////////////////////////////////
          
 bool Transaction::isVisibleForRead (TransactionId const& from, 
-                                    TransactionId const& to) {
+                                    TransactionId const& to) const {
   if (visibility(from) != Transaction::VisibilityType::VISIBLE) {
     return false;
   }

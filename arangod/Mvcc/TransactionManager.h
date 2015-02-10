@@ -137,7 +137,7 @@ namespace triagens {
 /// @brief returns the status of a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual Transaction::StatusType statusTransaction (TransactionId const&) = 0;
+        virtual Transaction::StatusType statusTransaction (TransactionId const&) const = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief adds the transactions from the parameter to the list of failed
