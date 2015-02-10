@@ -660,9 +660,9 @@ namespace triagens {
               // This is a "first" one in its doubly linked list:
               insert(oldTable[j].ptr, true, false);
               // Now walk to the end of the list:
-              IndexType k;
-              while (oldTable[j].next != INVALID_INDEX) {
-                k = oldTable[j].next;
+              IndexType k = j;
+              while (oldTable[k].next != INVALID_INDEX) {
+                k = oldTable[k].next;
               }
               // Now insert all of them backwards, not repeating k:
               while (k != j) {
