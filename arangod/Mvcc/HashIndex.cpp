@@ -229,7 +229,7 @@ HashIndex::HashIndex (TRI_idx_iid_t id,
     _theHash(nullptr),
     _unique(unique),
     _sparse(sparse) {
-  
+ 
   try {
     _theHash = new Hash_t(hashKey(paths.size()), 
                           hashElement(paths.size()), 
@@ -462,6 +462,13 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookupContinue(
                                                   size_t limit = 0) {
 
   return lookupInternal(coll, trans, nullptr, previousLast, limit);
+}
+        
+////////////////////////////////////////////////////////////////////////////////
+/// @brief a garbage collection function for the index
+////////////////////////////////////////////////////////////////////////////////
+
+void HashIndex::cleanup () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
