@@ -1743,6 +1743,7 @@ static void JS_ByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>& ar
 ////////////////////////////////////////////////////////////////////////////////
 
 static void JS_MvccByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TransactionBase transBase(true);   // To protect against assertions, FIXME later
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 

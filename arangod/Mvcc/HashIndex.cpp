@@ -402,10 +402,11 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookupInternal (
   }
 
   try {
+    bool leave = false;
     while (limit == 0 || theResult->size() < limit) {
       size_t subLimit = (limit == 0) ? 0 : limit - theResult->size();
       std::vector<Element*>* subResult;
-      if (previousLastElement != nullptr) {
+      if (previousLastElement == nullptr) {
         subResult = _theHash->lookupByKey(key, subLimit);
       }
       else {
@@ -421,13 +422,16 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookupInternal (
             theResult->push_back(d->_document);
           }
         }
+        if (subResult->size() < subLimit) {
+          leave = true;
+        }
         delete subResult;
       }
       catch (...) {
         delete subResult;
         throw;
       }
-      if (limit == 0) {
+      if (subLimit == 0 || leave) {
         break;   // Otherwise we would loop forever
       }
     }
