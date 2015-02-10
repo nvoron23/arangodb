@@ -85,9 +85,6 @@ class hashElement {
     inline uint64_t operator() (HashIndex::Element const* elm, bool byKey) {
       uint64_t hash = 0x0123456789abcdef;
 
-      TRI_shaped_json_t shaped;
-      TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, elm->_document->getDataPtr());
-
       char const* base = elm->_document->getShapedJsonPtr();
       for (size_t j = 0; j < _nrFields; ++j) {
         // ignore the sid for hashing

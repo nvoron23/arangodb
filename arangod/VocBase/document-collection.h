@@ -232,6 +232,11 @@ struct TRI_doc_mptr_t {
         auto offset = (reinterpret_cast<triagens::wal::document_marker_t const*>(marker))->_offsetJson;
         return static_cast<char const*>(getDataPtr()) + offset;
       }
+      else if (marker->_type == TRI_WAL_MARKER_MVCC_DOCUMENT ||
+               marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+        auto offset = (reinterpret_cast<triagens::wal::mvcc_document_marker_t const*>(marker))->_offsetJson;
+        return static_cast<char const*>(getDataPtr()) + offset;
+      }
 
       TRI_ASSERT(false);
 
