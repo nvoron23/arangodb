@@ -115,51 +115,47 @@ bool Transaction::hasWaitForSync () const {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief prepare the statistics so updating them later is guaranteed to
+/// succeed
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::prepareStats (TransactionCollection const* collection) {
+  auto cid = collection->id();
+  auto it = _stats.find(cid);
+
+  if (it == _stats.end()) {
+    _stats.emplace(std::make_pair(cid, CollectionStats()));
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief update the number of inserted documents
+/// this is guaranteed to not fail if prepareStats() was called before
 ////////////////////////////////////////////////////////////////////////////////
 
 void Transaction::incNumInserted (TransactionCollection const* collection,
                                   bool waitForSync) {
   auto cid = collection->id();
   auto it = _stats.find(cid);
-
-  if (it == _stats.end()) {
-    CollectionStats stats;
-    stats.numInserted++;
-    stats.waitForSync = waitForSync || collection->waitForSync();
-    _stats.insert(std::make_pair(cid, stats));
-  }
-  else {
-    (*it).second.numInserted++;
-  }
+  
+  TRI_ASSERT(it != _stats.end());
+  (*it).second.numInserted++;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief update the number of removed documents
+/// this is guaranteed to not fail if prepareStats() was called before
 ////////////////////////////////////////////////////////////////////////////////
 
 void Transaction::incNumRemoved (TransactionCollection const* collection,
                                  bool waitForSync) {
   auto cid = collection->id();
   auto it = _stats.find(cid);
+  
+  TRI_ASSERT(it != _stats.end());
 
-  if (it == _stats.end()) {
-    CollectionStats stats;
-    stats.numRemoved++;
-    stats.waitForSync = waitForSync || collection->waitForSync();
-    _stats.insert(std::make_pair(cid, stats));
-  }
-  else {
-    (*it).second.numRemoved++;
-  }
+  (*it).second.numRemoved++;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief update the number of removed documents
-////////////////////////////////////////////////////////////////////////////////
-
-        void incNumRemoved (TransactionCollection const*);
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the transaction status

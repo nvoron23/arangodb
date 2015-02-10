@@ -106,7 +106,8 @@ MasterpointerManager::MasterpointerManager ()
     _freelist(nullptr),
     _head(nullptr),
     _tail(nullptr),
-    _blocks() {
+    _blocks(),
+    _toRecycle() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +142,7 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
       // acquire a new block
       auto begin = new TRI_doc_mptr_t[blockSize];
       try {
-        _blocks.push_back(begin);
+        _blocks.emplace_back(begin);
       }
       catch (...) {
         delete[] begin;
@@ -171,7 +172,6 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
   // outside the lock
   TRI_ASSERT_EXPENSIVE(mptr != nullptr);
 
-  // TODO: properly initialize the master pointer
   mptr->setDataPtr(data);
   mptr->_rid = TRI_EXTRACT_MARKER_RID(static_cast<TRI_df_marker_t const*>(data));
 
@@ -206,6 +206,32 @@ void MasterpointerManager::link (TRI_doc_mptr_t* mptr) {
     mptr->_prev = _tail;
     _tail->_next = mptr;
     _tail = mptr;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief unlink the master pointer from the list
+////////////////////////////////////////////////////////////////////////////////
+
+void MasterpointerManager::unlink (TRI_doc_mptr_t* mptr) {
+  // this can fail...
+  _toRecycle.emplace_back(mptr);
+
+  {
+    MUTEX_LOCKER(_lock);
+    if (_head == mptr) {
+      _head = mptr->_next;
+    }
+    if (_tail == mptr) {
+      _tail = mptr->_prev;
+    }
+  }
+
+  if (mptr->_prev != nullptr) {
+    mptr->_prev->_next = mptr->_next;
+  }
+  if (mptr->_next != nullptr) {
+    mptr->_next->_prev = mptr->_prev;
   }
 }
 

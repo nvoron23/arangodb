@@ -259,6 +259,7 @@ OperationResult CollectionOperations::InsertDocument (TransactionScope* transact
                                                       Document& document,
                                                       OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
+  transaction->prepareStats(collection);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the insert operation is ongoing
@@ -346,6 +347,7 @@ OperationResult CollectionOperations::RemoveDocument (TransactionScope* transact
                                                       Document const& document,
                                                       OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
+  transaction->prepareStats(collection);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the remove operation is ongoing
@@ -373,6 +375,7 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
                                                       TRI_json_t const* update,
                                                       OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
+  transaction->prepareStats(collection);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the update operation is ongoing
@@ -455,6 +458,7 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
                                                        Document& document,
                                                        OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
+  transaction->prepareStats(collection);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the update operation is ongoing
