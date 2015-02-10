@@ -3435,7 +3435,7 @@ static void MvccInsert (TRI_vocbase_col_t const* collection,
     TRI_GET_GLOBAL_STRING(_IdKey);
     TRI_GET_GLOBAL_STRING(_RevKey);
     TRI_GET_GLOBAL_STRING(_KeyKey);
-    result->ForceSet(_IdKey,  V8DocumentId(isolate, transactionCollection->name(), docKey));
+    result->ForceSet(_IdKey, V8DocumentId(isolate, transactionCollection->name(), docKey));
     result->ForceSet(_RevKey, V8RevisionId(isolate, TRI_EXTRACT_MARKER_RID(insertResult.mptr)));
     result->ForceSet(_KeyKey, TRI_V8_STRING(docKey));
 

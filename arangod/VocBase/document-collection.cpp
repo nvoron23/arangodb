@@ -4277,7 +4277,7 @@ static TRI_index_t* CreateHashIndexDocumentCollection (TRI_document_collection_t
   }
     
     
-  document->addIndex(new triagens::mvcc::HashIndex(iid, document, fieldsVector, pathsVector, unique, false));
+  document->addIndex(new triagens::mvcc::HashIndex(idx->_iid, document, fieldsVector, pathsVector, unique, false));
 
   // store index and return
   res = AddIndex(document, idx);

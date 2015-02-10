@@ -28,7 +28,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "v8-query.h"
-#include "v8-vocindex.h"
 
 #include "Basics/logging.h"
 #include "Basics/random.h"
@@ -38,6 +37,10 @@
 #include "FulltextIndex/fulltext-index.h"
 #include "FulltextIndex/fulltext-result.h"
 #include "FulltextIndex/fulltext-query.h"
+#include "Mvcc/HashIndex.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "SkipLists/skiplistIndex.h"
 #include "Utils/transactions.h"
 #include "V8/v8-globals.h"
@@ -46,7 +49,8 @@
 #include "V8Server/v8-vocbase.h"
 #include "VocBase/edge-collection.h"
 #include "VocBase/vocbase.h"
-#include "v8-wrapshapedjson.h"
+#include "V8Server/v8-vocindex.h"
+#include "V8Server/v8-wrapshapedjson.h"
 
 using namespace std;
 using namespace triagens::basics;
@@ -600,6 +604,47 @@ static int SetupSearchValue (TRI_vector_t const* paths,
       }
       return res;
     }
+  }
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief sets up the example object for a hash index
+////////////////////////////////////////////////////////////////////////////////
+
+static int SetupSearchValue (v8::Isolate* isolate,
+                             std::vector<TRI_shape_pid_t> const& paths,
+                             v8::Handle<v8::Object> const example,
+                             TRI_shaper_t* shaper,
+                             std::vector<TRI_shaped_json_t>& result) {
+  TRI_ASSERT(result.size() == paths.size());
+
+  size_t i = 0;
+  for (auto const& pid : paths) {
+    TRI_ASSERT(pid != 0);
+    char const* name = TRI_AttributeNameShapePid(shaper, pid);
+
+    if (name == nullptr) {
+      return TRI_ERROR_BAD_PARAMETER;
+    }
+
+    v8::Handle<v8::String> key = TRI_V8_STRING(name);
+    int res;
+
+    if (example->HasOwnProperty(key)) {
+      v8::Handle<v8::Value> val = example->Get(key);
+
+      res = TRI_FillShapedJsonV8Object(isolate, val, &result[i], shaper, false);
+    }
+    else {
+      res = TRI_FillShapedJsonV8Object(isolate, v8::Null(isolate), &result[i], shaper, false);
+    }
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      return res;
+    }
+    ++i;
   }
 
   return TRI_ERROR_NO_ERROR;
@@ -1687,6 +1732,118 @@ static void JS_ByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>& ar
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief selects documents by example using a hash index
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+
+  // expecting index, example, skip, and limit
+  if (args.Length() < 2) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccByExampleHash(<index>, <example>, <skip>, <limit>)");
+  }
+
+  // extract the example
+  if (! args[1]->IsObject()) {
+    TRI_V8_THROW_TYPE_ERROR("<example> must be an object");
+  }
+
+  v8::Handle<v8::Object> example = args[1]->ToObject();
+
+  // extract skip and limit
+  TRI_voc_ssize_t skip;
+  TRI_voc_size_t limit;
+  ExtractSkipAndLimit(args, 2, skip, limit);
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+  
+    // extract the index
+    CollectionNameResolver resolver(collection->_vocbase); // TODO
+    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+
+    if (index == nullptr ||
+        index->type() != TRI_IDX_TYPE_HASH_INDEX) {
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
+    }
+
+    auto hashIndex = static_cast<triagens::mvcc::HashIndex*>(index);
+    auto const& paths = hashIndex->paths();
+    std::vector<TRI_shaped_json_t> searchValue(paths.size());
+
+    TRI_shaper_t* shaper = transactionCollection->shaper(); // PROTECTED by trx from above
+    int res = SetupSearchValue(isolate, paths, example, shaper, searchValue);
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      if (res == TRI_RESULT_ELEMENT_NOT_FOUND) {
+        TRI_V8_RETURN(EmptyResult(isolate));
+      }
+      TRI_V8_THROW_EXCEPTION(res);
+    }
+  
+    // setup result
+    v8::Handle<v8::Object> result = v8::Object::New(isolate);
+    v8::Handle<v8::Array> documents = v8::Array::New(isolate);
+    result->ForceSet(TRI_V8_ASCII_STRING("documents"), documents);
+
+    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(hashIndex->lookup(transactionCollection, transaction, &searchValue, limit)); 
+ 
+    if (indexResult.get() == nullptr) {
+      TRI_V8_RETURN(result);
+    }
+
+    auto const& documentsFound = *(indexResult.get());
+
+    size_t total = indexResult->size();
+    size_t count = 0;
+
+    if (total > 0) {
+      size_t s;
+      size_t e;
+      CalculateSkipLimitSlice(total, skip, limit, s, e);
+
+      if (s < e) {
+        for (size_t i = s;  i < e;  ++i) {
+          v8::Handle<v8::Value> doc = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, documentsFound[i]->getDataPtr());
+
+          if (doc.IsEmpty()) {
+            TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+            break;
+          }
+
+          documents->Set((uint32_t) count++, doc);
+        }
+      }
+    }
+  
+    result->ForceSet(TRI_V8_ASCII_STRING("total"), v8::Number::New(isolate, static_cast<double>(total)));
+    result->ForceSet(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, static_cast<double>(count)));
+
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  TRI_ASSERT(false);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief selects documents by condition using a skiplist index
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2531,6 +2688,7 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("INEDGES"), JS_InEdgesQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("LAST"), JS_LastQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NEAR"), JS_NearQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExampleHash"), JS_MvccByExampleHashIndex, true);
 
   // internal method. not intended to be used by end-users
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NTH"), JS_NthQuery, true);

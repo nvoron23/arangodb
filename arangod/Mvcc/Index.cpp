@@ -51,6 +51,7 @@ Index::Index (TRI_idx_iid_t id,
   : _id(id),
     _collection(collection),
     _fields(fields) {
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////

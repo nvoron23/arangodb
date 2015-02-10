@@ -131,6 +131,10 @@ namespace triagens {
           return _paths.size();
         }
 
+        std::vector<TRI_shape_pid_t> const& paths () const {
+          return _paths;
+        }
+
       private:
 
         std::vector<TRI_doc_mptr_t*>* lookupInternal(

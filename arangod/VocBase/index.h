@@ -53,6 +53,12 @@ struct TRI_shaped_json_s;
 struct TRI_document_collection_t;
 struct TRI_transaction_collection_s;
 
+namespace triagens {
+  namespace mvcc {
+    class Index;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                      public types
 // -----------------------------------------------------------------------------
@@ -288,6 +294,13 @@ int TRI_SaveIndex (struct TRI_document_collection_t*,
 
 TRI_index_t* TRI_LookupIndex (struct TRI_document_collection_t const*,
                               TRI_idx_iid_t);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up an index identifier
+////////////////////////////////////////////////////////////////////////////////
+
+triagens::mvcc::Index* TRI_LookupMvccIndex (struct TRI_document_collection_t const*,
+                                            TRI_idx_iid_t);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief creates a basic index description as JSON

@@ -271,6 +271,8 @@ void HashIndex::insert (TransactionCollection* coll,
   if (! _unique) {
     WRITE_LOCKER(_lock);
     Element* hashElement = allocAndFillElement(coll, doc, includeForSparse);
+    TRI_ASSERT(hashElement != nullptr);
+
     if (! _sparse || includeForSparse) {
       try {
         _theHash->insert(hashElement, false, false);
@@ -279,6 +281,9 @@ void HashIndex::insert (TransactionCollection* coll,
         deleteElement(hashElement);
         throw;
       }
+    }
+    else {
+      deleteElement(hashElement);
     }
   }
   else {  // _unique == true
@@ -375,7 +380,7 @@ void HashIndex::preCommit (TransactionCollection*,
 /// @brief lookup by key with limit, internal function
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<TRI_doc_mptr_t*>* HashIndex::lookupInternal(
+std::vector<TRI_doc_mptr_t*>* HashIndex::lookupInternal (
                                   TransactionCollection* coll,
                                   Transaction* trans,
                                   Key const* key,
@@ -452,7 +457,7 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookup (TransactionCollection* coll,
 /// @brief lookup by key with limit, continuation
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<TRI_doc_mptr_t*>* HashIndex::lookupContinue(
+std::vector<TRI_doc_mptr_t*>* HashIndex::lookupContinue (
                                                   TransactionCollection* coll,
                                                   Transaction* trans,
                                                   TRI_doc_mptr_t* previousLast,

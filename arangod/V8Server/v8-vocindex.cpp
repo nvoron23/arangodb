@@ -28,18 +28,18 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "v8-vocindex.h"
-#include "v8-vocbase.h"
-#include "v8-vocbaseprivate.h"
-#include "v8-collection.h"
 
 #include "Basics/conversions.h"
-#include "V8/v8-conv.h"
+#include "CapConstraint/cap-constraint.h"
+#include "Mvcc/Index.h"
 #include "Utils/transactions.h"
 #include "Utils/V8TransactionContext.h"
-
-#include "CapConstraint/cap-constraint.h"
+#include "V8/v8-conv.h"
 #include "V8/v8-globals.h"
 #include "V8/v8-utils.h"
+#include "V8Server/v8-collection.h"
+#include "V8Server/v8-vocbase.h"
+#include "V8Server/v8-vocbaseprivate.h"
 
 using namespace std;
 using namespace triagens::basics;
@@ -1564,6 +1564,52 @@ TRI_index_t* TRI_LookupIndexByHandle (v8::Isolate* isolate,
   return idx;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up an index identifier
+////////////////////////////////////////////////////////////////////////////////
+
+triagens::mvcc::Index* TRI_LookupMvccIndexByHandle (v8::Isolate* isolate,
+                                                    triagens::arango::CollectionNameResolver const* resolver,
+                                                    TRI_vocbase_col_t const* collection,
+                                                    v8::Handle<v8::Value> const val) {
+  // reset the collection identifier
+  string collectionName;
+  TRI_idx_iid_t iid = 0;
+
+  // assume we are already loaded
+  TRI_ASSERT(collection != nullptr);
+  TRI_ASSERT(collection->_collection != nullptr);
+
+  // extract the index identifier from a string
+  if (val->IsString() || val->IsStringObject() || val->IsNumber()) {
+    if (! IsIndexHandle(val, collectionName, iid)) {
+      return nullptr;
+    }
+  }
+
+  // extract the index identifier from an object
+  else if (val->IsObject()) {
+    TRI_GET_GLOBALS();
+
+    v8::Handle<v8::Object> obj = val->ToObject();
+    TRI_GET_GLOBAL_STRING(IdKey);
+    v8::Handle<v8::Value> iidVal = obj->Get(IdKey);
+
+    if (! IsIndexHandle(iidVal, collectionName, iid)) {
+      return nullptr;
+    }
+  }
+
+  if (! collectionName.empty()) {
+    if (! EqualCollection(resolver, collectionName, collection)) {
+      // I wish this error provided me with more information!
+      // e.g. 'cannot access index outside the collection it was defined in'
+      return nullptr;
+    }
+  }
+
+  return TRI_LookupMvccIndex(collection->_collection, iid);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a collection

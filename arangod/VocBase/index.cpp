@@ -44,6 +44,7 @@
 #include "FulltextIndex/fulltext-wordlist.h"
 #include "GeoIndex/geo-index.h"
 #include "HashIndex/hash-index.h"
+#include "Mvcc/Index.h"
 #include "ShapedJson/shape-accessor.h"
 #include "ShapedJson/shaped-json.h"
 #include "Utils/Exception.h"
@@ -412,6 +413,21 @@ TRI_index_t* TRI_LookupIndex (TRI_document_collection_t const* document,
   }
 
   TRI_set_errno(TRI_ERROR_ARANGO_NO_INDEX);
+
+  return nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up an index identifier
+////////////////////////////////////////////////////////////////////////////////
+
+triagens::mvcc::Index* TRI_LookupMvccIndex (TRI_document_collection_t const* document,
+                                            TRI_idx_iid_t iid) {
+  for (auto idx : document->_indexes) {
+    if (idx->id()== iid) {
+      return idx;
+    }
+  }
 
   return nullptr;
 }
