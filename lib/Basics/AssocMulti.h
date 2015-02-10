@@ -475,7 +475,7 @@ namespace triagens {
           result->reserve((std::max)(4ul, limit));
           while (true) {
             i = _table[i].next;
-            if (i == INVALID_INDEX || (limit != 0 && result.size() >= limit)) {
+            if (i == INVALID_INDEX || (limit != 0 && result->size() >= limit)) {
               break;
             }
             result->push_back(_table[i].ptr);
@@ -655,8 +655,20 @@ namespace triagens {
           // table is already clear by allocate, copy old data
           IndexType j;
           for (j = 0; j < oldAlloc; j++) {
-            if (oldTable[j].ptr != nullptr) {
+            if (oldTable[j].ptr != nullptr && 
+                oldTable[j].prev == INVALID_INDEX) {
+              // This is a "first" one in its doubly linked list:
               insert(oldTable[j].ptr, true, false);
+              // Now walk to the end of the list:
+              IndexType k;
+              while (oldTable[j].next != INVALID_INDEX) {
+                k = oldTable[j].next;
+              }
+              // Now insert all of them backwards, not repeating k:
+              while (k != j) {
+                insert(oldTable[k].ptr, true, false);
+                k = oldTable[k].prev;
+              }
             }
           }
 

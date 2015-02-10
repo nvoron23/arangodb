@@ -84,16 +84,16 @@ namespace triagens {
         virtual void preCommit (TransactionCollection*,
                                 Transaction*) override final;
 
-        std::vector<TRI_doc_mptr_t*>* lookup (class TransactionCollection* coll,
+        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection* coll,
                                               Transaction* trans,
                                               Key const* key,
-                                              size_t limit) const;
+                                              size_t limit);
 
         std::vector<TRI_doc_mptr_t*>* lookupContinue(
-                                          class TransactionCollection* coll,
+                                          TransactionCollection* coll,
                                           Transaction* trans,
                                           TRI_doc_mptr_t* previousLast,
-                                          size_t limit) const;
+                                          size_t limit);
 
 
         // a garbage collection function for the index
@@ -133,6 +133,12 @@ namespace triagens {
 
       private:
 
+        std::vector<TRI_doc_mptr_t*>* lookupInternal(
+                                          TransactionCollection* coll,
+                                          Transaction* trans,
+                                          Key const* key,
+                                          TRI_doc_mptr_t* previousLast,
+                                          size_t limit);
         size_t keySize () const;
 
         Element* allocAndFillElement(TransactionCollection* coll,

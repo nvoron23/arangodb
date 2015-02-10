@@ -375,6 +375,96 @@ void HashIndex::preCommit (TransactionCollection*,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief lookup by key with limit, internal function
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<TRI_doc_mptr_t*>* HashIndex::lookupInternal(
+                                  TransactionCollection* coll,
+                                  Transaction* trans,
+                                  Key const* key,
+                                  TRI_doc_mptr_t* previousLast,
+                                  size_t limit) {
+
+  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> theResult
+        (new std::vector<TRI_doc_mptr_t*>);
+  Element* previousLastElement = nullptr;
+  Element* previousLastElementAlloc = nullptr;
+  if (key != nullptr) {
+    TRI_ASSERT(previousLast == nullptr);
+  }
+  else {
+    TRI_ASSERT(previousLast != nullptr);
+    bool dummy;
+    previousLastElement = allocAndFillElement(coll, previousLast, dummy);
+    previousLastElementAlloc = previousLastElement;
+  }
+
+  try {
+    while (limit == 0 || theResult->size() < limit) {
+      size_t subLimit = (limit == 0) ? 0 : limit - theResult->size();
+      std::vector<Element*>* subResult;
+      if (previousLastElement != nullptr) {
+        subResult = _theHash->lookupByKey(key, subLimit);
+      }
+      else {
+        subResult = _theHash->lookupByKeyContinue(previousLastElement,
+                                                  subLimit);
+        previousLastElement = subResult->back();
+      }
+      try {
+        for (auto* d : *subResult) {
+          TransactionId from = d->_document->from();
+          TransactionId to = d->_document->to();
+          if (trans->isVisibleForRead(from, to)) {
+            theResult->push_back(d->_document);
+          }
+        }
+        delete subResult;
+      }
+      catch (...) {
+        delete subResult;
+        throw;
+      }
+      if (limit == 0) {
+        break;   // Otherwise we would loop forever
+      }
+    }
+  }
+  catch (...) {
+    if (previousLastElementAlloc != nullptr) {
+      deleteElement(previousLastElementAlloc);
+    }
+    throw;
+  }
+
+  return theResult.release();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief lookup by key with limit
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<TRI_doc_mptr_t*>* HashIndex::lookup (TransactionCollection* coll,
+                                                 Transaction* trans,
+                                                 Key const* key,
+                                                 size_t limit = 0) {
+  return lookupInternal(coll, trans, key, nullptr, limit);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief lookup by key with limit, continuation
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<TRI_doc_mptr_t*>* HashIndex::lookupContinue(
+                                                  TransactionCollection* coll,
+                                                  Transaction* trans,
+                                                  TRI_doc_mptr_t* previousLast,
+                                                  size_t limit = 0) {
+
+  return lookupInternal(coll, trans, nullptr, previousLast, limit);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief return the memory used by the index
 ////////////////////////////////////////////////////////////////////////////////
   
