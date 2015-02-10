@@ -271,7 +271,7 @@ std::string TopLevelTransaction::toString () const {
 /// ongoing when this one started
 ////////////////////////////////////////////////////////////////////////////////
 
-bool TopLevelTransaction::wasOngoingAtStart (TransactionId::InternalType other) {
+bool TopLevelTransaction::wasOngoingAtStart (TransactionId::InternalType other) const {
   if (_runningTransactions == nullptr) {
     return false;
   }

@@ -266,7 +266,9 @@ namespace triagens {
 /// @brief return the transaction status
 ////////////////////////////////////////////////////////////////////////////////
 
-        Transaction::StatusType status () const; 
+        Transaction::StatusType status () const {
+          return _status;
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief commit the transaction
@@ -360,7 +362,7 @@ namespace triagens {
 /// is still ongoing
 ////////////////////////////////////////////////////////////////////////////////
         
-         StatusType statusSubTransaction (TransactionId const& sub);
+         StatusType statusSubTransaction (TransactionId const& sub) const;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief isNotAborted, this is a pure optimisation method. It checks
@@ -384,13 +386,17 @@ namespace triagens {
 /// @brief set the killed flag
 ////////////////////////////////////////////////////////////////////////////////
 
-        void killed (bool);
+        void killed (bool) {
+          _killed = true;
+        }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief check the killed flag
 ////////////////////////////////////////////////////////////////////////////////
 
-        bool killed ();
+        bool killed () const {
+          return _killed;
+        }
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods

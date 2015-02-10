@@ -157,31 +157,6 @@ void Transaction::incNumRemoved (TransactionCollection const* collection,
   (*it).second.numRemoved++;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return the transaction status
-////////////////////////////////////////////////////////////////////////////////
-
-Transaction::StatusType Transaction::status () const {
-  // TODO: implement locking here in case multiple threads access the same transaction
-  return _status;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief set the killed flag
-////////////////////////////////////////////////////////////////////////////////
-
-void Transaction::killed (bool) {
-  _killed = true;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief check the killed flag
-////////////////////////////////////////////////////////////////////////////////
-
-bool Transaction::killed () {
-  return _killed;
-}
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
@@ -317,7 +292,7 @@ bool Transaction::isVisibleForRead (TransactionId const& from,
 /// are still ongoing
 ////////////////////////////////////////////////////////////////////////////////
       
-Transaction::StatusType Transaction::statusSubTransaction (TransactionId const& sub) {
+Transaction::StatusType Transaction::statusSubTransaction (TransactionId const& sub) const {
   if (_committedSubTransactions.find(sub.own()) != _committedSubTransactions.end()) {
     // sub transaction has committed
     return Transaction::StatusType::COMMITTED;

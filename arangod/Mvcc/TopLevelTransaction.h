@@ -146,7 +146,7 @@ namespace triagens {
 /// ongoing when this one started
 ////////////////////////////////////////////////////////////////////////////////
 
-        bool wasOngoingAtStart (TransactionId::InternalType);
+        bool wasOngoingAtStart (TransactionId::InternalType) const;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
