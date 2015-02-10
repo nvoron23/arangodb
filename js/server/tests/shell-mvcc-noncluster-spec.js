@@ -1,3 +1,5 @@
+/*jshint strict: false */
+/*global require, describe, expect, beforeEach, afterEach, it */
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief test the server-side MVCC behaviour
 ///
@@ -25,10 +27,8 @@
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-var jsunity = require("jsunity");
 var internal = require("internal");
 var db = internal.db;
-var print = internal.print;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  database methods
@@ -66,7 +66,7 @@ describe("MVCC", function () {
       expect(d).toEqual({});
       expect(error.errorNum).toEqual(1202);
     }
-    if (t != null) {
+    if (t !== null) {
       db._popTransaction(t.id);
     }
   }
@@ -1481,6 +1481,63 @@ describe("MVCC", function () {
 
     // Now really remove:
     expect(c.mvccRemove("doc1")).toEqual(true);
+  });
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test write conflicts between top level transactions
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should detect write conflicts between top level transactions",
+     function () {
+    var c = db[cn];
+    verifyTransactionStack([]);
+    
+    var t1 = db._beginTransaction(); db._popTransaction();
+    var t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t2 conflict if t1 has inserted something:
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    c.mvccInsert({_key: "A", Hallo:1});
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    var error1;
+    try {
+      c.mvccInsert({_key: "A", Hallo:1});
+      error1 = {};
+    }
+    catch (e1) {
+      error1 = e1;
+    }
+    expect(error1.errorNum).toEqual(1237);
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    // Check a t1 conflict if t2 has inserted something:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccInsert({_key: "B", Hallo:1});
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    var error2;
+    try {
+      c.mvccInsert({_key: "B", Hallo:1});
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2.errorNum).toEqual(1237);
+    db._commitTransaction(t1.id);
+    db._pushTransaction(t2.id);
+    db._commitTransaction(t2.id);
+    verifyTransactionStack([]);
   });
 
 });
