@@ -58,8 +58,9 @@ JAVASCRIPT_JSLINT = \
 	`find @srcdir@/js/common/modules/org -name "*.js"` \
 	`find @srcdir@/js/client/modules -name "*.js"` \
 	`find @srcdir@/js/server/modules -name "*.js"` \
-	`find @srcdir@/js/server/tests -name "aql-*.js" | grep -v "ranges-combined.*.js"` \
+	`find @srcdir@/js/server/tests -name "*.js"` \
 	`find @srcdir@/js/common/tests -name "*.js"` \
+	`find @srcdir@/js/client/tests -name "*.js"` \
 	\
 	`find @srcdir@/js/apps/system/cerberus -name "*.js"` \
 	`find @srcdir@/js/apps/system/gharial -name "*.js"` \
@@ -105,6 +106,14 @@ jslint:
 	exit $$RESULT
 
 jshint: jslint
+
+gitjslint:
+	if test "`git status  |grep 'js$$' |wc -l`" -eq 0; then \
+		exit 0; \
+	fi
+	for file in ` git status  |grep 'js$$' |sed "s;.*:;;"`; do \
+	        bin/arangosh --jslint $$file || exit 1; \
+	 done
 
 ################################################################################
 ### @brief sets up the directories
