@@ -182,7 +182,7 @@ void PrimaryIndex::insert (TransactionCollection* transColl,
 TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
                                       Transaction*,
                                       std::string const& key,
-                                      TRI_doc_mptr_t const* mptr) {
+                                      TRI_doc_mptr_t* mptr) {
   THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "should not call this method");
 }
 
@@ -223,7 +223,7 @@ TRI_doc_mptr_t* PrimaryIndex::remove (TransactionCollection* transColl,
 
 void PrimaryIndex::forget (TransactionCollection*,
                            Transaction*,
-                           TRI_doc_mptr_t const* doc) {
+                           TRI_doc_mptr_t* doc) {
   TRI_doc_mptr_t const* old;
 
   old = _theHash->remove(doc);

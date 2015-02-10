@@ -365,7 +365,8 @@ namespace triagens {
 /// @brief lookups an element given a key
 ////////////////////////////////////////////////////////////////////////////////
 
-        std::vector<Element*>* lookupByKey (Key const* key) const {
+        std::vector<Element*>* lookupByKey (Key const* key,
+                                            size_t limit = 0) const {
           std::unique_ptr<std::vector<Element*>> result(new std::vector<Element*>());
 
           // compute the hash
@@ -393,16 +394,106 @@ namespace triagens {
             // We found the beginning of the linked list:
 
             // pre-initialize the result to save at least a few reallocs
-            result->reserve(4);
+            result->reserve((std::max)(4ul, limit));
             do {
               result->push_back(_table[i].ptr);
               i = _table[i].next;
             } 
-            while (i != INVALID_INDEX);
+            while (i != INVALID_INDEX &&
+                   (limit == 0 || result->size() < limit));
           }
 
           // return whatever we found
           return result.release();
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up all elements with the same key as a given element
+////////////////////////////////////////////////////////////////////////////////
+
+        std::vector<Element*>* lookupWithElementByKey (
+                                    Element const* element,
+                                    size_t limit = 0) const {
+          std::unique_ptr<std::vector<Element*>> result(new std::vector<Element*>());
+
+          // compute the hash
+          IndexType hash = sizeof(IndexType) == 8 ?
+                             _hashElement(element, true) :
+                             TRI_64to32(_hashElement(element, true));
+          IndexType i = hash % _nrAlloc;
+
+#ifdef TRI_INTERNAL_STATS
+          // update statistics
+          _nrFinds++;
+#endif
+
+          // search the table
+          while (_table[i].ptr != nullptr &&
+                 (! _isEqualElementElement(element, _table[i].ptr, true) ||
+                  _table[i].prev != INVALID_INDEX)) {
+            i = incr(i);
+#ifdef TRI_INTERNAL_STATS
+            _nrProbesF++;
+#endif
+          }
+
+          if (_table[i].ptr != nullptr) {
+            // We found the beginning of the linked list:
+
+            // pre-initialize the result to save at least a few reallocs
+            result->reserve(std::max(4ul, limit));
+            do {
+              result->push_back(_table[i].ptr);
+              i = _table[i].next;
+            } 
+            while (i != INVALID_INDEX &&
+                   (limit == 0 || result->size() < limit));
+          }
+
+          // return whatever we found
+          return result.release();
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up all elements with the same key as a given element, 
+/// continuation
+////////////////////////////////////////////////////////////////////////////////
+
+        std::vector<Element*>* lookupWithElementByKeyContinue (
+                                    Element const* element,
+                                    size_t limit = 0) const {
+          std::unique_ptr<std::vector<Element*>> result(new std::vector<Element*>());
+
+          IndexType i = findElementPlace(element, true);
+          if (_table[i].ptr == nullptr) {
+            return nullptr;
+          }
+          // compute the hash
+
+          // continue search of the table
+          // pre-initialize the result to save at least a few reallocs
+          result->reserve((std::max)(4ul, limit));
+          while (true) {
+            i = _table[i].next;
+            if (i == INVALID_INDEX || (limit != 0 && result.size() >= limit)) {
+              break;
+            }
+            result->push_back(_table[i].ptr);
+          } 
+
+          // return whatever we found
+          return result.release();
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up all elements with the same key as a given element, 
+/// continuation
+////////////////////////////////////////////////////////////////////////////////
+
+        std::vector<Element*>* lookupByKeyContinue (
+                                    Element const* element,
+                                    size_t limit = 0) const {
+          return lookupWithElementByKeyContinue(element, limit);
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -504,6 +595,19 @@ namespace triagens {
           return _nrUsed > 0 ?
                  (_nrUsed - _nrCollisions) / _nrUsed :
                  1.0;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief iteration over all pointers in the hash array, the callback 
+/// function is called on the Element* for each thingy stored in the hash
+////////////////////////////////////////////////////////////////////////////////
+
+        void iterate (std::function<void(Element*)> callback) {
+          for (IndexType i = 0; i < _nrAlloc; i++) {
+            if (_table[i].ptr != nullptr) {
+              callback(_table[i].ptr);
+            }
+          }
         }
 
 // -----------------------------------------------------------------------------

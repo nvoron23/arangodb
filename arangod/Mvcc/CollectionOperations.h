@@ -144,7 +144,7 @@ namespace triagens {
           code(TRI_ERROR_NO_ERROR) {
       }
       
-      explicit OperationResult (TRI_doc_mptr_t const* mptr) 
+      explicit OperationResult (TRI_doc_mptr_t* mptr) 
         : mptr(mptr),
           tick(0),
           actualRevision(0),
@@ -166,10 +166,10 @@ namespace triagens {
           code(code) {
       }
 
-      TRI_doc_mptr_t const*          mptr;
-      TRI_voc_tick_t                 tick;
-      TRI_voc_rid_t                  actualRevision;
-      int                            code;
+      TRI_doc_mptr_t* mptr;
+      TRI_voc_tick_t  tick;
+      TRI_voc_rid_t   actualRevision;
+      int             code;
     
     };
 

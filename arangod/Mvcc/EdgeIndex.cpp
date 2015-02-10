@@ -381,7 +381,7 @@ void EdgeIndex::insert (TransactionCollection*, Transaction*, TRI_doc_mptr_t* do
 TRI_doc_mptr_t* EdgeIndex::remove (TransactionCollection*,
                                    Transaction*,
                                    std::string const& key,
-                                   TRI_doc_mptr_t const* doc) {
+                                   TRI_doc_mptr_t* doc) {
   _from->remove(doc);  // OUT
   _to->remove(doc);    // IN
   return nullptr;  // this is nonsense
@@ -392,7 +392,7 @@ TRI_doc_mptr_t* EdgeIndex::remove (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
         
 void EdgeIndex::forget (TransactionCollection*,
-                        Transaction*, TRI_doc_mptr_t const* doc) {
+                        Transaction*, TRI_doc_mptr_t* doc) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -191,7 +191,7 @@ void GeoIndex2::insert (TransactionCollection*,
 TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
                                    Transaction*,
                                    std::string const&,
-                                   TRI_doc_mptr_t const* doc) {
+                                   TRI_doc_mptr_t* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
   TRI_shaped_json_t shapedJson;
@@ -231,7 +231,7 @@ TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
 
 void GeoIndex2::forget (TransactionCollection*,
                         Transaction*,
-                        TRI_doc_mptr_t const* doc) {
+                        TRI_doc_mptr_t* doc) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

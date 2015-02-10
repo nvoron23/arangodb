@@ -51,11 +51,19 @@ namespace triagens {
       
       public:
 
+        struct Element {
+          TRI_doc_mptr_t*  _document;
+          TRI_shaped_sub_t _subObjects[];
+        };
+
+        typedef std::vector<TRI_shaped_json_t> Key;
+
         HashIndex (TRI_idx_iid_t id,
                    struct TRI_document_collection_t*,
                    std::vector<std::string> const& fields,
                    std::vector<TRI_shape_pid_t> const& paths,
-                   bool unique);
+                   bool unique,
+                   bool sparse);
 
         ~HashIndex ();
 
@@ -68,26 +76,44 @@ namespace triagens {
                    TransactionCollection*,
                    Transaction*,
                    std::string const&,
-                   struct TRI_doc_mptr_t const*) override final;
+                   struct TRI_doc_mptr_t*) override final;
         virtual void forget (TransactionCollection*,
                              Transaction*,
-                             struct TRI_doc_mptr_t const*) override final;
+                             struct TRI_doc_mptr_t*) override final;
 
         virtual void preCommit (TransactionCollection*,
                                 Transaction*) override final;
+
+        std::vector<TRI_doc_mptr_t*>* lookup (class TransactionCollection* coll,
+                                              Transaction* trans,
+                                              Key const* key,
+                                              size_t limit) const;
+
+        std::vector<TRI_doc_mptr_t*>* lookupContinue(
+                                          class TransactionCollection* coll,
+                                          Transaction* trans,
+                                          TRI_doc_mptr_t* previousLast,
+                                          size_t limit) const;
+
 
         // a garbage collection function for the index
         void cleanup () override final;
 
         // give index a hint about the expected size
-        void sizeHint (size_t) override final;
+        void sizeHint (size_t size) override final {
+          int res = _theHash->resize(3 * size + 1);  
+            // Take into account old revisions
+          if (res == TRI_ERROR_OUT_OF_MEMORY) {
+            THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+          }
+        }
   
         bool hasSelectivity () const override final {
           return true;
         }
 
         double getSelectivity () const override final {
-          return 1.0;  // TODO
+          return _theHash->selectivity();
         }
 
         size_t memory () override final;
@@ -101,43 +127,29 @@ namespace triagens {
           return "hash";
         }
 
-      private:
-
-        size_t keyEntrySize () const;
-
-        template<typename T>
-        int fillIndexSearchValueByHashIndexElement (struct TRI_index_search_value_s*,
-                                                    T const*);
-
-        template<typename T>
-        int allocateSubObjectsHashIndexElement (T*);
-
-        template<typename T>
-        void freeSubObjectsHashIndexElement (T*);
-
-        template<typename T>
-        int hashIndexHelper (T*, struct TRI_doc_mptr_t const*);
-
-        template<typename T>
-        int hashIndexHelperAllocate (T*, struct TRI_doc_mptr_t const*);
-
-        int insertUnique (struct TRI_hash_index_element_s const*, bool);
-        int removeUnique (struct TRI_hash_index_element_s*);
-        struct TRI_hash_index_element_s* findUnique (struct TRI_index_search_value_s*);
-
-        int insertMulti (struct TRI_hash_index_element_multi_s*, bool);
-        int removeMulti (struct TRI_hash_index_element_multi_s*);
+        size_t nrIndexedFields () const {
+          return _paths.size();
+        }
 
       private:
+
+        size_t keySize () const;
+
+        Element* allocAndFillElement(TransactionCollection* coll,
+                                     TRI_doc_mptr_t* doc,
+                                     bool& includeForSparse);
+
+        void deleteElement(Element*);
 
         std::vector<TRI_shape_pid_t> const  _paths;
 
-        union {
-          TRI_hash_array_t       _hashArray;   // the hash array itself, unique values
-          TRI_hash_array_multi_t _hashArrayMulti;   // the hash array itself, non-unique values
-        };
+        typedef triagens::basics::AssocMulti<Key, Element, uint32_t> Hash_t;
+
+        Hash_t* _theHash;
 
         bool _unique;
+
+        bool _sparse;
     };
 
   }

@@ -591,7 +591,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
       while (i > 0) {
         --i;
         try {
-          indexes[i]->forget(collection, transaction, const_cast<TRI_doc_mptr_t const*>(*mptr));
+          indexes[i]->forget(collection, transaction, *mptr);
         }
         catch (...) {
         }

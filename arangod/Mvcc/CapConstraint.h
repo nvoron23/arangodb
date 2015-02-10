@@ -65,10 +65,10 @@ namespace triagens {
         struct TRI_doc_mptr_t* remove (TransactionCollection*,
                                        Transaction*,
                                        std::string const&,
-                                       struct TRI_doc_mptr_t const*) = 0;
+                                       struct TRI_doc_mptr_t*) = 0;
         void forget (TransactionCollection*,
                      Transaction*,
-                     struct TRI_doc_mptr_t const*) = 0;
+                     struct TRI_doc_mptr_t*) = 0;
 
         void preCommit (TransactionCollection*,
                         Transaction*) = 0;

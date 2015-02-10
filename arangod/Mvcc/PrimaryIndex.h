@@ -67,7 +67,7 @@ namespace triagens {
                   TransactionCollection*,
                   Transaction*,
                   std::string const&,
-                  struct TRI_doc_mptr_t const*) override final;
+                  struct TRI_doc_mptr_t*) override final;
         
         struct TRI_doc_mptr_t* remove (
                 TransactionCollection*,
@@ -77,7 +77,7 @@ namespace triagens {
 
         virtual void forget (TransactionCollection*,
                              Transaction*,
-                             struct TRI_doc_mptr_t const*) override final;
+                             struct TRI_doc_mptr_t*) override final;
 
         virtual void preCommit (TransactionCollection*,
                                 Transaction*) override final;

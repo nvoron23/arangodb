@@ -96,7 +96,7 @@ void CapConstraint::insert (TransactionCollection* traColl,
 TRI_doc_mptr_t* CapConstraint::remove (TransactionCollection*, 
                                        Transaction*,
                                        std::string const&,
-                                       TRI_doc_mptr_t const*) {
+                                       TRI_doc_mptr_t*) {
   return nullptr;  // FIXME: this is nonsense
 }  
 
@@ -105,7 +105,7 @@ TRI_doc_mptr_t* CapConstraint::remove (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 void CapConstraint::forget (TransactionCollection*, Transaction*,
-                            TRI_doc_mptr_t const*) {
+                            TRI_doc_mptr_t*) {
 }  
 
 ////////////////////////////////////////////////////////////////////////////////
