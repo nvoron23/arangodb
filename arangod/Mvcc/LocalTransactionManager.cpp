@@ -182,8 +182,12 @@ Transaction* LocalTransactionManager::createSubTransaction (TRI_vocbase_t* vocba
 
   // we do have a transaction now
 
-  // insert into list of currently running transactions  
+  // insert into list of currently running transactions
+  // this might fail 
   insertRunningTransaction(transaction.get());
+
+  // only if this succeeds we can modify the parent transaction
+  parent->_ongoingSubTransaction = transaction.get();
 
   return transaction.release();
 }

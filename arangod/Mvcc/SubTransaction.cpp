@@ -57,7 +57,6 @@ SubTransaction::SubTransaction (Transaction* parent,
     _parentTransaction(parent) {
  
   _parentTransaction->subTransactionStarted(this);
-  _parentTransaction->_ongoingSubTransaction = this;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

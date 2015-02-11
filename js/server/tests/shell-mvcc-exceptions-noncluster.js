@@ -114,6 +114,52 @@ function mvccExceptionsSuite () {
     },
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief test out-of-memory in insertRunningTransaction
+////////////////////////////////////////////////////////////////////////////////
+
+    testSubTransactionCreation1Oom : function () {
+      var trx1 = db._beginTransaction();
+
+      internal.debugSetFailAt("LocalTransactionManager::insertRunningTransaction1");
+
+      try {
+        // create a sub-transaction
+        db._beginTransaction();
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_OUT_OF_MEMORY.code, err.errorNum);
+      }
+
+      internal.debugClearFailAt();
+
+      db._commitTransaction(trx1);
+    },
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test out-of-memory in insertRunningTransaction
+////////////////////////////////////////////////////////////////////////////////
+
+    testSubTransactionCreation2Oom : function () {
+      var trx1 = db._beginTransaction();
+
+      internal.debugSetFailAt("LocalTransactionManager::insertRunningTransaction1");
+
+      try {
+        // create a sub-transaction
+        db._beginTransaction();
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_OUT_OF_MEMORY.code, err.errorNum);
+      }
+
+      internal.debugClearFailAt();
+
+      db._rollbackTransaction(trx1);
+    },
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief test out-of-memory in deleteKilledTransactions
 ////////////////////////////////////////////////////////////////////////////////
 
