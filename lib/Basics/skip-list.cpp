@@ -136,7 +136,7 @@ int SkipList::lookupLess (void* doc,
       if (nullptr == *next) {
         break;
       }
-      cmp = _cmp_elm_elm(_cmpdata, (*next)->_doc, doc, cmptype);
+      cmp = _cmp_elm_elm((*next)->_doc, doc, cmptype);
       if (cmp >= 0) {
         break;
       }
@@ -179,7 +179,7 @@ int SkipList::lookupLessOrEq (void* doc,
       if (nullptr == *next) {
         break;
       }
-      cmp = _cmp_elm_elm(_cmpdata, (*next)->_doc, doc, cmptype);
+      cmp = _cmp_elm_elm((*next)->_doc, doc, cmptype);
       if (cmp > 0) {
         break;
       }
@@ -215,7 +215,7 @@ int SkipList::lookupKeyLess (void* key,
       if (nullptr == *next) {
         break;
       }
-      cmp = _cmp_key_elm(_cmpdata, key, (*next)->_doc);
+      cmp = _cmp_key_elm(key, (*next)->_doc);
       if (cmp <= 0) {
         break;
       }
@@ -247,7 +247,7 @@ int SkipList::lookupKeyLessOrEq (void* key,
       if (nullptr == *next) {
         break;
       }
-      cmp = _cmp_key_elm(_cmpdata, key, (*next)->_doc);
+      cmp = _cmp_key_elm(key, (*next)->_doc);
       if (cmp < 0) {
         break;
       }
@@ -275,10 +275,9 @@ int SkipList::lookupKeyLessOrEq (void* key,
 
 SkipList::SkipList (SkipListCmpElmElm cmp_elm_elm,
                     SkipListCmpKeyElm cmp_key_elm,
-                    void* cmpdata,
                     SkipListFreeFunc freefunc,
                     bool unique) 
-    : _cmp_elm_elm(cmp_elm_elm), _cmp_key_elm(cmp_key_elm), _cmpdata(cmpdata),
+    : _cmp_elm_elm(cmp_elm_elm), _cmp_key_elm(cmp_key_elm),
       _free(freefunc), _unique(unique), _nrUsed(0) {
   
   // set initial memory usage
@@ -348,9 +347,9 @@ int SkipList::insert (void* doc) {
   // Uniqueness test if wanted:
   if (_unique) {
     if ((pos[0] != _start &&
-         0 == _cmp_elm_elm(_cmpdata,doc,pos[0]->_doc,SKIPLIST_CMP_PREORDER)) ||
+         0 == _cmp_elm_elm(doc,pos[0]->_doc,SKIPLIST_CMP_PREORDER)) ||
         (nullptr != next &&
-         0 == _cmp_elm_elm(_cmpdata,doc,next->_doc,SKIPLIST_CMP_PREORDER))) {
+         0 == _cmp_elm_elm(doc,next->_doc,SKIPLIST_CMP_PREORDER))) {
       return TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED;
     }
   }

@@ -147,7 +147,7 @@ class CmpElmElm {
     }
     ~CmpElmElm () {
     }
-    int operator() (void* sli, void* left, void* right, 
+    int operator() (void* left, void* right, 
                     triagens::basics::SkipListCmpType cmptype) {
       TRI_skiplist_index_element_t* leftElement = static_cast<TRI_skiplist_index_element_t*>(left);
       TRI_skiplist_index_element_t* rightElement = static_cast<TRI_skiplist_index_element_t*>(right);
@@ -217,7 +217,7 @@ class CmpKeyElm {
     }
     ~CmpKeyElm () {
     }
-    int operator() (void* sli, void* left, void* right) {
+    int operator() (void* left, void* right) {
       TRI_skiplist_index_key_t* leftKey = static_cast<TRI_skiplist_index_key_t*>(left);
       TRI_skiplist_index_element_t* rightElement = static_cast<TRI_skiplist_index_element_t*>(right);
       TRI_shaper_t* shaper;

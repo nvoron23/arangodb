@@ -89,16 +89,13 @@ namespace triagens {
 /// implemented by the comparison function. The proper total order
 /// must refine the preorder in the sense that a < b in the proper order
 /// implies a <= b in the preorder.
-/// The first argument is a data pointer which may contain arbitrary
-/// infrastructure needed for the comparison. See cmpdata field in the
-/// skiplist type.
 /// The cmp_key_elm variant compares a key with an element using the preorder.
 /// The first argument is a data pointer as above, the second is a pointer
 /// to the key and the third is a pointer to an element.
 ////////////////////////////////////////////////////////////////////////////////
 
-    typedef std::function<int(void*, void*, void*, SkipListCmpType)> SkipListCmpElmElm;
-    typedef std::function<int(void*, void*, void*)> SkipListCmpKeyElm;
+    typedef std::function<int(void*, void*, SkipListCmpType)> SkipListCmpElmElm;
+    typedef std::function<int(void*, void*)> SkipListCmpKeyElm;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Type of a pointer to a function that is called whenever a
@@ -119,7 +116,6 @@ namespace triagens {
         SkipListNode* _end;
         SkipListCmpElmElm _cmp_elm_elm;
         SkipListCmpKeyElm _cmp_key_elm;
-        void* _cmpdata;   // will be the first argument
         SkipListFreeFunc _free;
         bool _unique;     // indicates whether multiple entries that
                           // are equal in the preorder are allowed in
@@ -141,7 +137,6 @@ namespace triagens {
 
         SkipList (SkipListCmpElmElm cmp_elm_elm,
                   SkipListCmpKeyElm cmp_key_elm,
-                  void* cmpdata,
                   SkipListFreeFunc freefunc,
                   bool unique);
 
