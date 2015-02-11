@@ -154,20 +154,23 @@ MasterpointerContainer MasterpointerManager::create (void const* data,
 
       TRI_doc_mptr_t* ptr = begin + (blockSize - 1);
       for (;  begin <= ptr;  ptr--) {
-        ptr->_next = next;
+        ptr->setDataPtr(next);
         next = ptr;
       }
     
       _freelist = next;
     }
 
+    TRI_ASSERT(_freelist != nullptr);
+
     mptr = _freelist;
-    mptr->_rid = 0;
-    mptr->setDataPtr(nullptr);
-    mptr->_prev = nullptr;
-    mptr->_next = nullptr;
-    _freelist = mptr->_next; 
+    _freelist = const_cast<TRI_doc_mptr_t*>(static_cast<TRI_doc_mptr_t const*>(mptr->getDataPtr()));
   }
+
+  mptr->_rid = 0;
+  mptr->setDataPtr(nullptr);
+  mptr->_prev = nullptr;
+  mptr->_next = nullptr;
 
   // outside the lock
   TRI_ASSERT_EXPENSIVE(mptr != nullptr);
@@ -245,11 +248,11 @@ void MasterpointerManager::recycle (TRI_doc_mptr_t* mptr) {
   mptr->clear();
 
   MUTEX_LOCKER(_lock);
+  mptr->setDataPtr(_freelist);
+  _freelist = mptr;
+  
   TRI_ASSERT_EXPENSIVE(_head != mptr);
   TRI_ASSERT_EXPENSIVE(_tail != mptr);
-
-  mptr->_next = _freelist;
-  _freelist = mptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -295,15 +298,15 @@ void MasterpointerManager::shutdownIterator () {
 ////////////////////////////////////////////////////////////////////////////////
 
 size_t MasterpointerManager::getBlockSize (size_t blockNumber) const {
-  static size_t const BLOCK_SIZE_UNIT = 128;
+  static size_t const BLOCK_SIZE_UNIT = 256;
 
   if (blockNumber < 8) {
     // use a small block size in the beginning to save memory
     return (size_t) (BLOCK_SIZE_UNIT << blockNumber);
   }
 
-  // use a block size of 32768
-  // this will use 32768 * sizeof(TRI_doc_mptr_t) bytes, i.e. 1.5 MB
+  // use a block size of 65536
+  // this will use 65536 * sizeof(TRI_doc_mptr_t) bytes
   return (size_t) (BLOCK_SIZE_UNIT << 8);
 }
 
