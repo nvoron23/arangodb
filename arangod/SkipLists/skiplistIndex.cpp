@@ -515,7 +515,6 @@ SkiplistIndex* SkiplistIndex_new (TRI_document_collection_t* document,
     skiplistIndex->skiplist = new triagens::basics::SkipList(
                                            CmpElmElm(skiplistIndex), 
                                            CmpKeyElm(skiplistIndex), 
-                                           skiplistIndex,
                                            FreeElm, unique);
   }
   catch (...) {
@@ -579,9 +578,8 @@ static bool skiplistIndex_findHelperIntervalValid(
   }
 
   CmpElmElm comparer(skiplistIndex);
-  compareResult = comparer( skiplistIndex,
-                            lNode->document(), rNode->document(), 
-                            triagens::basics::SKIPLIST_CMP_TOTORDER );
+  compareResult = comparer(lNode->document(), rNode->document(), 
+                           triagens::basics::SKIPLIST_CMP_TOTORDER );
   return (compareResult == -1);
   // Since we know that the nodes are not neighbours, we can guarantee
   // at least one document in the interval.
@@ -615,7 +613,7 @@ static bool skiplistIndex_findHelperIntervalIntersectionValid (
   }
   else {
     CmpElmElm comparer(skiplistIndex);
-    compareResult = comparer(skiplistIndex, lNode->document(), 
+    compareResult = comparer(lNode->document(), 
                              rNode->document(), 
                              triagens::basics::SKIPLIST_CMP_TOTORDER);
   }
@@ -641,7 +639,7 @@ static bool skiplistIndex_findHelperIntervalIntersectionValid (
   }
   else {
     CmpElmElm comparer(skiplistIndex);
-    compareResult = comparer(skiplistIndex, lNode->document(), 
+    compareResult = comparer(lNode->document(), 
                              rNode->document(),
                              triagens::basics::SKIPLIST_CMP_TOTORDER);
   }
@@ -734,7 +732,7 @@ static void SkiplistIndex_findHelper (SkiplistIndex* skiplistIndex,
         temp = temp->nextNode();
         if (nullptr != temp) {
           CmpKeyElm comparer(skiplistIndex);
-          if (0 == comparer(skiplistIndex, &values, temp->document())) {
+          if (0 == comparer(&values, temp->document())) {
             interval._rightEndPoint = temp->nextNode();
             if (skiplistIndex_findHelperIntervalValid(skiplistIndex,
                                                       &interval)) {

@@ -34,8 +34,7 @@
 
 using namespace std;
 
-static int CmpElmElm (void* sli,
-                      void* left,
+static int CmpElmElm (void* left,
                       void* right,
                       triagens::basics::SkipListCmpType cmptype) {
   auto l = *(static_cast<int*>(left));
@@ -47,8 +46,7 @@ static int CmpElmElm (void* sli,
   return 0;
 }
 
-static int CmpKeyElm (void* sli,
-                      void* left,
+static int CmpKeyElm (void* left,
                       void* right) {
   auto l = *(static_cast<int*>(left));
   auto r = *(static_cast<int*>(right));
@@ -91,7 +89,7 @@ BOOST_FIXTURE_TEST_SUITE(CSkipListTest, CSkipListSetup)
 ////////////////////////////////////////////////////////////////////////////////
 
 BOOST_AUTO_TEST_CASE (tst_unique_forward) {
-  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, nullptr, FreeElm, true);
+  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, FreeElm, true);
   
   // check start node
   BOOST_CHECK_EQUAL((void*) 0, skiplist.startNode()->nextNode());
@@ -171,7 +169,7 @@ BOOST_AUTO_TEST_CASE (tst_unique_forward) {
 ////////////////////////////////////////////////////////////////////////////////
 
 BOOST_AUTO_TEST_CASE (tst_unique_reverse) {
-  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, nullptr, FreeElm, true);
+  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, FreeElm, true);
   
   // check start node
   BOOST_CHECK_EQUAL((void*) 0, skiplist.startNode()->nextNode());
@@ -251,7 +249,7 @@ BOOST_AUTO_TEST_CASE (tst_unique_reverse) {
 ////////////////////////////////////////////////////////////////////////////////
 
 BOOST_AUTO_TEST_CASE (tst_unique_lookup) {
-  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, nullptr, FreeElm, true);
+  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, FreeElm, true);
   
   std::vector<int*> values; 
   for (int i = 0; i < 100; ++i) {
@@ -294,7 +292,7 @@ BOOST_AUTO_TEST_CASE (tst_unique_lookup) {
 ////////////////////////////////////////////////////////////////////////////////
 
 BOOST_AUTO_TEST_CASE (tst_unique_remove) {
-  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, nullptr, FreeElm, true);
+  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, FreeElm, true);
   
   std::vector<int*> values; 
   for (int i = 0; i < 100; ++i) {
@@ -399,7 +397,7 @@ BOOST_AUTO_TEST_CASE (tst_unique_remove) {
 ////////////////////////////////////////////////////////////////////////////////
 
 BOOST_AUTO_TEST_CASE (tst_unique_remove_all) {
-  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, nullptr, FreeElm, true);
+  triagens::basics::SkipList skiplist(CmpElmElm, CmpKeyElm, FreeElm, true);
   
   std::vector<int*> values; 
   for (int i = 0; i < 100; ++i) {
