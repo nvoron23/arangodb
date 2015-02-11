@@ -70,44 +70,44 @@ describe("MVCC hash index non-sparse", function () {
     // Empty:
     var r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.documents).toEqual([]);
-    var r = c.mvccByExampleHash(idx, { value : 2 });
+    r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.documents).toEqual([]);
-    var r = c.mvccByExampleHash(idx, { value : null });
+    r = c.mvccByExampleHash(idx, { value : null });
     expect(r.documents).toEqual([]);
-    var r = c.mvccByExampleHash(idx, { });
+    r = c.mvccByExampleHash(idx, { });
     expect(r.documents).toEqual([]);
 
     // One document:
     c.mvccInsert({value : 1});
-    var r = c.mvccByExampleHash(idx, { value : 1 });
+    r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(1);
-    var r = c.mvccByExampleHash(idx, { value : 2 });
+    r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.count).toEqual(0);
-    var r = c.mvccByExampleHash(idx, { value : null });
+    r = c.mvccByExampleHash(idx, { value : null });
     expect(r.count).toEqual(0);
-    var r = c.mvccByExampleHash(idx, { });
+    r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(0);
 
     // Two documents:
     c.mvccInsert({value : 1});
-    var r = c.mvccByExampleHash(idx, { value : 1 });
+    r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(2);
-    var r = c.mvccByExampleHash(idx, { value : 2 });
+    r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.count).toEqual(0);
-    var r = c.mvccByExampleHash(idx, { value : null });
+    r = c.mvccByExampleHash(idx, { value : null });
     expect(r.count).toEqual(0);
-    var r = c.mvccByExampleHash(idx, { });
+    r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(0);
 
     // Three documents, different values:
     c.mvccInsert({value : 2});
-    var r = c.mvccByExampleHash(idx, { value : 1 });
+    r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(2);
-    var r = c.mvccByExampleHash(idx, { value : 2 });
+    r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.count).toEqual(1);
-    var r = c.mvccByExampleHash(idx, { value : null });
+    r = c.mvccByExampleHash(idx, { value : null });
     expect(r.count).toEqual(0);
-    var r = c.mvccByExampleHash(idx, { });
+    r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(0);
 
     // A thousand documents:
@@ -116,13 +116,13 @@ describe("MVCC hash index non-sparse", function () {
       c.mvccInsert({value : 1});
       require("internal").print(i);
     }
-    var r = c.mvccByExampleHash(idx, { value : 1 });
+    r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(1002);
-    var r = c.mvccByExampleHash(idx, { value : 2 });
+    r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.count).toEqual(1);
-    var r = c.mvccByExampleHash(idx, { value : null });
+    r = c.mvccByExampleHash(idx, { value : null });
     expect(r.count).toEqual(0);
-    var r = c.mvccByExampleHash(idx, { });
+    r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(0);
 
     // A thousand mode documents:
@@ -130,13 +130,13 @@ describe("MVCC hash index non-sparse", function () {
       c.mvccInsert({value : i});
       require("internal").print(i);
     }
-    var r = c.mvccByExampleHash(idx, { value : 1 });
+    r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(1003);
-    var r = c.mvccByExampleHash(idx, { value : 2 });
+    r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.count).toEqual(2);
-    var r = c.mvccByExampleHash(idx, { value : null });
+    r = c.mvccByExampleHash(idx, { value : null });
     expect(r.count).toEqual(0);
-    var r = c.mvccByExampleHash(idx, { });
+    r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(0);
   });
       
