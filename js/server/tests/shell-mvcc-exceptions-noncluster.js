@@ -142,6 +142,90 @@ function mvccExceptionsSuite () {
       // transaction should be gone now
       stack = db._stackTransactions().map(function(t) { return t.id; });
       assertEqual(0, stack.length);
+    },
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test out-of-memory in InsertDocumentWorker
+////////////////////////////////////////////////////////////////////////////////
+
+    testInsertDocumentWorker1Oom : function () {
+      internal.debugSetFailAt("CollectionOperations::InsertDocumentWorker1");
+
+      try {
+        c.mvccInsert({ _key: "abc", value: 1 });
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_DEBUG.code, err.errorNum);
+      }
+
+      try {
+        c.mvccDocument("abc");
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_ARANGO_DOCUMENT_NOT_FOUND.code, err.errorNum);
+      }
+      
+      assertEqual(0, c.mvccCount());
+
+      internal.debugClearFailAt();
+    },
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test out-of-memory in InsertDocumentWorker
+////////////////////////////////////////////////////////////////////////////////
+
+    testInsertDocumentWorker2Oom : function () {
+      internal.debugSetFailAt("CollectionOperations::InsertDocumentWorker2");
+
+      try {
+        c.mvccInsert({ _key: "abc", value: 1 });
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_DEBUG.code, err.errorNum);
+      }
+
+      try {
+        c.mvccDocument("abc");
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_ARANGO_DOCUMENT_NOT_FOUND.code, err.errorNum);
+      }
+      
+      assertEqual(0, c.mvccCount());
+
+      internal.debugClearFailAt();
+    },
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test out-of-memory in InsertDocumentWorker
+////////////////////////////////////////////////////////////////////////////////
+
+    testInsertDocumentWorker3Oom : function () {
+      internal.debugSetFailAt("CollectionOperations::InsertDocumentWorker3");
+
+      try {
+        c.mvccInsert({ _key: "abc", value: 1 });
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_DEBUG.code, err.errorNum);
+      }
+
+      try {
+        c.mvccDocument("abc");
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_ARANGO_DOCUMENT_NOT_FOUND.code, err.errorNum);
+      }
+
+      assertEqual(0, c.mvccCount());
+
+      internal.debugClearFailAt();
     }
 
   };
