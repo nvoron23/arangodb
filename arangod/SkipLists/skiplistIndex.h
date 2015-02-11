@@ -48,8 +48,10 @@ struct TRI_document_collection_t;
 // --SECTION--                                        skiplistIndex public types
 // -----------------------------------------------------------------------------
 
+typedef triagens::basics::SkipList<void, void> SkipListVoidVoid;
+
 typedef struct {
-  triagens::basics::SkipList* skiplist;
+  SkipListVoidVoid* skiplist;
   bool unique;
   struct TRI_document_collection_t* _collection;
   size_t _numFields;
@@ -83,8 +85,8 @@ TRI_skiplist_index_element_t;
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef struct TRI_skiplist_iterator_interval_s {
-  triagens::basics::SkipListNode* _leftEndPoint;
-  triagens::basics::SkipListNode* _rightEndPoint;
+  SkipListVoidVoid::Node* _leftEndPoint;
+  SkipListVoidVoid::Node* _rightEndPoint;
 }
 TRI_skiplist_iterator_interval_t;
 
@@ -92,7 +94,7 @@ typedef struct TRI_skiplist_iterator_s {
   SkiplistIndex* _index;
   TRI_vector_t _intervals;
   size_t _currentInterval; // starts with 0, current interval used
-  triagens::basics::SkipListNode* _cursor;
+  SkipListVoidVoid::Node* _cursor;
                  // always holds the last node returned, initially equal to
                  // the _leftEndPoint of the first interval (or the 
                  // _rightEndPoint of the last interval in the reverse

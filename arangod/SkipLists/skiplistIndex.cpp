@@ -148,7 +148,7 @@ class CmpElmElm {
     ~CmpElmElm () {
     }
     int operator() (void* left, void* right, 
-                    triagens::basics::SkipListCmpType cmptype) {
+                    SkipListVoidVoid::CmpType cmptype) {
       TRI_skiplist_index_element_t* leftElement = static_cast<TRI_skiplist_index_element_t*>(left);
       TRI_skiplist_index_element_t* rightElement = static_cast<TRI_skiplist_index_element_t*>(right);
       TRI_shaper_t* shaper;
@@ -188,7 +188,7 @@ class CmpElmElm {
       // otherwise.
       // ...........................................................................
 
-      if (triagens::basics::SKIPLIST_CMP_PREORDER == cmptype) {
+      if (SkipListVoidVoid::CMP_PREORDER == cmptype) {
         return 0;
       }
 
@@ -371,7 +371,7 @@ static TRI_skiplist_index_element_t* SkiplistPrevIterationCallback (
   // use the current cursor and move jumpSize backward
   // ...........................................................................
 
-  triagens::basics::SkipListNode* result = nullptr; 
+  SkipListVoidVoid::Node* result = nullptr; 
 
   for (int64_t j = 0; j < jumpSize; ++j) {
     while (true) {   // will be left by break
@@ -512,10 +512,9 @@ SkiplistIndex* SkiplistIndex_new (TRI_document_collection_t* document,
   skiplistIndex->_numFields = numFields;
   skiplistIndex->unique = unique;
   try {
-    skiplistIndex->skiplist = new triagens::basics::SkipList(
-                                           CmpElmElm(skiplistIndex), 
-                                           CmpKeyElm(skiplistIndex), 
-                                           FreeElm, unique);
+    skiplistIndex->skiplist = new SkipListVoidVoid(CmpElmElm(skiplistIndex), 
+                                                   CmpKeyElm(skiplistIndex), 
+                                                   FreeElm, unique);
   }
   catch (...) {
     TRI_Free(TRI_CORE_MEM_ZONE, skiplistIndex);
@@ -539,8 +538,8 @@ static bool skiplistIndex_findHelperIntervalValid(
                         SkiplistIndex* skiplistIndex,
                         TRI_skiplist_iterator_interval_t const* interval) {
   int compareResult;
-  triagens::basics::SkipListNode* lNode;
-  triagens::basics::SkipListNode* rNode;
+  SkipListVoidVoid::Node* lNode;
+  SkipListVoidVoid::Node* rNode;
 
   lNode = interval->_leftEndPoint;
 
@@ -579,7 +578,7 @@ static bool skiplistIndex_findHelperIntervalValid(
 
   CmpElmElm comparer(skiplistIndex);
   compareResult = comparer(lNode->document(), rNode->document(), 
-                           triagens::basics::SKIPLIST_CMP_TOTORDER );
+                           SkipListVoidVoid::CMP_TOTORDER );
   return (compareResult == -1);
   // Since we know that the nodes are not neighbours, we can guarantee
   // at least one document in the interval.
@@ -590,8 +589,8 @@ static bool skiplistIndex_findHelperIntervalIntersectionValid (
                     TRI_skiplist_iterator_interval_t* lInterval,
                     TRI_skiplist_iterator_interval_t* rInterval,
                     TRI_skiplist_iterator_interval_t* interval) {
-  triagens::basics::SkipListNode* lNode;
-  triagens::basics::SkipListNode* rNode;
+  SkipListVoidVoid::Node* lNode;
+  SkipListVoidVoid::Node* rNode;
 
   lNode = lInterval->_leftEndPoint;
   rNode = rInterval->_leftEndPoint;
@@ -615,7 +614,7 @@ static bool skiplistIndex_findHelperIntervalIntersectionValid (
     CmpElmElm comparer(skiplistIndex);
     compareResult = comparer(lNode->document(), 
                              rNode->document(), 
-                             triagens::basics::SKIPLIST_CMP_TOTORDER);
+                             SkipListVoidVoid::CMP_TOTORDER);
   }
 
   if (compareResult < 1) {
@@ -641,7 +640,7 @@ static bool skiplistIndex_findHelperIntervalIntersectionValid (
     CmpElmElm comparer(skiplistIndex);
     compareResult = comparer(lNode->document(), 
                              rNode->document(),
-                             triagens::basics::SKIPLIST_CMP_TOTORDER);
+                             SkipListVoidVoid::CMP_TOTORDER);
   }
 
   if (compareResult < 1) {
@@ -664,7 +663,7 @@ static void SkiplistIndex_findHelper (SkiplistIndex* skiplistIndex,
   TRI_relation_index_operator_t*    relationOperator;
   TRI_logical_index_operator_t*     logicalOperator;
   TRI_skiplist_iterator_interval_t  interval;
-  triagens::basics::SkipListNode*   temp;
+  SkipListVoidVoid::Node* temp;
 
   TRI_InitVector(&(leftResult), TRI_UNKNOWN_MEM_ZONE,
                  sizeof(TRI_skiplist_iterator_interval_t));
