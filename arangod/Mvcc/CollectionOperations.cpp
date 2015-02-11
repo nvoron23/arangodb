@@ -576,6 +576,10 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
   // set data pointer to point to the marker just created
   MasterpointerContainer mptr = collection->masterpointerManager()->create(marker.get()->mem(), transactionId);
   mptr->setFrom(transactionId);
+
+  TRI_IF_FAILURE("CollectionOperations::InsertDocumentWorker1") {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+  }
   
   // iterate over all indexes while holding the index read-lock
   auto indexes = indexUser.indexes();
@@ -584,6 +588,10 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
     try {
       indexes[i]->insert(collection, transaction, *mptr);
       indexUser.mustClick();
+  
+      TRI_IF_FAILURE("CollectionOperations::InsertDocumentWorker2") {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+      }
     }
     catch (...) {
       // an error occurred during insert
@@ -601,6 +609,10 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
   }
 
   // when we are here, the document is present in all indexes 
+  
+  TRI_IF_FAILURE("CollectionOperations::InsertDocumentWorker3") {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+  }
 
   // now append the marker to the WAL
   WriteResult writeResult;
