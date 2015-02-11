@@ -50,7 +50,6 @@ lib_libarango_a_SOURCES = \
 	lib/Basics/ReadLocker.cpp \
 	lib/Basics/ReadUnlocker.cpp \
 	lib/Basics/ReadWriteLock.cpp \
-	lib/Basics/skip-list.cpp \
 	lib/Basics/socket-utils.cpp \
 	lib/Basics/ssl-helper.cpp \
 	lib/Basics/string-buffer.cpp \
