@@ -1484,7 +1484,7 @@ describe("MVCC", function () {
   });
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief test write conflicts between top level transactions
+/// @brief test write conflicts between inserts of top level transactions
 ////////////////////////////////////////////////////////////////////////////////
 
   it("should detect write conflicts between inserts of top level transactions",
@@ -1540,8 +1540,8 @@ describe("MVCC", function () {
 
     verifyTransactionStack([]);
     
-    var t1 = db._beginTransaction(); db._popTransaction();
-    var t2 = db._beginTransaction(); db._popTransaction();
+    t1 = db._beginTransaction(); db._popTransaction();
+    t2 = db._beginTransaction(); db._popTransaction();
 
     // Check a t1 conflict if t2 has inserted something and has committed:
     db._pushTransaction(t2.id);
@@ -1552,7 +1552,6 @@ describe("MVCC", function () {
 
     db._pushTransaction(t1.id);
     verifyTransactionStack([t1]);
-    var error2;
     try {
       c.mvccInsert({_key: "C", Hallo:1});
       error2 = {};
@@ -1564,8 +1563,8 @@ describe("MVCC", function () {
     db._commitTransaction(t1.id);
     verifyTransactionStack([]);
 
-    var t1 = db._beginTransaction(); db._popTransaction();
-    var t2 = db._beginTransaction(); db._popTransaction();
+    t1 = db._beginTransaction(); db._popTransaction();
+    t2 = db._beginTransaction(); db._popTransaction();
 
     // Check a t1 non-conflict if t2 has inserted something and has aborted:
     db._pushTransaction(t2.id);
@@ -1576,9 +1575,335 @@ describe("MVCC", function () {
 
     db._pushTransaction(t1.id);
     verifyTransactionStack([t1]);
-    var error2;
     try {
       c.mvccInsert({_key: "D", Hallo:1});
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2).toEqual({});
+    db._commitTransaction(t1.id);
+    verifyTransactionStack([]);
+  });
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test write conflicts between replaces of top level transactions
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should detect write conflicts between replaces of top level transactions",
+     function () {
+    var c = db[cn];
+    verifyTransactionStack([]);
+    
+    c.mvccInsert({_key: "A", Hallo: 1});
+    c.mvccInsert({_key: "B", Hallo: 1});
+    c.mvccInsert({_key: "C", Hallo: 1});
+    c.mvccInsert({_key: "D", Hallo: 1});
+
+    var t1 = db._beginTransaction(); db._popTransaction();
+    var t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t2 conflict if t1 has replaced something:
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    c.mvccReplace("A", {Hallo:2});
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    var error1;
+    try {
+      c.mvccReplace("A", {Hallo:2});
+      error1 = {};
+    }
+    catch (e1) {
+      error1 = e1;
+    }
+    expect(error1.errorNum).toEqual(1237);
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    // Check a t1 conflict if t2 has replaced something:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccReplace("B", {Hallo:2});
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    var error2;
+    try {
+      c.mvccReplace("B", {Hallo:2});
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2.errorNum).toEqual(1237);
+    db._commitTransaction(t1.id);
+    db._pushTransaction(t2.id);
+    db._commitTransaction(t2.id);
+
+    verifyTransactionStack([]);
+    
+    t1 = db._beginTransaction(); db._popTransaction();
+    t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t1 conflict if t2 has inserted something and has committed:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccReplace("C", {Hallo:2});
+    db._commitTransaction(t2.id);
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    try {
+      c.mvccReplace("C", {Hallo:2});
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2.errorNum).toEqual(1237);
+    db._commitTransaction(t1.id);
+    verifyTransactionStack([]);
+
+    t1 = db._beginTransaction(); db._popTransaction();
+    t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t1 non-conflict if t2 has inserted something and has aborted:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccReplace("D", {Hallo:2});
+    db._rollbackTransaction(t2.id);
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    try {
+      c.mvccReplace("D", {Hallo:2});
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2).toEqual({});
+    db._commitTransaction(t1.id);
+    verifyTransactionStack([]);
+  });
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test write conflicts between updates of top level transactions
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should detect write conflicts between updates of top level transactions",
+     function () {
+    var c = db[cn];
+    verifyTransactionStack([]);
+    
+    c.mvccInsert({_key: "A", Hallo: 1});
+    c.mvccInsert({_key: "B", Hallo: 1});
+    c.mvccInsert({_key: "C", Hallo: 1});
+    c.mvccInsert({_key: "D", Hallo: 1});
+
+    var t1 = db._beginTransaction(); db._popTransaction();
+    var t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t2 conflict if t1 has updated something:
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    c.mvccUpdate("A", {Hallo:2});
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    var error1;
+    try {
+      c.mvccUpdate("A", {Hallo:2});
+      error1 = {};
+    }
+    catch (e1) {
+      error1 = e1;
+    }
+    expect(error1.errorNum).toEqual(1237);
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    // Check a t1 conflict if t2 has updated something:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccUpdate("B", {Hallo:2});
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    var error2;
+    try {
+      c.mvccUpdate("B", {Hallo:2});
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2.errorNum).toEqual(1237);
+    db._commitTransaction(t1.id);
+    db._pushTransaction(t2.id);
+    db._commitTransaction(t2.id);
+
+    verifyTransactionStack([]);
+    
+    t1 = db._beginTransaction(); db._popTransaction();
+    t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t1 conflict if t2 has inserted something and has committed:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccUpdate("C", {Hallo:2});
+    db._commitTransaction(t2.id);
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    try {
+      c.mvccUpdate("C", {Hallo:2});
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2.errorNum).toEqual(1237);
+    db._commitTransaction(t1.id);
+    verifyTransactionStack([]);
+
+    t1 = db._beginTransaction(); db._popTransaction();
+    t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t1 non-conflict if t2 has inserted something and has aborted:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccUpdate("D", {Hallo:2});
+    db._rollbackTransaction(t2.id);
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    try {
+      c.mvccUpdate("D", {Hallo:2});
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2).toEqual({});
+    db._commitTransaction(t1.id);
+    verifyTransactionStack([]);
+  });
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test write conflicts between deletes of top level transactions
+////////////////////////////////////////////////////////////////////////////////
+
+  it("should detect write conflicts between deletes of top level transactions",
+     function () {
+    var c = db[cn];
+    verifyTransactionStack([]);
+    
+    c.mvccInsert({_key: "A", Hallo: 1});
+    c.mvccInsert({_key: "B", Hallo: 1});
+    c.mvccInsert({_key: "C", Hallo: 1});
+    c.mvccInsert({_key: "D", Hallo: 1});
+
+    var t1 = db._beginTransaction(); db._popTransaction();
+    var t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t2 conflict if t1 has removed something:
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    c.mvccRemove("A");
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    var error1;
+    try {
+      c.mvccRemove("A");
+      error1 = {};
+    }
+    catch (e1) {
+      error1 = e1;
+    }
+    expect(error1.errorNum).toEqual(1237);
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    // Check a t1 conflict if t2 has removed something:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccRemove("B");
+    db._popTransaction();
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    var error2;
+    try {
+      c.mvccRemove("B");
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2.errorNum).toEqual(1237);
+    db._commitTransaction(t1.id);
+    db._pushTransaction(t2.id);
+    db._commitTransaction(t2.id);
+
+    verifyTransactionStack([]);
+    
+    t1 = db._beginTransaction(); db._popTransaction();
+    t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t1 conflict if t2 has inserted something and has committed:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccRemove("C");
+    db._commitTransaction(t2.id);
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    try {
+      c.mvccRemove("C");
+      error2 = {};
+    }
+    catch (e2) {
+      error2 = e2;
+    }
+    expect(error2.errorNum).toEqual(1237);
+    db._commitTransaction(t1.id);
+    verifyTransactionStack([]);
+
+    t1 = db._beginTransaction(); db._popTransaction();
+    t2 = db._beginTransaction(); db._popTransaction();
+
+    // Check a t1 non-conflict if t2 has inserted something and has aborted:
+    db._pushTransaction(t2.id);
+    verifyTransactionStack([t2]);
+    c.mvccRemove("D");
+    db._rollbackTransaction(t2.id);
+    verifyTransactionStack([]);
+
+    db._pushTransaction(t1.id);
+    verifyTransactionStack([t1]);
+    try {
+      c.mvccRemove("D");
       error2 = {};
     }
     catch (e2) {
