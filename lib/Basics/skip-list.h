@@ -97,15 +97,15 @@ namespace triagens {
 /// to the key and the third is a pointer to an element.
 ////////////////////////////////////////////////////////////////////////////////
 
-    typedef int (*SkipListCmpElmElm)(void*, void*, void*, SkipListCmpType);
-    typedef int (*SkipListCmpKeyElm)(void*, void*, void*);
+    typedef std::function<int(void*, void*, void*, SkipListCmpType)> SkipListCmpElmElm;
+    typedef std::function<int(void*, void*, void*)> SkipListCmpKeyElm;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Type of a pointer to a function that is called whenever a
 /// document is removed from a skiplist.
 ////////////////////////////////////////////////////////////////////////////////
 
-    typedef void (*SkipListFreeFunc)(void*);
+    typedef std::function<void(void*)> SkipListFreeFunc;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief type of a skiplist
