@@ -762,22 +762,12 @@ describe("MVCC unique hash index sparse", function () {
     expect(r.count).toEqual(0);
 
     // Now delete again:
-    r = c.mvccByExampleHash(idx, { value : 1 });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
-    }
-    r = c.mvccByExampleHash(idx, { value : 1 });
-    expect(r.count).toEqual(0);
-    r = c.mvccByExampleHash(idx, { value : 2 });
-    expect(r.count).toEqual(1);
-    r = c.mvccByExampleHash(idx, { value : null });
-    expect(r.count).toEqual(0);
-    r = c.mvccByExampleHash(idx, { });
-    expect(r.count).toEqual(0);
-
-    r = c.mvccByExampleHash(idx, { value : 2 });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    var j;
+    for (j = 1; j <= 1000; j++) {
+      r = c.mvccByExampleHash(idx, { value : j });
+      for (i = 0; i < r.documents.length; i++) {
+        c.mvccRemove(r.documents[i]._key);
+      }
     }
     r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(0);
@@ -789,7 +779,7 @@ describe("MVCC unique hash index sparse", function () {
     expect(r.count).toEqual(0);
 
     r = c.mvccAllQuery();
-    expect(r.documents.length).toEqual(4);
+    expect(r.documents.length).toEqual(6);
     for (i = 0; i < r.documents.length; i++) {
       c.mvccRemove(r.documents[i]._key);
     }
