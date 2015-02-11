@@ -151,25 +151,17 @@ describe("MVCC hash index non-sparse", function () {
     expect(r.count).toEqual(3);
 
     // Some documents without a bound value
-    require("internal").print("Hallo1");
     c.mvccInsert({});
-    require("internal").print("Hallo2");
     c.mvccInsert({});
-    require("internal").print("Hallo3");
     c.mvccInsert({});
-    require("internal").print("Hallo4");
     r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(1003);
-    require("internal").print("Hallo5");
     r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.count).toEqual(2);
-    require("internal").print("Hallo6");
     r = c.mvccByExampleHash(idx, { value : null });
     expect(r.count).toEqual(6);
-    require("internal").print("Hallo7");
     r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(6);
-    require("internal").print("Hallo8");
   });
       
 });
