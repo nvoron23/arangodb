@@ -3259,11 +3259,14 @@ static int PathBasedIndexFromJson (TRI_document_collection_t* document,
                                                            TRI_vector_pointer_t const*,
                                                            TRI_idx_iid_t,
                                                            bool,
+                                                           bool,
                                                            bool*),
-                                   TRI_index_t** dst) {
+                                   TRI_index_t** dst,
+                                   bool sparseDefault) {
   TRI_json_t* bv;
   TRI_vector_pointer_t attributes;
   bool unique;
+  bool sparse;
   size_t fieldCount;
 
   if (dst != nullptr) {
@@ -3294,6 +3297,14 @@ static int PathBasedIndexFromJson (TRI_document_collection_t* document,
 
   unique = bv->_value._boolean;
 
+  // determine if the hash index is sparse
+  bv = TRI_LookupObjectJson(definition, "sparse");
+
+  sparse = sparseDefault;
+  if (TRI_IsBooleanJson(bv)) {
+    sparse = bv->_value._boolean;
+  }
+
   // Initialise the vector in which we store the fields on which the hashing
   // will be based.
   TRI_InitVectorPointer(&attributes, TRI_CORE_MEM_ZONE);
@@ -3306,7 +3317,7 @@ static int PathBasedIndexFromJson (TRI_document_collection_t* document,
   }
 
   // create the index
-  TRI_index_t* idx = creator(document, &attributes, iid, unique, nullptr);
+  TRI_index_t* idx = creator(document, &attributes, iid, unique, sparse, nullptr);
 
   if (dst != nullptr) {
     *dst = idx;
@@ -4197,6 +4208,7 @@ static TRI_index_t* CreateHashIndexDocumentCollection (TRI_document_collection_t
                                                        TRI_vector_pointer_t const* attributes,
                                                        TRI_idx_iid_t iid,
                                                        bool unique,
+                                                       bool sparse,
                                                        bool* created) {
   TRI_vector_pointer_t fields;
   TRI_vector_t paths;
@@ -4277,7 +4289,7 @@ static TRI_index_t* CreateHashIndexDocumentCollection (TRI_document_collection_t
   }
     
     
-  document->addIndex(new triagens::mvcc::HashIndex(idx->_iid, document, fieldsVector, pathsVector, unique, false));
+  document->addIndex(new triagens::mvcc::HashIndex(idx->_iid, document, fieldsVector, pathsVector, unique, sparse));
 
   // store index and return
   res = AddIndex(document, idx);
@@ -4303,7 +4315,7 @@ static int HashIndexFromJson (TRI_document_collection_t* document,
                               TRI_json_t const* definition,
                               TRI_idx_iid_t iid,
                               TRI_index_t** dst) {
-  return PathBasedIndexFromJson(document, definition, iid, CreateHashIndexDocumentCollection, dst);
+  return PathBasedIndexFromJson(document, definition, iid, CreateHashIndexDocumentCollection, dst, true);
 }
 
 // -----------------------------------------------------------------------------
@@ -4350,6 +4362,7 @@ TRI_index_t* TRI_EnsureHashIndexDocumentCollection (TRI_document_collection_t* d
                                                     TRI_idx_iid_t iid,
                                                     TRI_vector_pointer_t const* attributes,
                                                     bool unique,
+                                                    bool sparse,
                                                     bool* created) {
   TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
 
@@ -4360,7 +4373,7 @@ TRI_index_t* TRI_EnsureHashIndexDocumentCollection (TRI_document_collection_t* d
   TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
 
   // given the list of attributes (as strings)
-  TRI_index_t* idx = CreateHashIndexDocumentCollection(document, attributes, iid, unique, created);
+  TRI_index_t* idx = CreateHashIndexDocumentCollection(document, attributes, iid, unique, sparse, created);
 
   if (idx != nullptr) {
     if (created) {
@@ -4399,6 +4412,7 @@ static TRI_index_t* CreateSkiplistIndexDocumentCollection (TRI_document_collecti
                                                            TRI_vector_pointer_t const* attributes,
                                                            TRI_idx_iid_t iid,
                                                            bool unique,
+                                                           bool sparse,
                                                            bool* created) {
   TRI_vector_pointer_t fields;
   TRI_vector_t paths;
@@ -4484,7 +4498,7 @@ static int SkiplistIndexFromJson (TRI_document_collection_t* document,
                                   TRI_json_t const* definition,
                                   TRI_idx_iid_t iid,
                                   TRI_index_t** dst) {
-  return PathBasedIndexFromJson(document, definition, iid, CreateSkiplistIndexDocumentCollection, dst);
+  return PathBasedIndexFromJson(document, definition, iid, CreateSkiplistIndexDocumentCollection, dst, false);
 }
 
 // -----------------------------------------------------------------------------
@@ -4531,6 +4545,7 @@ TRI_index_t* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_collection_
                                                         TRI_idx_iid_t iid,
                                                         TRI_vector_pointer_t const* attributes,
                                                         bool unique,
+                                                        bool sparse,
                                                         bool* created) {
   TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
 
@@ -4540,7 +4555,7 @@ TRI_index_t* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_collection_
 
   TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
 
-  TRI_index_t* idx = CreateSkiplistIndexDocumentCollection(document, attributes, iid, unique, created);
+  TRI_index_t* idx = CreateSkiplistIndexDocumentCollection(document, attributes, iid, unique, sparse, created);
 
   if (idx != nullptr) {
     if (created) {
