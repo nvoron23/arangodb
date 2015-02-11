@@ -93,6 +93,8 @@ namespace triagens {
         virtual bool hasSelectivity () const = 0;
         virtual double getSelectivity () const = 0;
 
+        virtual triagens::basics::Json figures () const;
+
         virtual triagens::basics::Json toJson (TRI_memory_zone_t*) const;
 
         inline TRI_idx_iid_t id () const {
