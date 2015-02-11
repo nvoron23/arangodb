@@ -157,6 +157,46 @@ describe("MVCC hash index non-sparse", function () {
     expect(r.count).toEqual(6);
     r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(6);
+
+    // Now delete again:
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(2);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(6);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(6);
+
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(6);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(6);
+
+    r = c.mvccByExampleHash(idx, { value : null });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(0);
   });
       
 });
@@ -280,6 +320,46 @@ describe("MVCC hash index sparse", function () {
     expect(r.count).toEqual(1003);
     r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.count).toEqual(2);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(0);
+
+    // Now delete again:
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(2);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(0);
+
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(0);
+
+    r = c.mvccAllQuery();
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(0);
     r = c.mvccByExampleHash(idx, { value : null });
     expect(r.count).toEqual(0);
     r = c.mvccByExampleHash(idx, { });
@@ -448,6 +528,46 @@ describe("MVCC unique hash index non-sparse", function () {
       error = e;
     }
     expect(error.errorNum).toEqual(1210);
+
+    // Now delete again:
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(1);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(1);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(1);
+
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(1);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(1);
+
+    r = c.mvccAllQuery();
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(0);
   });
       
 });
@@ -636,6 +756,47 @@ describe("MVCC unique hash index sparse", function () {
     expect(r.count).toEqual(1);
     r = c.mvccByExampleHash(idx, { value : 2 });
     expect(r.count).toEqual(1);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(0);
+
+    // Now delete again:
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(1);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(0);
+
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(0);
+
+    r = c.mvccAllQuery();
+    expect(r.documents.length).toEqual(4);
+    for (i = 0; i < r.documents.length; i++) {
+      c.mvccRemove(r.documents[i]._key);
+    }
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(0);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(0);
     r = c.mvccByExampleHash(idx, { value : null });
     expect(r.count).toEqual(0);
     r = c.mvccByExampleHash(idx, { });
