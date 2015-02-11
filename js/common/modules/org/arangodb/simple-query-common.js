@@ -364,10 +364,9 @@ SimpleQuery.prototype.limit = function (limit) {
 /// @startDocuBlock querySkip
 /// `query.skip(number)`
 ///
-/// Skips the first *number* documents. If *number* is positive, then skip
-/// the number of documents. If *number* is negative, then the total amount N
-/// of documents must be known and the results starts at position (N +
-/// *number*).
+/// Skips the first *number* documents. *number* must be non-negative,
+/// and the result is that the query skips the given number of
+/// documents.
 ///
 /// In general the input to *limit* should be sorted. Otherwise it will be
 /// unclear which documents are used in the result set.
