@@ -1808,7 +1808,7 @@ static void JS_MvccByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>
     v8::Handle<v8::Array> documents = v8::Array::New(isolate);
     result->ForceSet(TRI_V8_ASCII_STRING("documents"), documents);
 
-    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(hashIndex->lookup(transactionCollection, transaction, &searchValue, limit)); 
+    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(hashIndex->lookup(transactionCollection, transaction, &searchValue, 0)); 
     DestroySearchValue(searchValue);
  
     if (indexResult.get() == nullptr) {
