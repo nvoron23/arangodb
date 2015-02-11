@@ -114,7 +114,6 @@ describe("MVCC hash index non-sparse", function () {
     var i;
     for (i = 0; i < 1000; i++) {
       c.mvccInsert({value : 1});
-      require("internal").print(i);
     }
     r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(1002);
@@ -125,10 +124,9 @@ describe("MVCC hash index non-sparse", function () {
     r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(0);
 
-    // A thousand mode documents:
+    // A thousand more documents:
     for (i = 0; i < 1000; i++) {
       c.mvccInsert({value : i});
-      require("internal").print(i);
     }
     r = c.mvccByExampleHash(idx, { value : 1 });
     expect(r.count).toEqual(1003);
@@ -138,6 +136,40 @@ describe("MVCC hash index non-sparse", function () {
     expect(r.count).toEqual(0);
     r = c.mvccByExampleHash(idx, { });
     expect(r.count).toEqual(0);
+
+    // Some documents with value: null
+    c.mvccInsert({value : null});
+    c.mvccInsert({value : null});
+    c.mvccInsert({value : null});
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(1003);
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(2);
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(3);
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(3);
+
+    // Some documents without a bound value
+    require("internal").print("Hallo1");
+    c.mvccInsert({});
+    require("internal").print("Hallo2");
+    c.mvccInsert({});
+    require("internal").print("Hallo3");
+    c.mvccInsert({});
+    require("internal").print("Hallo4");
+    r = c.mvccByExampleHash(idx, { value : 1 });
+    expect(r.count).toEqual(1003);
+    require("internal").print("Hallo5");
+    r = c.mvccByExampleHash(idx, { value : 2 });
+    expect(r.count).toEqual(2);
+    require("internal").print("Hallo6");
+    r = c.mvccByExampleHash(idx, { value : null });
+    expect(r.count).toEqual(6);
+    require("internal").print("Hallo7");
+    r = c.mvccByExampleHash(idx, { });
+    expect(r.count).toEqual(6);
+    require("internal").print("Hallo8");
   });
       
 });
