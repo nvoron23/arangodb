@@ -393,8 +393,6 @@ namespace triagens {
           if (_table[i].ptr != nullptr) {
             // We found the beginning of the linked list:
 
-            // pre-initialize the result to save at least a few reallocs
-            result->reserve((std::max)(4ul, limit));
             do {
               result->push_back(_table[i].ptr);
               i = _table[i].next;
@@ -440,8 +438,6 @@ namespace triagens {
           if (_table[i].ptr != nullptr) {
             // We found the beginning of the linked list:
 
-            // pre-initialize the result to save at least a few reallocs
-            result->reserve(std::max(4ul, limit));
             do {
               result->push_back(_table[i].ptr);
               i = _table[i].next;
@@ -471,8 +467,6 @@ namespace triagens {
           // compute the hash
 
           // continue search of the table
-          // pre-initialize the result to save at least a few reallocs
-          result->reserve((std::max)(4ul, limit));
           while (true) {
             i = _table[i].next;
             if (i == INVALID_INDEX || (limit != 0 && result->size() >= limit)) {
