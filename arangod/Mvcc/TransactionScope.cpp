@@ -59,7 +59,8 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
   : _transactionManager(triagens::mvcc::TransactionManager::instance()),
     _transaction(nullptr),
     _id(0),
-    _pushedOnThreadStack(false) {
+    _pushedOnThreadStack(false),
+    _shouldCommit(false) {
 
   TransactionStackAccessor accessor;
   bool const hasThreadTransactions = ! accessor.isEmpty();
@@ -118,7 +119,12 @@ TransactionScope::~TransactionScope () {
   if (isOur()) {
     removeFromStack();
     try {
-      _transactionManager->rollbackTransaction(_id);
+      if (_shouldCommit) {
+        _transactionManager->commitTransaction(_id);
+      }
+      else {
+        _transactionManager->rollbackTransaction(_id);
+      }
     }
     catch (...) {
     }
@@ -139,20 +145,12 @@ std::map<std::string, bool> const& TransactionScope::NoCollections () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief commit the scoped transaction
-/// this will do nothing if the transaction was re-used from an outer scope,
-/// but will commit the transaction otherwise
+/// @brief set the commit flag for the scoped transaction
 ////////////////////////////////////////////////////////////////////////////////
 
 void TransactionScope::commit () {
   if (isOur()) {
-    removeFromStack();
-    try {
-      _transactionManager->commitTransaction(_id);
-    }
-    catch (...) {
-    }
-    _id = 0;
+    _shouldCommit = true;
   }
 }
 

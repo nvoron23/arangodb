@@ -75,10 +75,18 @@ void LocalTransactionManagerCleanupThread::stop () {
 
 void LocalTransactionManagerCleanupThread::run () {
   while (! _stopped) {
-    if (_manager->killRunningTransactions(_defaultTtl)) {
-      _manager->deleteKilledTransactions();
+    bool sleep = true;
+
+    try {
+      if (_manager->killRunningTransactions(_defaultTtl)) {
+        _manager->deleteKilledTransactions();
+        sleep = false;
+      }
     }
-    else {
+    catch (...) {
+    }
+    
+    if (sleep) {
       usleep(1000 * 200);
     }
   }
@@ -131,7 +139,7 @@ LocalTransactionManager::~LocalTransactionManager () {
   delete _cleanupThread;
 
   try {
-    killRunningTransactions(0.0);
+    killAllRunningTransactions();
     deleteKilledTransactions();
   }
   catch (...) {
@@ -365,6 +373,7 @@ void LocalTransactionManager::deleteRunningTransaction (Transaction* transaction
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief initializes a transaction with state
+/// this is called under the write-lock of the transaction manager
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::initializeTransaction (Transaction* transaction) {
@@ -409,20 +418,38 @@ void LocalTransactionManager::insertRunningTransaction (Transaction* transaction
   auto id = transaction->id();
 
   WRITE_LOCKER(_lock); 
+
+  TRI_IF_FAILURE("LocalTransactionManager::insertRunningTransaction1") {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
+
   auto it = _runningTransactions.emplace(std::make_pair(id.own(), transaction));
 
   // must have inserted!
   TRI_ASSERT_EXPENSIVE(it.second);
 
   try {
+    TRI_IF_FAILURE("LocalTransactionManager::insertRunningTransaction2") {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    }
+
     // if inserting into second list fails, we must rollback the insert!
     _leasedTransactions.emplace(id.own());
   }
   catch (...) {
-    _runningTransactions.erase(it.second);
+    _runningTransactions.erase(it.first);
+  
+    // must be present in none
+    TRI_ASSERT_EXPENSIVE(_runningTransactions.find(id.own()) == _runningTransactions.end());
+    TRI_ASSERT_EXPENSIVE(_leasedTransactions.find(id.own()) == _leasedTransactions.end());
     throw;
   }
 
+  // must be present in both
+  TRI_ASSERT_EXPENSIVE(_runningTransactions.find(id.own()) != _runningTransactions.end());
+  TRI_ASSERT_EXPENSIVE(_leasedTransactions.find(id.own()) != _leasedTransactions.end());
+
+  // still holding the write-lock here
   initializeTransaction(transaction);
 }
 
@@ -458,6 +485,20 @@ bool LocalTransactionManager::killRunningTransactions (double maxAge) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief unconditionally kill all running transactions 
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalTransactionManager::killAllRunningTransactions () {
+  READ_LOCKER(_lock);
+
+  for (auto it : _runningTransactions) {
+    if (! it.second->killed()) {
+      it.second->killed(true);
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief physically remove killed transactions
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -487,6 +528,10 @@ void LocalTransactionManager::deleteKilledTransactions () {
           // remove from list of currently running transactions so it cannot
           // be found anymore
           runningTransactions.erase(id.own());
+  
+          TRI_IF_FAILURE("LocalTransactionManager::deleteKilledTransactions") {
+            THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+          }
 
           transactionsToDelete.emplace_back(transaction);
         }
