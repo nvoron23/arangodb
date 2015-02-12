@@ -1128,7 +1128,6 @@ struct TRI_index_s* TRI_EnsureHashIndexDocumentCollection (TRI_document_collecti
                                                            TRI_idx_iid_t,
                                                            TRI_vector_pointer_t const*,
                                                            bool,
-                                                           bool,
                                                            bool*);
 
 // -----------------------------------------------------------------------------
@@ -1156,7 +1155,6 @@ struct TRI_index_s* TRI_LookupSkiplistIndexDocumentCollection (TRI_document_coll
 struct TRI_index_s* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_collection_t*,
                                                                TRI_idx_iid_t,
                                                                TRI_vector_pointer_t const*,
-                                                               bool,
                                                                bool,
                                                                bool*);
 

@@ -211,21 +211,6 @@ static int ProcessIndexUniqueFlag (v8::Isolate* isolate,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief process the sparse flag and add it to the json
-////////////////////////////////////////////////////////////////////////////////
-
-static int ProcessIndexSparseFlag (v8::Isolate* isolate,
-                                   v8::Handle<v8::Object> const obj,
-                                   TRI_json_t* json,
-                                   bool sparseDefault) {
-  v8::HandleScope scope(isolate);
-  bool sparse = ExtractBoolFlag(isolate, obj, TRI_V8_ASCII_STRING("sparse"), sparseDefault);
-  TRI_Insert3ObjectJson(TRI_UNKNOWN_MEM_ZONE, json, "sparse", TRI_CreateBooleanJson(TRI_UNKNOWN_MEM_ZONE, sparse));
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief process the ignoreNull flag and add it to the json
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -278,7 +263,6 @@ static int EnhanceJsonIndexHash (v8::Isolate* isolate,
                                  bool create) {
   int res = ProcessIndexFields(isolate, obj, json, 0, create);
   ProcessIndexUniqueFlag(isolate, obj, json);
-  ProcessIndexSparseFlag(isolate, obj, json, true);
   return res;
 }
 
@@ -292,7 +276,6 @@ static int EnhanceJsonIndexSkiplist (v8::Isolate* isolate,
                                      bool create) {
   int res = ProcessIndexFields(isolate, obj, json, 0, create);
   ProcessIndexUniqueFlag(isolate, obj, json);
-  ProcessIndexSparseFlag(isolate, obj, json, false);
   return res;
 }
 
@@ -550,15 +533,6 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     unique = value->_value._boolean;
   }
 
-  // extract sparse
-  bool sparse = false;
-  bool sparseSet = false;
-  value = TRI_LookupObjectJson(json, "sparse");
-  if (TRI_IsBooleanJson(value)) {
-    sparse = value->_value._boolean;
-    sparseSet = true;
-  }
-
   TRI_vector_pointer_t attributes;
   TRI_InitVectorPointer(&attributes, TRI_CORE_MEM_ZONE);
 
@@ -712,12 +686,10 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
       TRI_ASSERT(attributes._length > 0);
 
       if (create) {
-        bool sparseReally = sparseSet ? sparse : true;
         idx = TRI_EnsureHashIndexDocumentCollection(document,
                                                     iid,
                                                     &attributes,
                                                     unique,
-                                                    sparseReally,
                                                     &created);
       }
       else {
@@ -739,12 +711,10 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
       TRI_ASSERT(attributes._length > 0);
 
       if (create) {
-        bool sparseReally = sparseSet ? sparse : false;
         idx = TRI_EnsureSkiplistIndexDocumentCollection(document,
                                                         iid,
                                                         &attributes,
                                                         unique,
-                                                        sparseReally,
                                                         &created);
       }
       else {
