@@ -226,6 +226,7 @@ void PrimaryIndex::forget (TransactionCollection*,
                            TRI_doc_mptr_t* doc) {
   TRI_doc_mptr_t const* old;
 
+  WRITE_LOCKER(_lock);
   old = _theHash->remove(doc);
 
   if (old == nullptr) {
@@ -255,6 +256,8 @@ void PrimaryIndex::cleanup () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void PrimaryIndex::sizeHint (size_t size) {
+  WRITE_LOCKER(_lock);
+
   int res = _theHash->resize(3 * size + 1);   // Take into account old revisions
   if (res == TRI_ERROR_OUT_OF_MEMORY) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -266,6 +269,7 @@ void PrimaryIndex::sizeHint (size_t size) {
 ////////////////////////////////////////////////////////////////////////////////
   
 size_t PrimaryIndex::memory () {
+  READ_LOCKER(_lock);
   return _theHash->memoryUsage();
 }
 

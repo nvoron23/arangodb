@@ -95,18 +95,11 @@ namespace triagens {
                                           TRI_doc_mptr_t* previousLast,
                                           size_t limit);
 
-
         // a garbage collection function for the index
         void cleanup () override final;
 
         // give index a hint about the expected size
-        void sizeHint (size_t size) override final {
-          int res = _theHash->resize(3 * size + 1);  
-            // Take into account old revisions
-          if (res == TRI_ERROR_OUT_OF_MEMORY) {
-            THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
-          }
-        }
+        void sizeHint (size_t) override final;
   
         bool hasSelectivity () const override final {
           return true;

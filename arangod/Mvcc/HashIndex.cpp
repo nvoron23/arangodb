@@ -28,14 +28,15 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "HashIndex.h"
-#include "Basics/WriteLocker.h"
 #include "Basics/fasthash.h"
+#include "Basics/ReadLocker.h"
+#include "Basics/WriteLocker.h"
 #include "HashIndex/hash-index.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
-#include "Mvcc/Transaction.h"
-#include "Mvcc/TransactionCollection.h"
 
 using namespace triagens::basics;
 using namespace triagens::mvcc;
@@ -85,15 +86,15 @@ class hashElement {
     inline uint64_t operator() (HashIndex::Element const* elm, bool byKey) {
       uint64_t hash = 0x0123456789abcdef;
 
-      char const* base = elm->_document->getShapedJsonPtr();
-      for (size_t j = 0; j < _nrFields; ++j) {
-        // ignore the sid for hashing
-        char const* ptr = base + elm->_subObjects[j]._offset;
-
-        // only hash the data block
-        hash = fasthash64(ptr, elm->_subObjects[j]._length, hash);
-      }
       if (byKey) {
+        char const* base = elm->_document->getShapedJsonPtr();
+        for (size_t j = 0; j < _nrFields; ++j) {
+          // ignore the sid for hashing
+          char const* ptr = base + elm->_subObjects[j]._offset;
+
+          // only hash the data block
+          hash = fasthash64(ptr, elm->_subObjects[j]._length, hash);
+        }
         return hash;
       }
 
@@ -454,6 +455,7 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookup (TransactionCollection* coll,
                                                  Transaction* trans,
                                                  Key const* key,
                                                  size_t limit = 0) {
+  READ_LOCKER(_lock);
   return lookupInternal(coll, trans, key, nullptr, limit);
 }
 
@@ -467,6 +469,7 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookupContinue (
                                                   TRI_doc_mptr_t* previousLast,
                                                   size_t limit = 0) {
 
+  READ_LOCKER(_lock);
   return lookupInternal(coll, trans, nullptr, previousLast, limit);
 }
         
@@ -478,10 +481,25 @@ void HashIndex::cleanup () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief give index a hint about the expected size
+////////////////////////////////////////////////////////////////////////////////
+        
+void HashIndex::sizeHint (size_t size) {
+  WRITE_LOCKER(_lock);
+
+  int res = _theHash->resize(3 * size + 1);  
+  // Take into account old revisions
+  if (res == TRI_ERROR_OUT_OF_MEMORY) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief return the memory used by the index
 ////////////////////////////////////////////////////////////////////////////////
   
 size_t HashIndex::memory () {
+  READ_LOCKER(_lock);
   return _theHash->memoryUsage() + keySize() * _theHash->size();
 }
 

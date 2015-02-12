@@ -34,6 +34,7 @@
 #include "Basics/JsonHelper.h"
 #include "Basics/AssocMulti.h"
 #include "Mvcc/Index.h"
+#include "VocBase/edge-collection.h"
 
 struct TRI_doc_mptr_t;
 struct TRI_document_collection_t;
@@ -44,13 +45,19 @@ namespace triagens {
     class TransactionCollection;
     class Transaction;
 
+    struct EdgeIndexSearchValue {
+      TRI_voc_key_t key;
+      TRI_voc_cid_t cid;
+      TRI_edge_direction_e direction;
+    };
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   class EdgeIndex
 // -----------------------------------------------------------------------------
 
     class EdgeIndex : public Index {
 
-      typedef triagens::basics::AssocMulti<void, void, uint32_t> TRI_EdgeIndexHash_t;
+      typedef triagens::basics::AssocMulti<struct TRI_edge_header_s, struct TRI_doc_mptr_t, uint32_t> TRI_EdgeIndexHash_t;
 
       public:
 
@@ -75,6 +82,19 @@ namespace triagens {
         void preCommit (TransactionCollection*,
                         Transaction*);
 
+        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection* coll,
+                                              Transaction* trans,
+                                              TRI_edge_direction_e direction,
+                                              TRI_edge_header_t const* lookup,
+                                              size_t limit);
+
+        std::vector<TRI_doc_mptr_t*>* lookupContinue(
+                                          TransactionCollection* coll,
+                                          Transaction* trans,
+                                          TRI_edge_direction_e direction,
+                                          TRI_doc_mptr_t* previousLast,
+                                          size_t limit);
+
         // give index a hint about the expected size
         void sizeHint (size_t) override final;
   
@@ -98,6 +118,20 @@ namespace triagens {
         }
 
       private:
+
+        std::vector<TRI_doc_mptr_t*>* lookupInternal(
+                                          TransactionCollection* coll,
+                                          Transaction* trans,
+                                          TRI_edge_direction_e direction,
+                                          TRI_edge_header_t const* lookup,
+                                          TRI_doc_mptr_t* previousLast,
+                                          size_t limit);
+
+        void lookupPart (TRI_EdgeIndexHash_t* part,
+                         Transaction* trans,
+                         TRI_edge_header_t const* lookup,
+                         std::vector<TRI_doc_mptr_t*>* result,
+                         size_t limit);
   
         TRI_EdgeIndexHash_t* _from;
         TRI_EdgeIndexHash_t* _to;

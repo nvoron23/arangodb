@@ -37,8 +37,9 @@
 #include "FulltextIndex/fulltext-index.h"
 #include "GeoIndex/geo-index.h"
 #include "HashIndex/hash-index.h"
-#include "Mvcc/Index.h"
+#include "Mvcc/EdgeIndex.h"
 #include "Mvcc/HashIndex.h"
+#include "Mvcc/Index.h"
 #include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/PrimaryIndex.h"
 #include "ShapedJson/shape-accessor.h"
@@ -2223,6 +2224,16 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
       DestroyBaseDocumentCollection(document);
       TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
+      return false;
+    }
+    
+    // add an MVCC edge index to the collection
+    auto mvccEdgeIndex = new triagens::mvcc::EdgeIndex(document->_info._cid, document);
+    try {
+      document->addIndex(mvccEdgeIndex);
+    }
+    catch (...) {
+      delete mvccEdgeIndex;
       return false;
     }
   }
