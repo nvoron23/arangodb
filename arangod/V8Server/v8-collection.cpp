@@ -3288,7 +3288,7 @@ static void JS_MvccCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN(v8::Number::New(isolate, static_cast<int>(count)));
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -3350,7 +3350,7 @@ static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN(TRI_WrapShapedJson(isolate, &resolver, transactionCollection, readResult.mptr->getDataPtr()));
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -3442,7 +3442,7 @@ static void MvccInsert (TRI_vocbase_col_t const* collection,
     TRI_V8_RETURN(result);
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -3589,7 +3589,7 @@ static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN_TRUE();
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -3713,7 +3713,7 @@ static void JS_MvccReplace (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN(result);
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -3841,7 +3841,7 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN(result);
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -3922,7 +3922,7 @@ static void JS_MvccAllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_RETURN(result);
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);

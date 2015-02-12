@@ -383,7 +383,7 @@ static void JS_TransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>& a
     TRI_V8_RETURN(result);
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -513,10 +513,13 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
     auto id = transaction->id();
 
     if (pop) {
-      // the just-created transaction must be at the top of the stack
+      // the just-created transaction must be at the top of the stack and leased
       triagens::mvcc::TransactionStackAccessor accessor;
       TRI_ASSERT_EXPENSIVE(accessor.peek() == transaction);
       accessor.pop();
+  
+      auto transactionManager = triagens::mvcc::TransactionManager::instance();
+      transactionManager->unleaseTransaction(transaction);
     }
 
     v8::Handle<v8::Object> result = v8::Object::New(isolate);
@@ -525,7 +528,7 @@ static void JS_BeginTransactionDatabase (const v8::FunctionCallbackInfo<v8::Valu
     TRI_V8_RETURN(result);
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -585,7 +588,7 @@ static void JS_CommitTransactionDatabase (const v8::FunctionCallbackInfo<v8::Val
     TRI_V8_RETURN_TRUE();
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -639,7 +642,7 @@ static void JS_RollbackTransactionDatabase (const v8::FunctionCallbackInfo<v8::V
     TRI_V8_RETURN_TRUE();
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -709,7 +712,7 @@ static void JS_PopTransactionDatabase (const v8::FunctionCallbackInfo<v8::Value>
     TRI_V8_RETURN_TRUE();
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -757,7 +760,7 @@ static void JS_PushTransactionDatabase (const v8::FunctionCallbackInfo<v8::Value
     TRI_V8_RETURN_TRUE();
   }
   catch (triagens::arango::Exception const& ex) {
-    TRI_V8_THROW_EXCEPTION(ex.code());
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
   catch (...) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);

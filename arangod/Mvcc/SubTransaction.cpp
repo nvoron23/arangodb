@@ -128,14 +128,19 @@ CollectionStats SubTransaction::aggregatedStats (TRI_voc_cid_t id) {
   CollectionStats stats;
 
   auto current = static_cast<Transaction*>(this);
+
   while (current != nullptr) {
     auto it = current->_stats.find(id);
+
     if (it != current->_stats.end()) {
       // merge with already collected stats
       stats.merge((*it).second);
     }
 
     // until we're at the top
+    if (current->isTopLevel()) {
+      break;
+    }
     current = current->parentTransaction();
   }
 

@@ -102,6 +102,12 @@ void LocalTransactionManagerCleanupThread::run () {
 
 double const LocalTransactionManager::DefaultTtl = 5.0;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief reserve room to keep in list of transactions for failed transactions
+////////////////////////////////////////////////////////////////////////////////
+
+size_t const LocalTransactionManager::ReserveRoomForFailed = 16;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -203,6 +209,10 @@ Transaction* LocalTransactionManager::leaseTransaction (TransactionId::InternalT
 
   if (it == _runningTransactions.end()) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_TRANSACTION_NOT_FOUND);
+  }
+  
+  TRI_IF_FAILURE("LocalTransactionManager::leaseTransaction") {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 
   auto found = _leasedTransactions.insert(id);
@@ -339,6 +349,10 @@ Transaction::StatusType LocalTransactionManager::statusTransaction (TransactionI
 ////////////////////////////////////////////////////////////////////////////////
 
 void LocalTransactionManager::addFailedTransactions (std::unordered_set<TransactionId::InternalType> const& transactions) {
+  TRI_IF_FAILURE("LocalTransactionManager::addFailedTransactions") {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
+
   WRITE_LOCKER(_lock); 
 
   _failedTransactions.insert(transactions.begin(), transactions.end());
@@ -426,6 +440,9 @@ void LocalTransactionManager::insertRunningTransaction (Transaction* transaction
   TRI_IF_FAILURE("LocalTransactionManager::insertRunningTransaction1") {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
+
+  // must have room in the list of _failedTransactions if this transaction later fails
+  _failedTransactions.reserve(_failedTransactions.size() + ReserveRoomForFailed);
 
   auto it = _runningTransactions.emplace(std::make_pair(id.own(), transaction));
 

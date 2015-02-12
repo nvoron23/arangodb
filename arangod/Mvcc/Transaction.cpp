@@ -41,6 +41,12 @@ using namespace triagens::mvcc;
 // --SECTION--                                                 class Transaction
 // -----------------------------------------------------------------------------
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief reserve room for committed transactions
+////////////////////////////////////////////////////////////////////////////////
+
+size_t const Transaction::ReserveRoomForCommitted = 8;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -172,7 +178,7 @@ void Transaction::subTransactionStarted (Transaction* transaction) {
   
   // reserve enough space in the container so later commits won't fail with
   // out of memory
-  _committedSubTransactions.reserve(n + 8);
+  _committedSubTransactions.reserve(n + ReserveRoomForCommitted);
 
   // this will recursively inform all parent transactions
   if (! isTopLevel()) {

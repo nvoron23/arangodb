@@ -160,6 +160,116 @@ function mvccExceptionsSuite () {
     },
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief test out-of-memory in leaseTransaction
+////////////////////////////////////////////////////////////////////////////////
+
+    testLeaseTransactionOom : function () {
+      var trx = db._beginTransaction({ pop: true });
+
+      internal.debugSetFailAt("LocalTransactionManager::leaseTransaction");
+      
+      var stack;
+      stack = db._stackTransactions();
+      assertEqual(0, stack.length);
+
+      try {
+        // create a top-level transaction
+        db._pushTransaction(trx);
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_OUT_OF_MEMORY.code, err.errorNum);
+      }
+
+      internal.debugClearFailAt();
+      
+      stack = db._stackTransactions();
+      assertEqual(0, stack.length);
+
+      db._pushTransaction(trx);
+      db._rollbackTransaction(trx);
+    },
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test out-of-memory in leaseTransaction
+////////////////////////////////////////////////////////////////////////////////
+
+    testLeaseTransactionSubTransactionOom : function () {
+      var trx1 = db._beginTransaction();
+      var trx2 = db._beginTransaction({ pop: true });
+
+      var stack;
+      stack = db._stackTransactions().map(function(t) { return t.id; });
+      assertEqual(1, stack.length);
+      assertEqual(trx1.id, stack[0]);
+     
+      internal.debugSetFailAt("LocalTransactionManager::leaseTransaction");
+
+      try {
+        // create a sub-transaction
+        db._pushTransaction(trx2);
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_OUT_OF_MEMORY.code, err.errorNum);
+      }
+      
+      stack = db._stackTransactions().map(function(t) { return t.id; });
+      assertEqual(1, stack.length);
+      assertEqual(trx1.id, stack[0]);
+
+      internal.debugClearFailAt();
+      db._pushTransaction(trx2);
+      db._rollbackTransaction(trx2);
+      db._rollbackTransaction(trx1);
+      
+      stack = db._stackTransactions();
+      assertEqual(0, stack.length);
+    },
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test out-of-memory in addFailedTransactions
+////////////////////////////////////////////////////////////////////////////////
+
+    testAddFailedTransactionsSubTransactionOom : function () {
+      var trx1 = db._beginTransaction();
+
+      c.mvccInsert({ value: 1 });
+      assertEqual(1, c.mvccCount());
+
+      var trx2 = db._beginTransaction();
+      c.mvccInsert({ value: 2 });
+      assertEqual(2, c.mvccCount());
+      
+      var stack;
+      stack = db._stackTransactions().map(function(t) { return t.id; });
+      assertEqual(2, stack.length);
+      assertEqual(trx1.id, stack[0]);
+      assertEqual(trx2.id, stack[1]);
+
+      internal.debugSetFailAt("LocalTransactionManager::addFailedTransactions");
+
+      try {
+        db._rollbackTransaction(trx2);
+        fail();
+      }
+      catch (err) {
+        assertEqual(internal.errors.ERROR_OUT_OF_MEMORY.code, err.errorNum);
+      }
+      
+      stack = db._stackTransactions().map(function(t) { return t.id; });
+      assertEqual(1, stack.length);
+      assertEqual(trx1.id, stack[0]);
+      
+      assertEqual(1, c.mvccCount());
+      internal.debugClearFailAt();
+
+      db._commitTransaction(trx1);
+
+      assertEqual(1, c.mvccCount());
+    },
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief test out-of-memory in deleteKilledTransactions
 ////////////////////////////////////////////////////////////////////////////////
 
