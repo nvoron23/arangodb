@@ -136,11 +136,11 @@ namespace triagens {
                                           Key const* key,
                                           TRI_doc_mptr_t* previousLast,
                                           size_t limit);
-        size_t keySize () const;
+        size_t elementSize () const;
 
-        Element* allocAndFillElement(TransactionCollection* coll,
-                                     TRI_doc_mptr_t* doc,
-                                     bool& includeForSparse);
+        Element* allocateAndFillElement(TransactionCollection* coll,
+                                        TRI_doc_mptr_t* doc,
+                                        bool& includeForSparse);
 
         void deleteElement(Element*);
 
