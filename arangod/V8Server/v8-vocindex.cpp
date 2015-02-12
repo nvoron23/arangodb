@@ -1641,7 +1641,7 @@ triagens::mvcc::Index* TRI_LookupMvccIndexByHandle (v8::Isolate* isolate,
     }
   }
 
-  return TRI_LookupMvccIndex(collection->_collection, iid);
+  return collection->_collection->lookupIndex(iid);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
