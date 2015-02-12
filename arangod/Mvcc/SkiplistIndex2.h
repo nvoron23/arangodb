@@ -32,8 +32,8 @@
 
 #include "Basics/Common.h"
 #include "Basics/JsonHelper.h"
+#include "Basics/SkipList.h"
 #include "Mvcc/Index.h"
-#include "SkipLists/skiplistIndex.h"
 #include "ShapedJson/shaped-json.h"
 
 struct TRI_doc_mptr_t;
@@ -50,6 +50,13 @@ namespace triagens {
       
       public:
 
+        struct Element {
+          TRI_doc_mptr_t*  _document;
+          TRI_shaped_sub_t _subObjects[];
+        };
+
+        typedef std::vector<TRI_shaped_json_t> Key;
+
         SkiplistIndex2 (TRI_idx_iid_t id,
                         struct TRI_document_collection_t*,
                         std::vector<std::string> const& fields,
@@ -62,7 +69,7 @@ namespace triagens {
 
       public:
   
-        virtual void insert (TransactionCollection*, 
+        virtual void insert (TransactionCollection*,
                              Transaction*,
                              struct TRI_doc_mptr_t*) override final;
         virtual struct TRI_doc_mptr_t* remove (
@@ -77,6 +84,12 @@ namespace triagens {
         virtual void preCommit (TransactionCollection*,
                                 Transaction*) override final;
 
+        // a garbage collection function for the index
+        void cleanup () override final;
+
+        // give index a hint about the expected size
+        void sizeHint (size_t) override final;
+  
         bool hasSelectivity () const override final {
           return false;
         }
@@ -96,15 +109,31 @@ namespace triagens {
           return "skiplist";
         }
 
+        size_t nrIndexedFields () const {
+          return _paths.size();
+        }
+
+        std::vector<TRI_shape_pid_t> const& paths () const {
+          return _paths;
+        }
+
+      public:
+
+        typedef triagens::basics::SkipList<Key, Element> SkipList_t;
+
+        size_t elementSize () const;
+
+        Element* allocateAndFillElement(TransactionCollection* coll,
+                                        TRI_doc_mptr_t* doc,
+                                        bool& includeForSparse);
+
+        void deleteElement(Element*);
+
       private:
 
-       int shapify (TRI_skiplist_index_element_t*,
-                    struct TRI_doc_mptr_t const*);
+        std::vector<TRI_shape_pid_t> const  _paths;
 
-      private:
-
-        std::vector<TRI_shape_pid_t> _paths;  
-        SkiplistIndex*               _skiplistIndex; 
+        SkipList_t* _theSkipList;
 
         bool _unique;
         bool _ignoreNull;
