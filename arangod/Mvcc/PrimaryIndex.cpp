@@ -29,6 +29,7 @@
 
 #include "PrimaryIndex.h"
 #include "Basics/fasthash.h"
+#include "Basics/gcd.h"
 #include "Basics/WriteLocker.h"
 #include "Basics/ReadLocker.h"
 #include "Utils/Exception.h"
@@ -286,12 +287,64 @@ Json PrimaryIndex::toJson (TRI_memory_zone_t* zone) const {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return a random document from the collection
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* PrimaryIndex::random (TransactionCollection* transColl,
+                                      Transaction* trans) {
+  size_t step = 0;
+  size_t position = 0;
+  
+  READ_LOCKER(_lock);
+
+  if (_theHash->size() == 0) {
+    // index is completely empty. we won't find any document
+    return nullptr;
+  }
+
+  size_t const n = _theHash->capacity();
+            
+  // find a co-prime for n
+  while (true) {
+    step = static_cast<size_t>(TRI_UInt32Random()) % n;
+    if (step > 10 && triagens::basics::binaryGcd<size_t>(n, step) == 1) {
+      while (position == 0) {
+        position = static_cast<size_t>(TRI_UInt32Random()) % n;
+      }
+      break;
+    }
+  }
+          
+  size_t const initialPosition = position;
+
+  // now loop until we either find a visible document or have reached our
+  // starting position again
+  do {
+    TRI_doc_mptr_t* d = _theHash->at(position);
+
+    if (d != nullptr) {
+      TransactionId from = d->from();
+      TransactionId to = d->to();
+      if (trans->isVisibleForRead(from, to)) {
+        return d;
+      }
+    }
+    position += step;
+    position = position % n;
+  }
+  while (position != initialPosition);
+
+  // nothing found
+  return nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief find the visible revision by its key
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_doc_mptr_t* PrimaryIndex::lookup (TransactionCollection* transColl,
-                        Transaction* trans,
-                        std::string const& key) {
+                                      Transaction* trans,
+                                      std::string const& key) {
   READ_LOCKER(_lock);
   return findVisibleRevision(transColl, trans, key);
 }

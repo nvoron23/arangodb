@@ -63,6 +63,7 @@ namespace triagens {
         virtual void insert (TransactionCollection*, 
                              Transaction*,
                              struct TRI_doc_mptr_t*) override final;
+
         virtual struct TRI_doc_mptr_t* remove (
                   TransactionCollection*,
                   Transaction*,
@@ -81,6 +82,9 @@ namespace triagens {
 
         virtual void preCommit (TransactionCollection*,
                                 Transaction*) override final;
+        
+        struct TRI_doc_mptr_t* random (TransactionCollection*,
+                                       Transaction*);
 
         struct TRI_doc_mptr_t* lookup (TransactionCollection*,
                                        Transaction*,

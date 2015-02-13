@@ -250,6 +250,34 @@ int64_t CollectionOperations::Count (TransactionScope* transactionScope,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief reads a random document from the collection
+////////////////////////////////////////////////////////////////////////////////
+
+OperationResult CollectionOperations::RandomDocument (TransactionScope* transactionScope,
+                                                      TransactionCollection* collection) {
+  // acquire a read-lock on the list of indexes so no one else creates or drops indexes
+  // while the operation is ongoing
+  IndexUser indexUser(collection);
+  
+  auto primaryIndex = indexUser.primaryIndex();
+ 
+  auto* transaction = transactionScope->transaction();
+  auto mptr = primaryIndex->random(collection, transaction);
+  
+  // no need to commit a read, but if we don't commit, it would be rolled back 
+  // and rollbacks make you inspect logs too often unnecessarily
+  transactionScope->commit();
+
+  if (mptr == nullptr) {
+    return OperationResult(TRI_ERROR_NO_ERROR);
+  }
+
+  TRI_ASSERT(mptr != nullptr);
+    
+  return OperationResult(mptr);  
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief insert a document
 /// this calls the internal worker function for insert
 ////////////////////////////////////////////////////////////////////////////////
@@ -262,7 +290,7 @@ OperationResult CollectionOperations::InsertDocument (TransactionScope* transact
   transaction->prepareStats(collection);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
-  // while the insert operation is ongoing
+  // while the operation is ongoing
   IndexUser indexUser(collection);
 
   auto result = InsertDocumentWorker(transactionScope, collection, indexUser, document, options);
@@ -286,7 +314,7 @@ OperationResult CollectionOperations::ReadDocument (TransactionScope* transactio
                                                     Document const& document,
                                                     OperationOptions const& options) {
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
-  // while the insert operation is ongoing
+  // while the operation is ongoing
   IndexUser indexUser(collection);
 
   auto result = ReadDocumentWorker(transactionScope, collection, indexUser, document, options);
@@ -350,7 +378,7 @@ OperationResult CollectionOperations::RemoveDocument (TransactionScope* transact
   transaction->prepareStats(collection);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
-  // while the remove operation is ongoing
+  // while the operation is ongoing
   IndexUser indexUser(collection);
 
   TransactionId originalTransactionId;
@@ -378,7 +406,7 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
   transaction->prepareStats(collection);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
-  // while the update operation is ongoing
+  // while the operation is ongoing
   IndexUser indexUser(collection);
 
   // first remove the document...
@@ -461,7 +489,7 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
   transaction->prepareStats(collection);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
-  // while the update operation is ongoing
+  // while the operation is ongoing
   IndexUser indexUser(collection);
 
   // first remove the document...

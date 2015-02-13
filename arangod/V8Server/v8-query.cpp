@@ -37,6 +37,7 @@
 #include "FulltextIndex/fulltext-index.h"
 #include "FulltextIndex/fulltext-result.h"
 #include "FulltextIndex/fulltext-query.h"
+#include "Mvcc/CollectionOperations.h"
 #include "Mvcc/EdgeIndex.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/Transaction.h"
@@ -1491,6 +1492,70 @@ static void JS_ByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>& ar
 }
 
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief selects a random document
+///
+/// @FUN{@FA{collection}.any()}
+///
+/// The @FN{any} method returns a random document from the collection.  It returns
+/// @LIT{null} if the collection is empty.
+///
+/// @EXAMPLES
+///
+/// @code
+/// arangod> db.example.any()
+/// { "_id" : "example/222716379559", "_rev" : "222716379559", "Hello" : "World" }
+/// @endcode
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccAnyQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TransactionBase transBase(true);   // To protect against assertions, FIXME later
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+    
+  CollectionNameResolver resolver(collection->_vocbase); // TODO
+  
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+  
+    auto readResult = triagens::mvcc::CollectionOperations::RandomDocument(&transactionScope, transactionCollection);
+    
+    if (readResult.code != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(readResult.code);
+    }
+
+    if (readResult.mptr == nullptr) {
+      // collection is empty
+      TRI_V8_RETURN_NULL();
+    }
+
+    // convert to v8
+    v8::Handle<v8::Value> result = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, readResult.mptr->getDataPtr());
+
+    if (result.IsEmpty()) {
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    }
+
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  TRI_ASSERT(false);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief selects documents by example using a hash index
@@ -2618,6 +2683,7 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("INEDGES"), JS_InEdgesQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("LAST"), JS_LastQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NEAR"), JS_NearQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccAny"), JS_MvccAnyQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExampleHash"), JS_MvccByExampleHashIndex, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccEdges"), JS_MvccEdgesQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccInEdges"), JS_MvccInEdgesQuery, true);
