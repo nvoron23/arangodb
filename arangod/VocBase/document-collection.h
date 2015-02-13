@@ -496,6 +496,8 @@ public:
   void shutdownIndexes ();
   void addIndex (triagens::mvcc::Index*);
   std::vector<triagens::mvcc::Index*> indexes () const;
+  triagens::mvcc::Index* lookupIndex (TRI_idx_iid_t);
+  triagens::mvcc::Index* lookupIndex (TRI_idx_type_e);
   void readLockIndexes();
   void readUnlockIndexes();
   void writeLockIndexes();

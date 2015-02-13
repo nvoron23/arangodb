@@ -418,21 +418,6 @@ TRI_index_t* TRI_LookupIndex (TRI_document_collection_t const* document,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief looks up an index identifier
-////////////////////////////////////////////////////////////////////////////////
-
-triagens::mvcc::Index* TRI_LookupMvccIndex (TRI_document_collection_t const* document,
-                                            TRI_idx_iid_t iid) {
-  for (auto idx : document->_indexes) {
-    if (idx->id()== iid) {
-      return idx;
-    }
-  }
-
-  return nullptr;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief creates a basic index description as JSON
 /// this only contains the common index fields and needs to be extended by the
 /// specialised index

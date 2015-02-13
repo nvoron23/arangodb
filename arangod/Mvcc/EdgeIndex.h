@@ -82,14 +82,12 @@ namespace triagens {
         void preCommit (TransactionCollection*,
                         Transaction*);
 
-        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection* coll,
-                                              Transaction* trans,
+        std::vector<TRI_doc_mptr_t*>* lookup (Transaction* trans,
                                               TRI_edge_direction_e direction,
                                               TRI_edge_header_t const* lookup,
                                               size_t limit);
 
         std::vector<TRI_doc_mptr_t*>* lookupContinue(
-                                          TransactionCollection* coll,
                                           Transaction* trans,
                                           TRI_edge_direction_e direction,
                                           TRI_doc_mptr_t* previousLast,
@@ -120,7 +118,6 @@ namespace triagens {
       private:
 
         std::vector<TRI_doc_mptr_t*>* lookupInternal(
-                                          TransactionCollection* coll,
                                           Transaction* trans,
                                           TRI_edge_direction_e direction,
                                           TRI_edge_header_t const* lookup,
@@ -131,7 +128,8 @@ namespace triagens {
                          Transaction* trans,
                          TRI_edge_header_t const* lookup,
                          std::vector<TRI_doc_mptr_t*>* result,
-                         size_t limit);
+                         size_t limit,
+                         bool filterReflexive);
   
         TRI_EdgeIndexHash_t* _from;
         TRI_EdgeIndexHash_t* _to;

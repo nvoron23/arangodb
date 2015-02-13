@@ -3112,13 +3112,12 @@ static void JS_ListEndpoints (const v8::FunctionCallbackInfo<v8::Value>& args) {
 /// @brief parse vertex handle from a v8 value (string | object)
 ////////////////////////////////////////////////////////////////////////////////
 
-int TRI_ParseVertex (const v8::FunctionCallbackInfo<v8::Value>& args,
+int TRI_ParseVertex (v8::Isolate* isolate,
                      CollectionNameResolver const* resolver,
                      TRI_voc_cid_t& cid,
                      std::unique_ptr<char[]>& key,
                      v8::Handle<v8::Value> const val) {
 
-  v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
   TRI_ASSERT(key.get() == nullptr);
@@ -3152,6 +3151,19 @@ int TRI_ParseVertex (const v8::FunctionCallbackInfo<v8::Value>& args,
   }
 
   return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief parse vertex handle from a v8 value (string | object)
+////////////////////////////////////////////////////////////////////////////////
+
+int TRI_ParseVertex (const v8::FunctionCallbackInfo<v8::Value>& args,
+                     CollectionNameResolver const* resolver,
+                     TRI_voc_cid_t& cid,
+                     std::unique_ptr<char[]>& key,
+                     v8::Handle<v8::Value> const val) {
+
+  return TRI_ParseVertex(args.GetIsolate(), resolver, cid, key, val);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

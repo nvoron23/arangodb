@@ -66,7 +66,7 @@ class hashKey {
 
       for (size_t j = 0; j < _nrFields; ++j) {
         // ignore the sid for hashing
-        hash = fasthash64(key->at(j)._data.data, key->at(j)._data.length, hash);
+        hash = fasthash64((*key)[j]._data.data, (*key)[j]._data.length, hash);
       }
 
       return hash;
@@ -125,7 +125,7 @@ class compareKeyElement {
       char const* base = elm->_document->getShapedJsonPtr();
 
       for (size_t j = 0; j < _nrFields; ++j) {
-        TRI_shaped_json_t const* leftJson = &(key->at(j));
+        TRI_shaped_json_t const* leftJson = &((*key)[j]);
         TRI_shaped_sub_t const* rightSub = &(elm->_subObjects[j]);
 
         if (leftJson->_sid != rightSub->_sid) {

@@ -37,6 +37,7 @@
 #include "FulltextIndex/fulltext-index.h"
 #include "FulltextIndex/fulltext-result.h"
 #include "FulltextIndex/fulltext-query.h"
+#include "Mvcc/EdgeIndex.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
@@ -1738,6 +1739,8 @@ static void JS_ByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>& ar
 
 }
 
+
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief selects documents by example using a hash index
 ////////////////////////////////////////////////////////////////////////////////
@@ -1853,6 +1856,171 @@ static void JS_MvccByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>
 
   TRI_ASSERT(false);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief worker function for querying the edge index
+////////////////////////////////////////////////////////////////////////////////
+    
+static int AddEdges (v8::Isolate* isolate, 
+                     TRI_edge_direction_e direction, 
+                     triagens::mvcc::Transaction* transaction,
+                     triagens::mvcc::TransactionCollection* transactionCollection,
+                     CollectionNameResolver const* resolver,
+                     triagens::mvcc::EdgeIndex* edgeIndex,
+                     v8::Handle<v8::Array>& result,
+                     v8::Handle<v8::Value> const vertex) {
+  TRI_voc_cid_t cid;
+  std::unique_ptr<char[]> key;
+
+  int res = TRI_ParseVertex(isolate, resolver, cid, key, vertex);
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    return res;
+  }
+
+  uint32_t i = result->Length();
+
+  TRI_edge_header_t const edge = { cid, key.get() }; 
+  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> found(edgeIndex->lookup(transaction, direction, &edge, 0));
+
+  if (found.get() == nullptr) {
+    return TRI_ERROR_NO_ERROR;
+  }
+
+  auto edges = (*found.get());
+
+  if (i == 0 && ! edges.empty()) {
+    result = v8::Array::New(isolate, static_cast<uint32_t>(edges.size()));
+  }
+
+  for (auto const& it : edges) {
+    v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, resolver, transactionCollection, it->getDataPtr());
+
+    if (document.IsEmpty()) {
+      return TRI_ERROR_OUT_OF_MEMORY;
+    }
+          
+    result->Set(i++, document);
+  }
+
+  return TRI_ERROR_NO_ERROR;
+}
+  
+////////////////////////////////////////////////////////////////////////////////
+/// @brief queries the edge index
+////////////////////////////////////////////////////////////////////////////////
+
+static void MvccEdgesQuery (TRI_edge_direction_e direction,
+                            const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TransactionBase transBase(true);   // To protect against assertions, FIXME later
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+  
+  if (collection->_type != TRI_COL_TYPE_EDGE) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_TYPE_INVALID);
+  }
+  
+  // first and only argument schould be a list of document idenfifier
+  if (args.Length() != 1) {
+    switch (direction) {
+      case TRI_EDGE_IN:
+        TRI_V8_THROW_EXCEPTION_USAGE("mvccInEdges(<vertices>)");
+
+      case TRI_EDGE_OUT:
+        TRI_V8_THROW_EXCEPTION_USAGE("mvccOutEdges(<vertices>)");
+
+      case TRI_EDGE_ANY:
+      default: {
+        TRI_V8_THROW_EXCEPTION_USAGE("mvccEdges(<vertices>)");
+      }
+    }
+  }
+    
+  CollectionNameResolver resolver(collection->_vocbase); // TODO
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+  
+    auto edgeIndex = static_cast<triagens::mvcc::EdgeIndex*>(transactionCollection->documentCollection()->lookupIndex(TRI_IDX_TYPE_EDGE_INDEX));
+
+    if (edgeIndex == nullptr) {
+      // collection must have an edge index
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+    }
+
+    v8::Handle<v8::Array> result = v8::Array::New(isolate);
+
+    if (args[0]->IsArray()) {
+      v8::Handle<v8::Array> vertices = v8::Handle<v8::Array>::Cast(args[0]);
+      uint32_t const length = vertices->Length();
+
+      for (uint32_t i = 0; i < length; ++i) {
+        int res = AddEdges(isolate, direction, transaction, transactionCollection, &resolver, edgeIndex, result, vertices->Get(i));
+
+        if (res != TRI_ERROR_NO_ERROR) {
+          // ignore error
+          continue;
+        }
+      }
+    }
+    else {
+      int res = AddEdges(isolate, direction, transaction, transactionCollection, &resolver, edgeIndex, result, args[0]);
+
+      if (res != TRI_ERROR_NO_ERROR) {
+        // do not ignore error
+        TRI_V8_THROW_EXCEPTION(res);
+      }
+    }
+
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  TRI_ASSERT(false);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief selects connected edges
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccEdgesQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccEdgesQuery(TRI_EDGE_ANY, args);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief selects connected edges
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccInEdgesQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccEdgesQuery(TRI_EDGE_IN, args);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief selects connected edges
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccOutEdgesQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccEdgesQuery(TRI_EDGE_OUT, args);
+}
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief selects documents by condition using a skiplist index
@@ -2700,6 +2868,9 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("LAST"), JS_LastQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NEAR"), JS_NearQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExampleHash"), JS_MvccByExampleHashIndex, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccEdges"), JS_MvccEdgesQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccInEdges"), JS_MvccInEdgesQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccOutEdges"), JS_MvccOutEdgesQuery, true);
 
   // internal method. not intended to be used by end-users
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("NTH"), JS_NthQuery, true);
