@@ -64,46 +64,46 @@ describe("MVCC skiplist index non-sparse", function () {
 
     // Empty:
     var r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
 
     // One document:
     c.mvccInsert({value : 1});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Two documents:
     c.mvccInsert({value : 1});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Three documents, different values:
     c.mvccInsert({value : 2});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A thousand documents:
     var i;
@@ -111,92 +111,92 @@ describe("MVCC skiplist index non-sparse", function () {
       c.mvccInsert({value : 1});
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1002);
+    expect(r.length).toEqual(1002);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A thousand more documents:
     for (i = 0; i < 1000; i++) {
       c.mvccInsert({value : i});
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1003);
+    expect(r.length).toEqual(1003);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Some documents with value: null
     c.mvccInsert({value : null});
     c.mvccInsert({value : null});
     c.mvccInsert({value : null});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1003);
+    expect(r.length).toEqual(1003);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(3);
+    expect(r.length).toEqual(3);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(3);
+    expect(r.length).toEqual(3);
 
     // Some documents without a bound value
     c.mvccInsert({});
     c.mvccInsert({});
     c.mvccInsert({});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1003);
+    expect(r.length).toEqual(1003);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(6);
+    expect(r.length).toEqual(6);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(6);
+    expect(r.length).toEqual(6);
 
     // Now delete again:
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(6);
+    expect(r.length).toEqual(6);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(6);
+    expect(r.length).toEqual(6);
 
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(6);
+    expect(r.length).toEqual(6);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(6);
+    expect(r.length).toEqual(6);
 
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
   });
       
 });
@@ -231,46 +231,46 @@ describe("MVCC skiplist index sparse", function () {
 
     // Empty:
     var r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
 
     // One document:
     c.mvccInsert({value : 1});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Two documents:
     c.mvccInsert({value : 1});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Three documents, different values:
     c.mvccInsert({value : 2});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A thousand documents:
     var i;
@@ -278,92 +278,92 @@ describe("MVCC skiplist index sparse", function () {
       c.mvccInsert({value : 1});
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1002);
+    expect(r.length).toEqual(1002);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A thousand more documents:
     for (i = 0; i < 1000; i++) {
       c.mvccInsert({value : i});
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1003);
+    expect(r.length).toEqual(1003);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Some documents with value: null
     c.mvccInsert({value : null});
     c.mvccInsert({value : null});
     c.mvccInsert({value : null});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1003);
+    expect(r.length).toEqual(1003);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Some documents without a bound value
     c.mvccInsert({});
     c.mvccInsert({});
     c.mvccInsert({});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1003);
+    expect(r.length).toEqual(1003);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Now delete again:
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(2);
+    expect(r.length).toEqual(2);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     r = c.mvccAllQuery();
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
   });
 
 });
@@ -398,24 +398,24 @@ describe("MVCC unique skiplist index non-sparse", function () {
 
     // Empty:
     var r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
 
     // One document:
     c.mvccInsert({value : 1});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Two documents unique constraint violated:
     var error;
@@ -428,24 +428,24 @@ describe("MVCC unique skiplist index non-sparse", function () {
     }
     expect(error.errorNum).toEqual(1210);
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Three documents, different values:
     c.mvccInsert({value : 2});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A thousand documents:
     var i;
@@ -453,26 +453,26 @@ describe("MVCC unique skiplist index non-sparse", function () {
       c.mvccInsert({value : i});
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 147 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A document with value: null
     c.mvccInsert({value : null});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
 
     // Another document with value: null
     try {
@@ -496,18 +496,18 @@ describe("MVCC unique skiplist index non-sparse", function () {
 
     // Remove the document again:
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    c.mvccRemove(r.documents[0]._key);
+    c.mvccRemove(r[0]._key);
 
     // A document with unbound value:
     c.mvccInsert({});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
 
     // Another document with value: null
     try {
@@ -531,43 +531,43 @@ describe("MVCC unique skiplist index non-sparse", function () {
 
     // Now delete again:
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
 
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
 
     r = c.mvccAllQuery();
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
   });
       
 });
@@ -602,24 +602,24 @@ describe("MVCC unique skiplist index sparse", function () {
 
     // Empty:
     var r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.documents).toEqual([]);
+    expect(r).toEqual([]);
 
     // One document:
     c.mvccInsert({value : 1});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Two documents unique constraint violated:
     var error;
@@ -632,24 +632,24 @@ describe("MVCC unique skiplist index sparse", function () {
     }
     expect(error.errorNum).toEqual(1210);
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Three documents, different values:
     c.mvccInsert({value : 2});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A thousand documents:
     var i;
@@ -657,26 +657,26 @@ describe("MVCC unique skiplist index sparse", function () {
       c.mvccInsert({value : i});
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 147 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A document with value: null
     c.mvccInsert({value : null});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Another document with value: null
     try {
@@ -688,13 +688,13 @@ describe("MVCC unique skiplist index sparse", function () {
     }
     expect(error).toEqual({});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A document without a bound value
     try {
@@ -706,24 +706,24 @@ describe("MVCC unique skiplist index sparse", function () {
     }
     expect(error).toEqual({});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A document with unbound value:
     c.mvccInsert({});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Another document with value: null
     try {
@@ -735,13 +735,13 @@ describe("MVCC unique skiplist index sparse", function () {
     }
     expect(error).toEqual({});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // A document without a bound value
     try {
@@ -753,44 +753,44 @@ describe("MVCC unique skiplist index sparse", function () {
     }
     expect(error).toEqual({});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(1);
+    expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     // Now delete again:
     var j;
     for (j = 1; j <= 1000; j++) {
       r = c.mvccByExampleSkiplist(idx, { value : j });
-      for (i = 0; i < r.documents.length; i++) {
-        c.mvccRemove(r.documents[i]._key);
+      for (i = 0; i < r.length; i++) {
+        c.mvccRemove(r[i]._key);
       }
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
 
     r = c.mvccAllQuery();
-    expect(r.documents.length).toEqual(6);
-    for (i = 0; i < r.documents.length; i++) {
-      c.mvccRemove(r.documents[i]._key);
+    expect(r.length).toEqual(6);
+    for (i = 0; i < r.length; i++) {
+      c.mvccRemove(r[i]._key);
     }
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { value : null });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.count).toEqual(0);
+    expect(r.length).toEqual(0);
   });
       
 });

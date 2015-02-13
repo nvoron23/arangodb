@@ -295,6 +295,53 @@ namespace triagens {
           current = nullptr;
         }
       }
+      
+      TRI_doc_mptr_t const* next (int64_t& skip,
+                                  int64_t& limit) {
+        TRI_ASSERT(limit > 0);
+        TRI_doc_mptr_t const* result = nullptr;
+
+        while (result == nullptr && current != nullptr && limit > 0) {
+          bool isVisible = transaction->isVisibleForRead(current->from(), current->to());
+
+          if (isVisible) {
+            if (skip > 0) {
+              --skip;
+            }
+            else {
+              result = current;
+              --limit;
+            }
+          }
+
+          if (reverse) {
+            // reverse iterator
+            if (current == head) {
+              current = nullptr;
+              break;
+            }
+
+            // previous element
+            current = current->_prev;
+          }
+          else {
+            // forward iterator
+            if (current == tail) {
+              current = nullptr;
+              break;
+            }
+
+            // next element
+            current = current->_next;
+          }
+        }
+
+        if (limit == 0) {
+          current = nullptr;
+        }
+
+        return result;
+      }
 
       Transaction* transaction;
       MasterpointerManager* const manager;

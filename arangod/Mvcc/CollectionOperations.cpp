@@ -345,7 +345,6 @@ OperationResult CollectionOperations::ReadAllDocuments (TransactionScope* transa
   auto limit = options.searchOptions->limit;
   bool reverse = options.searchOptions->reverse;
 
-std::cout << "REVERSE: " << reverse << "; sKIP: " << skip << ", LIMIT: " << limit << "\n";
   {
     std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), reverse));
     auto it = iterator.get();
@@ -353,6 +352,95 @@ std::cout << "REVERSE: " << reverse << "; sKIP: " << skip << ", LIMIT: " << limi
     // TODO: implement skip
     while (it->hasMore()) {
       it->next(foundDocuments, skip, limit, 1000);
+    }
+  }
+
+  OperationResult result(TRI_ERROR_NO_ERROR);
+ 
+  if (result.code == TRI_ERROR_NO_ERROR) {
+    // no need to commit a read, but if we don't commit, it would be rolled back 
+    // and rollbacks make you inspect logs too often unnecessarily
+    transactionScope->commit();
+  }
+
+  return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief read all documents by example
+////////////////////////////////////////////////////////////////////////////////
+
+OperationResult CollectionOperations::ReadByExample (TransactionScope* transactionScope,
+                                                     TransactionCollection* collection,
+                                                     std::vector<TRI_shape_pid_t> const& pids,
+                                                     std::vector<TRI_shaped_json_t*> const& shapes,
+                                                     std::vector<TRI_doc_mptr_t const*>& foundDocuments,
+                                                     OperationOptions const& options) {
+  auto* transaction = transactionScope->transaction();
+
+  // must have search options!
+  TRI_ASSERT(options.searchOptions != nullptr);
+
+  auto skip = options.searchOptions->skip;
+  auto limit = options.searchOptions->limit;
+  bool reverse = options.searchOptions->reverse;
+
+  auto shaper = collection->shaper();
+
+  TRI_ASSERT(shapes.size() == pids.size());
+
+  auto isMatch = [&shaper, &shapes, &pids](TRI_shaped_json_t const* shaped) -> bool {
+    TRI_shape_t const* shape;
+    TRI_shaped_json_t result;
+  
+    size_t const n = shapes.size();
+
+    for (size_t i = 0; i < n; ++i) {
+      bool ok = TRI_ExtractShapedJsonVocShaper(shaper,
+                                               shaped,
+                                               shapes[i]->_sid,
+                                               pids[i],
+                                               &result,
+                                               &shape);
+    
+      if (! ok || shape == nullptr) {
+        return false;
+      }
+
+      auto example = shapes[i]->_data;
+    
+      if (result._data.length != example.length) {
+        return false;
+      }
+
+      if (::memcmp(result._data.data, example.data, example.length) != 0) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+
+  {
+    TRI_shaped_json_t shaped;
+
+    std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), reverse));
+    auto it = iterator.get();
+   
+    // TODO: implement skip
+    while (it->hasMore()) {
+      auto document = it->next(skip, limit);
+
+      if (document == nullptr) {
+        break;
+      }
+  
+      TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, document->getDataPtr());  // PROTECTED by trx coming from above
+
+      if (isMatch(&shaped)) {
+        foundDocuments.push_back(document);
+      }
     }
   }
 

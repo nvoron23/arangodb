@@ -281,6 +281,17 @@ namespace triagens {
                                                  OperationOptions const&);
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief read all documents by example
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult ReadByExample (TransactionScope*, 
+                                              TransactionCollection*,
+                                              std::vector<TRI_shape_pid_t> const&,
+                                              std::vector<TRI_shaped_json_t*> const&,
+                                              std::vector<TRI_doc_mptr_t const*>&, 
+                                              OperationOptions const&);
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief remove a document
 ////////////////////////////////////////////////////////////////////////////////
 
