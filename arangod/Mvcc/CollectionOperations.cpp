@@ -343,12 +343,14 @@ OperationResult CollectionOperations::ReadAllDocuments (TransactionScope* transa
 
   auto skip = options.searchOptions->skip;
   auto limit = options.searchOptions->limit;
+  bool reverse = options.searchOptions->reverse;
 
+std::cout << "REVERSE: " << reverse << "; sKIP: " << skip << ", LIMIT: " << limit << "\n";
   {
-    std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager()));
+    std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), reverse));
     auto it = iterator.get();
    
-    // TODO: implement skip and limit
+    // TODO: implement skip
     while (it->hasMore()) {
       it->next(foundDocuments, skip, limit, 1000);
     }

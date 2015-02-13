@@ -178,8 +178,9 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     struct SearchOptions {
-      int64_t skip   = 0;
-      int64_t limit  = INT64_MAX;
+      int64_t skip    = 0;
+      int64_t limit   = INT64_MAX;
+      bool    reverse = false;
     };
 
 // -----------------------------------------------------------------------------

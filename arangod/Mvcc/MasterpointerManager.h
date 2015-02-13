@@ -222,13 +222,23 @@ namespace triagens {
 
     struct MasterpointerIterator {
       MasterpointerIterator (Transaction* transaction,
-                             MasterpointerManager* manager)
+                             MasterpointerManager* manager,
+                             bool reverse)
         : transaction(transaction),
           manager(manager),
           current(nullptr),
-          tail(nullptr) {
+          head(nullptr),
+          tail(nullptr),
+          reverse(reverse) {
 
-        manager->initializeIterator(current, tail);
+        manager->initializeIterator(head, tail);
+
+        if (reverse) {
+          current = tail;
+        }
+        else {
+          current = head;
+        }
       }
 
       ~MasterpointerIterator () {
@@ -259,13 +269,26 @@ namespace triagens {
             }
           }
 
-          if (current == tail) {
-            current = nullptr;
-            break;
-          }
+          if (reverse) {
+            // reverse iterator
+            if (current == head) {
+              current = nullptr;
+              break;
+            }
 
-          // next element
-          current = current->_next;
+            // previous element
+            current = current->_prev;
+          }
+          else {
+            // forward iterator
+            if (current == tail) {
+              current = nullptr;
+              break;
+            }
+
+            // next element
+            current = current->_next;
+          }
         }
 
         if (limit == 0) {
@@ -276,7 +299,9 @@ namespace triagens {
       Transaction* transaction;
       MasterpointerManager* const manager;
       TRI_doc_mptr_t const* current;
+      TRI_doc_mptr_t const* head;
       TRI_doc_mptr_t const* tail;
+      bool reverse;
     };
 
   }
