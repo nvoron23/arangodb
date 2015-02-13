@@ -267,6 +267,10 @@ namespace triagens {
           // next element
           current = current->_next;
         }
+
+        if (limit == 0) {
+          current = nullptr;
+        }
       }
 
       Transaction* transaction;

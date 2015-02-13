@@ -1835,6 +1835,101 @@ static void JS_MvccOutEdgesQuery (const v8::FunctionCallbackInfo<v8::Value>& arg
   MvccEdgesQuery(TRI_EDGE_OUT, args);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief selects the n first documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccFirst (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TransactionBase transBase(true);   // To protect against assertions, FIXME later
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  if (args.Length() > 1) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccFirst(<count>)");
+  }
+
+  triagens::mvcc::SearchOptions searchOptions;
+  searchOptions.skip = 0;
+  searchOptions.limit = 1;
+  
+  bool returnArray = false;
+
+  // if argument is supplied, we return an array - otherwise we simply return the first doc
+  if (args.Length() == 1) {
+    if (! args[0]->IsUndefined()) {
+      searchOptions.limit = TRI_ObjectToInt64(args[0]);
+      returnArray = true;
+    }
+  }
+
+  if (searchOptions.limit < 1) {
+    TRI_V8_THROW_EXCEPTION_PARAMETER("invalid value for <count>");
+  }
+
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+  CollectionNameResolver resolver(collection->_vocbase); // TODO
+  
+  triagens::mvcc::OperationOptions options;
+  options.searchOptions = &searchOptions;
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+
+    std::vector<TRI_doc_mptr_t const*> foundDocuments;
+    auto searchResult = triagens::mvcc::CollectionOperations::ReadAllDocuments(&transactionScope, transactionCollection, foundDocuments, options);
+ 
+    if (searchResult.code != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(searchResult.code);
+    }
+  
+    if (returnArray) {
+      size_t const n = foundDocuments.size();
+      auto result = v8::Array::New(isolate, static_cast<int>(n));
+
+      for (size_t i = 0; i < n; ++i) {
+        v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[i]->getDataPtr());
+
+        if (document.IsEmpty()) {
+          TRI_V8_THROW_EXCEPTION_MEMORY();
+        }
+        result->Set(static_cast<uint32_t>(i), document);
+      }
+
+      TRI_V8_RETURN(result);
+    }
+      
+    if (foundDocuments.empty()) {
+      TRI_V8_RETURN_NULL();
+    }
+      
+    v8::Handle<v8::Value> result = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[0]->getDataPtr());
+    
+    if (result.IsEmpty()) {
+      TRI_V8_THROW_EXCEPTION_MEMORY();
+    }
+     
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
+}
 
 
 
@@ -2688,6 +2783,7 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccEdges"), JS_MvccEdgesQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccInEdges"), JS_MvccInEdgesQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccOutEdges"), JS_MvccOutEdgesQuery, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccFirst"), JS_MvccFirst, true);
 
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("OUTEDGES"), JS_OutEdgesQuery, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("WITHIN"), JS_WithinQuery, true);
