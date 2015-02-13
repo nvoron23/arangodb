@@ -23,6 +23,7 @@
 /// Copyright holder is ArangoDB GmbH, Cologne, Germany
 ///
 /// @author Jan Steemann
+/// @author Max Neunhoeffer
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
@@ -271,7 +272,7 @@ void HashIndex::insert (TransactionCollection* coll,
 
   if (! _unique) {
     WRITE_LOCKER(_lock);
-    Element* hashElement = allocAndFillElement(coll, doc, includeForSparse);
+    Element* hashElement = allocateAndFillElement(coll, doc, includeForSparse);
     TRI_ASSERT(hashElement != nullptr);
 
     if (! _sparse || includeForSparse) {
@@ -291,7 +292,7 @@ void HashIndex::insert (TransactionCollection* coll,
     // See whether or not we find any revision that is in conflict with us.
     // Note that this could be a revision which we are not allowed to see!
     WRITE_LOCKER(_lock);
-    Element* hashElement = allocAndFillElement(coll, doc, includeForSparse);
+    Element* hashElement = allocateAndFillElement(coll, doc, includeForSparse);
     if (! _sparse || includeForSparse) {
       try {
         std::unique_ptr<std::vector<Element*>> revisions 
@@ -311,14 +312,17 @@ void HashIndex::insert (TransactionCollection* coll,
               continue;  // Ignore, has been made obsolete for us
             }
             else if (visTo == Transaction::VisibilityType::CONCURRENT) {
+              deleteElement(hashElement);
               THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
             }
             else {  // INVISIBLE, this includes to == 0
+              deleteElement(hashElement);
               THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
             }
           }
           else if (visFrom == Transaction::VisibilityType::CONCURRENT) {
             if (visTo != Transaction::VisibilityType::VISIBLE ) {
+              deleteElement(hashElement);
               THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
             }
             else {
@@ -360,13 +364,20 @@ void HashIndex::forget (TransactionCollection* coll,
                         Transaction*,
                         TRI_doc_mptr_t* doc) {
   bool dummy;
-  std::unique_ptr<Element> hashElement(allocAndFillElement(coll, doc, dummy));
-  WRITE_LOCKER(_lock);
-  Element* old = _theHash->remove(hashElement.get());
-  if (old == nullptr) {
-    THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
+  Element* hashElement = allocateAndFillElement(coll, doc, dummy);
+  try {
+    WRITE_LOCKER(_lock);
+    Element* old = _theHash->remove(hashElement);
+    if (old == nullptr) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
+    }
+    deleteElement(old);
   }
-  deleteElement(old);
+  catch (...) {
+    deleteElement(hashElement);
+    throw;
+  }
+  deleteElement(hashElement);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -398,7 +409,7 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookupInternal (
   else {
     TRI_ASSERT(previousLast != nullptr);
     bool dummy;
-    previousLastElement = allocAndFillElement(coll, previousLast, dummy);
+    previousLastElement = allocateAndFillElement(coll, previousLast, dummy);
     previousLastElementAlloc = previousLastElement;
   }
 
@@ -500,7 +511,7 @@ void HashIndex::sizeHint (size_t size) {
   
 size_t HashIndex::memory () {
   READ_LOCKER(_lock);
-  return _theHash->memoryUsage() + keySize() * _theHash->size();
+  return _theHash->memoryUsage() + elementSize() * _theHash->size();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -523,20 +534,21 @@ Json HashIndex::toJson (TRI_memory_zone_t* zone) const {
 /// @brief returns the memory needed for an index key entry
 ////////////////////////////////////////////////////////////////////////////////
 
-size_t HashIndex::keySize () const {
+size_t HashIndex::elementSize () const {
   return sizeof(TRI_doc_mptr_t*) + _paths.size() * sizeof(TRI_shaped_sub_t);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief allocAndFillElement
+/// @brief allocateAndFillElement
 ////////////////////////////////////////////////////////////////////////////////
 
-HashIndex::Element* HashIndex::allocAndFillElement (TransactionCollection* coll,
-                                                    TRI_doc_mptr_t* doc,
-                                                    bool& includeForSparse) {
-  HashIndex::Element* elm 
+HashIndex::Element* HashIndex::allocateAndFillElement ( 
+                                         TransactionCollection* coll,
+                                         TRI_doc_mptr_t* doc,
+                                         bool& includeForSparse) {
+  auto elm 
     = static_cast<HashIndex::Element*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, 
-                                                    keySize(), false));
+                                                    elementSize(), false));
 
   if (elm == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);

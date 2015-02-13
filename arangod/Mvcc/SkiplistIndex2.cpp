@@ -23,11 +23,16 @@
 /// Copyright holder is ArangoDB GmbH, Cologne, Germany
 ///
 /// @author Jan Steemann
+/// @author Max Neunhoeffer
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "SkiplistIndex2.h"
+#include "Basics/ReadLocker.h"
+#include "Basics/WriteLocker.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
@@ -38,6 +43,230 @@ using namespace triagens::mvcc;
 // -----------------------------------------------------------------------------
 // --SECTION--                                               class SkiplistIndex
 // -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private helpers
+// -----------------------------------------------------------------------------
+
+// .............................................................................
+// recall for all of the following comparison functions:
+//
+// left < right  return -1
+// left > right  return  1
+// left == right return  0
+//
+// furthermore:
+//
+// the following order is currently defined for placing an order on documents
+// undef < null < boolean < number < strings < lists < hash arrays
+// note: undefined will be treated as NULL pointer not NULL JSON OBJECT
+// within each type class we have the following order
+// boolean: false < true
+// number: natural order
+// strings: lexicographical
+// lists: lexicographically and within each slot according to these rules.
+// ...........................................................................
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief compares a key with an element, version with proper types
+////////////////////////////////////////////////////////////////////////////////
+
+static int CompareKeyElement (TRI_shaped_json_t const* left,
+                              SkiplistIndex2::Element* right,
+                              size_t rightPosition,
+                              TRI_shaper_t* shaper) {
+  int result;
+
+  TRI_ASSERT(nullptr != left);
+  TRI_ASSERT(nullptr != right);
+  result = TRI_CompareShapeTypes(nullptr,
+                                 nullptr,
+                                 left,
+                                 shaper,
+                                 right->_document->getShapedJsonPtr(),
+                                 &right->_subObjects[rightPosition],
+                                 nullptr,
+                                 shaper);
+
+  // ...........................................................................
+  // In the above function CompareShapeTypes we use strcmp which may
+  // return an integer greater than 1 or less than -1. From this
+  // function we only need to know whether we have equality (0), less
+  // than (-1) or greater than (1)
+  // ...........................................................................
+
+  if (result < 0) {
+    result = -1;
+  }
+  else if (result > 0) {
+    result = 1;
+  }
+
+  return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief compares elements, version with proper types
+////////////////////////////////////////////////////////////////////////////////
+
+static int CompareElementElement (SkiplistIndex2::Element* left,
+                                  size_t leftPosition,
+                                  SkiplistIndex2::Element* right,
+                                  size_t rightPosition,
+                                  TRI_shaper_t* shaper) {
+  TRI_ASSERT(nullptr != left);
+  TRI_ASSERT(nullptr != right);
+
+  int result = TRI_CompareShapeTypes(left->_document->getShapedJsonPtr(),
+                                     &left->_subObjects[leftPosition],
+                                     nullptr,
+                                     shaper,
+                                     right->_document->getShapedJsonPtr(),
+                                     &right->_subObjects[rightPosition],
+                                     nullptr,
+                                     shaper);
+
+  // ...........................................................................
+  // In the above function CompareShapeTypes we use strcmp which may
+  // return an integer greater than 1 or less than -1. From this
+  // function we only need to know whether we have equality (0), less
+  // than (-1) or greater than (1)
+  // ...........................................................................
+
+  if (result < 0) {
+    return -1;
+  }
+  else if (result > 0) {
+    return 1;
+  }
+
+  return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief compares two elements in a skip list, this is the generic callback
+////////////////////////////////////////////////////////////////////////////////
+
+class CmpElmElm {
+    TRI_shaper_t* _shaper;
+    size_t _numFields;
+  public:
+    CmpElmElm (TRI_shaper_t* shaper, size_t numFields) 
+      : _shaper(shaper), _numFields(numFields) {
+    }
+    ~CmpElmElm () {
+    }
+    int operator() (SkiplistIndex2::Element* leftElement, 
+                    SkiplistIndex2::Element* rightElement, 
+                    SkiplistIndex2::SkipList_t::CmpType cmptype) {
+      TRI_ASSERT(nullptr != leftElement);
+      TRI_ASSERT(nullptr != rightElement);
+
+      // .......................................................................
+      // The document could be the same -- so no further comparison is required.
+      // .......................................................................
+
+      if (leftElement == rightElement ||
+          leftElement->_document == rightElement->_document) {
+        return 0;
+      }
+
+      int compareResult;
+      for (size_t j = 0;  j < _numFields;  j++) {
+        compareResult = CompareElementElement(leftElement,
+                                              j,
+                                              rightElement,
+                                              j,
+                                              _shaper);
+
+        if (compareResult != 0) {
+          return compareResult;
+        }
+      }
+
+      // .......................................................................
+      // This is where the difference between the preorder and the proper total
+      // order comes into play. Here if the 'keys' are the same,
+      // but the doc ptr is different (which it is since we are here), then
+      // we return 0 if we use the preorder and look at the _key attribute
+      // otherwise.
+      // .......................................................................
+
+      if (SkiplistIndex2::SkipList_t::CMP_PREORDER == cmptype) {
+        return 0;
+      }
+
+      // We break this tie in the key comparison by first looking at the key...
+      compareResult = strcmp(TRI_EXTRACT_MARKER_KEY(leftElement->_document),
+                             TRI_EXTRACT_MARKER_KEY(rightElement->_document));
+
+      if (compareResult < 0) {
+        return -1;
+      }
+      else if (compareResult > 0) {
+        return 1;
+      }
+      // ... and then at the revision:
+      if (leftElement->_document->_rid < rightElement->_document->_rid) {
+        return -1;
+      }
+      else if (leftElement->_document->_rid > rightElement->_document->_rid) {
+        return 1;
+      }
+      return 0;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief compares a key with an element in a skip list, generic callback
+////////////////////////////////////////////////////////////////////////////////
+
+class CmpKeyElm {
+    TRI_shaper_t* _shaper;
+    size_t _numFields;
+  public:
+    CmpKeyElm (TRI_shaper_t* shaper, size_t numFields) 
+      : _shaper(shaper), _numFields(numFields) {
+    }
+    ~CmpKeyElm () {
+    }
+    int operator() (SkiplistIndex2::Key*     leftKey, 
+                    SkiplistIndex2::Element* rightElement) {
+      TRI_ASSERT(nullptr != leftKey);
+      TRI_ASSERT(nullptr != rightElement);
+
+      // Note that the key might contain fewer fields than there are indexed
+      // attributes, therefore we only run the following loop to
+      // leftKey->_numFields.
+      for (size_t j = 0;  j < leftKey->size();  j++) {
+        int compareResult = CompareKeyElement(&leftKey->at(j), 
+                                              rightElement, j, _shaper);
+
+        if (compareResult != 0) {
+          return compareResult;
+        }
+      }
+
+      return 0;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief frees an element in the skiplist
+////////////////////////////////////////////////////////////////////////////////
+
+class FreeElm {
+    SkiplistIndex2* _skipListIndex;
+  public:
+    FreeElm (SkiplistIndex2* skipListIndex)
+      : _skipListIndex(skipListIndex) {
+    }
+    ~FreeElm () {
+    }
+    void operator() (SkiplistIndex2::Element* elm) {
+      _skipListIndex->deleteElement(elm);
+    }
+};
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -52,20 +281,24 @@ SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
                                 std::vector<std::string> const& fields,
                                 std::vector<TRI_shape_pid_t> const& paths,
                                 bool unique,
-                                bool ignoreNull,
                                 bool sparse)
   : Index(id, collection, fields),
     _paths(paths),
-    _skiplistIndex(nullptr),
+    _theSkipList(nullptr),
     _unique(unique),
-    _ignoreNull(ignoreNull),
     _sparse(sparse) {
   
-    _skiplistIndex = SkiplistIndex_new(_collection, _paths.size(), unique);
-
-    if (_skiplistIndex == nullptr) {
-      THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
-    }
+  try {
+    _theSkipList = new SkipList_t(CmpElmElm(collection->getShaper(),
+                                            paths.size()),
+                                  CmpKeyElm(collection->getShaper(),
+                                            paths.size()),
+                                  FreeElm(this),
+                                  unique);
+  }
+  catch (...) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -73,8 +306,9 @@ SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
 ////////////////////////////////////////////////////////////////////////////////
 
 SkiplistIndex2::~SkiplistIndex2 () {
-  if (_skiplistIndex != nullptr) {
-    SkiplistIndex_free(_skiplistIndex);
+  if (_theSkipList != nullptr) {
+    delete _theSkipList;
+    _theSkipList = nullptr;
   }
 }
 
@@ -86,68 +320,87 @@ SkiplistIndex2::~SkiplistIndex2 () {
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
         
-void SkiplistIndex2::insert (TransactionCollection*,
-                             Transaction*,
+void SkiplistIndex2::insert (TransactionCollection* coll,
+                             Transaction* trans,
                              TRI_doc_mptr_t* doc) {
-  // ...........................................................................
-  // Allocate storage to shaped json objects stored as a simple list.
-  // These will be used for comparisions
-  // ...........................................................................
+  bool includeForSparse = true;
 
-  TRI_skiplist_index_element_t skiplistElement;
-  skiplistElement._subObjects = static_cast<TRI_shaped_sub_t*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(TRI_shaped_sub_t) * _paths.size(), false));
+  if (! _unique) {
+    WRITE_LOCKER(_lock);
+    Element* listElement = allocateAndFillElement(coll, doc, includeForSparse);
+    TRI_ASSERT(listElement != nullptr);
 
-  if (skiplistElement._subObjects == nullptr) {
-    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
-  }
-
-  int res = shapify(&skiplistElement, doc);
-  // ...........................................................................
-  // most likely the cause of this error is that the index is sparse
-  // and not all attributes the index needs are set -- so the document
-  // is ignored. So not really an error at all. Note that this does
-  // not happen in a non-sparse skiplist index, in which empty
-  // attributes are always treated as if they were bound to null, so
-  // TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING cannot happen at
-  // all.
-  // ...........................................................................
-
-  if (res != TRI_ERROR_NO_ERROR) {
-
-    // ..........................................................................
-    // Deallocated the memory already allocated to skiplistElement.fields
-    // ..........................................................................
-
-    TRI_Free(TRI_UNKNOWN_MEM_ZONE, skiplistElement._subObjects);
-
-    // .........................................................................
-    // It may happen that the document does not have the necessary
-    // attributes to be included within the hash index, in this case do
-    // not report back an error.
-    // .........................................................................
-
-    if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
-      return;
+    if (! _sparse || includeForSparse) {
+      try {
+        _theSkipList->insert(listElement);
+      }
+      catch (...) {
+        deleteElement(listElement);
+        throw;
+      }
     }
-
-    THROW_ARANGO_EXCEPTION(res);
+    else {
+      deleteElement(listElement);
+    }
   }
-
-  // ...........................................................................
-  // Fill the json field list from the document for skiplist index
-  // ...........................................................................
-
-  res = SkiplistIndex_insert(_skiplistIndex, &skiplistElement);
-
-  // ...........................................................................
-  // Memory which has been allocated to skiplistElement.fields remains allocated
-  // contents of which are stored in the hash array.
-  // ...........................................................................
-
-  TRI_Free(TRI_UNKNOWN_MEM_ZONE, skiplistElement._subObjects);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    THROW_ARANGO_EXCEPTION(res);
+  else {  // _unique == true
+    // See whether or not we find any revision that is in conflict with us.
+    // Note that this could be a revision which we are not allowed to see!
+    WRITE_LOCKER(_lock);
+    Element* listElement = allocateAndFillElement(coll, doc, includeForSparse);
+    if (! _sparse || includeForSparse) {
+      try {
+        // Find the last element in the list whose key is less than ours:
+        SkipList_t::Node* node = _theSkipList->leftLookup(listElement);
+        while (true) {   // will be left by break
+          node = node->nextNode();
+          if (node == nullptr) {
+            break;
+          }
+          Element* p = node->document();
+          CmpElmElm comparer(coll->shaper(), nrIndexedFields());
+          if (comparer(listElement, p, SkipList_t::CMP_PREORDER) != 0) {
+            break;
+          }
+          TransactionId from = p->_document->from();
+          TransactionId to = p->_document->to();
+          Transaction::VisibilityType visFrom = trans->visibility(from);
+          Transaction::VisibilityType visTo = trans->visibility(to);
+          if (visFrom == Transaction::VisibilityType::VISIBLE) {
+            if (visTo == Transaction::VisibilityType::VISIBLE) {
+              continue;  // Ignore, has been made obsolete for us
+            }
+            else if (visTo == Transaction::VisibilityType::CONCURRENT) {
+              deleteElement(listElement);
+              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+            }
+            else {  // INVISIBLE, this includes to == 0
+              deleteElement(listElement);
+              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
+            }
+          }
+          else if (visFrom == Transaction::VisibilityType::CONCURRENT) {
+            if (visTo != Transaction::VisibilityType::VISIBLE ) {
+              deleteElement(listElement);
+              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+            }
+            else {
+              TRI_ASSERT(false);   // to cannot be VISIBLE unless from is
+            }
+          }
+          else {
+            TRI_ASSERT(visTo == Transaction::VisibilityType::INVISIBLE);
+               // nothing else possible
+            continue;
+          }
+        }
+        _theSkipList->insert(listElement);
+      }
+      catch (...) {
+        deleteElement(listElement);
+        throw;
+      }
+    }
   }
 }
 
@@ -159,74 +412,30 @@ TRI_doc_mptr_t* SkiplistIndex2::remove (TransactionCollection*,
                                         Transaction*,
                                         std::string const&,
                                         TRI_doc_mptr_t* doc) {
-  // ...........................................................................
-  // Allocate some memory for the SkiplistIndexElement structure
-  // ...........................................................................
-
-  TRI_skiplist_index_element_t skiplistElement;
-  skiplistElement._subObjects = static_cast<TRI_shaped_sub_t*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(TRI_shaped_sub_t) * _paths.size(), false));
-
-  if (skiplistElement._subObjects == nullptr) {
-    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
-  }
-
-  // ..........................................................................
-  // Fill the json field list from the document
-  // ..........................................................................
-
-  int res = shapify(&skiplistElement, doc);
-
-  // ..........................................................................
-  // Error returned generally implies that the document never was part of the
-  // skiplist index
-  // ..........................................................................
-
-  if (res != TRI_ERROR_NO_ERROR) {
-
-    // ........................................................................
-    // Deallocate memory allocated to skiplistElement.fields above
-    // ........................................................................
-
-    TRI_Free(TRI_UNKNOWN_MEM_ZONE, skiplistElement._subObjects);
-
-    // ........................................................................
-    // It may happen that the document does not have the necessary attributes
-    // to have particpated within the hash index. In this case, we do not
-    // report an error to the calling procedure.
-    // ........................................................................
-
-    if (res == TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING) {
-      return nullptr;   // this is nonsense
-    }
-
-    THROW_ARANGO_EXCEPTION(res);
-  }
-
-  // ...........................................................................
-  // Attempt the removal for skiplist indexes
-  // ...........................................................................
-
-  res = SkiplistIndex_remove(_skiplistIndex, &skiplistElement);
-
-  // ...........................................................................
-  // Deallocate memory allocated to skiplistElement.fields above
-  // ...........................................................................
-
-  TRI_Free(TRI_UNKNOWN_MEM_ZONE, skiplistElement._subObjects);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    THROW_ARANGO_EXCEPTION(res);
-  }
-  return nullptr;   // this is nonsense
+  return nullptr;   // this is a no-operation
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief forget document in the index
 ////////////////////////////////////////////////////////////////////////////////
         
-void SkiplistIndex2::forget (TransactionCollection*,
-                             Transaction*,
+void SkiplistIndex2::forget (TransactionCollection* coll,
+                             Transaction* trans,
                              TRI_doc_mptr_t* doc) {
+  bool dummy;
+  Element* listElement = allocateAndFillElement(coll, doc, dummy);
+  try {
+    WRITE_LOCKER(_lock);
+    int res = _theSkipList->remove(listElement);
+    if (res != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
+    }
+  }
+  catch (...) {
+    deleteElement(listElement);
+    throw;
+  }
+  deleteElement(listElement);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -234,6 +443,7 @@ void SkiplistIndex2::forget (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 void SkiplistIndex2::preCommit (TransactionCollection*, Transaction*) {
+  // this is intentionally a no-operation
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -241,7 +451,7 @@ void SkiplistIndex2::preCommit (TransactionCollection*, Transaction*) {
 ////////////////////////////////////////////////////////////////////////////////
 
 size_t SkiplistIndex2::memory () {
-  return SkiplistIndex_memoryUsage(_skiplistIndex);
+  return _theSkipList->memoryUsage() + elementSize() * _theSkipList->getNrUsed();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -256,85 +466,126 @@ Json SkiplistIndex2::toJson (TRI_memory_zone_t* zone) const {
   }
   json("fields", fields)
       ("unique", Json(zone, _unique))
-      ("ignoreNull", Json(zone, _ignoreNull))
       ("sparse", Json(zone, _sparse));
   return json;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief cleanup
+////////////////////////////////////////////////////////////////////////////////
+        
+// a garbage collection function for the index
+void SkiplistIndex2::cleanup () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief sizeHint - ignored
+////////////////////////////////////////////////////////////////////////////////
+        
+// give index a hint about the expected size
+void SkiplistIndex2::sizeHint (size_t) {
+}
+
+  
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief helper for skiplist methods
+/// @brief returns the memory needed for an index key entry
 ////////////////////////////////////////////////////////////////////////////////
 
-int SkiplistIndex2::shapify (TRI_skiplist_index_element_t* skiplistElement,
-                             TRI_doc_mptr_t const* doc) {
-  // ..........................................................................
-  // Assign the document to the SkiplistIndexElement structure so that it can
-  // be retrieved later.
-  // ..........................................................................
+size_t SkiplistIndex2::elementSize () const {
+  return sizeof(TRI_doc_mptr_t*) + _paths.size() * sizeof(TRI_shaped_sub_t);
+}
 
-  TRI_ASSERT(doc != nullptr);
-  TRI_ASSERT(doc->getDataPtr() != nullptr);   // ONLY IN INDEX, PROTECTED by RUNTIME
+////////////////////////////////////////////////////////////////////////////////
+/// @brief allocateAndFillElement
+////////////////////////////////////////////////////////////////////////////////
 
-  TRI_shaped_json_t shapedJson;
-  TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME
+SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
+                                 TransactionCollection* coll,
+                                 TRI_doc_mptr_t* doc,
+                                 bool& includeForSparse) {
+  auto elm 
+    = static_cast<SkiplistIndex2::Element*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, 
+                                                         elementSize(),
+                                                         false));
 
-  if (shapedJson._sid == TRI_SHAPE_ILLEGAL) {
-    return TRI_ERROR_INTERNAL;
+  if (elm == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 
-  skiplistElement->_document = const_cast<TRI_doc_mptr_t*>(doc);
-  char const* ptr = skiplistElement->_document->getShapedJsonPtr();  // ONLY IN INDEX, PROTECTED by RUNTIME
+  elm->_document = doc;
+
+  // ...........................................................................
+  // Assign the document to the Element structure - so that it can later
+  // be retreived.
+  // ...........................................................................
+
+  TRI_shaped_json_t shapedJson;
+  TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, doc->getDataPtr());
+
+  char const* ptr = doc->getShapedJsonPtr();
+
+  // ...........................................................................
+  // Extract the attribute values
+  // ...........................................................................
+
+  TRI_shaped_sub_t shapedSub;           // the relative sub-object
+  TRI_shaper_t* shaper = coll->shaper();
 
   size_t const n = _paths.size();
 
+  includeForSparse = true;
   for (size_t i = 0; i < n; ++i) {
     TRI_shape_pid_t path = _paths[i];
 
-    // ..........................................................................
-    // Determine if document has that particular shape
-    // ..........................................................................
+    // determine if document has that particular shape
+    TRI_shape_access_t const* acc 
+          = TRI_FindAccessorVocShaper(shaper, shapedJson._sid, path);
 
-    TRI_shape_access_t const* acc = TRI_FindAccessorVocShaper(_collection->getShaper(), shapedJson._sid, path);  // ONLY IN INDEX, PROTECTED by RUNTIME
-
+    // field not part of the object
     if (acc == nullptr || acc->_resultSid == TRI_SHAPE_ILLEGAL) {
-      // OK, the document does not contain the attributed needed by 
-      // the index, are we sparse?
-      if (! _sparse) {
-        // No, so let's fake a JSON null:
-        skiplistElement->_subObjects[i]._sid = TRI_LookupBasicSidShaper(TRI_SHAPE_NULL);
-        skiplistElement->_subObjects[i]._length = 0;
-        skiplistElement->_subObjects[i]._offset = 0;
-        continue;
+      shapedSub._sid    = TRI_LookupBasicSidShaper(TRI_SHAPE_NULL);
+      shapedSub._length = 0;
+      shapedSub._offset = 0;
+      includeForSparse = false;
+    }
+
+    // extract the field
+    else {
+      TRI_shaped_json_t shapedObject;       // the sub-object
+
+      if (! TRI_ExecuteShapeAccessor(acc, &shapedJson, &shapedObject)) {
+        TRI_Free(TRI_UNKNOWN_MEM_ZONE, static_cast<void*>(elm));
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
-      return TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING;
+      if (shapedObject._sid == TRI_LookupBasicSidShaper(TRI_SHAPE_NULL)) {
+        includeForSparse = false;
+      }
+
+      shapedSub._sid    = shapedObject._sid;
+      shapedSub._length = shapedObject._data.length;
+      shapedSub._offset = static_cast<uint32_t>(((char const*) shapedObject._data.data) - ptr);
     }
 
-    // ..........................................................................
-    // Extract the field
-    // ..........................................................................
-
-    TRI_shaped_json_t shapedObject;
-    if (! TRI_ExecuteShapeAccessor(acc, &shapedJson, &shapedObject)) {
-      return TRI_ERROR_INTERNAL;
-    }
-
-    // .........................................................................
-    // Store the field
-    // .........................................................................
-
-    skiplistElement->_subObjects[i]._sid = shapedObject._sid;
-    skiplistElement->_subObjects[i]._length = shapedObject._data.length;
-    skiplistElement->_subObjects[i]._offset = static_cast<uint32_t>(((char const*) shapedObject._data.data) - ptr);
+    // store the json shaped sub-object -- this is what will be compared
+    elm->_subObjects[i] = shapedSub;
   }
 
-  return TRI_ERROR_NO_ERROR;
+  return elm;
 }
-        
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief deleteElement
+////////////////////////////////////////////////////////////////////////////////
+
+void SkiplistIndex2::deleteElement (Element* elm) {
+  TRI_Free(TRI_UNKNOWN_MEM_ZONE, static_cast<void*>(elm));
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       END-OF-FILE
 // -----------------------------------------------------------------------------
