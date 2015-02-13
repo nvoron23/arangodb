@@ -45,6 +45,7 @@
 #include "GeoIndex/geo-index.h"
 #include "HashIndex/hash-index.h"
 #include "Mvcc/Index.h"
+#include "Mvcc/SkiplistIndex2.h"
 #include "ShapedJson/shape-accessor.h"
 #include "ShapedJson/shaped-json.h"
 #include "Utils/Exception.h"
@@ -1496,6 +1497,17 @@ TRI_index_t* TRI_CreateSkiplistIndex (TRI_document_collection_t* document,
   TRI_InitVectorString(&idx->_fields, TRI_CORE_MEM_ZONE);
   TRI_CopyDataFromVectorPointerVectorString(TRI_CORE_MEM_ZONE, &idx->_fields, fields);
 
+  std::vector<std::string> fieldsVector;
+  for (size_t i = 0; i < fields->_length; ++i) {
+    fieldsVector.push_back(std::string(static_cast<char const*>(fields->_buffer[i])));
+  }
+
+  std::vector<TRI_shape_pid_t> pathsVector;
+  for (size_t i = 0; i < paths->_length; ++i) {
+    TRI_shape_pid_t* p = reinterpret_cast<TRI_shape_pid_t*>(TRI_AtVector(paths, i));
+    pathsVector.push_back(*p);
+  }
+
   skiplistIndex->_skiplistIndex = SkiplistIndex_new(document,
                                                     paths->_length,
                                                     unique);
@@ -1508,6 +1520,8 @@ TRI_index_t* TRI_CreateSkiplistIndex (TRI_document_collection_t* document,
                 "creating skiplist structure");
     return nullptr;
   }
+
+  document->addIndex(new triagens::mvcc::SkiplistIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, sparse));
 
   return idx;
 }
