@@ -108,6 +108,7 @@ static void TRI_GlobalEntryFunction () {
   int maxOpenFiles = 2048;  // upper hard limit for windows
   int res = 0;
 
+
   // Uncomment this to call this for extended debug information.
   // If you familiar with valgrind ... then this is not like that, however
   // you do get some similar functionality.
@@ -261,7 +262,14 @@ static void InstallService (int argc, char* argv[]) {
 
 #ifdef _WIN32
 
-static void DeleteService (int argc, char* argv[]) {
+static void DeleteService (int argc, char* argv[], bool force) {
+  CHAR path[MAX_PATH] = "";
+
+  if(! GetModuleFileNameA(NULL, path, MAX_PATH)) {
+    std::cerr << "FATAL: GetModuleFileNameA failed" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
   std::cout << "INFO: removing service '" << ServiceName << "'" << std::endl;
 
   SC_HANDLE schSCManager = OpenSCManager(NULL, SERVICES_ACTIVE_DATABASE, SC_MANAGER_ALL_ACCESS);
@@ -272,9 +280,35 @@ static void DeleteService (int argc, char* argv[]) {
   }
 
   SC_HANDLE schService = OpenServiceA(
-    schSCManager,                // SCManager database
-    ServiceName.c_str(),         // name of service
-    DELETE);                     // only need DELETE access
+                                      schSCManager,                      // SCManager database
+                                      ServiceName.c_str(),               // name of service
+                                      DELETE|SERVICE_QUERY_CONFIG);      // first validate whether its us, then delete.
+
+  char serviceConfigMemory[8192]; // msdn says: 8k is enough.
+  DWORD bytesNeeded = 0;
+  if (QueryServiceConfig(schService, 
+                         (LPQUERY_SERVICE_CONFIGA)&serviceConfigMemory,
+                         sizeof(serviceConfigMemory),
+                         &bytesNeeded)) {
+    QUERY_SERVICE_CONFIG *cfg = (QUERY_SERVICE_CONFIG*) &serviceConfigMemory;
+    if (strcmp(cfg->lpBinaryPathName, path)) {
+      if (!force) {
+        std::cerr << "NOT removing service of other installation: " <<
+          cfg->lpBinaryPathName <<
+          "Our path is: " << 
+          path << std::endl;
+
+        CloseServiceHandle(schSCManager);
+        return;
+      }
+      else {
+        std::cerr << "Removing service of other installation because of FORCE: " <<
+          cfg->lpBinaryPathName <<
+          "Our path is: " << 
+          path << std::endl;
+      }
+    }
+  }
 
   CloseServiceHandle(schSCManager);
 
@@ -420,6 +454,8 @@ int main (int argc, char* argv[]) {
   int res = 0;
   bool startAsService = false;
 
+  signal(SIGSEGV, abortHandler);
+
 #ifdef _WIN32
 
   if (1 < argc) {
@@ -428,7 +464,8 @@ int main (int argc, char* argv[]) {
       exit(EXIT_SUCCESS);
     }
     else if (TRI_EqualString(argv[1], "--uninstall-service")) {
-      DeleteService(argc, argv);
+      bool force = ((argc > 2) && !strcmp(argv[2], "--force"));
+      DeleteService(argc, argv, force);
       exit(EXIT_SUCCESS);
     }
     else if (TRI_EqualString(argv[1], "--start-service")) {
