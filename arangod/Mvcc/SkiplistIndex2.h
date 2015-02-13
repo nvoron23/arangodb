@@ -62,7 +62,6 @@ namespace triagens {
                         std::vector<std::string> const& fields,
                         std::vector<TRI_shape_pid_t> const& paths,
                         bool unique,
-                        bool ignoreNull,
                         bool sparse);
 
         ~SkiplistIndex2 ();
@@ -136,7 +135,6 @@ namespace triagens {
         SkipList_t* _theSkipList;
 
         bool _unique;
-        bool _ignoreNull;
         bool _sparse;
     };
 

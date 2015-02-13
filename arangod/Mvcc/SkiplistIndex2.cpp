@@ -281,13 +281,11 @@ SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
                                 std::vector<std::string> const& fields,
                                 std::vector<TRI_shape_pid_t> const& paths,
                                 bool unique,
-                                bool ignoreNull,
                                 bool sparse)
   : Index(id, collection, fields),
     _paths(paths),
     _theSkipList(nullptr),
     _unique(unique),
-    _ignoreNull(ignoreNull),
     _sparse(sparse) {
   
   try {
@@ -468,7 +466,6 @@ Json SkiplistIndex2::toJson (TRI_memory_zone_t* zone) const {
   }
   json("fields", fields)
       ("unique", Json(zone, _unique))
-      ("ignoreNull", Json(zone, _ignoreNull))
       ("sparse", Json(zone, _sparse));
   return json;
 }
