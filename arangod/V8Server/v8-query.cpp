@@ -1977,7 +1977,7 @@ static void MvccEdgesQuery (TRI_edge_direction_e direction,
     else {
       int res = AddEdges(isolate, direction, transaction, transactionCollection, &resolver, edgeIndex, result, args[0]);
 
-      if (res != TRI_ERROR_NO_ERROR) {
+      if (res != TRI_ERROR_NO_ERROR && res != TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND) {
         // do not ignore error
         TRI_V8_THROW_EXCEPTION(res);
       }

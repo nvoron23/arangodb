@@ -49,6 +49,7 @@ exports.executeTestSuite = function (specFileNames, options) {
   sandbox.require = require;
   sandbox.createSpy = jasmine.createSpy;
   sandbox.createSpyObj = jasmine.createSpyObj;
+  sandbox.jasmine = jasmine;
 
   sandbox.catchExceptions(false);
 
