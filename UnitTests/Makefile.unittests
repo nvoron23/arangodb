@@ -537,7 +537,8 @@ SHELL_SERVER_MVCC = \
                @top_srcdir@/js/server/tests/shell-mvcc-exceptions-noncluster.js \
                @top_srcdir@/js/server/tests/shell-mvcc-edgeindex-spec.js \
                @top_srcdir@/js/server/tests/shell-mvcc-hashindex-spec.js \
-               @top_srcdir@/js/server/tests/shell-mvcc-noncluster-spec.js 
+               @top_srcdir@/js/server/tests/shell-mvcc-noncluster-spec.js \
+               @top_srcdir@/js/server/tests/shell-mvcc-skiplistindex-spec.js 
 
 .PHONY: unittests-shell-server-mvcc
 
