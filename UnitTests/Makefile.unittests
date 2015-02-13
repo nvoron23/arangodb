@@ -468,7 +468,7 @@ SHELL_COMMON = \
 ################################################################################
 
 SHELL_SERVER_ONLY = \
-               @top_srcdir@/js/server/tests/shell-readonly-noncluster-disabled.js\
+               @top_srcdir@/js/server/tests/shell-readonly-noncluster-disabled.js \
                @top_srcdir@/js/server/tests/shell-wal-noncluster.js \
                @top_srcdir@/js/server/tests/shell-sharding-helpers.js \
                @top_srcdir@/js/server/tests/shell-compaction-noncluster-timecritical.js \
@@ -533,6 +533,29 @@ unittests-shell-server-only:
 	@rm -rf "$(VOCDIR)"
 	@echo
 
+SHELL_SERVER_MVCC = \
+               @top_srcdir@/js/server/tests/shell-mvcc-exceptions-noncluster.js \
+               @top_srcdir@/js/server/tests/shell-mvcc-hashindex-spec.js \
+               @top_srcdir@/js/server/tests/shell-mvcc-noncluster-spec.js 
+
+.PHONY: unittests-shell-server-mvcc
+
+UNITTESTS_SERVER_MVCC = $(addprefix --javascript.unit-tests ,$(SHELL_SERVER_MVCC))
+
+unittests-shell-server-mvcc:
+	@echo
+	@echo "================================================================================"
+	@echo "<< SHELL SERVER TESTS (MVCC)                                                  >>"
+	@echo "================================================================================"
+	@echo
+
+	@rm -rf "$(VOCDIR)"
+	@mkdir -p "$(VOCDIR)/databases"
+
+	$(VALGRIND) @builddir@/bin/arangod "$(VOCDIR)" $(SERVER_OPT) --server.endpoint tcp://$(VOCHOST):$(VOCPORT) $(UNITTESTS_SERVER_MVCC) || test "x$(FORCE)" == "x1"
+
+	@rm -rf "$(VOCDIR)"
+	@echo
 
 ################################################################################
 ### @brief SHELL SERVER TESTS (AQL)
