@@ -72,6 +72,20 @@ Document::Document (TRI_shaper_t* shaper,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create a document from a master pointer
+////////////////////////////////////////////////////////////////////////////////
+
+Document::Document (TRI_doc_mptr_t const* mptr)
+  : shaper(nullptr),
+    shaped(nullptr),
+    key(TRI_EXTRACT_MARKER_KEY(mptr)),
+    revision(TRI_EXTRACT_MARKER_RID(mptr)),
+    edge(nullptr),
+    keySpecified(false),
+    freeShape(false) {
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create a document from another
 ////////////////////////////////////////////////////////////////////////////////
         
@@ -224,6 +238,14 @@ Document Document::CreateFromKey (std::string const& key,
   return Document(nullptr, nullptr, key, revisionId, CollectionOperations::KeySpecified, false);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create a document from a master pointer
+////////////////////////////////////////////////////////////////////////////////
+
+Document Document::CreateFromMptr (TRI_doc_mptr_t const* mptr) {
+  return Document(mptr);
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                       struct CollectionOperations
 // -----------------------------------------------------------------------------
@@ -294,6 +316,51 @@ OperationResult CollectionOperations::RandomDocument (TransactionScope* transact
   TRI_ASSERT(mptr != nullptr);
     
   return OperationResult(mptr);  
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief truncate the collection
+////////////////////////////////////////////////////////////////////////////////
+
+OperationResult CollectionOperations::Truncate (TransactionScope* transactionScope,
+                                                TransactionCollection* collection,
+                                                OperationOptions const& options) {
+  auto* transaction = transactionScope->transaction();
+  transaction->prepareStats(collection);
+  
+  // acquire a read-lock on the list of indexes so no one else creates or drops indexes
+  // while the operation is ongoing
+  IndexUser indexUser(collection);
+
+  int64_t numRemoved = 0;
+  TRI_voc_rid_t tick = 0;
+
+  {
+    std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), false));
+    auto it = iterator.get();
+  
+    TransactionId originalTransactionId;
+   
+    while (it->hasMore()) {
+      TRI_doc_mptr_t const* found = it->next();
+  
+      auto result = RemoveDocumentWorker(transactionScope, collection, indexUser, Document::CreateFromMptr(found), options, originalTransactionId);
+  
+      if (result.code != TRI_ERROR_NO_ERROR) {
+        return result;
+      }
+        
+      numRemoved++;
+      tick = result.tick;
+    }
+  }
+
+  if (numRemoved > 0) {
+    transaction->incNumRemoved(collection, numRemoved, options.waitForSync);
+    transaction->updateRevisionId(collection, tick);
+  }
+
+  return OperationResult(TRI_ERROR_NO_ERROR);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -522,7 +589,6 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
 
   // first remove the document...
   TransactionId originalTransactionId;
-
   auto removeResult = RemoveDocumentWorker(transactionScope, collection, indexUser, document, options, originalTransactionId);
 
   if (removeResult.code != TRI_ERROR_NO_ERROR) {

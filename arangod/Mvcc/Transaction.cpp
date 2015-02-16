@@ -146,6 +146,9 @@ void Transaction::incNumInserted (TransactionCollection const* collection,
   
   TRI_ASSERT(it != _stats.end());
   (*it).second.numInserted++;
+  if (waitForSync) {
+    (*it).second.waitForSync = true;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -161,6 +164,28 @@ void Transaction::incNumRemoved (TransactionCollection const* collection,
   TRI_ASSERT(it != _stats.end());
 
   (*it).second.numRemoved++;
+  if (waitForSync) {
+    (*it).second.waitForSync = true;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the number of removed documents
+/// this is guaranteed to not fail if prepareStats() was called before
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::incNumRemoved (TransactionCollection const* collection,
+                                 int64_t value,
+                                 bool waitForSync) {
+  auto cid = collection->id();
+  auto it = _stats.find(cid);
+  
+  TRI_ASSERT(it != _stats.end());
+
+  (*it).second.numRemoved += value;
+  if (waitForSync) {
+    (*it).second.waitForSync = true;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

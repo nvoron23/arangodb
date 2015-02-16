@@ -60,6 +60,8 @@ namespace triagens {
                   TRI_voc_rid_t,
                   bool,
                   bool);
+        
+        explicit Document (struct TRI_doc_mptr_t const*);
 
       public:
         
@@ -96,6 +98,8 @@ namespace triagens {
         
         static Document CreateFromKey (std::string const&,
                                        TRI_voc_rid_t = 0);
+        
+        static Document CreateFromMptr (TRI_doc_mptr_t const*);
 
         struct TRI_shaper_s* shaper;
         struct TRI_shaped_json_s const* shaped;
@@ -260,6 +264,14 @@ namespace triagens {
 
         static OperationResult RandomDocument (TransactionScope*,
                                                TransactionCollection*);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief truncate the collection
+////////////////////////////////////////////////////////////////////////////////
+
+        static OperationResult Truncate (TransactionScope*, 
+                                         TransactionCollection*,
+                                         OperationOptions const&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief reads a random document from the collection

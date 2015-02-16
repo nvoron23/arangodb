@@ -28,35 +28,36 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "v8-collection.h"
-#include "v8-vocbaseprivate.h"
-#include "v8-wrapshapedjson.h"
-
+#include "Aql/Query.h"
 #include "Basics/Utf8Helper.h"
 #include "Basics/conversions.h"
 #include "Basics/json-utilities.h"
-#include "V8/v8-conv.h"
+#include "Cluster/ClusterMethods.h"
+#include "Mvcc/CollectionOperations.h"
+#include "Mvcc/Index.h"
+#include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/TopLevelTransaction.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionManager.h"
+#include "Mvcc/TransactionScope.h"
 #include "Utils/transactions.h"
-#include "Utils/V8TransactionContext.h"
-
-#include "Aql/Query.h"
 #include "Utils/V8ResolverGuard.h"
+#include "Utils/V8TransactionContext.h"
+#include "V8/v8-conv.h"
 #include "V8/v8-utils.h"
-#include "Wal/LogfileManager.h"
-
+#include "V8Server/v8-vocbase.h"
+#include "V8Server/v8-vocbaseprivate.h"
+#include "V8Server/v8-vocindex.h"
+#include "V8Server/v8-wrapshapedjson.h"
 #include "VocBase/auth.h"
 #include "VocBase/key-generator.h"
+#include "Wal/LogfileManager.h"
 
-#include "Cluster/ClusterMethods.h"
-
-#include "unicode/timezone.h"
-
-#include "v8-vocbase.h"
-#include "v8-vocindex.h"
 
 using namespace std;
 using namespace triagens::basics;
 using namespace triagens::arango;
-using namespace triagens::rest;
 
 
 struct LocalCollectionGuard {
@@ -3242,21 +3243,6 @@ static void JS_StatusVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args
   TRI_V8_RETURN(v8::Number::New(isolate, (int) status));
 }
 
-#include "Mvcc/CollectionOperations.h"
-#include "Mvcc/SubTransaction.h"
-#include "Mvcc/TopLevelTransaction.h"
-#include "Mvcc/Transaction.h"
-#include "Mvcc/TransactionCollection.h"
-#include "Mvcc/TransactionManager.h"
-#include "Mvcc/TransactionScope.h"
-#include "Mvcc/Index.h"
-#include "Mvcc/GeoIndex2.h"
-#include "Mvcc/HashIndex.h"
-#include "Mvcc/SkiplistIndex2.h"
-#include "Mvcc/FulltextIndex.h"
-#include "Mvcc/EdgeIndex.h"
-#include "Mvcc/CapConstraint.h"
-#include "Mvcc/PrimaryIndex.h"
 
 
 static void JS_MvccCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -3851,6 +3837,9 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_ASSERT(false);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief fetches all documents from a collection
+////////////////////////////////////////////////////////////////////////////////
 
 static void JS_MvccAllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
@@ -3920,6 +3909,57 @@ static void JS_MvccAllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     result->ForceSet(TRI_V8_ASCII_STRING("count"), v8::Number::New(isolate, count));
 
     TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief truncates a collection
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccTruncate (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+  
+  triagens::mvcc::OperationOptions options;
+  options.waitForSync = ExtractWaitForSync(args, 1);
+
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+  CollectionNameResolver resolver(collection->_vocbase); // TODO
+
+  try {
+    // force a sub-transaction so we can rollback the entire truncate operation easily
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true, true);
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+
+    auto truncateResult = triagens::mvcc::CollectionOperations::Truncate(&transactionScope, transactionCollection, options);
+ 
+    if (truncateResult.code != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(truncateResult.code);
+    }
+
+    transactionScope.commit();
+  
+    TRI_V8_RETURN_UNDEFINED();
   }
   catch (triagens::arango::Exception const& ex) {
     TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
@@ -5039,6 +5079,7 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccReplace"), JS_MvccReplace);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccUpdate"), JS_MvccUpdate);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccAllQuery"), JS_MvccAllQuery);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("mvccTruncate"), JS_MvccTruncate);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("TRUNCATE"), JS_TruncateVocbaseCol, true);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("truncateDatafile"), JS_TruncateDatafileVocbaseCol);
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("type"), JS_TypeVocbaseCol);
