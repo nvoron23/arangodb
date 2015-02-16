@@ -208,9 +208,11 @@ namespace triagens {
           while (true) {   // will be left by return when the right height is found
             uint32_t r = TRI_UInt32Random();
             for (count = 32; count > 0; count--) {
-                if (0 != (r & 1UL) || height == TRI_SKIPLIST_MAX_HEIGHT) return height;
-                r = r >> 1;
-                height++;
+              if (0 != (r & 1UL) || height == TRI_SKIPLIST_MAX_HEIGHT) {
+                return height;
+              }
+              r = r >> 1;
+              height++;
             }
           }
         }

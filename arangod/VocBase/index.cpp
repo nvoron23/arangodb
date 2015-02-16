@@ -1221,11 +1221,10 @@ static int SkiplistIndexHelper (TRI_skiplist_index_t const* skiplistIndex,
     if (acc == nullptr || acc->_resultSid == TRI_SHAPE_ILLEGAL) {
       // OK, the document does not contain the attributed needed by 
       // the index, are we sparse?
-      skiplistElement->_subObjects[j]._sid = TRI_LookupBasicSidShaper(TRI_SHAPE_NULL);
-      skiplistElement->_subObjects[j]._length = 0;
-      skiplistElement->_subObjects[j]._offset = 0;
+      skiplistElement->_subObjects[j]._sid = BasicShapes::TRI_SHAPE_SID_NULL; 
 
       res = TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING;
+
       if (sparse) {
         // no need to continue
         return res;
@@ -1242,8 +1241,9 @@ static int SkiplistIndexHelper (TRI_skiplist_index_t const* skiplistIndex,
       return TRI_ERROR_INTERNAL;
     }
 
-    if (shapedObject._sid == TRI_LookupBasicSidShaper(TRI_SHAPE_NULL)) {
+    if (shapedObject._sid == BasicShapes::TRI_SHAPE_SID_NULL) {
       res = TRI_ERROR_ARANGO_INDEX_DOCUMENT_ATTRIBUTE_MISSING;
+
       if (sparse) {
         // no need to continue
         return res;
@@ -1254,9 +1254,7 @@ static int SkiplistIndexHelper (TRI_skiplist_index_t const* skiplistIndex,
     // Store the field
     // .........................................................................
 
-    skiplistElement->_subObjects[j]._sid = shapedObject._sid;
-    skiplistElement->_subObjects[j]._length = shapedObject._data.length;
-    skiplistElement->_subObjects[j]._offset = static_cast<uint32_t>(((char const*) shapedObject._data.data) - ptr);
+    TRI_FillShapedSub(&skiplistElement->_subObjects[j], &shapedObject, ptr);
   }
 
   return res;
