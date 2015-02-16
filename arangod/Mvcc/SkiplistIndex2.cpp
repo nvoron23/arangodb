@@ -315,6 +315,19 @@ SkiplistIndex2::~SkiplistIndex2 () {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  public functions
 // -----------------------------------------------------------------------------
+        
+std::vector<TRI_doc_mptr_t*>* SkiplistIndex2::lookup (TransactionCollection* coll,
+                                                      Transaction* trans,
+                                                      TRI_index_operator_t* op,
+                                                      size_t skip,
+                                                      size_t limit,
+                                                      bool reverse) {
+  
+  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> theResult(new std::vector<TRI_doc_mptr_t*>);
+  // TODO: this has to be implemented still!
+
+  return theResult.release();
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief insert document into index
@@ -424,9 +437,11 @@ void SkiplistIndex2::forget (TransactionCollection* coll,
                              TRI_doc_mptr_t* doc) {
   bool dummy;
   Element* listElement = allocateAndFillElement(coll, doc, dummy);
+
   try {
     WRITE_LOCKER(_lock);
     int res = _theSkipList->remove(listElement);
+    
     if (res != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
     }
@@ -451,6 +466,7 @@ void SkiplistIndex2::preCommit (TransactionCollection*, Transaction*) {
 ////////////////////////////////////////////////////////////////////////////////
 
 size_t SkiplistIndex2::memory () {
+  READ_LOCKER(_lock);
   return _theSkipList->memoryUsage() + elementSize() * _theSkipList->getNrUsed();
 }
 

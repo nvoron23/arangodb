@@ -38,6 +38,7 @@
 
 struct TRI_doc_mptr_t;
 struct TRI_document_collection_t;
+struct TRI_index_operator_s;
 
 namespace triagens {
   namespace mvcc {
@@ -67,6 +68,13 @@ namespace triagens {
         ~SkiplistIndex2 ();
 
       public:
+
+        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection*,
+                                              Transaction*,
+                                              struct TRI_index_operator_s*,
+                                              size_t,
+                                              size_t,
+                                              bool);
   
         virtual void insert (TransactionCollection*,
                              Transaction*,

@@ -191,7 +191,6 @@ namespace triagens {
           freeNode(_start);
         }
 
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    static helpers
 // -----------------------------------------------------------------------------
@@ -378,7 +377,7 @@ namespace triagens {
           }
 
           // Now delete where next points to:
-          for (lev = next->_height-1; lev >= 0; lev--) {
+          for (lev = next->_height - 1; lev >= 0; lev--) {
             // Note the order from top to bottom. The element remains in
             // the skiplist as long as we are at a level > 0, only some
             // optimisations in performance vanish before that. Only
@@ -429,7 +428,7 @@ namespace triagens {
           Node* next = nullptr; // to please the compiler
           int cmp;
 
-          cmp = lookupLess(doc,&pos,&next,CMP_TOTORDER);
+          cmp = lookupLess(doc, &pos, &next, CMP_TOTORDER);
           // Now pos[0] points to the largest node whose document is
           // less than doc. next points to the next node and can be
           // nullptr if there is none. doc is in the skiplist iff next
@@ -501,7 +500,6 @@ namespace triagens {
           // stored at the node next.
           return pos[0];
         }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief finds the last document that is less or equal to doc in
@@ -576,7 +574,6 @@ namespace triagens {
           delete node;
         }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief lookupLess
 /// The following function is the main search engine for our skiplists.
@@ -641,12 +638,10 @@ namespace triagens {
                             Node* (*pos)[TRI_SKIPLIST_MAX_HEIGHT],
                             Node** next,
                             CmpType cmptype) const {
-          int lev;
           int cmp = 0;  // just in case to avoid undefined values
-          Node* cur;
 
-          cur = _start;
-          for (lev = _start->_height-1; lev >= 0; lev--) {
+          Node* cur = _start;
+          for (int lev = _start->_height - 1; lev >= 0; lev--) {
             while (true) {   // will be left by break
               *next = cur->_next[lev];
               if (nullptr == *next) {
@@ -666,7 +661,6 @@ namespace triagens {
           return cmp;
         }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief lookupKeyLess
 /// We have two more very similar functions which look up documents if
@@ -678,12 +672,10 @@ namespace triagens {
         int lookupKeyLess (Key* key,
                            Node* (*pos)[TRI_SKIPLIST_MAX_HEIGHT],
                            Node** next) const {
-          int lev;
           int cmp = 0;  // just in case to avoid undefined values
-          Node* cur;
 
-          cur = _start;
-          for (lev = _start->_height-1; lev >= 0; lev--) {
+          Node* cur = _start;
+          for (int lev = _start->_height - 1; lev >= 0; lev--) {
             while (true) {   // will be left by break
               *next = cur->_next[lev];
               if (nullptr == *next) {
@@ -710,12 +702,10 @@ namespace triagens {
         int lookupKeyLessOrEq (Key* key,
                                Node* (*pos)[TRI_SKIPLIST_MAX_HEIGHT],
                                Node** next) const {
-          int lev;
           int cmp = 0;  // just in case to avoid undefined values
-          Node* cur;
 
-          cur = _start;
-          for (lev = _start->_height-1; lev >= 0; lev--) {
+          Node* cur = _start;
+          for (int lev = _start->_height - 1; lev >= 0; lev--) {
             while (true) {   // will be left by break
               *next = cur->_next[lev];
               if (nullptr == *next) {

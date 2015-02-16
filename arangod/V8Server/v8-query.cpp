@@ -43,6 +43,7 @@
 #include "Mvcc/GeoIndex2.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/MasterpointerManager.h"
+#include "Mvcc/SkiplistIndex2.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionScope.h"
@@ -60,6 +61,16 @@
 using namespace std;
 using namespace triagens::basics;
 using namespace triagens::arango;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief query types
+////////////////////////////////////////////////////////////////////////////////
+
+typedef enum {
+  QUERY_EXAMPLE,
+  QUERY_CONDITION
+}
+QueryType;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  helper functions
@@ -429,7 +440,7 @@ static int SetupSearchValue (v8::Isolate* isolate,
 /// @brief selects documents by example using a hash index
 ////////////////////////////////////////////////////////////////////////////////
 
-static void JS_MvccByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_MvccByExampleHash (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TransactionBase transBase(true);   // To protect against assertions, FIXME later
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
@@ -534,6 +545,403 @@ static void JS_MvccByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>
   }
 
   TRI_ASSERT(false);
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                  skiplist queries
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief sets up the skiplist operator for a skiplist condition query
+////////////////////////////////////////////////////////////////////////////////
+
+static TRI_index_operator_t* SetupSkiplistCondition (v8::Isolate* isolate,
+                                                     std::vector<TRI_shape_pid_t> const& paths,
+                                                     v8::Handle<v8::Object> const example,
+                                                     TRI_shaper_t* shaper) {
+  TRI_json_t* parameters = TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE);
+
+  if (parameters == nullptr) {
+    return nullptr;
+  }
+  
+  TRI_index_operator_t* lastOperator = nullptr;
+
+  // free function, called when anything goes wrong 
+  auto freeOperator = [&] () -> void {
+    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, parameters);
+
+    if (lastOperator != nullptr) {
+      TRI_FreeIndexOperator(lastOperator);
+    }
+  };
+
+  size_t numEq = 0;
+  size_t lastNonEq = 0;
+
+  // iterate over all index fields
+  for (size_t i = 1; i <= paths.size(); ++i) {
+    auto pid = paths[i - 1];
+    TRI_ASSERT(pid != 0);
+    char const* name = TRI_AttributeNameShapePid(shaper, pid);
+    
+    v8::Handle<v8::String> key = TRI_V8_STRING(name);
+
+    if (! example->HasOwnProperty(key)) {
+      break;
+    }
+
+    v8::Handle<v8::Value> fieldConditions = example->Get(key);
+
+    if (! fieldConditions->IsArray()) {
+      // wrong data type for field conditions
+      break;
+    }
+
+    // iterator over all conditions
+    v8::Handle<v8::Array> values = v8::Handle<v8::Array>::Cast(fieldConditions);
+
+    for (uint32_t j = 0; j < values->Length(); ++j) {
+      v8::Handle<v8::Value> fieldCondition = values->Get(j);
+
+      if (! fieldCondition->IsArray() ||
+          v8::Handle<v8::Array>::Cast(fieldCondition)->Length() != 2) {
+        // wrong data type for single condition
+        freeOperator();
+        return nullptr;
+      }
+
+      v8::Handle<v8::Array> condition = v8::Handle<v8::Array>::Cast(fieldCondition);
+      v8::Handle<v8::Value> op = condition->Get(0);
+      v8::Handle<v8::Value> value = condition->Get(1);
+
+      if (! op->IsString() && ! op->IsStringObject()) {
+        // wrong operator type
+        freeOperator();
+        return nullptr;
+      }
+
+      std::unique_ptr<TRI_json_t> json(TRI_ObjectToJson(isolate, value));
+
+      if (json.get() == nullptr) {
+        freeOperator();
+        return nullptr;
+      }
+
+      std::string&& opValue = TRI_ObjectToString(op);
+      if (opValue == "==") {
+        // equality comparison
+
+        if (lastNonEq > 0) {
+          freeOperator();
+          return nullptr;
+        }
+
+        TRI_PushBack3ArrayJson(TRI_UNKNOWN_MEM_ZONE, parameters, json.release());
+        // creation of equality operator is deferred until it is finally needed
+        ++numEq;
+        break;
+      }
+
+
+      if (lastNonEq > 0 && lastNonEq != i) {
+        // if we already had a range condition and a previous field, we cannot continue
+        // because the skiplist interface does not support such queries
+        freeOperator();
+        return nullptr;
+      }
+
+      TRI_index_operator_type_e opType;
+      if (opValue == ">") {
+        opType = TRI_GT_INDEX_OPERATOR;
+      }
+      else if (opValue == ">=") {
+        opType = TRI_GE_INDEX_OPERATOR;
+      }
+      else if (opValue == "<") {
+        opType = TRI_LT_INDEX_OPERATOR;
+      }
+      else if (opValue == "<=") {
+        opType = TRI_LE_INDEX_OPERATOR;
+      }
+      else {
+        // wrong operator type
+        freeOperator();
+        return nullptr;
+      }
+
+      lastNonEq = i;
+
+      TRI_json_t* cloned = TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, parameters);
+
+      if (cloned == nullptr) {
+        freeOperator();
+        return nullptr;
+      }
+
+      TRI_PushBack3ArrayJson(TRI_UNKNOWN_MEM_ZONE, cloned, json.release());
+
+      if (numEq) {
+        // create equality operator if one is in queue
+        TRI_json_t* clonedParams = TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, parameters);
+
+        if (clonedParams == nullptr) {
+          TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, cloned);
+          freeOperator();
+          return nullptr;
+        }
+
+        lastOperator = TRI_CreateIndexOperator(TRI_EQ_INDEX_OPERATOR, 
+                                               nullptr,
+                                               nullptr, 
+                                               clonedParams, 
+                                               shaper, 
+                                               TRI_LengthArrayJson(clonedParams));
+        numEq = 0;
+      }
+
+      // create the operator for the current condition
+      TRI_index_operator_t* current = TRI_CreateIndexOperator(opType,
+                                                              nullptr,
+                                                              nullptr, 
+                                                              cloned, 
+                                                              shaper, 
+                                                              TRI_LengthArrayJson(cloned));
+
+      if (current == nullptr) {
+        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, cloned);
+        freeOperator();
+        return nullptr;
+      }
+
+      if (lastOperator == nullptr) {
+        lastOperator = current;
+      }
+      else {
+        // merge the current operator with previous operators using logical AND
+        TRI_index_operator_t* newOperator = TRI_CreateIndexOperator(TRI_AND_INDEX_OPERATOR, 
+                                                                    lastOperator, 
+                                                                    current, 
+                                                                    nullptr, 
+                                                                    shaper, 
+                                                                    2);
+
+        if (newOperator == nullptr) {
+          TRI_FreeIndexOperator(current);
+          freeOperator();
+          return nullptr;
+        }
+        else {
+          lastOperator = newOperator;
+        }
+      }
+    }
+
+  }
+
+  if (numEq) {
+    // create equality operator if one is in queue
+    TRI_ASSERT(lastOperator == nullptr);
+    TRI_ASSERT(lastNonEq == 0);
+
+    TRI_json_t* clonedParams = TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, parameters);
+
+    if (clonedParams == nullptr) {
+      freeOperator();
+      return nullptr;
+    }
+
+    lastOperator = TRI_CreateIndexOperator(TRI_EQ_INDEX_OPERATOR, 
+                                           nullptr,
+                                           nullptr,
+                                           clonedParams, 
+                                           shaper, 
+                                           TRI_LengthArrayJson(clonedParams));
+  }
+
+  TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, parameters);
+
+  return lastOperator;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief sets up the skiplist operator for a skiplist example query
+///
+/// this will set up a JSON container with the example values as a list
+/// at the end, one skiplist equality operator is created for the entire list
+////////////////////////////////////////////////////////////////////////////////
+
+static TRI_index_operator_t* SetupSkiplistExample (v8::Isolate* isolate,
+                                                   std::vector<TRI_shape_pid_t> const& paths,
+                                                   v8::Handle<v8::Object> const example,
+                                                   TRI_shaper_t* shaper) {
+  std::unique_ptr<TRI_json_t> parameters(TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE));
+
+  if (parameters.get() == nullptr) {
+    return nullptr;
+  }
+  
+  TRI_ASSERT(! paths.empty());
+
+  for (size_t i = 0; i < paths.size(); ++i) {
+    auto pid = paths[i];
+    TRI_ASSERT(pid != 0);
+    char const* name = TRI_AttributeNameShapePid(shaper, pid);
+    
+    v8::Handle<v8::String> key = TRI_V8_STRING(name);
+
+    if (! example->HasOwnProperty(key)) {
+      break;
+    }
+
+    v8::Handle<v8::Value> value = example->Get(key);
+
+    TRI_json_t* json = TRI_ObjectToJson(isolate, value);
+
+    if (json == nullptr) {
+      return nullptr;
+    }
+
+    TRI_PushBack3ArrayJson(TRI_UNKNOWN_MEM_ZONE, parameters.get(), json);
+  }
+
+  size_t const n = TRI_LengthArrayJson(parameters.get());
+
+  if (n == 0) {
+    // JSON is empty
+    return nullptr;
+  }
+  
+  // example means equality comparisons only
+  return TRI_CreateIndexOperator(TRI_EQ_INDEX_OPERATOR, 
+                                 nullptr, 
+                                 nullptr,
+                                 parameters.release(), 
+                                 shaper, 
+                                 n);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief selects documents by example using a hash index
+////////////////////////////////////////////////////////////////////////////////
+
+static void MvccSkiplistQuery (QueryType type,
+                               const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TransactionBase transBase(true);   // To protect against assertions, FIXME later
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+
+  // expecting index, example, skip, and limit
+  if (args.Length() < 2) {
+    if (type == QUERY_CONDITION) {
+      TRI_V8_THROW_EXCEPTION_USAGE("mvccByConditionSkiplist(<index>, <conditions>, <skip>, <limit>, <reverse>)");
+    }
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccByExampleSkiplist(<index>, <example>, <skip>, <limit>, <reverse>)");
+  }
+  
+  // extract the example
+  if (! args[1]->IsObject()) {
+    if (type == QUERY_CONDITION) {
+      TRI_V8_THROW_TYPE_ERROR("<conditions> must be an object");
+    }
+    TRI_V8_THROW_TYPE_ERROR("<example> must be an object");
+  }
+
+  bool reverse = false;
+  if (args.Length() > 4) {
+    reverse = TRI_ObjectToBoolean(args[4]);
+  }
+
+
+  // extract skip and limit
+  TRI_voc_ssize_t skip;
+  TRI_voc_size_t limit;
+  ExtractSkipAndLimit(args, 2, skip, limit);
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+  
+    // extract the index
+    CollectionNameResolver resolver(collection->_vocbase); // TODO
+    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+
+    if (index == nullptr ||
+        index->type() != TRI_IDX_TYPE_SKIPLIST_INDEX) {
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
+    }
+
+    auto skiplistIndex = static_cast<triagens::mvcc::SkiplistIndex2*>(index);
+    auto const& paths = skiplistIndex->paths();
+
+    auto example = args[1]->ToObject();
+
+    std::unique_ptr<TRI_index_operator_t> skiplistOperator;
+    if (type == QUERY_CONDITION) {
+      skiplistOperator.reset(SetupSkiplistCondition(isolate, paths, example, transactionCollection->shaper()));
+    }
+    else {
+      skiplistOperator.reset(SetupSkiplistExample(isolate, paths, example, transactionCollection->shaper()));
+    }
+
+    if (skiplistOperator.get() == nullptr) {
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_BAD_PARAMETER);
+    }
+
+    // setup result
+    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(skiplistIndex->lookup(transactionCollection, transaction, skiplistOperator.get(), skip, limit, reverse)); 
+ 
+    auto const& foundDocuments = *(indexResult.get());
+
+    auto result = v8::Array::New(isolate, foundDocuments.size());
+    uint32_t i = 0;
+
+    for (auto const& it : foundDocuments) {
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, it->getDataPtr());
+
+      if (document.IsEmpty()) {
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+      }
+
+      result->Set(i++, document);
+    }
+
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  TRI_ASSERT(false);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief query a skiplist by condition
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccByConditionSkiplist (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccSkiplistQuery(QUERY_CONDITION, args);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief query a skiplist by example
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccByExampleSkiplist (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccSkiplistQuery(QUERY_EXAMPLE, args);
 }
 
 // -----------------------------------------------------------------------------
@@ -1303,16 +1711,6 @@ typedef struct {
 }
 geo_coordinate_distance_t;
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief query types
-////////////////////////////////////////////////////////////////////////////////
-
-typedef enum {
-  QUERY_EXAMPLE,
-  QUERY_CONDITION
-}
-query_t;
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
@@ -1752,7 +2150,7 @@ static int SetupSearchValue (TRI_vector_t const* paths,
 
 static void ExecuteSkiplistQuery (const v8::FunctionCallbackInfo<v8::Value>& args,
                                                    std::string const& signature,
-                                                   query_t type) {
+                                                   QueryType type) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
@@ -3425,8 +3823,10 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("WITHIN"), JS_WithinQuery, true);
 
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccAny"), JS_MvccAny, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByConditionSkiplist"), JS_MvccByConditionSkiplist, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExample"), JS_MvccByExample, true);
-  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExampleHash"), JS_MvccByExampleHashIndex, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExampleHash"), JS_MvccByExampleHash, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExampleSkiplist"), JS_MvccByExampleSkiplist, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccChecksum"), JS_MvccChecksum, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccEdges"), JS_MvccEdges, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccInEdges"), JS_MvccInEdges, true);

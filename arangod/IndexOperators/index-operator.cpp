@@ -150,12 +150,11 @@ void TRI_ClearIndexOperator(TRI_index_operator_t* indexOperator) {
   } // end of switch statement
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief copy a skiplist operator recursively (deep copy)
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_operator_t* TRI_CopyIndexOperator (TRI_index_operator_t* indexOperator) {
+TRI_index_operator_t* TRI_CopyIndexOperator (TRI_index_operator_t const* indexOperator) {
   TRI_index_operator_t* newOperator = nullptr;
 
   if (indexOperator == nullptr) {
@@ -180,7 +179,6 @@ TRI_index_operator_t* TRI_CopyIndexOperator (TRI_index_operator_t* indexOperator
       newOperator = &(newLogicalOperator->base);
 
       break;
-
     }
 
     case TRI_EQ_INDEX_OPERATOR:
@@ -228,7 +226,6 @@ TRI_index_operator_t* TRI_CopyIndexOperator (TRI_index_operator_t* indexOperator
 
   return newOperator;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief free a skiplist operator recursively

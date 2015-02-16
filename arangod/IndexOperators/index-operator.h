@@ -79,7 +79,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef enum {
-
   TRI_EQ_INDEX_OPERATOR,
   TRI_NE_INDEX_OPERATOR,
   TRI_LE_INDEX_OPERATOR,
@@ -93,8 +92,6 @@ typedef enum {
 }
 TRI_index_operator_type_e;
 
-
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief operands and operators
 ////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +101,6 @@ typedef struct TRI_index_operator_s {
   TRI_shaper_t* _shaper;
 }
 TRI_index_operator_t;
-
 
 //................................................................................
 // Storage for NOT / AND / OR logical operators used in skip list indexes and others
@@ -118,7 +114,6 @@ typedef struct TRI_logical_index_operator_s {
 }
 TRI_logical_index_operator_t;
 
-
 //................................................................................
 // Storage for relation operator, e.g. <, <=, >, >=, ==, in
 //................................................................................
@@ -131,7 +126,6 @@ typedef struct TRI_relation_index_operator_s {
   size_t _numFields;          // number of fields in the array above
 }
 TRI_relation_index_operator_t;
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a new index operator of the specified type
@@ -148,12 +142,10 @@ TRI_index_operator_t* TRI_CreateIndexOperator (TRI_index_operator_type_e,
                                                size_t);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief copy an index  operator recursively (deep copy)
+/// @brief copy an index operator recursively (deep copy)
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_operator_t* TRI_CopyIndexOperator (TRI_index_operator_t*);
-
-
+TRI_index_operator_t* TRI_CopyIndexOperator (TRI_index_operator_t const*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief free an index operator recursively
@@ -163,42 +155,24 @@ TRI_index_operator_t* TRI_CopyIndexOperator (TRI_index_operator_t*);
 
 void TRI_FreeIndexOperator (TRI_index_operator_t*);
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief default deleter for TRI_json_t
+/// this can be used to put a TRI_json_t with TRI_UNKNOWN_MEM_ZONE into an
+/// std::unique_ptr
+////////////////////////////////////////////////////////////////////////////////
 
+namespace std {
+  template<>
+  class default_delete<TRI_index_operator_t> {
+    public:
 
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                      public types
-// -----------------------------------------------------------------------------
-
-// .............................................................................
-// A structure which (eventually) will allow a query to make an informed 'guess'
-// as to the likelihood of an index being efficient if used for document
-// retrieval. Added here in this file for convenience. Eventually this structrue
-// will be expanded. (Essentially a placeholder for now.)
-// .............................................................................
-
-typedef struct TRI_index_challenge_s {
-  double _response; // 0 == NO, 1 == YES
-} TRI_index_challenge_t;
-
-// .............................................................................
-// An enumeration of possible methods which require assignment from a 'generic'
-// index structure to a concrete index structure. Added here in this file
-// for convenience.
-// .............................................................................
-
-typedef enum {
-  TRI_INDEX_METHOD_ASSIGNMENT_FREE,
-  TRI_INDEX_METHOD_ASSIGNMENT_QUERY,
-  TRI_INDEX_METHOD_ASSIGNMENT_RESULT
+      void operator() (TRI_index_operator_t* op) {
+        if (op != nullptr) {
+          TRI_FreeIndexOperator(op);
+        }
+      }
+  };
 }
-TRI_index_method_assignment_type_e;
-
-struct TRI_index_iterator_s;
-
-typedef int (*TRI_index_query_method_call_t) (void*, TRI_index_operator_t*, TRI_index_challenge_t*, void*);
-typedef struct TRI_index_iterator_s* (*TRI_index_query_result_method_call_t) (void*, TRI_index_operator_t*, void*, bool (*filter) (struct TRI_index_iterator_s*));
-typedef int (*TRI_index_query_free_method_call_t) (void*, void*);
 
 #endif
 
