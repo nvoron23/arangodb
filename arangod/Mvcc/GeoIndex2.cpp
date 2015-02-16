@@ -91,8 +91,7 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
     _longitude(paths[1]),
     _geoJson(false),
     _unique(unique),
-    _ignoreNull(ignoreNull)
-{
+    _ignoreNull(ignoreNull) {
   
   _geoIndex = GeoIndex_new();
 
@@ -264,34 +263,30 @@ Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
     // index has one field
   
     // convert location to string
-    TRI_shape_path_t const* path = shaper->lookupAttributePathByPid(shaper, _location);  // ONLY IN INDEX, PROTECTED by RUNTIME
+    char const* location = TRI_AttributeNameShapePid(shaper, _location);
 
-    if (path == nullptr) {
+    if (location == nullptr) {
       return Json();
     }
 
-    char const* location = TRI_NAME_SHAPE_PATH(path);
     f.push_back(location);
   }
   else {
     // index has two fields
-    TRI_shape_path_t const* path = shaper->lookupAttributePathByPid(shaper, _latitude);  // ONLY IN INDEX, PROTECTED by RUNTIME
+    char const* latitude = TRI_AttributeNameShapePid(shaper, _latitude);
 
-    if (path == nullptr) {
+    if (latitude == nullptr) {
       return Json();
     }
 
-    char const* latitude = TRI_NAME_SHAPE_PATH(path);
     f.push_back(latitude);
 
-    // convert longitude to string
-    path = shaper->lookupAttributePathByPid(shaper, _longitude);  // ONLY IN INDEX, PROTECTED by RUNTIME
+    char const* longitude = TRI_AttributeNameShapePid(shaper, _longitude);
 
-    if (path == nullptr) {
+    if (longitude == nullptr) {
       return Json();
     }
-
-    char const* longitude = TRI_NAME_SHAPE_PATH(path);
+    
     f.push_back(longitude);
   }
 
@@ -342,11 +337,11 @@ bool GeoIndex2::extractDoubleArray (TRI_shaper_t* shaper,
     *missing = true;
     return false;
   }
-  else if (json._sid == TRI_LookupBasicSidShaper(TRI_SHAPE_NUMBER)) {
+  else if (json._sid == BasicShapes::TRI_SHAPE_SID_NUMBER) {
     *result = * (double*) json._data.data;
     return true;
   }
-  else if (json._sid == TRI_LookupBasicSidShaper(TRI_SHAPE_NULL)) {
+  else if (json._sid == BasicShapes::TRI_SHAPE_SID_NULL) {
     *missing = true;
     return false;
   }
@@ -394,7 +389,7 @@ bool GeoIndex2::extractDoubleList (TRI_shaper_t* shaper,
     // latitude
     ok = TRI_AtListShapedJson((TRI_list_shape_t const*) shape, &list, 0, &entry);
 
-    if (! ok || entry._sid != TRI_LookupBasicSidShaper(TRI_SHAPE_NUMBER)) {
+    if (! ok || entry._sid != BasicShapes::TRI_SHAPE_SID_NUMBER) {
       return false;
     }
 
@@ -403,7 +398,7 @@ bool GeoIndex2::extractDoubleList (TRI_shaper_t* shaper,
     // longitude
     ok = TRI_AtListShapedJson((TRI_list_shape_t const*) shape, &list, 1, &entry);
 
-    if (! ok || entry._sid != TRI_LookupBasicSidShaper(TRI_SHAPE_NUMBER)) {
+    if (! ok || entry._sid != BasicShapes::TRI_SHAPE_SID_NUMBER) {
       return false;
     }
 
@@ -416,7 +411,7 @@ bool GeoIndex2::extractDoubleList (TRI_shaper_t* shaper,
   else if (shape->_type == TRI_SHAPE_HOMOGENEOUS_LIST) {
     TRI_homogeneous_list_shape_t const* hom = (TRI_homogeneous_list_shape_t const*) shape;
 
-    if (hom->_sidEntry != TRI_LookupBasicSidShaper(TRI_SHAPE_NUMBER)) {
+    if (hom->_sidEntry != BasicShapes::TRI_SHAPE_SID_NUMBER) {
       return false;
     }
 
@@ -451,7 +446,7 @@ bool GeoIndex2::extractDoubleList (TRI_shaper_t* shaper,
   else if (shape->_type == TRI_SHAPE_HOMOGENEOUS_SIZED_LIST) {
     TRI_homogeneous_sized_list_shape_t const* hom = (TRI_homogeneous_sized_list_shape_t const*) shape;
 
-    if (hom->_sidEntry != TRI_LookupBasicSidShaper(TRI_SHAPE_NUMBER)) {
+    if (hom->_sidEntry != BasicShapes::TRI_SHAPE_SID_NUMBER) {
       return false;
     }
 

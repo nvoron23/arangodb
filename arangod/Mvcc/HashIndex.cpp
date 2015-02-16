@@ -88,13 +88,13 @@ class hashElement {
       uint64_t hash = 0x0123456789abcdef;
 
       if (byKey) {
-        char const* base = elm->_document->getShapedJsonPtr();
         for (size_t j = 0; j < _nrFields; ++j) {
+          char const* data;
+          size_t length;
+          TRI_InspectShapedSub(&elm->_subObjects[j], elm->_document, data, length);
           // ignore the sid for hashing
-          char const* ptr = base + elm->_subObjects[j]._offset;
-
           // only hash the data block
-          hash = fasthash64(ptr, elm->_subObjects[j]._length, hash);
+          hash = fasthash64(data, length, hash);
         }
         return hash;
       }
@@ -122,8 +122,6 @@ class compareKeyElement {
     }
     inline bool operator() (HashIndex::Key const* key,
                             HashIndex::Element const* elm) {
-      char const* base = elm->_document->getShapedJsonPtr();
-
       for (size_t j = 0; j < _nrFields; ++j) {
         TRI_shaped_json_t const* leftJson = &((*key)[j]);
         TRI_shaped_sub_t const* rightSub = &(elm->_subObjects[j]);
@@ -133,17 +131,17 @@ class compareKeyElement {
         }
 
         auto length = leftJson->_data.length;
+    
+        char const* rightData;
+        size_t rightLength;
+        TRI_InspectShapedSub(rightSub, elm->_document, rightData, rightLength);
 
-        if (length != rightSub->_length) {
+        if (length != rightLength) {
           return false;
         }
 
-        if (0 < length) {
-          char const* ptr = base + rightSub->_offset;
-
-          if (memcmp(leftJson->_data.data, ptr, length) != 0) {
-            return false;
-          }
+        if (length > 0 && memcmp(leftJson->_data.data, rightData, length) != 0) {
+          return false;
         }
       }
 
@@ -165,8 +163,6 @@ class compareElementElement {
     inline bool operator() (HashIndex::Element const* left,
                             HashIndex::Element const* right,
                             bool byKey) {
-      char const* baseLeft = left->_document->getShapedJsonPtr();
-      char const* baseRight = right->_document->getShapedJsonPtr();
 
       for (size_t j = 0; j < _nrFields; ++j) {
         TRI_shaped_sub_t const* leftSub = &(left->_subObjects[j]);
@@ -176,24 +172,27 @@ class compareElementElement {
           return false;
         }
 
-        auto length = leftSub->_length;
+        char const* leftData;
+        size_t leftLength;
+        TRI_InspectShapedSub(leftSub, left->_document, leftData, leftLength);
 
-        if (length != rightSub->_length) {
+        char const* rightData;
+        size_t rightLength;
+        TRI_InspectShapedSub(rightSub, right->_document, rightData, rightLength);
+
+        if (leftLength != rightLength) {
           return false;
         }
 
-        if (0 < length) {
-          char const* ptrLeft = baseLeft + leftSub->_offset;
-          char const* ptrRight = baseRight + rightSub->_offset;
-
-          if (memcmp(ptrLeft, ptrRight, length) != 0) {
-            return false;
-          }
+        if (leftLength > 0 && memcmp(leftData, rightData, leftLength) != 0) {
+          return false;
         }
       }
+
       if (byKey) {
         return true;
       }
+
       if (left->_document->_rid != right->_document->_rid) {
         return false;
       }
@@ -567,7 +566,6 @@ HashIndex::Element* HashIndex::allocateAndFillElement (
   // Extract the attribute values
   // ...........................................................................
 
-  TRI_shaped_sub_t shapedSub;           // the relative sub-object
   TRI_shaper_t* shaper = coll->shaper();
 
   size_t const n = _paths.size();
@@ -582,9 +580,8 @@ HashIndex::Element* HashIndex::allocateAndFillElement (
 
     // field not part of the object
     if (acc == nullptr || acc->_resultSid == TRI_SHAPE_ILLEGAL) {
-      shapedSub._sid    = TRI_LookupBasicSidShaper(TRI_SHAPE_NULL);
-      shapedSub._length = 0;
-      shapedSub._offset = 0;
+      elm->_subObjects[i]._sid = BasicShapes::TRI_SHAPE_SID_NULL;
+      
       includeForSparse = false;
     }
 
@@ -597,17 +594,12 @@ HashIndex::Element* HashIndex::allocateAndFillElement (
         THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
-      if (shapedObject._sid == TRI_LookupBasicSidShaper(TRI_SHAPE_NULL)) {
+      if (shapedObject._sid == BasicShapes::TRI_SHAPE_SID_NULL) {
         includeForSparse = false;
       }
 
-      shapedSub._sid    = shapedObject._sid;
-      shapedSub._length = shapedObject._data.length;
-      shapedSub._offset = static_cast<uint32_t>(((char const*) shapedObject._data.data) - ptr);
+      TRI_FillShapedSub(&elm->_subObjects[i], &shapedObject, ptr);
     }
-
-    // store the json shaped sub-object -- this is what will be hashed
-    elm->_subObjects[i] = shapedSub;
   }
 
   return elm;

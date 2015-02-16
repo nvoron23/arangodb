@@ -532,7 +532,6 @@ SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
   // Extract the attribute values
   // ...........................................................................
 
-  TRI_shaped_sub_t shapedSub;           // the relative sub-object
   TRI_shaper_t* shaper = coll->shaper();
 
   size_t const n = _paths.size();
@@ -547,9 +546,7 @@ SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
 
     // field not part of the object
     if (acc == nullptr || acc->_resultSid == TRI_SHAPE_ILLEGAL) {
-      shapedSub._sid    = TRI_LookupBasicSidShaper(TRI_SHAPE_NULL);
-      shapedSub._length = 0;
-      shapedSub._offset = 0;
+      elm->_subObjects[i]._sid = BasicShapes::TRI_SHAPE_SID_NULL;
       includeForSparse = false;
     }
 
@@ -562,17 +559,12 @@ SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
         THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
-      if (shapedObject._sid == TRI_LookupBasicSidShaper(TRI_SHAPE_NULL)) {
+      if (shapedObject._sid == BasicShapes::TRI_SHAPE_SID_NULL) {
         includeForSparse = false;
       }
 
-      shapedSub._sid    = shapedObject._sid;
-      shapedSub._length = shapedObject._data.length;
-      shapedSub._offset = static_cast<uint32_t>(((char const*) shapedObject._data.data) - ptr);
+      TRI_FillShapedSub(&elm->_subObjects[i], &shapedObject, ptr);
     }
-
-    // store the json shaped sub-object -- this is what will be compared
-    elm->_subObjects[i] = shapedSub;
   }
 
   return elm;
