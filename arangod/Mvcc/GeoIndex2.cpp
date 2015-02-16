@@ -191,37 +191,7 @@ TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
                                    Transaction*,
                                    std::string const&,
                                    TRI_doc_mptr_t* doc) {
-  TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
-
-  TRI_shaped_json_t shapedJson;
-  TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME
-
-  // lookup OLD latitude and longitude
-  bool ok;
-  double latitude;
-  double longitude;
-  bool missing;
-
-  if (_location != 0) {
-    ok = extractDoubleList(shaper, &shapedJson, _location, &latitude, &longitude, &missing);
-  }
-  else {
-    ok = extractDoubleArray(shaper, &shapedJson, _latitude, &latitude, &missing);
-    ok = ok && extractDoubleArray(shaper, &shapedJson, _longitude, &longitude, &missing);
-  }
-
-  // and remove old entry
-  if (ok) {
-    GeoCoordinate gc;
-    gc.latitude = latitude;
-    gc.longitude = longitude;
-    gc.data = static_cast<void*>(doc);
-
-    // ignore non-existing elements in geo-index
-    GeoIndex_remove(_geoIndex, &gc);
-  }
-
-  return nullptr;  // FIXME: this is nonsense
+  return nullptr;  
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -241,6 +211,58 @@ std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::near (Transaction* t
   coordinate.longitude = longitude;
   
   auto result = GeoIndex_NearestCountPoints(transaction, _geoIndex, &coordinate, (int) limit);
+
+  if (result == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
+ 
+  size_t const n = result->length;
+
+  if (n == 0) {
+    // empty result
+    GeoIndex_CoordinatesFree(result);
+    return theResult.release();
+  }
+
+  try {
+    theResult->reserve(n);
+    
+    for (size_t i = 0; i < n; ++i) {
+      theResult->emplace_back(std::make_pair(static_cast<TRI_doc_mptr_t*>(result->coordinates[i].data), result->distances[i])); 
+    }
+  }
+  catch (...) {
+    GeoIndex_CoordinatesFree(result);
+    throw;
+  }
+    
+  GeoIndex_CoordinatesFree(result);
+
+  // sort result by distance
+  std::sort(theResult->begin(), theResult->end(), [] (std::pair<TRI_doc_mptr_t const*, double> const& left, std::pair<TRI_doc_mptr_t const*, double> const& right) {
+    return left.second < right.second;
+  });
+
+  return theResult.release();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief query documents within a radius
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::within (Transaction* transaction,
+                                                                    double latitude,
+                                                                    double longitude,
+                                                                    double radius) {
+  
+  std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> theResult
+        (new std::vector<std::pair<TRI_doc_mptr_t*, double>>);
+  
+  GeoCoordinate coordinate;
+  coordinate.latitude  = latitude;
+  coordinate.longitude = longitude;
+  
+  auto result = GeoIndex_PointsWithinRadius(transaction, _geoIndex, &coordinate, radius);
 
   if (result == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);

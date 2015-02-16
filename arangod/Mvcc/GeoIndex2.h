@@ -76,6 +76,11 @@ namespace triagens {
                                                                double,
                                                                double,
                                                                size_t);
+        
+        std::vector<std::pair<TRI_doc_mptr_t*, double>>* within (Transaction*,
+                                                                 double,
+                                                                 double,
+                                                                 double);
   
         virtual void insert (TransactionCollection*, 
                              Transaction*,

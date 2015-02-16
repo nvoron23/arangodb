@@ -1226,6 +1226,73 @@ GeoCoordinates * GeoIndex_PointsWithinRadius(GeoIndex * gi,
     answer=GeoAnswers(gix,gres);
     return answer;   /* note - this may be NULL  */
 }
+
+GeoCoordinates* GeoIndex_PointsWithinRadius (triagens::mvcc::Transaction* transaction,
+                                             GeoIndex* gi,
+                                             GeoCoordinate* c, 
+                                             double d) {
+  GeoIx* gix = (GeoIx*) gi;
+
+  GeoResults* gres = GeoResultsCons(100);
+
+  if (gres == nullptr) {
+    return nullptr;
+  }
+  
+  GeoDetailedPoint gd;
+  GeoMkDetail(gix, &gd, c);
+  GeoStack gk;
+  GeoStackSet(&gk, &gd, gres);
+  double maxsnmd = GeoMetersToSNMD(d);
+  GeoSetDistance(&gd, maxsnmd);
+
+  gk.stacksize++;
+  while (gk.stacksize >= 1) {
+    gk.stacksize--;
+    int pot = gk.potid[gk.stacksize];
+
+    if (GeoPotJunk(&gd, pot)) {
+      continue;
+    }
+
+    GeoPot* gp = gix->pots + pot;
+    if (gp->LorLeaf == 0) {
+      for (int i = 0; i < gp->RorPoints; i++) {
+        int slot = gp->points[i];
+        double snmd = GeoSNMD(&gd, gix->gc + slot);
+        if (snmd > (maxsnmd * 1.00000000000001)) {
+          continue;
+        }
+
+        TRI_doc_mptr_t const* document = static_cast<TRI_doc_mptr_t const*>((gix->gc)[slot].data);
+        triagens::mvcc::TransactionId from = document->from();
+        triagens::mvcc::TransactionId to = document->to();
+        if (! transaction->isVisibleForRead(from, to)) {
+          continue;
+        }
+
+        int r = GeoResultsGrow(gres);
+
+        if (r == -1) {
+          TRI_Free(TRI_UNKNOWN_MEM_ZONE, gres->snmd);
+          TRI_Free(TRI_UNKNOWN_MEM_ZONE, gres->slot);
+          TRI_Free(TRI_UNKNOWN_MEM_ZONE, gres);
+          return nullptr;
+        }
+
+        gres->slot[gres->pointsct] = slot;
+        gres->snmd[gres->pointsct] = snmd;
+        gres->pointsct++;
+      }
+    }
+    else {
+      gk.potid[gk.stacksize++] = gp->LorLeaf;
+      gk.potid[gk.stacksize++] = gp->RorPoints;
+    }
+  }
+
+  return GeoAnswers(gix, gres);
+}
 /* =================================================== */
 /*            GeoIndex_NearestCountPoints              */
 /* The other user-visible search call, which finds the */
