@@ -342,6 +342,41 @@ namespace triagens {
 
         return result;
       }
+      
+      TRI_doc_mptr_t const* next () {
+        TRI_doc_mptr_t const* result = nullptr;
+
+        while (result == nullptr && current != nullptr) {
+          bool isVisible = transaction->isVisibleForRead(current->from(), current->to());
+
+          if (isVisible) {
+            result = current;
+          }
+
+          if (reverse) {
+            // reverse iterator
+            if (current == head) {
+              current = nullptr;
+              break;
+            }
+
+            // previous element
+            current = current->_prev;
+          }
+          else {
+            // forward iterator
+            if (current == tail) {
+              current = nullptr;
+              break;
+            }
+
+            // next element
+            current = current->_next;
+          }
+        }
+
+        return result;
+      }
 
       Transaction* transaction;
       MasterpointerManager* const manager;

@@ -163,6 +163,21 @@ void Transaction::incNumRemoved (TransactionCollection const* collection,
   (*it).second.numRemoved++;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the last revision id of the collection
+/// this is guaranteed to not fail if prepareStats() was called before
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::updateRevisionId (TransactionCollection const* collection,
+                                    TRI_voc_rid_t revisionId) {
+  auto cid = collection->id();
+  auto it = _stats.find(cid);
+  
+  TRI_ASSERT(it != _stats.end());
+
+  (*it).second.updateRevision(revisionId);
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------

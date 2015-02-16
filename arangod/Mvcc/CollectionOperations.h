@@ -151,8 +151,16 @@ namespace triagens {
           code(TRI_ERROR_NO_ERROR) {
       }
       
-      explicit OperationResult (int code, 
-                                TRI_voc_rid_t actualRevision) 
+      OperationResult (TRI_doc_mptr_t* mptr,
+                       TRI_voc_tick_t tick) 
+        : mptr(mptr),
+          tick(tick),
+          actualRevision(0),
+          code(TRI_ERROR_NO_ERROR) {
+      }
+      
+      OperationResult (int code, 
+                       TRI_voc_rid_t actualRevision) 
         : mptr(nullptr),
           tick(0),
           actualRevision(actualRevision),
@@ -238,6 +246,13 @@ namespace triagens {
 
         static int64_t Count (TransactionScope*,
                               TransactionCollection*);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the last revision in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+        static TRI_voc_rid_t Revision (TransactionScope*,
+                                       TransactionCollection*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief reads a random document from the collection

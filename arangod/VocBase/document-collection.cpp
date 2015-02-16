@@ -117,6 +117,7 @@ TRI_document_collection_t::TRI_document_collection_t ()
     _indexes(),
     _documentCounterLock(),
     _documentCounter(0),
+    _revisionId(0),
     _masterpointerManager(nullptr),
     _keyGenerator(nullptr),
     _uncollectedLogfileEntries(0) {
@@ -265,6 +266,26 @@ void TRI_document_collection_t::updateDocumentCounter (int64_t value) {
   WRITE_LOCKER(_documentCounterLock);
   TRI_ASSERT_EXPENSIVE(_documentCounter + value >= 0);
   _documentCounter += value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the last revision id in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_voc_rid_t TRI_document_collection_t::revisionId () {
+  READ_LOCKER(_documentCounterLock);
+  return _revisionId;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the last revision id in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::updateRevisionId (TRI_voc_rid_t revisionId) {
+  WRITE_LOCKER(_documentCounterLock);
+  if (revisionId > _revisionId) {
+    _revisionId = revisionId;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

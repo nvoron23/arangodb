@@ -490,8 +490,10 @@ public:
   triagens::basics::ReadWriteLock     _indexesLock;
   std::vector<triagens::mvcc::Index*> _indexes;
 
+  // TODO: use an atomic variable for this so the lock can go away
   triagens::basics::ReadWriteLock     _documentCounterLock;
-  int64_t _documentCounter;
+  int64_t                             _documentCounter;
+  TRI_voc_rid_t                       _revisionId;
  
   void shutdownIndexes ();
   void addIndex (triagens::mvcc::Index*);
@@ -504,6 +506,8 @@ public:
   void writeUnlockIndexes();
   int64_t documentCounter ();
   void updateDocumentCounter (int64_t);
+  TRI_voc_rid_t revisionId ();
+  void updateRevisionId (TRI_voc_rid_t);
   triagens::mvcc::MasterpointerManager* masterpointerManager () const;
   triagens::mvcc::MasterpointerManager* _masterpointerManager;
   

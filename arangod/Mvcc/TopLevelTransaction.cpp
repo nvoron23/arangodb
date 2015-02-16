@@ -137,11 +137,13 @@ void TopLevelTransaction::commit () {
     // and update the collection stats
     for (auto const& it : _stats) {
       int64_t difference = static_cast<int64_t>(it.second.numInserted - it.second.numRemoved);
+        
+      auto it2 = _collectionIds.find(it.first);
 
-      if (difference != 0) {
-        auto it2 = _collectionIds.find(it.first);
+      if (it2 != _collectionIds.end()) {
+        (*it2).second->updateRevisionId(it.second.revisionId);
 
-        if (it2 != _collectionIds.end()) {
+        if (difference != 0) {
           (*it2).second->updateDocumentCounter(difference);
         }
       }

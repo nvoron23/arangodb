@@ -250,6 +250,25 @@ int64_t CollectionOperations::Count (TransactionScope* transactionScope,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return the latest revision id the collection
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_voc_rid_t CollectionOperations::Revision (TransactionScope* transactionScope,
+                                              TransactionCollection* collection) {
+  auto* transaction = transactionScope->transaction();
+
+  // initial value
+  TRI_voc_rid_t revisionId = collection->revisionId();
+  auto stats = transaction->aggregatedStats(collection->id());
+
+  if (stats.revisionId > revisionId) {
+    return stats.revisionId;
+  }
+
+  return revisionId;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief reads a random document from the collection
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -298,6 +317,7 @@ OperationResult CollectionOperations::InsertDocument (TransactionScope* transact
   if (result.code == TRI_ERROR_NO_ERROR) {
     // commit the local operation
     transaction->incNumInserted(collection, options.waitForSync);
+    transaction->updateRevisionId(collection, result.tick);
     transactionScope->commit();
   }
  
@@ -477,6 +497,7 @@ OperationResult CollectionOperations::RemoveDocument (TransactionScope* transact
   if (result.code == TRI_ERROR_NO_ERROR) {
     // commit the local operation
     transaction->incNumRemoved(collection, options.waitForSync);
+    transaction->updateRevisionId(collection, result.tick);
     transactionScope->commit();
   }
 
@@ -543,6 +564,7 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
       // commit the local operation
       transaction->incNumRemoved(collection, options.waitForSync);
       transaction->incNumInserted(collection, options.waitForSync);
+      transaction->updateRevisionId(collection, result.tick);
       transactionScope->commit();
     }
     catch (...) {
@@ -608,6 +630,7 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
       // commit the local operation
       transaction->incNumRemoved(collection, options.waitForSync);
       transaction->incNumInserted(collection, options.waitForSync);
+      transaction->updateRevisionId(collection, result.tick);
       transactionScope->commit();
     }
     catch (...) {
@@ -749,7 +772,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
 
   TRI_ASSERT(mptr.get() != nullptr); 
   
-  return OperationResult(mptr.get());
+  return OperationResult(mptr.get(), writeResult.tick);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -826,6 +849,7 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
     return OperationResult(res, actualRevision);
   }
 
+  TRI_voc_tick_t tick;
   try {
     // iterate over all secondary indexes while holding the index read-lock
     auto indexes = indexUser.indexes();
@@ -854,6 +878,8 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
     if (res != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(res);
     }
+
+    tick = writeResult.tick;
   }
   catch (...) {
     // revert the value of the _to attribute
@@ -868,7 +894,7 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
 
   TRI_ASSERT(mptr != nullptr);
 
-  return OperationResult(mptr);
+  return OperationResult(mptr, tick);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

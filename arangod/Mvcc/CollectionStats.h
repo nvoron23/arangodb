@@ -31,6 +31,7 @@
 #define ARANGODB_MVCC_COLLECTION_STATS_H 1
 
 #include "Basics/Common.h"
+#include "VocBase/voc-types.h"
 
 namespace triagens {
   namespace mvcc {
@@ -45,16 +46,25 @@ namespace triagens {
       }
 
       void merge (CollectionStats const& other) {
-        numInserted      += other.numInserted;
-        numRemoved       += other.numRemoved;
+        numInserted += other.numInserted;
+        numRemoved  += other.numRemoved;
 
+        updateRevision(other.revisionId);
+        
         waitForSync |= other.waitForSync;
       }
+      
+      inline void updateRevision (TRI_voc_rid_t other) {
+        if (other > revisionId) {
+          revisionId = other;
+        }
+      }
 
-      size_t numInserted      = 0;
-      size_t numRemoved       = 0;
+      size_t numInserted        = 0;
+      size_t numRemoved         = 0;
+      TRI_voc_rid_t revisionId  = 0;
 
-      bool   waitForSync      = false;
+      bool   waitForSync        = false;
     };
 
   }

@@ -40,6 +40,7 @@
 #include "Mvcc/CollectionOperations.h"
 #include "Mvcc/EdgeIndex.h"
 #include "Mvcc/HashIndex.h"
+#include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionScope.h"
@@ -532,6 +533,204 @@ static void JS_MvccByExampleHashIndex (const v8::FunctionCallbackInfo<v8::Value>
 
   TRI_ASSERT(false);
 }
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    checksum query
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief helper struct used when calculting checksums
+////////////////////////////////////////////////////////////////////////////////
+
+struct CollectionChecksumHelper {
+  CollectionChecksumHelper (CollectionNameResolver const* resolver,
+                            TRI_shaper_t* shaper,
+                            bool withRevisions,
+                            bool withData)
+    : resolver(resolver),
+      shaper(shaper),
+      checksum(0),
+      withRevisions(withRevisions),
+      withData(withData) {
+      
+    TRI_InitStringBuffer(&buffer, TRI_UNKNOWN_MEM_ZONE);
+  }
+  
+  ~CollectionChecksumHelper () {
+    TRI_DestroyStringBuffer(&buffer);
+  }
+
+  void update (TRI_doc_mptr_t const* mptr) {
+    TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());  // PROTECTED by trx in calling function TRI_DocumentIteratorDocumentCollection
+    uint32_t localCrc;
+
+    if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
+        marker->_type == TRI_WAL_MARKER_DOCUMENT ||
+        marker->_type == TRI_WAL_MARKER_MVCC_DOCUMENT) {
+      localCrc = TRI_Crc32HashString(TRI_EXTRACT_MARKER_KEY(mptr));  // PROTECTED by trx in calling function TRI_DocumentIteratorDocumentCollection
+      if (withRevisions) {
+        localCrc += TRI_Crc32HashPointer(&mptr->_rid, sizeof(TRI_voc_rid_t));
+      }
+    }
+    else if (marker->_type == TRI_DOC_MARKER_KEY_EDGE ||
+             marker->_type == TRI_WAL_MARKER_EDGE ||
+             marker->_type == TRI_WAL_MARKER_MVCC_EDGE) {
+      TRI_voc_cid_t fromCid;
+      TRI_voc_cid_t toCid;
+      uint32_t offsetFromKey;
+      uint32_t offsetToKey;
+
+      // must convert _rid, _fromCid, _toCid into strings for portability
+      localCrc = TRI_Crc32HashString(TRI_EXTRACT_MARKER_KEY(mptr));  // PROTECTED by trx in calling function TRI_DocumentIteratorDocumentCollection
+      if (withRevisions) {
+        localCrc += TRI_Crc32HashPointer(&mptr->_rid, sizeof(TRI_voc_rid_t));
+      }
+
+      if (marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
+        auto* e = reinterpret_cast<TRI_doc_edge_key_marker_t const*>(marker);
+        fromCid       = e->_fromCid;
+        toCid         = e->_toCid;
+        offsetFromKey = e->_offsetFromKey;
+        offsetToKey   = e->_offsetToKey;
+      }
+      else if (marker->_type == TRI_WAL_MARKER_EDGE) {
+        auto* e = reinterpret_cast<triagens::wal::edge_marker_t const*>(marker);
+        fromCid       = e->_fromCid;
+        toCid         = e->_toCid;
+        offsetFromKey = e->_offsetFromKey;
+        offsetToKey   = e->_offsetToKey;
+      }
+      else {
+        auto* e = reinterpret_cast<triagens::wal::mvcc_edge_marker_t const*>(marker);
+        fromCid       = e->_fromCid;
+        toCid         = e->_toCid;
+        offsetFromKey = e->_offsetFromKey;
+        offsetToKey   = e->_offsetToKey;
+      }
+        
+      string const extra = resolver->getCollectionNameCluster(toCid) + 
+                           TRI_DOCUMENT_HANDLE_SEPARATOR_CHR + 
+                           string(((char*) marker) + offsetToKey) +
+                           resolver->getCollectionNameCluster(fromCid) + 
+                           TRI_DOCUMENT_HANDLE_SEPARATOR_CHR + 
+                           string(((char*) marker) + offsetFromKey);
+ 
+      localCrc += TRI_Crc32HashPointer(extra.c_str(), extra.size());
+    }
+    else {
+      return;
+    } 
+
+    if (withData) {
+      // with data
+      void const* d = static_cast<void const*>(marker);
+
+      TRI_shaped_json_t shaped;
+      TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, d);
+
+      TRI_StringifyArrayShapedJson(shaper, &buffer, &shaped, false);  // PROTECTED by trx in calling function TRI_DocumentIteratorDocumentCollection
+      localCrc += TRI_Crc32HashPointer(TRI_BeginStringBuffer(&buffer), TRI_LengthStringBuffer(&buffer));
+      TRI_ResetStringBuffer(&buffer);
+    }
+
+    checksum += localCrc;
+  }
+
+  CollectionNameResolver const*  resolver;
+  TRI_shaper_t*                  shaper;
+  TRI_string_buffer_t            buffer;
+  uint32_t                       checksum;
+  bool const                     withRevisions;
+  bool const                     withData;
+    
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief calculates a checksum for the data in a collection
+/// @startDocuBlock collectionChecksum
+/// `collection.checksum(withRevisions, withData)`
+///
+/// The *checksum* operation calculates a CRC32 checksum of the keys
+/// contained in collection *collection*.
+///
+/// If the optional argument *withRevisions* is set to *true*, then the
+/// revision ids of the documents are also included in the checksumming.
+///
+/// If the optional argument *withData* is set to *true*, then the
+/// actual document data is also checksummed. Including the document data in
+/// checksumming will make the calculation slower, but is more accurate.
+///
+/// **Note**: this method is not available in a cluster.
+///
+/// @endDocuBlock
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccChecksum (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TransactionBase transBase(true);   // To protect against assertions, FIXME later
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  if (ServerState::instance()->isCoordinator()) {
+    // renaming a collection in a cluster is unsupported
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_CLUSTER_UNSUPPORTED);
+  }
+
+  bool withRevisions = false;
+  if (args.Length() > 0) {
+    withRevisions = TRI_ObjectToBoolean(args[0]);
+  }
+
+  bool withData = false;
+  if (args.Length() > 1) {
+    withData = TRI_ObjectToBoolean(args[1]);
+  }
+
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+  
+    // extract the index
+    CollectionNameResolver resolver(collection->_vocbase); // TODO
+    CollectionChecksumHelper helper(&resolver, transactionCollection->shaper(), withRevisions, withData);
+  
+    {
+      std::unique_ptr<triagens::mvcc::MasterpointerIterator> iterator(new triagens::mvcc::MasterpointerIterator(transaction, transactionCollection->masterpointerManager(), false));
+    
+      auto it = iterator.get();
+      while (it->hasMore()) {
+        TRI_doc_mptr_t const* found = it->next();
+        TRI_ASSERT(found != nullptr);
+
+        helper.update(found);
+      }
+    }
+ 
+    string const revisionString(std::to_string(triagens::mvcc::CollectionOperations::Revision(&transactionScope, transactionCollection)));
+
+    v8::Handle<v8::Object> result = v8::Object::New(isolate);
+    result->Set(TRI_V8_ASCII_STRING("checksum"), v8::Number::New(isolate, helper.checksum));
+    result->Set(TRI_V8_ASCII_STRING("revision"), TRI_V8_STD_STRING(revisionString));
+
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  TRI_ASSERT(false);
+}
+
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                     edges queries
@@ -3002,6 +3201,7 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccAny"), JS_MvccAny, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExample"), JS_MvccByExample, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccByExampleHash"), JS_MvccByExampleHashIndex, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccChecksum"), JS_MvccChecksum, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccEdges"), JS_MvccEdges, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccInEdges"), JS_MvccInEdges, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccOutEdges"), JS_MvccOutEdges, true);
