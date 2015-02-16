@@ -33,6 +33,9 @@
 #include <math.h>
 
 #include "GeoIndex.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionId.h"
+#include "VocBase/document-collection.h"
 
     /* Radius of the earth used for distances  */
 #define EARTHRADIUS 6371000.0
@@ -819,43 +822,38 @@ void GeoStackSet (GeoStack * gk, GeoDetailedPoint * gd, GeoResults * gr)
 /* structure just holds the slotid of each point chosen*/
 /* and the (SNMD) distance to the target point         */
 /* =================================================== */
-GeoResults * GeoResultsCons(int alloc)
-{
-    GeoResults * gres;
-    int * sa;
-    double * dd;
+GeoResults* GeoResultsCons (int alloc) {
+  if (alloc <= 0) {
+    return nullptr;
+  }
 
-    if (alloc <= 0) {
-      return NULL;
-    }
+  GeoResults* gres = static_cast<GeoResults*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(GeoResults), false));
 
-    gres = static_cast<GeoResults*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(GeoResults), false));
-    sa = static_cast<int*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, alloc*sizeof(int), false));
-    dd = static_cast<double*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, alloc*sizeof(double), false));
-    if( (gres==NULL) ||
-         (sa==NULL)  ||
-         (dd==NULL)   )
-    {
-        if(gres!=NULL) {
-          TRI_Free(TRI_UNKNOWN_MEM_ZONE, gres);
-        }
+  if (gres == nullptr) {
+    return nullptr;
+  }
 
-        if(sa!=NULL) {
-          TRI_Free(TRI_UNKNOWN_MEM_ZONE, sa);
-        }
+  int* sa = static_cast<int*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, alloc * sizeof(int), false));
 
-        if(dd!=NULL) {
-          TRI_Free(TRI_UNKNOWN_MEM_ZONE, dd);
-        }
+  if (sa == nullptr) {
+    TRI_Free(TRI_UNKNOWN_MEM_ZONE, gres);
+    return nullptr;
+  }
 
-        return NULL;
-    }
-    gres->pointsct = 0;
-    gres->allocpoints = alloc;
-    gres->slot = sa;
-    gres->snmd = dd;
+  double* dd = static_cast<double*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, alloc * sizeof(double), false));
+
+  if (dd == nullptr) {
+    TRI_Free(TRI_UNKNOWN_MEM_ZONE, sa);
+    TRI_Free(TRI_UNKNOWN_MEM_ZONE, gres);
+    return nullptr;
+  }
+
+  gres->pointsct = 0;
+  gres->allocpoints = alloc;
+  gres->slot = sa;
+  gres->snmd = dd;
 /* no need to initialize maxsnmd */
-    return gres;
+  return gres;
 }
 /* =================================================== */
 /*                 GeoResultsStartCount                */
@@ -938,6 +936,70 @@ void GeoResultsInsertPoint(GeoResults * gr, int slot, double snmd)
         return;
     }
 }
+
+static void GeoResultsInsertPoint (triagens::mvcc::Transaction* transaction,
+                                   GeoIx* gix,
+                                   GeoResults* gr, 
+                                   int slot, 
+                                   double snmd) {
+  if (snmd >= gr->snmd[0]) {
+    return;
+  }
+
+  // check document visibility  
+  TRI_doc_mptr_t const* document = static_cast<TRI_doc_mptr_t const*>((gix->gc)[slot].data);
+  triagens::mvcc::TransactionId from = document->from();
+  triagens::mvcc::TransactionId to = document->to();
+  if (! transaction->isVisibleForRead(from, to)) {
+    return;
+  }
+  
+  if (gr->slot[0] == 0) {
+    gr->pointsct++;
+  }
+
+  int i = 0;     /* i is now considered empty  */
+  while (true) {
+    int jj1 = 2 * i + 1;
+    int jj2 = 2 * i + 2;
+
+    if (jj1 < gr->allocpoints) {
+      if (jj2 < gr->allocpoints) {
+        if (gr->snmd[jj1] > gr->snmd[jj2]) {
+          int temp = jj1;
+          jj1 = jj2;
+          jj2 = temp;
+        }
+        /* so now jj2 is >= jj1 */
+        if (gr->snmd[jj2] <= snmd) {
+          gr->snmd[i] = snmd;
+          gr->slot[i] = slot;
+          return;
+        }
+
+        gr->snmd[i] = gr->snmd[jj2];
+        gr->slot[i] = gr->slot[jj2];
+        i = jj2;
+        continue;
+      }
+
+      if (gr->snmd[jj1] <= snmd) {
+        gr->snmd[i] = snmd;
+        gr->slot[i] = slot;
+        return;
+      }
+
+      gr->snmd[i] = gr->snmd[jj1];
+      gr->slot[i] = gr->slot[jj1];
+      i = jj1;
+      continue;
+    }
+
+    gr->snmd[i] = snmd;
+    gr->slot[i] = slot;
+    return;
+  }
+}
 /* =================================================== */
 /*                GeoResultsGrow                       */
 /* During a search-by distance (the search-by-count    */
@@ -993,14 +1055,14 @@ GeoCoordinates * GeoAnswers (GeoIx * gix, GeoResults * gr)
     GeoCoordinate  * gc;
     int i,j,slot;
     double mole;
-
+/*
     if (gr->pointsct == 0) {
       TRI_Free(TRI_UNKNOWN_MEM_ZONE, gr->slot);
       TRI_Free(TRI_UNKNOWN_MEM_ZONE, gr->snmd);
       TRI_Free(TRI_UNKNOWN_MEM_ZONE, gr);
       return NULL;
     }
-
+*/
     ans = static_cast<GeoCoordinates*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(GeoCoordinates), false));
     gc  = static_cast<GeoCoordinate*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, gr->pointsct * sizeof(GeoCoordinate), false));
 
@@ -1234,6 +1296,62 @@ GeoCoordinates * GeoIndex_NearestCountPoints(GeoIndex * gi,
     }
     answer=GeoAnswers(gix,gr);
     return answer;   /* note - this may be NULL  */
+}
+
+GeoCoordinates* GeoIndex_NearestCountPoints (triagens::mvcc::Transaction* transaction,
+                                             GeoIndex* gi,
+                                             GeoCoordinate* c, 
+                                             int count) {
+  GeoIx* gix = (GeoIx*) gi;
+  
+  GeoResults* gr = GeoResultsCons(count);
+
+  if (gr == nullptr) {
+    return nullptr;
+  }
+
+  GeoDetailedPoint gd;
+  GeoMkDetail(gix, &gd, c);
+  GeoStack gk;
+  GeoStackSet(&gk, &gd, gr);
+  GeoResultsStartCount(gr);
+  int left = count;
+
+  while (gk.stacksize >= 0) {
+    int pot = gk.potid[gk.stacksize--];
+    GeoPot* gp = gix->pots + pot;
+
+    if (left <= 0) {
+      GeoSetDistance(&gd, gr->snmd[0]);
+      if (GeoPotJunk(&gd, pot)) {
+        continue;
+      }
+    }
+
+    if (gp->LorLeaf == 0) {
+      for (int i = 0; i < gp->RorPoints; i++) {
+        int slot = gp->points[i];
+        double snmd = GeoSNMD(&gd, gix->gc + slot);
+        GeoResultsInsertPoint(transaction, gix, gr, slot, snmd);
+        left--;
+        if (left < -1) {
+          left = -1;
+        }
+      }
+    }
+    else {
+      if (gd.gs > gp->middle) {
+        gk.potid[++gk.stacksize] = gp->LorLeaf;
+        gk.potid[++gk.stacksize] = gp->RorPoints;
+      }
+      else {
+        gk.potid[++gk.stacksize] = gp->RorPoints;
+        gk.potid[++gk.stacksize] = gp->LorLeaf;
+      }
+    }
+  }
+
+  return GeoAnswers(gix, gr);
 }
 /* =================================================== */
 /*             GeoIndexFreeSlot                        */

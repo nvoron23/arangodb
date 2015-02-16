@@ -71,15 +71,22 @@ namespace triagens {
         ~GeoIndex2 ();
 
       public:
+
+        std::vector<std::pair<TRI_doc_mptr_t*, double>>* near (Transaction*,
+                                                               double,
+                                                               double,
+                                                               size_t);
   
         virtual void insert (TransactionCollection*, 
                              Transaction*,
                              struct TRI_doc_mptr_t*) override final;
+
         virtual TRI_doc_mptr_t* remove (
                  TransactionCollection*,
                  Transaction*,
                  std::string const&,
                  struct TRI_doc_mptr_t*) override final;
+
         virtual void forget (TransactionCollection*,
                              Transaction*,
                              struct TRI_doc_mptr_t*) override final;

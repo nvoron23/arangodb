@@ -159,26 +159,26 @@ void GeoIndex2::insert (TransactionCollection*,
   GeoCoordinate gc;
   gc.latitude = latitude;
   gc.longitude = longitude;
-
-  gc.data = CONST_CAST(doc);
+  gc.data = static_cast<void*>(doc);
 
   int res = GeoIndex_insert(_geoIndex, &gc);
 
-  if (res == -1) {
-    THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
-  }
-  else if (res == -2) {
-    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
-  }
-  else if (res == -3) {
-    if (_unique) {
-      THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
+  if (res < 0) {
+    if (res == -1) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
     }
-    else {
-      return;
+    if (res == -2) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
     }
-  }
-  else if (res < 0) {
+    if (res == -3) {
+      if (_unique) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
+      }
+      else {
+        return;
+      }
+    }
+
     THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
   }
 }
@@ -215,13 +215,65 @@ TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
     GeoCoordinate gc;
     gc.latitude = latitude;
     gc.longitude = longitude;
-
-    gc.data = CONST_CAST(doc);
+    gc.data = static_cast<void*>(doc);
 
     // ignore non-existing elements in geo-index
     GeoIndex_remove(_geoIndex, &gc);
   }
+
   return nullptr;  // FIXME: this is nonsense
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief query documents near a coordinate
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::near (Transaction* transaction,
+                                                                  double latitude,
+                                                                  double longitude,
+                                                                  size_t limit) {
+  
+  std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> theResult
+        (new std::vector<std::pair<TRI_doc_mptr_t*, double>>);
+  
+  GeoCoordinate coordinate;
+  coordinate.latitude  = latitude;
+  coordinate.longitude = longitude;
+  
+  auto result = GeoIndex_NearestCountPoints(transaction, _geoIndex, &coordinate, (int) limit);
+
+  if (result == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
+ 
+  size_t const n = result->length;
+
+  if (n == 0) {
+    // empty result
+    GeoIndex_CoordinatesFree(result);
+    return theResult.release();
+  }
+
+  try {
+    theResult->reserve(n);
+    
+    for (size_t i = 0; i < n; ++i) {
+      theResult->emplace_back(std::make_pair(static_cast<TRI_doc_mptr_t*>(result->coordinates[i].data), result->distances[i])); 
+    }
+  }
+  catch (...) {
+    GeoIndex_CoordinatesFree(result);
+    throw;
+  }
+    
+  GeoIndex_CoordinatesFree(result);
+
+  // sort result by distance
+  std::sort(theResult->begin(), theResult->end(), [] (std::pair<TRI_doc_mptr_t const*, double> const& left, std::pair<TRI_doc_mptr_t const*, double> const& right) {
+    return left.second < right.second;
+  });
+
+  return theResult.release();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

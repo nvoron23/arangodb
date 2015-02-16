@@ -356,9 +356,9 @@ UnitTests_basics_suite_SOURCES = \
 	UnitTests/Basics/StringBufferTest.cpp \
 	UnitTests/Basics/StringUtilsTest.cpp
 
-UnitTests_geo_suite_CPPFLAGS = -I@top_srcdir@/arangod -I@top_builddir@/lib -I@top_srcdir@/lib
-UnitTests_geo_suite_LDADD = -L@top_builddir@/lib -larango -lboost_unit_test_framework
-UnitTests_geo_suite_DEPENDENCIES = @top_builddir@/lib/libarango.a
+UnitTests_geo_suite_CPPFLAGS = -I@top_srcdir@/arangod -I@top_builddir@/lib -I@top_srcdir@/lib $(AM_CPPFLAGS)
+UnitTests_geo_suite_LDADD = -L@top_builddir@/lib -L@top_builddir@/arangod -larangod -larango_v8 -larango_client -larango_fe -larango -lboost_unit_test_framework $(LIBS) @V8_LIBS@ 
+UnitTests_geo_suite_DEPENDENCIES = @top_builddir@/lib/libarango.a @top_builddir@/arangod/libarangod.a
 
 UnitTests_geo_suite_SOURCES = \
 	UnitTests/Geo/Runner.cpp \

@@ -38,6 +38,7 @@
 #include "GeoIndex/geo-index.h"
 #include "HashIndex/hash-index.h"
 #include "Mvcc/EdgeIndex.h"
+#include "Mvcc/GeoIndex2.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/MasterpointerManager.h"
@@ -3966,6 +3967,22 @@ static TRI_index_t* CreateGeoIndexDocumentCollection (TRI_document_collection_t*
     TRI_FreeGeoIndex(idx);
 
     return nullptr;
+  }
+
+  if (location != nullptr) {
+    std::vector<std::string> fieldsVector{ 
+      std::string(location)
+    };
+    std::vector<TRI_shape_pid_t> pathsVector{ loc };
+    document->addIndex(new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, ignoreNull, geoJson));
+  }
+  else {
+    std::vector<std::string> fieldsVector{ 
+      std::string(latitude), 
+      std::string(longitude) 
+    };
+    std::vector<TRI_shape_pid_t> pathsVector{ lat, lon };
+    document->addIndex(new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, ignoreNull));
   }
 
   if (created != nullptr) {

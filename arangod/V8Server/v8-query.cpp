@@ -39,6 +39,7 @@
 #include "FulltextIndex/fulltext-query.h"
 #include "Mvcc/CollectionOperations.h"
 #include "Mvcc/EdgeIndex.h"
+#include "Mvcc/GeoIndex2.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/Transaction.h"
@@ -1024,6 +1025,92 @@ static void JS_MvccLast (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 
   MvccTemporalQuery(args, true);
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                       geo queries
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief selects the n last documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccNear (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TransactionBase transBase(true);   // To protect against assertions, FIXME later
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+  
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+
+
+  if (args.Length() != 4) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccNear(<index-handle>, <latitude>, <longitude>, <limit>)");
+  }
+    
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+  
+    // extract the index
+    CollectionNameResolver resolver(collection->_vocbase); // TODO
+    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+  
+    if (index == nullptr ||
+        (index->type() != TRI_IDX_TYPE_GEO1_INDEX &&
+         index->type() != TRI_IDX_TYPE_GEO2_INDEX)) {
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
+    }
+  
+    // extract latitude and longitude
+    double latitude = TRI_ObjectToDouble(args[1]);
+    double longitude = TRI_ObjectToDouble(args[2]);
+  
+    // extract the limit
+    TRI_voc_ssize_t limit = (TRI_voc_ssize_t) TRI_ObjectToDouble(args[3]);
+    if (limit <= 0) {
+      limit = 100;
+    }
+  
+    std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> indexResult(static_cast<triagens::mvcc::GeoIndex2*>(index)->near(transaction, latitude, longitude, limit));
+    
+    // setup result
+    v8::Handle<v8::Object> result = v8::Object::New(isolate);
+    v8::Handle<v8::Array> documents = v8::Array::New(isolate, indexResult->size());
+    v8::Handle<v8::Array> distances = v8::Array::New(isolate, indexResult->size());
+ 
+    uint32_t i = 0;
+    for (auto const& it : *indexResult) {
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, it.first->getDataPtr());
+
+      if (document.IsEmpty()) {
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+      }
+
+      documents->Set(i, document);
+      distances->Set(i, v8::Number::New(isolate, it.second));
+      ++i; 
+    }
+
+    result->Set(TRI_V8_ASCII_STRING("documents"), documents);
+    result->Set(TRI_V8_ASCII_STRING("distances"), distances);
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  TRI_ASSERT(false);
 }
 
 
@@ -3207,6 +3294,7 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccOutEdges"), JS_MvccOutEdges, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccFirst"), JS_MvccFirst, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccLast"), JS_MvccLast, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccNear"), JS_MvccNear, true);
 }
 
 // -----------------------------------------------------------------------------

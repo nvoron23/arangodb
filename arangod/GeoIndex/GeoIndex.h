@@ -36,6 +36,12 @@
 #include "Basics/Common.h"
 #include "IndexOperators/index-operator.h"
 
+namespace triagens {
+  namespace mvcc {
+    class Transaction;
+  }
+}
+
 /* first the things that a user might want to change */
 
 /* a GeoString - a signed type of at least 64 bits   */
@@ -109,6 +115,10 @@ GeoCoordinates * GeoIndex_PointsWithinRadius(GeoIndex * gi,
                     GeoCoordinate * c, double d);
 GeoCoordinates * GeoIndex_NearestCountPoints(GeoIndex * gi,
                     GeoCoordinate * c, int count);
+GeoCoordinates * GeoIndex_NearestCountPoints (triagens::mvcc::Transaction*,
+                                              GeoIndex*,
+                                              GeoCoordinate*, 
+                                              int); 
 void GeoIndex_CoordinatesFree(GeoCoordinates * clist);
 #ifdef TRI_GEO_DEBUG
 void GeoIndex_INDEXDUMP(GeoIndex * gi, FILE * f);
