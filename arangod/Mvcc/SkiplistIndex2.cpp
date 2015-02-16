@@ -319,10 +319,26 @@ SkiplistIndex2::~SkiplistIndex2 () {
 std::vector<TRI_doc_mptr_t*>* SkiplistIndex2::lookup (TransactionCollection* coll,
                                                       Transaction* trans,
                                                       TRI_index_operator_t* op,
-                                                      size_t skip,
-                                                      size_t limit,
-                                                      bool reverse) {
+                                                      bool reverse,
+                                                      size_t limit) {
   
+  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> theResult(new std::vector<TRI_doc_mptr_t*>);
+  // TODO: this has to be implemented still!
+
+  return theResult.release();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief lookup by key with limit, continuation
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<TRI_doc_mptr_t*>* SkiplistIndex2::lookupContinue (
+                                                  TransactionCollection* coll,
+                                                  Transaction* trans,
+                                                  TRI_index_operator_t* op,
+                                                  TRI_doc_mptr_t* previousLast,
+                                                  bool reverse,
+                                                  size_t limit) {
   std::unique_ptr<std::vector<TRI_doc_mptr_t*>> theResult(new std::vector<TRI_doc_mptr_t*>);
   // TODO: this has to be implemented still!
 

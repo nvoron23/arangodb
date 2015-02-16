@@ -899,7 +899,7 @@ static void MvccSkiplistQuery (QueryType type,
     }
 
     // setup result
-    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(skiplistIndex->lookup(transactionCollection, transaction, skiplistOperator.get(), skip, limit, reverse)); 
+    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(skiplistIndex->lookup(transactionCollection, transaction, skiplistOperator.get(), reverse, limit));
  
     auto const& foundDocuments = *(indexResult.get());
 

@@ -72,18 +72,26 @@ namespace triagens {
         std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection*,
                                               Transaction*,
                                               struct TRI_index_operator_s*,
-                                              size_t,
-                                              size_t,
-                                              bool);
+                                              bool,
+                                              size_t);
+
+        std::vector<TRI_doc_mptr_t*>* lookupContinue (TransactionCollection*,
+                                              Transaction*,
+                                              struct TRI_index_operator_s*,
+                                              TRI_doc_mptr_t*,
+                                              bool,
+                                              size_t);
   
         virtual void insert (TransactionCollection*,
                              Transaction*,
                              struct TRI_doc_mptr_t*) override final;
+
         virtual struct TRI_doc_mptr_t* remove (
                    TransactionCollection*,
                    Transaction*,
                    std::string const&,
                    struct TRI_doc_mptr_t*) override final;
+
         virtual void forget (TransactionCollection*,
                              Transaction*,
                              struct TRI_doc_mptr_t*) override final;

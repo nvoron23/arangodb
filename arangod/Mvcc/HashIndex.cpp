@@ -461,7 +461,7 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookupInternal (
 std::vector<TRI_doc_mptr_t*>* HashIndex::lookup (TransactionCollection* coll,
                                                  Transaction* trans,
                                                  Key const* key,
-                                                 size_t limit = 0) {
+                                                 size_t limit) {
   READ_LOCKER(_lock);
   return lookupInternal(coll, trans, key, nullptr, limit);
 }
@@ -474,7 +474,7 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookupContinue (
                                                   TransactionCollection* coll,
                                                   Transaction* trans,
                                                   TRI_doc_mptr_t* previousLast,
-                                                  size_t limit = 0) {
+                                                  size_t limit) {
 
   READ_LOCKER(_lock);
   return lookupInternal(coll, trans, nullptr, previousLast, limit);
