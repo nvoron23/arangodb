@@ -61,6 +61,9 @@ namespace triagens {
         ~FulltextIndex ();
 
       public:
+
+        std::vector<TRI_doc_mptr_t*>* query (Transaction*,
+                                             std::string const&);
   
         virtual void insert (TransactionCollection*, 
                              Transaction*,

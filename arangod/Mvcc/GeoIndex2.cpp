@@ -28,6 +28,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "GeoIndex2.h"
+#include "Basics/ReadLocker.h"
+#include "Basics/WriteLocker.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
@@ -161,6 +163,7 @@ void GeoIndex2::insert (TransactionCollection*,
   gc.longitude = longitude;
   gc.data = static_cast<void*>(doc);
 
+  WRITE_LOCKER(_lock);
   int res = GeoIndex_insert(_geoIndex, &gc);
 
   if (res < 0) {
@@ -209,8 +212,12 @@ std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::near (Transaction* t
   GeoCoordinate coordinate;
   coordinate.latitude  = latitude;
   coordinate.longitude = longitude;
-  
-  auto result = GeoIndex_NearestCountPoints(transaction, _geoIndex, &coordinate, (int) limit);
+ 
+  GeoCoordinates* result = nullptr;
+  { 
+    READ_LOCKER(_lock);
+    result = GeoIndex_NearestCountPoints(transaction, _geoIndex, &coordinate, (int) limit);
+  }
 
   if (result == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -262,7 +269,11 @@ std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::within (Transaction*
   coordinate.latitude  = latitude;
   coordinate.longitude = longitude;
   
-  auto result = GeoIndex_PointsWithinRadius(transaction, _geoIndex, &coordinate, radius);
+  GeoCoordinates* result = nullptr;
+  {
+    READ_LOCKER(_lock);
+    result = GeoIndex_PointsWithinRadius(transaction, _geoIndex, &coordinate, radius);
+  }
 
   if (result == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -320,6 +331,7 @@ void GeoIndex2::preCommit (TransactionCollection*,
 ////////////////////////////////////////////////////////////////////////////////
 
 size_t GeoIndex2::memory () {
+  READ_LOCKER(_lock);
   return GeoIndex_MemoryUsage(_geoIndex);
 }
 
@@ -411,17 +423,17 @@ bool GeoIndex2::extractDoubleArray (TRI_shaper_t* shaper,
     *missing = true;
     return false;
   }
-  else if (json._sid == BasicShapes::TRI_SHAPE_SID_NUMBER) {
+
+  if (json._sid == BasicShapes::TRI_SHAPE_SID_NUMBER) {
     *result = * (double*) json._data.data;
     return true;
   }
-  else if (json._sid == BasicShapes::TRI_SHAPE_SID_NULL) {
+  if (json._sid == BasicShapes::TRI_SHAPE_SID_NULL) {
     *missing = true;
     return false;
   }
-  else {
-    return false;
-  }
+
+  return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -38,6 +38,7 @@
 #include "GeoIndex/geo-index.h"
 #include "HashIndex/hash-index.h"
 #include "Mvcc/EdgeIndex.h"
+#include "Mvcc/FulltextIndex.h"
 #include "Mvcc/GeoIndex2.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/Index.h"
@@ -4728,8 +4729,8 @@ static TRI_index_t* LookupFulltextIndexDocumentCollection (TRI_document_collecti
 ////////////////////////////////////////////////////////////////////////////////
 
 static TRI_index_t* CreateFulltextIndexDocumentCollection (TRI_document_collection_t* document,
-                                                           const char* attributeName,
-                                                           const bool indexSubstrings,
+                                                           char const* attributeName,
+                                                           bool indexSubstrings,
                                                            int minWordLength,
                                                            TRI_idx_iid_t iid,
                                                            bool* created) {
@@ -4775,6 +4776,9 @@ static TRI_index_t* CreateFulltextIndexDocumentCollection (TRI_document_collecti
 
     return nullptr;
   }
+
+  std::vector<std::string> fieldsVector{ std::string(attributeName) };
+  document->addIndex(new triagens::mvcc::FulltextIndex(idx->_iid, document, fieldsVector, minWordLength));
 
   if (created != nullptr) {
     *created = true;

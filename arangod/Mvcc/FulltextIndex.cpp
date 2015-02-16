@@ -30,8 +30,14 @@
 #include "FulltextIndex.h"
 #include "Basics/json.h"
 #include "Basics/utf8-helper.h"
+#include "Basics/ReadLocker.h"
+#include "Basics/WriteLocker.h"
 #include "FulltextIndex/fulltext-index.h"
+#include "FulltextIndex/fulltext-query.h"
+#include "FulltextIndex/fulltext-result.h"
 #include "FulltextIndex/fulltext-wordlist.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionId.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/voc-shaper.h"
@@ -86,6 +92,65 @@ FulltextIndex::~FulltextIndex () {
 }
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief query the fulltext index
+////////////////////////////////////////////////////////////////////////////////
+
+std::vector<TRI_doc_mptr_t*>* FulltextIndex::query (Transaction* transaction,
+                                                    std::string const& queryString) {
+  
+  TRI_fulltext_query_t* query = TRI_CreateQueryFulltextIndex(TRI_FULLTEXT_SEARCH_MAX_WORDS);
+
+  if (query == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
+  
+  int res = TRI_ParseQueryFulltextIndex(query, queryString.c_str());
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    TRI_FreeQueryFulltextIndex(query);
+    THROW_ARANGO_EXCEPTION(res);
+  }
+  
+  TRI_fulltext_result_t* queryResult = nullptr;
+  {
+    READ_LOCKER(_lock);
+    // note: TRI_QueryFulltextIndex will free its query argument!
+    queryResult = TRI_QueryFulltextIndex(_fulltextIndex, query);
+  }
+    
+  if (queryResult == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
+
+  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> theResult(new std::vector<TRI_doc_mptr_t*>);
+  try {
+    theResult->reserve(queryResult->_numDocuments);
+
+    for (size_t i = 0; i < queryResult->_numDocuments; ++i) {
+      TRI_doc_mptr_t* document = reinterpret_cast<TRI_doc_mptr_t*>(queryResult->_documents[i]);
+
+      TransactionId from = document->from();
+      TransactionId to = document->to();
+      if (transaction->isVisibleForRead(from, to)) {
+        theResult->emplace_back(document);
+      }
+    }
+  }
+  catch (...) {
+    TRI_FreeResultFulltextIndex(queryResult);
+    throw;
+  }
+    
+  TRI_FreeResultFulltextIndex(queryResult);
+
+  return theResult.release();
+}
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                            public virtual methods
 // -----------------------------------------------------------------------------
 
@@ -102,20 +167,31 @@ void FulltextIndex::insert (TransactionCollection*,
     // TODO: distinguish the cases "empty wordlist" and "out of memory"
     return;
   }
-
-  int res = TRI_ERROR_NO_ERROR;
-
-  if (wordlist->_numWords > 0) {
-    // TODO: use status codes
-    if (! TRI_InsertWordsFulltextIndex(_fulltextIndex, (TRI_fulltext_doc_t) ((uintptr_t) doc), wordlist)) {
-      res = TRI_ERROR_INTERNAL;
-    }
+    
+  if (wordlist->_numWords == 0) {
+    TRI_FreeWordlistFulltextIndex(wordlist);
+    return;
   }
 
-  TRI_FreeWordlistFulltextIndex(wordlist);
+  try {
+    int res = TRI_ERROR_NO_ERROR;
+    {
+      WRITE_LOCKER(_lock);
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    THROW_ARANGO_EXCEPTION(res);
+      if (! TRI_InsertWordsFulltextIndex(_fulltextIndex, (TRI_fulltext_doc_t) ((uintptr_t) doc), wordlist)) {
+        res = TRI_ERROR_INTERNAL;
+      }
+    }
+
+    TRI_FreeWordlistFulltextIndex(wordlist);
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(res);
+    }
+  }
+  catch (...) {
+    TRI_FreeWordlistFulltextIndex(wordlist);
+    throw;
   }
 }
 
@@ -127,8 +203,8 @@ TRI_doc_mptr_t* FulltextIndex::remove (TransactionCollection*,
                                        Transaction*,
                                        std::string const&,
                                        TRI_doc_mptr_t* doc) {
-  TRI_DeleteDocumentFulltextIndex(_fulltextIndex, (TRI_fulltext_doc_t) ((uintptr_t) doc));
-  return nullptr;  // FIXME this is nonsense
+  // TRI_DeleteDocumentFulltextIndex(_fulltextIndex, (TRI_fulltext_doc_t) ((uintptr_t) doc));
+  return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -164,6 +240,7 @@ void FulltextIndex::cleanup () {
 ////////////////////////////////////////////////////////////////////////////////
   
 size_t FulltextIndex::memory () {
+  READ_LOCKER(_lock);
   return TRI_MemoryFulltextIndex(_fulltextIndex);
 }
 

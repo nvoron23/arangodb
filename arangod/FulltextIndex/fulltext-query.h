@@ -105,8 +105,7 @@ void TRI_FreeQueryFulltextIndex (TRI_fulltext_query_t*);
 ////////////////////////////////////////////////////////////////////////////////
 
 int TRI_ParseQueryFulltextIndex (TRI_fulltext_query_t*,
-                                 char const*,
-                                 bool*);
+                                 char const*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief set a search word & option for a query

@@ -171,12 +171,9 @@ void TRI_FreeQueryFulltextIndex (TRI_fulltext_query_t* query) {
 ////////////////////////////////////////////////////////////////////////////////
 
 int TRI_ParseQueryFulltextIndex (TRI_fulltext_query_t* query,
-                                 char const* queryString,
-                                 bool* isSubstringQuery) {
+                                 char const* queryString) {
   char* ptr;
   size_t i;
-
-  *isSubstringQuery = false;
 
   ptr = (char*) queryString;
   if (*ptr == '\0') {

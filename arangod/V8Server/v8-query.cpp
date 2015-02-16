@@ -39,6 +39,7 @@
 #include "FulltextIndex/fulltext-query.h"
 #include "Mvcc/CollectionOperations.h"
 #include "Mvcc/EdgeIndex.h"
+#include "Mvcc/FulltextIndex.h"
 #include "Mvcc/GeoIndex2.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/MasterpointerManager.h"
@@ -1176,6 +1177,76 @@ static void JS_MvccWithin (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     result->Set(TRI_V8_ASCII_STRING("documents"), documents);
     result->Set(TRI_V8_ASCII_STRING("distances"), distances);
+    TRI_V8_RETURN(result);
+  }
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION(ex.code());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  TRI_ASSERT(false);
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    fulltext query
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief selects documents from a fultext index
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MvccFulltext (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TransactionBase transBase(true);   // To protect against assertions, FIXME later
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
+  
+  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), TRI_GetVocBaseColType());
+
+  if (collection == nullptr) {
+    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
+  }
+  
+  TRI_THROW_SHARDING_COLLECTION_NOT_YET_IMPLEMENTED(collection);
+
+  if (args.Length() != 2) {
+    TRI_V8_THROW_EXCEPTION_USAGE("mvccFulltext(<index-handle>, <query>");
+  }
+    
+  try {
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+  
+    // extract the index
+    CollectionNameResolver resolver(collection->_vocbase); // TODO
+    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+ 
+    if (index == nullptr ||
+        index->type() != TRI_IDX_TYPE_FULLTEXT_INDEX) {
+      TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
+    }
+  
+    std::string const&& queryString = TRI_ObjectToString(args[1]);
+
+    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(static_cast<triagens::mvcc::FulltextIndex*>(index)->query(transaction, queryString));
+    
+    // setup result
+    v8::Handle<v8::Array> result = v8::Array::New(isolate, indexResult->size());
+ 
+    uint32_t i = 0;
+    for (auto const& it : *indexResult) {
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, it->getDataPtr());
+
+      if (document.IsEmpty()) {
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+      }
+
+      result->Set(i++, document);
+    }
+
     TRI_V8_RETURN(result);
   }
   catch (triagens::arango::Exception const& ex) {
@@ -2885,7 +2956,6 @@ static void FulltextQuery (SingleCollectionReadOnlyTransaction& trx,
   }
 
   string const&& queryString = TRI_ObjectToString(args[1]);
-  bool isSubstringQuery = false;
 
   TRI_fulltext_query_t* query = TRI_CreateQueryFulltextIndex(TRI_FULLTEXT_SEARCH_MAX_WORDS);
 
@@ -2893,7 +2963,7 @@ static void FulltextQuery (SingleCollectionReadOnlyTransaction& trx,
     TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
-  int res = TRI_ParseQueryFulltextIndex(query, queryString.c_str(), &isSubstringQuery);
+  int res = TRI_ParseQueryFulltextIndex(query, queryString.c_str());
 
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_FreeQueryFulltextIndex(query);
@@ -2902,12 +2972,6 @@ static void FulltextQuery (SingleCollectionReadOnlyTransaction& trx,
   }
 
   TRI_fulltext_index_t* fulltextIndex = (TRI_fulltext_index_t*) idx;
-
-  if (isSubstringQuery && ! fulltextIndex->_indexSubstrings) {
-    TRI_FreeQueryFulltextIndex(query);
-
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);
-  }
 
   TRI_fulltext_result_t* queryResult = TRI_QueryFulltextIndex(fulltextIndex->_fulltextIndex, query);
 
@@ -3371,6 +3435,7 @@ void TRI_InitV8Queries (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccLast"), JS_MvccLast, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccNear"), JS_MvccNear, true);
   TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccWithin"), JS_MvccWithin, true);
+  TRI_AddMethodVocbase(isolate, VocbaseColTempl, TRI_V8_ASCII_STRING("mvccFulltext"), JS_MvccFulltext, true);
 }
 
 // -----------------------------------------------------------------------------
