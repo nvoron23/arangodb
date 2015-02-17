@@ -68,23 +68,24 @@ namespace triagens {
         ~HashIndex ();
 
       public:
+        
+        void insert (struct TRI_doc_mptr_t*) override final;
   
-        virtual void insert (TransactionCollection*,
-                             Transaction*,
-                             struct TRI_doc_mptr_t*) override final;
+        void insert (TransactionCollection*,
+                     Transaction*,
+                     struct TRI_doc_mptr_t*) override final;
 
-        virtual struct TRI_doc_mptr_t* remove (
-                   TransactionCollection*,
-                   Transaction*,
-                   std::string const&,
-                   struct TRI_doc_mptr_t*) override final;
+        struct TRI_doc_mptr_t* remove (TransactionCollection*,
+                                       Transaction*,
+                                       std::string const&,
+                                       struct TRI_doc_mptr_t*) override final;
 
-        virtual void forget (TransactionCollection*,
-                             Transaction*,
-                             struct TRI_doc_mptr_t*) override final;
+        void forget (TransactionCollection*,
+                     Transaction*,
+                     struct TRI_doc_mptr_t*) override final;
 
-        virtual void preCommit (TransactionCollection*,
-                                Transaction*) override final;
+        void preCommit (TransactionCollection*,
+                        Transaction*) override final;
 
         std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection* coll,
                                               Transaction* trans,
@@ -132,7 +133,7 @@ namespace triagens {
 
       private:
 
-        std::vector<TRI_doc_mptr_t*>* lookupInternal(
+        std::vector<TRI_doc_mptr_t*>* lookupInternal (
                                           TransactionCollection* coll,
                                           Transaction* trans,
                                           Key const* key,
@@ -140,11 +141,10 @@ namespace triagens {
                                           size_t limit);
         size_t elementSize () const;
 
-        Element* allocateAndFillElement(TransactionCollection* coll,
-                                        TRI_doc_mptr_t* doc,
-                                        bool& includeForSparse);
+        Element* allocateAndFillElement (TRI_doc_mptr_t* doc,
+                                         bool& includeForSparse);
 
-        void deleteElement(Element*);
+        void deleteElement (Element*);
 
         std::vector<TRI_shape_pid_t> const  _paths;
 

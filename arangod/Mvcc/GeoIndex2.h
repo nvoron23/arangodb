@@ -81,23 +81,24 @@ namespace triagens {
                                                                  double,
                                                                  double,
                                                                  double);
+        
+        void insert (struct TRI_doc_mptr_t*) override final;
   
-        virtual void insert (TransactionCollection*, 
-                             Transaction*,
-                             struct TRI_doc_mptr_t*) override final;
+        void insert (TransactionCollection*, 
+                     Transaction*,
+                     struct TRI_doc_mptr_t*) override final;
 
-        virtual TRI_doc_mptr_t* remove (
-                 TransactionCollection*,
-                 Transaction*,
-                 std::string const&,
-                 struct TRI_doc_mptr_t*) override final;
+        TRI_doc_mptr_t* remove (TransactionCollection*,
+                                Transaction*,
+                                std::string const&,
+                                struct TRI_doc_mptr_t*) override final;
 
-        virtual void forget (TransactionCollection*,
-                             Transaction*,
-                             struct TRI_doc_mptr_t*) override final;
+        void forget (TransactionCollection*,
+                     Transaction*,
+                     struct TRI_doc_mptr_t*) override final;
 
-        virtual void preCommit (TransactionCollection*,
-                                Transaction*) override final;
+        void preCommit (TransactionCollection*,
+                        Transaction*) override final;
 
         bool hasSelectivity () const override final {
           return false;

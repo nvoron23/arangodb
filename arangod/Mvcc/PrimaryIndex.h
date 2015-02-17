@@ -61,22 +61,22 @@ namespace triagens {
       public:
  
         // special methods only used while opening a collection       
-        void insert (struct TRI_doc_mptr_t*);
+        void insert (struct TRI_doc_mptr_t*) override final;
         
         struct TRI_doc_mptr_t* remove (std::string const&);
         
         struct TRI_doc_mptr_t* lookup (std::string const&);
 
+        void iterate (std::function<void(struct TRI_doc_mptr_t*)>);
   
-        virtual void insert (TransactionCollection*, 
-                             Transaction*,
-                             struct TRI_doc_mptr_t*) override final;
+        void insert (TransactionCollection*, 
+                     Transaction*,
+                     struct TRI_doc_mptr_t*) override final;
 
-        virtual struct TRI_doc_mptr_t* remove (
-                  TransactionCollection*,
-                  Transaction*,
-                  std::string const&,
-                  struct TRI_doc_mptr_t*) override final;
+        struct TRI_doc_mptr_t* remove (TransactionCollection*,
+                                       Transaction*,
+                                       std::string const&,
+                                       struct TRI_doc_mptr_t*) override final;
         
         struct TRI_doc_mptr_t* remove (
                 TransactionCollection*,
@@ -84,12 +84,12 @@ namespace triagens {
                 std::string const&,
                 TransactionId&);
 
-        virtual void forget (TransactionCollection*,
-                             Transaction*,
-                             struct TRI_doc_mptr_t*) override final;
+        void forget (TransactionCollection*,
+                     Transaction*,
+                     struct TRI_doc_mptr_t*) override final;
 
-        virtual void preCommit (TransactionCollection*,
-                                Transaction*) override final;
+        void preCommit (TransactionCollection*,
+                        Transaction*) override final;
         
         struct TRI_doc_mptr_t* random (TransactionCollection*,
                                        Transaction*);

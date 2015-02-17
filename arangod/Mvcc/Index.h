@@ -66,15 +66,19 @@ namespace triagens {
         virtual ~Index ();
 
       public:
+        
+        virtual void insert (struct TRI_doc_mptr_t*) = 0;
 
         virtual void insert (TransactionCollection*,
                              Transaction*,
                              struct TRI_doc_mptr_t*) = 0;
+
         virtual struct TRI_doc_mptr_t* remove (
                          TransactionCollection*,
                          Transaction*,
                          std::string const&,
                          struct TRI_doc_mptr_t*) = 0;
+
         virtual void forget (TransactionCollection*,
                              Transaction*,
                              struct TRI_doc_mptr_t*) = 0;

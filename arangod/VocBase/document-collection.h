@@ -496,7 +496,7 @@ public:
   TRI_voc_rid_t                       _revisionId;
  
   void shutdownIndexes ();
-  void addIndex (triagens::mvcc::Index*);
+  triagens::mvcc::Index* addIndex (triagens::mvcc::Index*);
   std::vector<triagens::mvcc::Index*> indexes () const;
   triagens::mvcc::Index* lookupIndex (TRI_idx_iid_t);
   triagens::mvcc::Index* lookupIndex (TRI_idx_type_e);
@@ -509,6 +509,7 @@ public:
   TRI_voc_rid_t revisionId ();
   void updateRevisionId (TRI_voc_rid_t);
   triagens::mvcc::MasterpointerManager* masterpointerManager () const;
+  void fillIndex (triagens::mvcc::Index*);
   triagens::mvcc::MasterpointerManager* _masterpointerManager;
   
   

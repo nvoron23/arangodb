@@ -227,6 +227,10 @@ HashIndex::HashIndex (TRI_idx_iid_t id,
     _theHash(nullptr),
     _unique(unique),
     _sparse(sparse) {
+
+  for (auto it : paths) {
+    TRI_ASSERT(it != 0);
+  }
  
   try {
     _theHash = new Hash_t(hashKey(paths.size()), 
@@ -257,6 +261,24 @@ HashIndex::~HashIndex () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief insert a document into the index (called when opening a collection)
+////////////////////////////////////////////////////////////////////////////////
+        
+void HashIndex::insert (TRI_doc_mptr_t* doc) {
+  bool includeForSparse = true;
+  Element* hashElement = allocateAndFillElement(doc, includeForSparse);
+  
+  TRI_ASSERT(hashElement != nullptr);
+      
+  if (_sparse && ! includeForSparse) {
+    _theHash->insert(hashElement, false, false);
+  }
+  else {
+    deleteElement(hashElement);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief insert a document into the index
 ////////////////////////////////////////////////////////////////////////////////
         
@@ -268,76 +290,76 @@ void HashIndex::insert (TransactionCollection* coll,
   // we can skip this check in the non-unique case.
 
   bool includeForSparse = true;
+  Element* hashElement = allocateAndFillElement(doc, includeForSparse);
+      
+  if (_sparse && ! includeForSparse) {
+    deleteElement(hashElement);
+    return;
+  }
+    
+  TRI_ASSERT(hashElement != nullptr);
 
   if (! _unique) {
     WRITE_LOCKER(_lock);
-    Element* hashElement = allocateAndFillElement(coll, doc, includeForSparse);
-    TRI_ASSERT(hashElement != nullptr);
-
-    if (! _sparse || includeForSparse) {
-      try {
-        _theHash->insert(hashElement, false, false);
-      }
-      catch (...) {
-        deleteElement(hashElement);
-        throw;
-      }
+    try {
+      _theHash->insert(hashElement, false, false);
     }
-    else {
+    catch (...) {
       deleteElement(hashElement);
+      throw;
     }
+    return;
   }
-  else {  // _unique == true
-    // See whether or not we find any revision that is in conflict with us.
-    // Note that this could be a revision which we are not allowed to see!
-    WRITE_LOCKER(_lock);
-    Element* hashElement = allocateAndFillElement(coll, doc, includeForSparse);
-    if (! _sparse || includeForSparse) {
-      try {
-        std::unique_ptr<std::vector<Element*>> revisions 
-            (_theHash->lookupWithElementByKey(hashElement));
 
-        // We need to check whether or not there is any document/revision
-        // that is in conflict with the new one, that is, its to() entry is
-        // either empty or not committed before we started. Note that the from()
-        // entry does not matter at all:
-        for (auto p : *(revisions.get())) {
-          TransactionId from = p->_document->from();
-          TransactionId to = p->_document->to();
-          Transaction::VisibilityType visFrom = trans->visibility(from);
-          Transaction::VisibilityType visTo = trans->visibility(to);
-          if (visFrom == Transaction::VisibilityType::VISIBLE) {
-            if (visTo == Transaction::VisibilityType::VISIBLE) {
-              continue;  // Ignore, has been made obsolete for us
-            }
-            else if (visTo == Transaction::VisibilityType::CONCURRENT) {
-              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
-            }
-            else {  // INVISIBLE, this includes to == 0
-              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
-            }
-          }
-          else if (visFrom == Transaction::VisibilityType::CONCURRENT) {
-            if (visTo != Transaction::VisibilityType::VISIBLE ) {
-              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
-            }
-            else {
-              TRI_ASSERT(false);   // to cannot be VISIBLE unless from is
-            }
-          }
-          else {
-            TRI_ASSERT(visTo == Transaction::VisibilityType::INVISIBLE);
-               // nothing else possible
-            continue;
-          }
+  // _unique == true
+  // See whether or not we find any revision that is in conflict with us.
+  // Note that this could be a revision which we are not allowed to see!
+  WRITE_LOCKER(_lock);
+
+  try {
+    std::unique_ptr<std::vector<Element*>> revisions 
+        (_theHash->lookupWithElementByKey(hashElement));
+
+    // We need to check whether or not there is any document/revision
+    // that is in conflict with the new one, that is, its to() entry is
+    // either empty or not committed before we started. Note that the from()
+    // entry does not matter at all:
+    for (auto p : *(revisions.get())) {
+      TransactionId from = p->_document->from();
+      TransactionId to = p->_document->to();
+      Transaction::VisibilityType visFrom = trans->visibility(from);
+      Transaction::VisibilityType visTo = trans->visibility(to);
+
+      if (visFrom == Transaction::VisibilityType::VISIBLE) {
+        if (visTo == Transaction::VisibilityType::VISIBLE) {
+          continue;  // Ignore, has been made obsolete for us
         }
-        _theHash->insert(hashElement, false, false);
+        else if (visTo == Transaction::VisibilityType::CONCURRENT) {
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+        }
+        else {  // INVISIBLE, this includes to == 0
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
+        }
       }
-      catch (...) {
-        deleteElement(hashElement);
-        throw;
+      else if (visFrom == Transaction::VisibilityType::CONCURRENT) {
+        if (visTo != Transaction::VisibilityType::VISIBLE ) {
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+        }
+        else {
+          TRI_ASSERT(false);   // to cannot be VISIBLE unless from is
+        }
+      }
+      else {
+        TRI_ASSERT(visTo == Transaction::VisibilityType::INVISIBLE);
+        // nothing else possible
+        continue;
       }
     }
+    _theHash->insert(hashElement, false, false);
+  }
+  catch (...) {
+    deleteElement(hashElement);
+    throw;
   }
 }
 
@@ -359,21 +381,28 @@ TRI_doc_mptr_t* HashIndex::remove (TransactionCollection*,
 void HashIndex::forget (TransactionCollection* coll,
                         Transaction*,
                         TRI_doc_mptr_t* doc) {
-  bool dummy;
-  Element* hashElement = allocateAndFillElement(coll, doc, dummy);
+  bool includeForSparse = true;
+  Element* hashElement = allocateAndFillElement(doc, includeForSparse);
+
+  if (_sparse && ! includeForSparse) {
+    deleteElement(hashElement);
+    return;
+  }
+
   try {
     WRITE_LOCKER(_lock);
     Element* old = _theHash->remove(hashElement);
+
     if (old == nullptr) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
     }
     deleteElement(old);
+    deleteElement(hashElement);
   }
   catch (...) {
     deleteElement(hashElement);
     throw;
   }
-  deleteElement(hashElement);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -405,7 +434,7 @@ std::vector<TRI_doc_mptr_t*>* HashIndex::lookupInternal (
   else {
     TRI_ASSERT(previousLast != nullptr);
     bool dummy;
-    previousLastElement = allocateAndFillElement(coll, previousLast, dummy);
+    previousLastElement = allocateAndFillElement(previousLast, dummy);
     previousLastElementAlloc = previousLastElement;
   }
 
@@ -538,10 +567,8 @@ size_t HashIndex::elementSize () const {
 /// @brief allocateAndFillElement
 ////////////////////////////////////////////////////////////////////////////////
 
-HashIndex::Element* HashIndex::allocateAndFillElement ( 
-                                         TransactionCollection* coll,
-                                         TRI_doc_mptr_t* doc,
-                                         bool& includeForSparse) {
+HashIndex::Element* HashIndex::allocateAndFillElement (TRI_doc_mptr_t* doc,
+                                                       bool& includeForSparse) {
   auto elm 
     = static_cast<HashIndex::Element*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, 
                                                     elementSize(), false));
@@ -566,8 +593,6 @@ HashIndex::Element* HashIndex::allocateAndFillElement (
   // Extract the attribute values
   // ...........................................................................
 
-  TRI_shaper_t* shaper = coll->shaper();
-
   size_t const n = _paths.size();
 
   includeForSparse = true;
@@ -576,7 +601,7 @@ HashIndex::Element* HashIndex::allocateAndFillElement (
 
     // determine if document has that particular shape
     TRI_shape_access_t const* acc 
-          = TRI_FindAccessorVocShaper(shaper, shapedJson._sid, path);
+          = TRI_FindAccessorVocShaper(_collection->getShaper(), shapedJson._sid, path);
 
     // field not part of the object
     if (acc == nullptr || acc->_resultSid == TRI_SHAPE_ILLEGAL) {

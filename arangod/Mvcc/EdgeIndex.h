@@ -67,6 +67,8 @@ namespace triagens {
         ~EdgeIndex ();
 
       public:
+        
+        void insert (struct TRI_doc_mptr_t*) override final;
   
         void insert (TransactionCollection*,
                      Transaction*,

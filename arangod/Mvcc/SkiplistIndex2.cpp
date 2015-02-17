@@ -288,6 +288,10 @@ SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
     _unique(unique),
     _sparse(sparse) {
   
+  for (auto it : paths) {
+    TRI_ASSERT(it != 0);
+  }
+  
   try {
     _theSkipList = new SkipList_t(CmpElmElm(collection->getShaper(),
                                             paths.size()),
@@ -346,6 +350,24 @@ std::vector<TRI_doc_mptr_t*>* SkiplistIndex2::lookupContinue (
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief insert document into index (called when opening a collection)
+////////////////////////////////////////////////////////////////////////////////
+        
+void SkiplistIndex2::insert (TRI_doc_mptr_t* doc) {
+  bool includeForSparse = true;
+  Element* listElement = allocateAndFillElement(doc, includeForSparse);
+
+  TRI_ASSERT(listElement != nullptr);
+
+  if (! _sparse || includeForSparse) {
+    _theSkipList->insert(listElement);
+  }
+  else {
+    deleteElement(listElement);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
         
@@ -353,83 +375,85 @@ void SkiplistIndex2::insert (TransactionCollection* coll,
                              Transaction* trans,
                              TRI_doc_mptr_t* doc) {
   bool includeForSparse = true;
+  Element* listElement = allocateAndFillElement(doc, includeForSparse);
+    
+  if (_sparse && ! includeForSparse) {
+    deleteElement(listElement);
+    return;
+  }
+    
+  TRI_ASSERT(listElement != nullptr);
 
   if (! _unique) {
-    WRITE_LOCKER(_lock);
-    Element* listElement = allocateAndFillElement(coll, doc, includeForSparse);
-    TRI_ASSERT(listElement != nullptr);
-
-    if (! _sparse || includeForSparse) {
-      try {
-        _theSkipList->insert(listElement);
-      }
-      catch (...) {
-        deleteElement(listElement);
-        throw;
-      }
+    try {
+      WRITE_LOCKER(_lock);
+      _theSkipList->insert(listElement);
     }
-    else {
+    catch (...) {
       deleteElement(listElement);
+      throw;
     }
   }
-  else {  // _unique == true
-    // See whether or not we find any revision that is in conflict with us.
-    // Note that this could be a revision which we are not allowed to see!
-    WRITE_LOCKER(_lock);
-    Element* listElement = allocateAndFillElement(coll, doc, includeForSparse);
-    if (! _sparse || includeForSparse) {
-      try {
-        // Find the last element in the list whose key is less than ours:
-        SkipList_t::Node* node = _theSkipList->leftLookup(listElement);
-        while (true) {   // will be left by break
-          node = node->nextNode();
-          if (node == nullptr) {
-            break;
-          }
-          Element* p = node->document();
-          CmpElmElm comparer(coll->shaper(), nrIndexedFields());
-          if (comparer(listElement, p, SkipList_t::CMP_PREORDER) != 0) {
-            break;
-          }
-          TransactionId from = p->_document->from();
-          TransactionId to = p->_document->to();
-          Transaction::VisibilityType visFrom = trans->visibility(from);
-          Transaction::VisibilityType visTo = trans->visibility(to);
-          if (visFrom == Transaction::VisibilityType::VISIBLE) {
-            if (visTo == Transaction::VisibilityType::VISIBLE) {
-              continue;  // Ignore, has been made obsolete for us
-            }
-            else if (visTo == Transaction::VisibilityType::CONCURRENT) {
-              deleteElement(listElement);
-              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
-            }
-            else {  // INVISIBLE, this includes to == 0
-              deleteElement(listElement);
-              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
-            }
-          }
-          else if (visFrom == Transaction::VisibilityType::CONCURRENT) {
-            if (visTo != Transaction::VisibilityType::VISIBLE ) {
-              deleteElement(listElement);
-              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
-            }
-            else {
-              TRI_ASSERT(false);   // to cannot be VISIBLE unless from is
-            }
-          }
-          else {
-            TRI_ASSERT(visTo == Transaction::VisibilityType::INVISIBLE);
-               // nothing else possible
-            continue;
-          }
-        }
-        _theSkipList->insert(listElement);
+  
+  // _unique == true
+  // See whether or not we find any revision that is in conflict with us.
+  // Note that this could be a revision which we are not allowed to see!
+  WRITE_LOCKER(_lock);
+
+  try {
+    // Find the last element in the list whose key is less than ours:
+    SkipList_t::Node* node = _theSkipList->leftLookup(listElement);
+    while (true) {   // will be left by break
+      node = node->nextNode();
+      if (node == nullptr) {
+        break;
       }
-      catch (...) {
-        deleteElement(listElement);
-        throw;
+
+      Element* p = node->document();
+      CmpElmElm comparer(coll->shaper(), nrIndexedFields());
+      if (comparer(listElement, p, SkipList_t::CMP_PREORDER) != 0) {
+        break;
+      }
+      
+      TransactionId from = p->_document->from();
+      TransactionId to = p->_document->to();
+      Transaction::VisibilityType visFrom = trans->visibility(from);
+      Transaction::VisibilityType visTo = trans->visibility(to);
+      
+      if (visFrom == Transaction::VisibilityType::VISIBLE) {
+        if (visTo == Transaction::VisibilityType::VISIBLE) {
+          continue;  // Ignore, has been made obsolete for us
+        }
+        else if (visTo == Transaction::VisibilityType::CONCURRENT) {
+          deleteElement(listElement);
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+        }
+        else {  // INVISIBLE, this includes to == 0
+          deleteElement(listElement);
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
+        }
+      }
+      else if (visFrom == Transaction::VisibilityType::CONCURRENT) {
+        if (visTo != Transaction::VisibilityType::VISIBLE ) {
+          deleteElement(listElement);
+          THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
+        }
+        else {
+          TRI_ASSERT(false);   // to cannot be VISIBLE unless from is
+        }
+      }
+      else {
+        TRI_ASSERT(visTo == Transaction::VisibilityType::INVISIBLE);
+        // nothing else possible
+        continue;
       }
     }
+
+    _theSkipList->insert(listElement);
+  }
+  catch (...) {
+    deleteElement(listElement);
+    throw;
   }
 }
 
@@ -451,8 +475,13 @@ TRI_doc_mptr_t* SkiplistIndex2::remove (TransactionCollection*,
 void SkiplistIndex2::forget (TransactionCollection* coll,
                              Transaction* trans,
                              TRI_doc_mptr_t* doc) {
-  bool dummy;
-  Element* listElement = allocateAndFillElement(coll, doc, dummy);
+  bool includeForSparse = false;
+  Element* listElement = allocateAndFillElement(doc, includeForSparse);
+
+  if (_sparse && ! includeForSparse) {
+    deleteElement(listElement);
+    return;
+  }
 
   try {
     WRITE_LOCKER(_lock);
@@ -461,12 +490,12 @@ void SkiplistIndex2::forget (TransactionCollection* coll,
     if (res != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
     }
+    deleteElement(listElement);
   }
   catch (...) {
     deleteElement(listElement);
     throw;
   }
-  deleteElement(listElement);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -536,7 +565,6 @@ size_t SkiplistIndex2::elementSize () const {
 ////////////////////////////////////////////////////////////////////////////////
 
 SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
-                                 TransactionCollection* coll,
                                  TRI_doc_mptr_t* doc,
                                  bool& includeForSparse) {
   auto elm 
@@ -564,8 +592,6 @@ SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
   // Extract the attribute values
   // ...........................................................................
 
-  TRI_shaper_t* shaper = coll->shaper();
-
   size_t const n = _paths.size();
 
   includeForSparse = true;
@@ -574,7 +600,7 @@ SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
 
     // determine if document has that particular shape
     TRI_shape_access_t const* acc 
-          = TRI_FindAccessorVocShaper(shaper, shapedJson._sid, path);
+          = TRI_FindAccessorVocShaper(_collection->getShaper(), shapedJson._sid, path);
 
     // field not part of the object
     if (acc == nullptr || acc->_resultSid == TRI_SHAPE_ILLEGAL) {

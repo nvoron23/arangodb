@@ -58,10 +58,13 @@ namespace triagens {
         ~CapConstraint ();
 
       public:
+        
+        void insert (struct TRI_doc_mptr_t*) override final;
   
         void insert (TransactionCollection*, 
                      Transaction*,
                      struct TRI_doc_mptr_t*) = 0;
+
         struct TRI_doc_mptr_t* remove (TransactionCollection*,
                                        Transaction*,
                                        std::string const&,

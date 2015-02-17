@@ -428,10 +428,29 @@ EdgeIndex::~EdgeIndex () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief insert document into index (called when opening the collection)
+////////////////////////////////////////////////////////////////////////////////
+ 
+void EdgeIndex::insert (TRI_doc_mptr_t* doc) {
+  _from->insert(doc, false, false); // OUT
+
+  try {
+    _to->insert(doc, false, false);   // IN
+  }
+  catch (...) {
+    _from->remove(doc);
+    // insert into to failed, now rollback insert into from
+    throw;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
  
-void EdgeIndex::insert (TransactionCollection*, Transaction*, TRI_doc_mptr_t* doc) {
+void EdgeIndex::insert (TransactionCollection*, 
+                        Transaction*, 
+                        TRI_doc_mptr_t* doc) {
   WRITE_LOCKER(_lock);
 
   _from->insert(doc, false, false); // OUT
@@ -467,11 +486,13 @@ void EdgeIndex::forget (TransactionCollection*,
   WRITE_LOCKER(_lock);
 
   void* old = _from->remove(doc);
+
   if (old == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
   }
   
   old = _to->remove(doc);
+
   if (old == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_NOT_FOUND);
   }

@@ -45,6 +45,7 @@
 #include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/OpenIterator.h"
 #include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/SkiplistIndex2.h"
 #include "ShapedJson/shape-accessor.h"
 #include "Utils/transactions.h"
 #include "Utils/CollectionReadLocker.h"
@@ -174,10 +175,11 @@ void TRI_document_collection_t::shutdownIndexes () {
 /// @brief adds an index to the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-void TRI_document_collection_t::addIndex (triagens::mvcc::Index* index) {
+triagens::mvcc::Index* TRI_document_collection_t::addIndex (triagens::mvcc::Index* index) {
   WRITE_LOCKER(_indexesLock);
 
   _indexes.push_back(index);
+  return index;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -297,6 +299,25 @@ void TRI_document_collection_t::updateRevisionId (TRI_voc_rid_t revisionId) {
 
 triagens::mvcc::MasterpointerManager* TRI_document_collection_t::masterpointerManager () const {
   return _masterpointerManager;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief fill an index
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::fillIndex (triagens::mvcc::Index* index) {
+  size_t const numDocuments = documentCounter();
+  index->sizeHint(numDocuments);
+
+  auto primaryIndex = lookupIndex(TRI_IDX_TYPE_PRIMARY_INDEX);
+
+  if (primaryIndex == nullptr) {
+    return;
+  }
+  
+ static_cast<triagens::mvcc::PrimaryIndex*>(primaryIndex)->iterate([&index](TRI_doc_mptr_t* document) -> void {
+    index->insert(document);
+  });
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3977,12 +3998,14 @@ static TRI_index_t* CreateGeoIndexDocumentCollection (TRI_document_collection_t*
     return nullptr;
   }
 
+  triagens::mvcc::Index* mvccIndex;
+
   if (location != nullptr) {
     std::vector<std::string> fieldsVector{ 
       std::string(location)
     };
     std::vector<TRI_shape_pid_t> pathsVector{ loc };
-    document->addIndex(new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, ignoreNull, geoJson));
+    mvccIndex = new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, ignoreNull, geoJson);
   }
   else {
     std::vector<std::string> fieldsVector{ 
@@ -3990,7 +4013,15 @@ static TRI_index_t* CreateGeoIndexDocumentCollection (TRI_document_collection_t*
       std::string(longitude) 
     };
     std::vector<TRI_shape_pid_t> pathsVector{ lat, lon };
-    document->addIndex(new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, ignoreNull));
+    mvccIndex = new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, ignoreNull);
+  }
+  
+  try {
+    document->addIndex(mvccIndex);
+  }
+  catch (...) {
+    delete mvccIndex;
+    throw;
   }
 
   if (created != nullptr) {
@@ -4356,11 +4387,13 @@ static TRI_index_t* CreateHashIndexDocumentCollection (TRI_document_collection_t
   }
 
   std::vector<std::string> fieldsVector;
+  fieldsVector.reserve(fields._length);
   for (size_t i = 0; i < fields._length; ++i) {
     fieldsVector.push_back(std::string(static_cast<char const*>(fields._buffer[i])));
   }
 
   std::vector<TRI_shape_pid_t> pathsVector;
+  pathsVector.reserve(paths._length);
   for (size_t i = 0; i < paths._length; ++i) {
     TRI_shape_pid_t* p = reinterpret_cast<TRI_shape_pid_t*>(TRI_AtVector(&paths, i));
     pathsVector.push_back(*p);
@@ -4397,8 +4430,6 @@ static TRI_index_t* CreateHashIndexDocumentCollection (TRI_document_collection_t
   }
     
     
-  document->addIndex(new triagens::mvcc::HashIndex(idx->_iid, document, fieldsVector, pathsVector, unique, sparse));
-
   // store index and return
   res = AddIndex(document, idx);
 
@@ -4406,6 +4437,17 @@ static TRI_index_t* CreateHashIndexDocumentCollection (TRI_document_collection_t
     TRI_FreeHashIndex(idx);
 
     return nullptr;
+  }
+  
+  
+  auto mvccIndex = new triagens::mvcc::HashIndex(idx->_iid, document, fieldsVector, pathsVector, unique, sparse);
+  
+  try {
+    document->addIndex(mvccIndex);
+  }
+  catch (...) {
+    delete mvccIndex;
+    throw;
   }
 
   if (created != nullptr) {
@@ -4561,6 +4603,20 @@ static TRI_index_t* CreateSkiplistIndexDocumentCollection (TRI_document_collecti
 
     return idx;
   }
+  
+  std::vector<std::string> fieldsVector;
+  fieldsVector.reserve(fields._length);
+  for (size_t i = 0; i < fields._length; ++i) {
+    fieldsVector.push_back(std::string(static_cast<char const*>(fields._buffer[i])));
+  }
+
+  std::vector<TRI_shape_pid_t> pathsVector;
+  pathsVector.reserve(paths._length);
+  for (size_t i = 0; i < paths._length; ++i) {
+    TRI_shape_pid_t* p = reinterpret_cast<TRI_shape_pid_t*>(TRI_AtVector(&paths, i));
+    pathsVector.push_back(*p);
+  }
+
 
   // Create the skiplist index
   idx = TRI_CreateSkiplistIndex(document, iid, &fields, &paths, sparse, unique);
@@ -4591,6 +4647,16 @@ static TRI_index_t* CreateSkiplistIndexDocumentCollection (TRI_document_collecti
     TRI_FreeSkiplistIndex(idx);
 
     return nullptr;
+  }
+  
+  auto mvccIndex = new triagens::mvcc::SkiplistIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, sparse);
+  
+  try {
+    document->addIndex(mvccIndex);
+  }
+  catch (...) {
+    delete mvccIndex;
+    throw;
   }
 
   if (created != nullptr) {
@@ -4784,8 +4850,17 @@ static TRI_index_t* CreateFulltextIndexDocumentCollection (TRI_document_collecti
     return nullptr;
   }
 
+
   std::vector<std::string> fieldsVector{ std::string(attributeName) };
-  document->addIndex(new triagens::mvcc::FulltextIndex(idx->_iid, document, fieldsVector, minWordLength));
+  auto mvccIndex = new triagens::mvcc::FulltextIndex(idx->_iid, document, fieldsVector, minWordLength);
+  
+  try {
+    document->addIndex(mvccIndex);
+  }
+  catch (...) {
+    delete mvccIndex;
+    throw;
+  }
 
   if (created != nullptr) {
     *created = true;
