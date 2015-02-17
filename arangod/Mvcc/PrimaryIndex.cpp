@@ -146,6 +146,56 @@ PrimaryIndex::~PrimaryIndex () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief insert a document into the index (special method, only used while
+/// opening a collection)
+/// this method does not require locking
+////////////////////////////////////////////////////////////////////////////////
+        
+void PrimaryIndex::insert (TRI_doc_mptr_t* doc) {
+  TRI_doc_mptr_t* old = _theHash->insert(doc, false, true);
+
+  if (old != nullptr) {
+    // This is serious: a document with this exact key and revision already
+    // exists!
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_KEYVALUE_KEY_EXISTS);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove a document from the index, specialized method (only used
+/// while opening a collection)
+/// this method does not require locking
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* PrimaryIndex::remove (std::string const& key) {
+  TRI_doc_mptr_t* previous = lookup(key);
+
+  if (previous != nullptr) {
+    _theHash->remove(previous);
+  }
+
+  return previous;
+}        
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief find the visible revision by its key (only used while opening a 
+/// collection)
+/// this method does not require locking
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* PrimaryIndex::lookup (std::string const& key) {
+  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> revisions(_theHash->lookupByKey(&key));
+  
+  for (auto p : *(revisions.get())) {
+    if (p != nullptr) {
+      return p;
+    }
+  }
+
+  return nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief insert a document into the index
 ////////////////////////////////////////////////////////////////////////////////
         

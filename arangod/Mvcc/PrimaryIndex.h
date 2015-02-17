@@ -59,6 +59,14 @@ namespace triagens {
         ~PrimaryIndex ();
 
       public:
+ 
+        // special methods only used while opening a collection       
+        void insert (struct TRI_doc_mptr_t*);
+        
+        struct TRI_doc_mptr_t* remove (std::string const&);
+        
+        struct TRI_doc_mptr_t* lookup (std::string const&);
+
   
         virtual void insert (TransactionCollection*, 
                              Transaction*,

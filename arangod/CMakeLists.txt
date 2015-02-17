@@ -98,6 +98,7 @@ add_executable(
     Mvcc/IndexUser.cpp
     Mvcc/LocalTransactionManager.cpp
     Mvcc/MasterpointerManager.cpp
+    Mvcc/OpenIterator.cpp
     Mvcc/PrimaryIndex.cpp
     Mvcc/SkiplistIndex2.cpp
     Mvcc/SubTransaction.cpp

@@ -756,7 +756,7 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
 
     case TRI_WAL_MARKER_DOCUMENT: {
       // re-insert the document into the collection
-      document_marker_t const* m = reinterpret_cast<document_marker_t const*>(marker);
+      auto* m = reinterpret_cast<document_marker_t const*>(marker);
       TRI_voc_cid_t collectionId = m->_collectionId;
       TRI_voc_tick_t databaseId  = m->_databaseId;
 
@@ -834,7 +834,7 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
 
     case TRI_WAL_MARKER_EDGE: {
       // re-insert the edge into the collection
-      edge_marker_t const* m = reinterpret_cast<edge_marker_t const*>(marker);
+      auto* m = reinterpret_cast<edge_marker_t const*>(marker);
       TRI_voc_cid_t collectionId = m->_collectionId;
       TRI_voc_tick_t databaseId  = m->_databaseId;
       
@@ -918,7 +918,7 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
 
     case TRI_WAL_MARKER_REMOVE: {
       // re-apply the remove operation
-      remove_marker_t const* m = reinterpret_cast<remove_marker_t const*>(marker);
+      auto* m = reinterpret_cast<remove_marker_t const*>(marker);
       TRI_voc_cid_t collectionId = m->_collectionId;
       TRI_voc_tick_t databaseId  = m->_databaseId;
       
@@ -980,7 +980,234 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
       }
       break;
     }
-    
+
+
+    case TRI_WAL_MARKER_MVCC_DOCUMENT: {
+      // re-insert the document into the collection
+      auto* m = reinterpret_cast<mvcc_document_marker_t const*>(marker);
+      TRI_voc_cid_t collectionId = m->_collectionId;
+      TRI_voc_tick_t databaseId  = m->_databaseId;
+
+      if (state->isDropped(databaseId, collectionId)) {
+        return true;
+      }
+
+      TRI_voc_tick_t transactionId = m->_transactionIdOwn;
+      if (state->ignoreTransaction(transactionId)) {
+        // transaction was aborted
+        return true;
+      }
+        
+      char const* base = reinterpret_cast<char const*>(m); 
+      char const* key = base + m->_offsetKey;
+      TRI_shaped_json_t shaped;
+      TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, m);
+
+      int res = TRI_ERROR_NO_ERROR;
+
+      if (state->isRemoteTransaction(transactionId)) {
+        // remote operation
+        res = state->executeRemoteOperation(databaseId, collectionId, transactionId, marker, datafile->_fid, [&](RemoteTransactionType* trx, Marker* envelope) -> int { 
+          if (IsVolatile(trx->trxCollection(collectionId))) {
+            return TRI_ERROR_NO_ERROR;
+          } 
+
+          TRI_doc_mptr_copy_t mptr;
+          int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, nullptr, false, false, true);
+
+          if (res == TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED) {
+            state->policy.setExpectedRevision(m->_revisionId);
+            res = TRI_UpdateShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &state->policy, false, false);
+          }
+
+          return res;
+        });
+      }
+      else if (! state->isUsedByRemoteTransaction(collectionId)) {
+        // local operation
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int { 
+          if (IsVolatile(trx->trxCollection())) {
+            return TRI_ERROR_NO_ERROR;
+          } 
+
+          TRI_doc_mptr_copy_t mptr;
+          int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, nullptr, false, false, true);
+
+          if (res == TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED) {
+            state->policy.setExpectedRevision(m->_revisionId);
+            res = TRI_UpdateShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &state->policy, false, false);
+          }
+
+          return res;
+        });
+      }
+      else {
+        // ERROR - found a local action for a collection that has an ongoing remote transaction
+        res = TRI_ERROR_TRANSACTION_INTERNAL;
+      }
+      
+      if (res != TRI_ERROR_NO_ERROR && 
+          res != TRI_ERROR_ARANGO_CONFLICT &&
+          res != TRI_ERROR_ARANGO_DATABASE_NOT_FOUND && 
+          res != TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND) {
+        LOG_WARNING("unable to insert document in collection %llu of database %llu: %s", 
+                    (unsigned long long) collectionId,
+                    (unsigned long long) databaseId,
+                    TRI_errno_string(res));
+        return state->canContinue();
+      }
+      break;
+    }
+
+
+    case TRI_WAL_MARKER_MVCC_EDGE: {
+      // re-insert the edge into the collection
+      auto* m = reinterpret_cast<mvcc_edge_marker_t const*>(marker);
+      TRI_voc_cid_t collectionId = m->_collectionId;
+      TRI_voc_tick_t databaseId  = m->_databaseId;
+      
+      if (state->isDropped(databaseId, collectionId)) {
+        return true;
+      }
+      
+      TRI_voc_tick_t transactionId = m->_transactionIdOwn;
+      if (state->ignoreTransaction(transactionId)) {
+        return true;
+      }
+
+      char const* base = reinterpret_cast<char const*>(m); 
+      char const* key = base + m->_offsetKey;
+      TRI_document_edge_t edge;
+      edge._fromCid = m->_fromCid;
+      edge._toCid   = m->_toCid;
+      edge._fromKey = const_cast<char*>(base) + m->_offsetFromKey;
+      edge._toKey   = const_cast<char*>(base) + m->_offsetToKey;
+
+      TRI_shaped_json_t shaped;
+      TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, m);
+
+      int res = TRI_ERROR_NO_ERROR;
+      
+      if (state->isRemoteTransaction(transactionId)) {
+        // remote operation
+        res = state->executeRemoteOperation(databaseId, collectionId, transactionId, marker, datafile->_fid, [&](RemoteTransactionType* trx, Marker* envelope) -> int {
+          if (IsVolatile(trx->trxCollection(collectionId))) {
+            return TRI_ERROR_NO_ERROR;
+          } 
+
+          TRI_doc_mptr_copy_t mptr;
+          int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &edge, false, false, true);
+
+          if (res == TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED) {
+            state->policy.setExpectedRevision(m->_revisionId);
+            res = TRI_UpdateShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &state->policy, false, false);
+          }
+
+          return res;
+        });
+      }
+      else if (! state->isUsedByRemoteTransaction(collectionId)) {
+        // local operation
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int {
+          if (IsVolatile(trx->trxCollection())) {
+            return TRI_ERROR_NO_ERROR;
+          } 
+ 
+          TRI_doc_mptr_copy_t mptr;
+          int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &edge, false, false, true);
+
+          if (res == TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED) {
+            state->policy.setExpectedRevision(m->_revisionId);
+            res = TRI_UpdateShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &state->policy, false, false);
+          }
+
+          return res;
+        });
+      }
+      else {
+        // ERROR - found a local action for a collection that has an ongoing remote transaction
+        res = TRI_ERROR_TRANSACTION_INTERNAL;
+      }
+
+      if (res != TRI_ERROR_NO_ERROR && 
+          res != TRI_ERROR_ARANGO_CONFLICT &&
+          res != TRI_ERROR_ARANGO_DATABASE_NOT_FOUND && 
+          res != TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND) {
+        LOG_WARNING("unable to insert edge in collection %llu of database %llu: %s", 
+                    (unsigned long long) collectionId,
+                    (unsigned long long) databaseId,
+                    TRI_errno_string(res));
+        return state->canContinue();
+      }
+
+      break;
+    }
+
+
+    case TRI_WAL_MARKER_MVCC_REMOVE: {
+      // re-apply the remove operation
+      auto* m = reinterpret_cast<mvcc_remove_marker_t const*>(marker);
+      TRI_voc_cid_t collectionId = m->_collectionId;
+      TRI_voc_tick_t databaseId  = m->_databaseId;
+      
+      if (state->isDropped(databaseId, collectionId)) {
+        return true;
+      }
+
+      TRI_voc_tick_t transactionId = m->_transactionIdOwn;
+      if (state->ignoreTransaction(transactionId)) {
+        return true;
+      }
+     
+      char const* base = reinterpret_cast<char const*>(m); 
+      char const* key = base + sizeof(remove_marker_t);
+      int res = TRI_ERROR_NO_ERROR;
+       
+      if (state->isRemoteTransaction(transactionId)) {
+        // remote operation
+        res = state->executeRemoteOperation(databaseId, collectionId, transactionId, marker, datafile->_fid, [&](RemoteTransactionType* trx, Marker* envelope) -> int { 
+          if (IsVolatile(trx->trxCollection(collectionId))) {
+            return TRI_ERROR_NO_ERROR;
+          } 
+
+          // remove the document and ignore any potential errors
+          state->policy.setExpectedRevision(m->_revisionId);
+          TRI_RemoveShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &state->policy, false, false);
+
+          return TRI_ERROR_NO_ERROR;
+        });
+      }
+      else if (! state->isUsedByRemoteTransaction(collectionId)) {
+        // local operation
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int { 
+          if (IsVolatile(trx->trxCollection())) {
+            return TRI_ERROR_NO_ERROR;
+          } 
+
+          // remove the document and ignore any potential errors
+          state->policy.setExpectedRevision(m->_revisionId);
+          TRI_RemoveShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &state->policy, false, false);
+
+          return TRI_ERROR_NO_ERROR;
+        });
+      }
+      else {
+        // ERROR - found a local action for a collection that has an ongoing remote transaction
+        res = TRI_ERROR_TRANSACTION_INTERNAL;
+      }
+
+      if (res != TRI_ERROR_NO_ERROR && 
+          res != TRI_ERROR_ARANGO_CONFLICT &&
+          res != TRI_ERROR_ARANGO_DATABASE_NOT_FOUND && 
+          res != TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND) {
+        LOG_WARNING("unable to remove document in collection %llu of database %llu: %s", 
+                    (unsigned long long) collectionId,
+                    (unsigned long long) databaseId,
+                    TRI_errno_string(res));
+        return state->canContinue();
+      }
+      break;
+    }
 
     // -----------------------------------------------------------------------------
     // transactions

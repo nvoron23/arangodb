@@ -80,6 +80,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/IndexUser.cpp \
 	arangod/Mvcc/LocalTransactionManager.cpp \
 	arangod/Mvcc/MasterpointerManager.cpp \
+	arangod/Mvcc/OpenIterator.cpp \
 	arangod/Mvcc/PrimaryIndex.cpp \
 	arangod/Mvcc/SkiplistIndex2.cpp \
 	arangod/Mvcc/SubTransaction.cpp \

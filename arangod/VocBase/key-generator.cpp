@@ -289,7 +289,7 @@ int TraditionalKeyGenerator::validate (std::string const& key,
 /// @brief track usage of a key
 ////////////////////////////////////////////////////////////////////////////////
 
-void TraditionalKeyGenerator::track (TRI_voc_key_t) {
+void TraditionalKeyGenerator::track (char const*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -433,7 +433,7 @@ int AutoIncrementKeyGenerator::validate (std::string const& key,
 /// @brief track usage of a key
 ////////////////////////////////////////////////////////////////////////////////
 
-void AutoIncrementKeyGenerator::track (TRI_voc_key_t key) {
+void AutoIncrementKeyGenerator::track (char const* key) {
   // check the numeric key part
   uint64_t value = TRI_UInt64String(key);
 

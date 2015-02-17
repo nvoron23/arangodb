@@ -43,6 +43,7 @@
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/MasterpointerManager.h"
+#include "Mvcc/OpenIterator.h"
 #include "Mvcc/PrimaryIndex.h"
 #include "ShapedJson/shape-accessor.h"
 #include "Utils/transactions.h"
@@ -349,9 +350,7 @@ static int FulltextIndexFromJson (TRI_document_collection_t*,
 ////////////////////////////////////////////////////////////////////////////////
 
 static uint64_t HashKeyDatafile (TRI_associative_pointer_t* array, void const* key) {
-  TRI_voc_fid_t const* k = static_cast<TRI_voc_fid_t const*>(key);
-
-  return *k;
+  return *(static_cast<TRI_voc_fid_t const*>(key));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2339,7 +2338,7 @@ static int IterateMarkersCollection (TRI_collection_t* collection) {
 
   // read all documents and fill primary index
   TRI_IterateCollection(collection, OpenIterator, &openState);
-
+  
   LOG_TRACE("found %llu document markers, %llu deletion markers for collection '%s'",
             (unsigned long long) openState._documents,
             (unsigned long long) openState._deletions,
@@ -2349,6 +2348,14 @@ static int IterateMarkersCollection (TRI_collection_t* collection) {
   OpenIteratorAbortTransaction(&openState);
 
   TRI_DestroyVector(&openState._operations);
+  
+  
+  {
+    // TODO: activate this to load documents into MVCC indexes
+    // triagens::mvcc::OpenIteratorState state(reinterpret_cast<TRI_document_collection_t*>(collection));
+    // TRI_IterateCollection(collection, triagens::mvcc::OpenIterator::execute, &state);
+  }
+
 
   return TRI_ERROR_NO_ERROR;
 }

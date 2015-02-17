@@ -217,9 +217,6 @@ void MasterpointerManager::link (TRI_doc_mptr_t* mptr) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void MasterpointerManager::unlink (TRI_doc_mptr_t* mptr) {
-  // this can fail...
-  _toRecycle.emplace_back(mptr);
-
   {
     MUTEX_LOCKER(_lock);
     if (_head == mptr) {
@@ -236,6 +233,8 @@ void MasterpointerManager::unlink (TRI_doc_mptr_t* mptr) {
   if (mptr->_next != nullptr) {
     mptr->_next->_prev = mptr->_prev;
   }
+
+  recycle(mptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
