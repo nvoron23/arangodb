@@ -113,91 +113,6 @@ GeoIndex2::~GeoIndex2 () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief insert document into index
-////////////////////////////////////////////////////////////////////////////////
-
-void GeoIndex2::insert (TransactionCollection*,
-                        Transaction*,
-                        TRI_doc_mptr_t* doc) {
-  TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
-
-  // lookup latitude and longitude
-  TRI_shaped_json_t shapedJson;
-  TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME
-
-  bool ok;
-  bool missing;
-  double latitude;
-  double longitude;
-
-  if (_location != 0) {
-    if (_geoJson) {
-      ok = extractDoubleList(shaper, &shapedJson, _location, &longitude, &latitude, &missing);
-    }
-    else {
-      ok = extractDoubleList(shaper, &shapedJson, _location, &latitude, &longitude, &missing);
-    }
-  }
-  else {
-    ok = extractDoubleArray(shaper, &shapedJson, _latitude, &latitude, &missing);
-    ok = ok && extractDoubleArray(shaper, &shapedJson, _longitude, &longitude, &missing);
-  }
-
-  if (! ok) {
-    if (_unique) {
-      if (_ignoreNull && missing) {
-        return;
-      }
-      else {
-        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
-      }
-    }
-    else {
-      return;
-    }
-  }
-
-  // and insert into index
-  GeoCoordinate gc;
-  gc.latitude = latitude;
-  gc.longitude = longitude;
-  gc.data = static_cast<void*>(doc);
-
-  WRITE_LOCKER(_lock);
-  int res = GeoIndex_insert(_geoIndex, &gc);
-
-  if (res < 0) {
-    if (res == -1) {
-      THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
-    }
-    if (res == -2) {
-      THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
-    }
-    if (res == -3) {
-      if (_unique) {
-        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
-      }
-      else {
-        return;
-      }
-    }
-
-    THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief remove document from index
-////////////////////////////////////////////////////////////////////////////////
-
-TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
-                                   Transaction*,
-                                   std::string const&,
-                                   TRI_doc_mptr_t* doc) {
-  return nullptr;  
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief query documents near a coordinate
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -310,12 +225,128 @@ std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::within (Transaction*
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief insert document into index
+////////////////////////////////////////////////////////////////////////////////
+
+void GeoIndex2::insert (TransactionCollection*,
+                        Transaction*,
+                        TRI_doc_mptr_t* doc) {
+  TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
+
+  // lookup latitude and longitude
+  TRI_shaped_json_t shapedJson;
+  TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME
+
+  bool ok;
+  bool missing;
+  double latitude;
+  double longitude;
+
+  if (_location != 0) {
+    if (_geoJson) {
+      ok = extractDoubleList(shaper, &shapedJson, _location, &longitude, &latitude, &missing);
+    }
+    else {
+      ok = extractDoubleList(shaper, &shapedJson, _location, &latitude, &longitude, &missing);
+    }
+  }
+  else {
+    ok = extractDoubleArray(shaper, &shapedJson, _latitude, &latitude, &missing);
+    ok = ok && extractDoubleArray(shaper, &shapedJson, _longitude, &longitude, &missing);
+  }
+
+  if (! ok) {
+    if (_unique) {
+      if (_ignoreNull && missing) {
+        return;
+      }
+      else {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
+      }
+    }
+    else {
+      return;
+    }
+  }
+
+  // and insert into index
+  GeoCoordinate gc;
+  gc.latitude = latitude;
+  gc.longitude = longitude;
+  gc.data = static_cast<void*>(doc);
+
+  WRITE_LOCKER(_lock);
+  int res = GeoIndex_insert(_geoIndex, &gc);
+
+  if (res < 0) {
+    if (res == -1) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
+    }
+    if (res == -2) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+    }
+    if (res == -3) {
+      if (_unique) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
+      }
+      else {
+        return;
+      }
+    }
+
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove document from index
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
+                                   Transaction*,
+                                   std::string const&,
+                                   TRI_doc_mptr_t* doc) {
+  return nullptr;  
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief forget document in index
 ////////////////////////////////////////////////////////////////////////////////
 
 void GeoIndex2::forget (TransactionCollection*,
                         Transaction*,
                         TRI_doc_mptr_t* doc) {
+  bool ok;
+  bool missing;
+  double latitude;
+  double longitude;
+  
+  TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
+
+  // lookup latitude and longitude
+  TRI_shaped_json_t shapedJson;
+  TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME
+
+  // lookup OLD latitude and longitude
+  if (_location != 0) {
+    ok = extractDoubleList(shaper, &shapedJson, _location, &latitude, &longitude, &missing);
+  }
+  else {
+    ok = extractDoubleArray(shaper, &shapedJson, _latitude, &latitude, &missing);
+    ok = ok && extractDoubleArray(shaper, &shapedJson, _longitude, &longitude, &missing);
+  }
+
+  // ignore non-existing elements in geo-index
+  // and remove old entry
+  if (ok) {
+    GeoCoordinate gc;
+    gc.latitude = latitude;
+    gc.longitude = longitude;
+    gc.data = static_cast<void*>(doc);
+  
+    WRITE_LOCKER(_lock);
+    GeoIndex_remove(_geoIndex, &gc);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
