@@ -2,6 +2,7 @@
 /*jshint strict: false, unused: false */
 /*global Backbone, $, window, arangoHelper, templateEngine, Joi, _, modalDialogHelper, alert*/
 (function() {
+
   window.ApplicationDetailView = Backbone.View.extend({
     el: '#content',
 
@@ -11,7 +12,9 @@
       'click .open': 'openApp',
       'click .delete': 'deleteApp',
       'click #configure-app': 'showConfigureDialog',
-      'click #app-switch-mode': 'toggleDevelopment'
+      'click #app-switch-mode': 'toggleDevelopment',
+      'click #app-setup': 'setup',
+      'click #app-teardown': 'teardown'
     },
 
     updateConfig: function() {
@@ -35,6 +38,18 @@
           $("#app-development-indicator").css("display", "none");
         }
       }.bind(this));
+    },
+
+    setup: function() {
+      this.model.setup(function(data) {
+
+      });
+    },
+
+    teardown: function() {
+      this.model.teardown(function(data) {
+
+      });
     },
 
     render: function() {
