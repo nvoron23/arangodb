@@ -568,20 +568,16 @@ static TRI_vector_pointer_t GetCollectionsCluster (TRI_vocbase_t* vocbase) {
 /// @brief get all cluster collection names
 ////////////////////////////////////////////////////////////////////////////////
 
-static TRI_vector_string_t GetCollectionNamesCluster (TRI_vocbase_t* vocbase) {
-  TRI_vector_string_t result;
-  TRI_InitVectorString(&result, TRI_UNKNOWN_MEM_ZONE);
+static std::vector<std::string> GetCollectionNamesCluster (TRI_vocbase_t* vocbase) {
+  std::vector<std::string> result;
 
   std::vector<shared_ptr<CollectionInfo> > const& collections
       = ClusterInfo::instance()->getCollections(vocbase->_name);
 
-  for (size_t i = 0, n = collections.size(); i < n; ++i) {
-    string const& name = collections[i]->name();
-    char* s = TRI_DuplicateString2Z(TRI_UNKNOWN_MEM_ZONE, name.c_str(), name.size());
+  result.reserve(collections.size());
 
-    if (s != nullptr) {
-      TRI_PushBackVectorString(&result, s);
-    }
+  for (size_t i = 0, n = collections.size(); i < n; ++i) {
+    result.emplace_back(collections[i]->name());
   }
 
   return result;
@@ -4544,39 +4540,34 @@ static void JS_CompletionsVocbase (const v8::FunctionCallbackInfo<v8::Value>& ar
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
+  auto result = v8::Array::New(isolate);
+
   TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
 
   if (vocbase == nullptr) {
-    TRI_V8_RETURN(v8::Array::New(isolate));
+    TRI_V8_RETURN(result);
   }
 
-  TRI_vector_string_t names;
-  if (ServerState::instance()->isCoordinator()) {
-    if (ClusterInfo::instance()->doesDatabaseExist(vocbase->_name)) {
-      names = GetCollectionNamesCluster(vocbase);
+  std::vector<std::string> names;
+
+  try {
+    if (ServerState::instance()->isCoordinator()) {
+      if (ClusterInfo::instance()->doesDatabaseExist(vocbase->_name)) {
+        names = GetCollectionNamesCluster(vocbase);
+      }
     }
     else {
-      TRI_InitVectorString(&names, TRI_UNKNOWN_MEM_ZONE);
+      names = TRI_CollectionNamesVocBase(vocbase);
     }
   }
-  else {
-    names = TRI_CollectionNamesVocBase(vocbase);
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 
-  size_t n = names._length;
   uint32_t j = 0;
-
-  auto result = v8::Array::New(isolate);
-  // add collection names
-  for (size_t i = 0;  i < n;  ++i) {
-    char const* name = TRI_AtVectorString(&names, i);
-
-    if (name != nullptr) {
-      result->Set(j++, TRI_V8_STRING(name));
-    }
+  for (auto const& it : names) {
+    result->Set(j++, TRI_V8_STD_STRING(it));
   }
-
-  TRI_DestroyVectorString(&names);
 
   // add function names. these are hard coded
   static const std::vector<std::string> BuiltInMethods{

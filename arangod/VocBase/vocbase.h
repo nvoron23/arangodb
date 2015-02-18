@@ -471,7 +471,7 @@ TRI_vector_pointer_t TRI_CollectionsVocBase (TRI_vocbase_t*);
 /// @brief returns names of all known collections
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_vector_string_t TRI_CollectionNamesVocBase (TRI_vocbase_t*);
+std::vector<std::string> TRI_CollectionNamesVocBase (TRI_vocbase_t*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns all known (document) collections with their parameters

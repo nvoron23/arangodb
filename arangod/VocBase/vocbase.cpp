@@ -1646,29 +1646,30 @@ TRI_vector_pointer_t TRI_CollectionsVocBase (TRI_vocbase_t* vocbase) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief returns names of all known (document) collections
+/// @brief returns names of all collections
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_vector_string_t TRI_CollectionNamesVocBase (TRI_vocbase_t* vocbase) {
-  TRI_vector_string_t result;
-
-  TRI_InitVectorString(&result, TRI_UNKNOWN_MEM_ZONE);
+std::vector<std::string> TRI_CollectionNamesVocBase (TRI_vocbase_t* vocbase) {
+  std::vector<std::string> result;
 
   TRI_READ_LOCK_COLLECTIONS_VOCBASE(vocbase);
+  result.reserve(vocbase->_collectionsByName._nrUsed);
 
-  for (size_t i = 0;  i < vocbase->_collectionsById._nrAlloc;  ++i) {
-    TRI_vocbase_col_t* found = static_cast<TRI_vocbase_col_t*>(vocbase->_collectionsById._table[i]);
+  try {
+    for (size_t i = 0;  i < vocbase->_collectionsById._nrAlloc;  ++i) {
+      TRI_vocbase_col_t* found = static_cast<TRI_vocbase_col_t*>(vocbase->_collectionsById._table[i]);
 
-    if (found != nullptr) {
-      char const* name = found->_name;
-
-      if (name != nullptr) {
-        TRI_PushBackVectorString(&result, TRI_DuplicateStringZ(TRI_UNKNOWN_MEM_ZONE, name));
+      if (found != nullptr && found->_name != nullptr) {
+        result.push_back(found->_name);
       }
     }
-  }
 
-  TRI_READ_UNLOCK_COLLECTIONS_VOCBASE(vocbase);
+    TRI_READ_UNLOCK_COLLECTIONS_VOCBASE(vocbase);
+  }
+  catch (...) {
+    TRI_READ_UNLOCK_COLLECTIONS_VOCBASE(vocbase);
+    throw;
+  }
 
   return result;
 }
