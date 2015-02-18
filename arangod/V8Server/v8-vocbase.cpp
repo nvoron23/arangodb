@@ -27,46 +27,45 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "v8-vocbaseprivate.h"
-#include "v8-wrapshapedjson.h"
-#include "v8-replication.h"
-#include "v8-vocindex.h"
-#include "v8-collection.h"
-
-#include "VocBase/general-cursor.h"
-#include "v8-voccursor.h"
-
 #include "Aql/Query.h"
 #include "Aql/QueryRegistry.h"
 #include "Basics/Utf8Helper.h"
-
 #include "Basics/conversions.h"
 #include "Basics/json-utilities.h"
 #include "Basics/MutexLocker.h"
-#include "Utils/transactions.h"
-#include "Utils/V8ResolverGuard.h"
-
-#include "HttpServer/ApplicationEndpointServer.h"
-#include "V8/v8-conv.h"
-#include "V8/v8-utils.h"
-#include "V8/V8LineEditor.h"
-#include "Wal/LogfileManager.h"
-
-#include "VocBase/auth.h"
-#include "v8.h"
-#include "V8/JSLoader.h"
-
 #include "Cluster/AgencyComm.h"
 #include "Cluster/ClusterComm.h"
 #include "Cluster/ClusterInfo.h"
 #include "Cluster/ClusterMethods.h"
 #include "Cluster/ServerState.h"
-
-#include "unicode/timezone.h"
-#include "unicode/smpdtfmt.h"
-#include "unicode/dtfmtsym.h"
-
+#include "HttpServer/ApplicationEndpointServer.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionId.h"
+#include "Mvcc/TransactionManager.h"
+#include "Mvcc/TransactionScope.h"
+#include "Mvcc/TransactionStackAccessor.h"
 #include "RestServer/ConsoleThread.h"
+#include "Utils/transactions.h"
+#include "Utils/V8ResolverGuard.h"
+#include "Utils/Exception.h"
+#include "VocBase/auth.h"
+#include "VocBase/general-cursor.h"
+#include "V8/JSLoader.h"
+#include "V8/v8-conv.h"
+#include "V8/v8-utils.h"
+#include "V8/V8LineEditor.h"
+#include "V8Server/v8-collection.h"
+#include "V8Server/v8-replication.h"
+#include "V8Server/v8-vocbaseprivate.h"
+#include "V8Server/v8-voccursor.h"
+#include "V8Server/v8-vocindex.h"
+#include "V8Server/v8-wrapshapedjson.h"
+#include "Wal/LogfileManager.h"
+
+#include <unicode/timezone.h>
+#include <unicode/smpdtfmt.h>
+#include <unicode/dtfmtsym.h>
+#include <v8.h>
 
 using namespace std;
 using namespace triagens::basics;
@@ -139,13 +138,6 @@ static v8::Handle<v8::Object> WrapClass (v8::Isolate *isolate,
 // -----------------------------------------------------------------------------
 // --SECTION--                                              javascript functions
 // -----------------------------------------------------------------------------
-
-#include "Mvcc/Transaction.h"
-#include "Mvcc/TransactionId.h"
-#include "Mvcc/TransactionManager.h"
-#include "Mvcc/TransactionScope.h"
-#include "Mvcc/TransactionStackAccessor.h"
-#include "Utils/Exception.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a v8 transaction id value from the internal transaction id

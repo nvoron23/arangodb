@@ -3316,7 +3316,6 @@ static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_THROW_EXCEPTION(res);
   }
 
-  
   // need a fake old transaction in order to not throw - can be removed later       
   TransactionBase oldTrx(true);
 
@@ -4567,7 +4566,7 @@ static void JS_CompletionsVocbase (const v8::FunctionCallbackInfo<v8::Value>& ar
   size_t n = names._length;
   uint32_t j = 0;
 
-  v8::Handle<v8::Array> result = v8::Array::New(isolate);
+  auto result = v8::Array::New(isolate);
   // add collection names
   for (size_t i = 0;  i < n;  ++i) {
     char const* name = TRI_AtVectorString(&names, i);
@@ -4580,30 +4579,43 @@ static void JS_CompletionsVocbase (const v8::FunctionCallbackInfo<v8::Value>& ar
   TRI_DestroyVectorString(&names);
 
   // add function names. these are hard coded
-  result->Set(j++, TRI_V8_ASCII_STRING("_changeMode()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_collection()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_collections()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_create()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_createDatabase()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_createDocumentCollection()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_createEdgeCollection()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_createStatement()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_document()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_drop()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_dropDatabase()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_executeTransaction()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_exists()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_id"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_isSystem()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_listDatabases()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_name()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_path()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_query()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_remove()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_replace()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_update()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_useDatabase()"));
-  result->Set(j++, TRI_V8_ASCII_STRING("_version()"));
+  static const std::vector<std::string> BuiltInMethods{
+    "_beginTransaction()",
+    "_changeMode()",
+    "_collection()",
+    "_collections()",
+    "_commitTransaction()",
+    "_create()",
+    "_createDatabase()",
+    "_createDocumentCollection()",
+    "_createEdgeCollection()",
+    "_document()",
+    "_drop()",
+    "_dropDatabase()",
+    "_executeTransaction()",
+    "_exists()",
+    "_id",
+    "_isSystem()",
+    "_listDatabases()",
+    "_listTransactions()",
+    "_name()",
+    "_path()",
+    "_popTransaction()",
+    "_pushTransaction()",
+    "_query()",
+    "_remove()",
+    "_replace()",
+    "_rollbackTransaction()",
+    "_stackTransactions()",
+    "_transaction()",
+    "_update()",
+    "_useDatabase()",
+    "_version()"
+  };
+
+  for (auto const& it : BuiltInMethods) {
+    result->Set(j++, TRI_V8_STD_STRING(it));
+  }
 
   TRI_V8_RETURN(result);
 }
