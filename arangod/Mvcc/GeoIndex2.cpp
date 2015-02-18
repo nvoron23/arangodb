@@ -53,8 +53,6 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
                       TRI_document_collection_t* collection,
                       std::vector<std::string> const& fields,
                       std::vector<TRI_shape_pid_t> const& paths,
-                      bool unique,
-                      bool ignoreNull,
                       bool geoJson)
   : Index(id, collection, fields),
     _lock(),
@@ -64,9 +62,7 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
     _location(paths[0]),
     _latitude(0),
     _longitude(0),
-    _geoJson(geoJson),
-    _unique(unique),
-    _ignoreNull(ignoreNull) {
+    _geoJson(geoJson) {
  
   _geoIndex = GeoIndex_new();
 
@@ -82,9 +78,7 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
 GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
                       TRI_document_collection_t* collection,
                       std::vector<std::string> const& fields,
-                      std::vector<TRI_shape_pid_t> const& paths,
-                      bool unique,
-                      bool ignoreNull)
+                      std::vector<TRI_shape_pid_t> const& paths) 
   : Index(id, collection, fields),
     _lock(),
     _paths(paths),
@@ -93,9 +87,7 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
     _location(0),
     _latitude(paths[0]),
     _longitude(paths[1]),
-    _geoJson(false),
-    _unique(unique),
-    _ignoreNull(ignoreNull) {
+    _geoJson(false) {
   
   _geoIndex = GeoIndex_new();
 
@@ -266,17 +258,8 @@ void GeoIndex2::insert (TransactionCollection*,
   }
 
   if (! ok) {
-    if (_unique) {
-      if (_ignoreNull && missing) {
-        return;
-      }
-      else {
-        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
-      }
-    }
-    else {
-      return;
-    }
+    // invalid location values. simply ignore them
+    return; 
   }
 
   // and insert into index
@@ -296,12 +279,8 @@ void GeoIndex2::insert (TransactionCollection*,
       THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
     }
     if (res == -3) {
-      if (_unique) {
-        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_GEO_INDEX_VIOLATED);
-      }
-      else {
-        return;
-      }
+      // location values out of bounds. simply ignore them
+      return;
     }
 
     THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
@@ -425,10 +404,14 @@ Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
     json("geoJson", Json(zone, _geoJson));
   }
 
-  // "constraint" and "unique" are identical for geo indexes.
-  // we return "constraint" just for downwards-compatibility
-  json("constraint", Json(zone, _unique))
-      ("ignoreNull", Json(zone, _ignoreNull));
+  // geo indexes are always non-unique
+  // geo indexes are always sparse. 
+  // "ignoreNull" has the same meaning as "sparse" and is only returned for backwards compatibility
+  // the "constraint" attribute has no meaning since ArangoDB 2.5 and is only returned for backwards compatibility
+  json("constraint", Json(zone, false))
+      ("unique", Json(zone, false))
+      ("ignoreNull", Json(zone, true))
+      ("sparse", Json(zone, true));
 
   Json fields(zone, Json::Object, f.size());
 

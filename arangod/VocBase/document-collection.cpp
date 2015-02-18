@@ -4003,7 +4003,7 @@ static TRI_index_t* CreateGeoIndexDocumentCollection (TRI_document_collection_t*
       std::string(location)
     };
     std::vector<TRI_shape_pid_t> pathsVector{ loc };
-    mvccIndex = new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, ignoreNull, geoJson);
+    mvccIndex = new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, geoJson);
   }
   else {
     std::vector<std::string> fieldsVector{ 
@@ -4011,7 +4011,7 @@ static TRI_index_t* CreateGeoIndexDocumentCollection (TRI_document_collection_t*
       std::string(longitude) 
     };
     std::vector<TRI_shape_pid_t> pathsVector{ lat, lon };
-    mvccIndex = new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, ignoreNull);
+    mvccIndex = new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector);
   }
   
   try {
@@ -4077,7 +4077,7 @@ static int GeoIndexFromJson (TRI_document_collection_t* document,
 
     // need just one field
     if (fieldCount == 1) {
-      TRI_json_t* loc = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 0));
+      TRI_json_t const* loc = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 0));
 
       idx = CreateGeoIndexDocumentCollection(document,
                                         loc->_value._string.data,
@@ -4104,8 +4104,8 @@ static int GeoIndexFromJson (TRI_document_collection_t* document,
   // attribute style
   else if (TRI_EqualString(typeStr, "geo2")) {
     if (fieldCount == 2) {
-      TRI_json_t* lat = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 0));
-      TRI_json_t* lon = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 1));
+      TRI_json_t const* lat = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 0));
+      TRI_json_t const* lon = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 1));
 
       idx = CreateGeoIndexDocumentCollection(document,
                                              nullptr,

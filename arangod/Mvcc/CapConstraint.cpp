@@ -82,7 +82,7 @@ void CapConstraint::insert (TRI_doc_mptr_t* doc) {
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-void CapConstraint::insert (TransactionCollection* traColl,
+void CapConstraint::insert (TransactionCollection*,
                             Transaction*,
                             TRI_doc_mptr_t* doc) {
   if (_size > 0) {
@@ -90,7 +90,7 @@ void CapConstraint::insert (TransactionCollection* traColl,
     auto marker = static_cast<TRI_df_marker_t const*>(doc->getDataPtr());  // ONLY IN INDEX, PROTECTED by RUNTIME
 
     // check if the document would be too big
-    if ((int64_t) marker->_size > (int64_t) _size) {
+    if (static_cast<int64_t>(marker->_size) > _size) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TOO_LARGE);
     }
   }
@@ -104,14 +104,15 @@ TRI_doc_mptr_t* CapConstraint::remove (TransactionCollection*,
                                        Transaction*,
                                        std::string const&,
                                        TRI_doc_mptr_t*) {
-  return nullptr;  // FIXME: this is nonsense
+  return nullptr; 
 }  
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief forget a document (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-void CapConstraint::forget (TransactionCollection*, Transaction*,
+void CapConstraint::forget (TransactionCollection*, 
+                            Transaction*,
                             TRI_doc_mptr_t*) {
 }  
 
@@ -119,7 +120,8 @@ void CapConstraint::forget (TransactionCollection*, Transaction*,
 /// @brief preCommit a document (does nothing so far)
 ////////////////////////////////////////////////////////////////////////////////
 
-void CapConstraint::preCommit (TransactionCollection*, Transaction*) {
+void CapConstraint::preCommit (TransactionCollection*,
+                               Transaction*) {
 }  
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -57,16 +57,12 @@ namespace triagens {
                    struct TRI_document_collection_t*,
                    std::vector<std::string> const&,
                    std::vector<TRI_shape_pid_t> const&,
-                   bool unique,
-                   bool ignoreNull,
                    bool geoJson);
         
         GeoIndex2 (TRI_idx_iid_t id,
                    struct TRI_document_collection_t*,
                    std::vector<std::string> const&,
-                   std::vector<TRI_shape_pid_t> const&,
-                   bool unique,
-                   bool ignoreNull);
+                   std::vector<TRI_shape_pid_t> const&);
 
         ~GeoIndex2 ();
 
@@ -206,17 +202,6 @@ namespace triagens {
 
         bool _geoJson;
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief whether the index is unique
-////////////////////////////////////////////////////////////////////////////////
-
-        bool _unique;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief whether the index should ignore null attributes
-////////////////////////////////////////////////////////////////////////////////
-
-        bool _ignoreNull;
     };
 
   }
