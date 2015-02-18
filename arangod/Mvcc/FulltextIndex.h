@@ -36,11 +36,7 @@
 #include "FulltextIndex/fulltext-index.h"
 #include "ShapedJson/shaped-json.h"
 
-struct TRI_doc_mptr_t;
-struct TRI_document_collection_t;
 struct TRI_fulltext_wordlist_s;
-struct TRI_json_t;
-struct TRI_transaction_collection_s;
 
 namespace triagens {
   namespace mvcc {
@@ -51,20 +47,25 @@ namespace triagens {
 
     class FulltextIndex : public Index {
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
+
       public:
 
-        FulltextIndex (TRI_idx_iid_t id,
+        FulltextIndex (TRI_idx_iid_t,
                        struct TRI_document_collection_t*,
-                       std::vector<std::string> const& fields,
-                       int minWordLength);
+                       std::vector<std::string> const&,
+                       int);
 
         ~FulltextIndex ();
 
+// -----------------------------------------------------------------------------
+// --SECTION--                            public methods, inherited from Index.h
+// -----------------------------------------------------------------------------
+
       public:
 
-        std::vector<TRI_doc_mptr_t*>* query (Transaction*,
-                                             std::string const&);
-        
         void insert (struct TRI_doc_mptr_t*) override final;
         
         void insert (TransactionCollection*, 
@@ -92,7 +93,9 @@ namespace triagens {
         }
 
         void cleanup () override final;
+
         size_t memory () override final;
+
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
@@ -102,15 +105,57 @@ namespace triagens {
         std::string typeName () const override final {
           return "fulltext";
         }
+        
+        void clickLock () override final {
+          _lock.writeLock();
+          _lock.writeUnlock();
+        }
 
-      private:
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+      public:
+        
+        std::vector<TRI_doc_mptr_t*>* query (Transaction*,
+                                             std::string const&);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+      private: 
 
         struct TRI_fulltext_wordlist_s* getWordlist (struct TRI_doc_mptr_t const*);
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+
       private:
-  
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the index R/W lock
+////////////////////////////////////////////////////////////////////////////////
+        
+        triagens::basics::ReadWriteLock   _lock;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the fulltext index
+////////////////////////////////////////////////////////////////////////////////
+
         TRI_fts_index_t* _fulltextIndex;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the indexed attribute (path)
+////////////////////////////////////////////////////////////////////////////////
+
         TRI_shape_pid_t _attribute;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief minimum word length
+////////////////////////////////////////////////////////////////////////////////
+
         int _minWordLength;
 
     };

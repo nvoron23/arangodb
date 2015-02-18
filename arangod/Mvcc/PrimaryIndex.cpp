@@ -28,14 +28,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "PrimaryIndex.h"
-#include "Basics/fasthash.h"
 #include "Basics/gcd.h"
 #include "Basics/WriteLocker.h"
 #include "Basics/ReadLocker.h"
+#include "Mvcc/TransactionCollection.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
-
-#include "Mvcc/TransactionCollection.h"
 
 using namespace triagens::basics;
 using namespace triagens::mvcc;
@@ -78,8 +76,8 @@ static uint64_t hashElement (TRI_doc_mptr_t const* elm, bool byKey) {
 /// @brief comparison function key/element
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool compareKeyElement(std::string const* key,
-                              TRI_doc_mptr_t const* elm) {
+static bool compareKeyElement (std::string const* key,
+                               TRI_doc_mptr_t const* elm) {
   // Maybe the hash alone can decide inequality:
   uint64_t hash = PrimaryIndex::hashKeyString(key->c_str(), key->size());
   if (hash != elm->getHash()) {
@@ -94,9 +92,9 @@ static bool compareKeyElement(std::string const* key,
 /// @brief comparison function element/element
 ////////////////////////////////////////////////////////////////////////////////
 
-static bool compareElementElement(TRI_doc_mptr_t const* left,
-                                  TRI_doc_mptr_t const* right,
-                                  bool byKey) {
+static bool compareElementElement (TRI_doc_mptr_t const* left,
+                                   TRI_doc_mptr_t const* right,
+                                   bool byKey) {
   // Does the hash tell us inequality?
   if (left->getHash() != right->getHash()) {
     return false;
@@ -126,6 +124,7 @@ PrimaryIndex::PrimaryIndex (TRI_idx_iid_t id,
                             TRI_document_collection_t* collection)
   : Index(id, collection, 
           std::vector<std::string>( { TRI_VOC_ATTRIBUTE_KEY } )),
+    _lock(),
     _theHash(nullptr) {
   
   _theHash = new PrimaryIndexHash_t(hashKey, hashElement,

@@ -33,12 +33,7 @@
 #include "Basics/Common.h"
 #include "Basics/JsonHelper.h"
 #include "Mvcc/Index.h"
-#include "HashIndex/hash-array.h"
-#include "HashIndex/hash-array-multi.h"
 #include "ShapedJson/shaped-json.h"
-
-struct TRI_doc_mptr_t;
-struct TRI_document_collection_t;
 
 namespace triagens {
   namespace mvcc {
@@ -48,6 +43,10 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     class HashIndex : public Index {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                      public types
+// -----------------------------------------------------------------------------
       
       public:
 
@@ -58,14 +57,24 @@ namespace triagens {
 
         typedef std::vector<TRI_shaped_json_t> Key;
 
-        HashIndex (TRI_idx_iid_t id,
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
+      
+      public:
+
+        HashIndex (TRI_idx_iid_t,
                    struct TRI_document_collection_t*,
-                   std::vector<std::string> const& fields,
-                   std::vector<TRI_shape_pid_t> const& paths,
-                   bool unique,
-                   bool sparse);
+                   std::vector<std::string> const&,
+                   std::vector<TRI_shape_pid_t> const&,
+                   bool,
+                   bool);
 
         ~HashIndex ();
+
+// -----------------------------------------------------------------------------
+// --SECTION--                            public methods, inherited from Index.h
+// -----------------------------------------------------------------------------
 
       public:
         
@@ -87,21 +96,8 @@ namespace triagens {
         void preCommit (TransactionCollection*,
                         Transaction*) override final;
 
-        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection* coll,
-                                              Transaction* trans,
-                                              Key const* key,
-                                              size_t limit);
-
-        std::vector<TRI_doc_mptr_t*>* lookupContinue(
-                                          TransactionCollection* coll,
-                                          Transaction* trans,
-                                          TRI_doc_mptr_t* previousLast,
-                                          size_t limit);
-
-        // a garbage collection function for the index
         void cleanup () override final;
 
-        // give index a hint about the expected size
         void sizeHint (size_t) override final;
   
         bool hasSelectivity () const override final {
@@ -113,6 +109,7 @@ namespace triagens {
         }
 
         size_t memory () override final;
+
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
@@ -122,7 +119,18 @@ namespace triagens {
         std::string typeName () const override final {
           return "hash";
         }
+        
+        void clickLock () override final {
+          _lock.writeLock();
+          _lock.writeUnlock();
+        }
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+      public:
+        
         size_t nrIndexedFields () const {
           return _paths.size();
         }
@@ -130,29 +138,75 @@ namespace triagens {
         std::vector<TRI_shape_pid_t> const& paths () const {
           return _paths;
         }
+        
+        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection*,
+                                              Transaction*,
+                                              Key const*,
+                                              size_t);
+
+        std::vector<TRI_doc_mptr_t*>* lookupContinue (TransactionCollection*,
+                                                      Transaction*,
+                                                      TRI_doc_mptr_t*,
+                                                      size_t);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
 
       private:
 
-        std::vector<TRI_doc_mptr_t*>* lookupInternal (
-                                          TransactionCollection* coll,
-                                          Transaction* trans,
-                                          Key const* key,
-                                          TRI_doc_mptr_t* previousLast,
-                                          size_t limit);
+        std::vector<TRI_doc_mptr_t*>* lookupInternal (TransactionCollection*,
+                                                      Transaction*,
+                                                      Key const*,
+                                                      TRI_doc_mptr_t*,
+                                                      size_t);
+
         size_t elementSize () const;
 
-        Element* allocateAndFillElement (TRI_doc_mptr_t* doc,
-                                         bool& includeForSparse);
+        Element* allocateAndFillElement (TRI_doc_mptr_t*,
+                                         bool&);
 
         void deleteElement (Element*);
 
-        std::vector<TRI_shape_pid_t> const  _paths;
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+
+      private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief typedef for the hash table
+////////////////////////////////////////////////////////////////////////////////
 
         typedef triagens::basics::AssocMulti<Key, Element, uint32_t> Hash_t;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the index R/W lock
+////////////////////////////////////////////////////////////////////////////////
+        
+        triagens::basics::ReadWriteLock   _lock;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the attribute paths
+////////////////////////////////////////////////////////////////////////////////
+        
+        std::vector<TRI_shape_pid_t> const  _paths;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the hash table
+////////////////////////////////////////////////////////////////////////////////
+
         Hash_t* _theHash;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether the index is unique
+////////////////////////////////////////////////////////////////////////////////
+
         bool _unique;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether the index is sparse
+////////////////////////////////////////////////////////////////////////////////
 
         bool _sparse;
     };

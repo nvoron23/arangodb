@@ -32,13 +32,10 @@
 
 #include "Basics/Common.h"
 #include "Basics/JsonHelper.h"
+#include "Basics/ReadWriteLock.h"
 #include "Basics/SkipList.h"
 #include "Mvcc/Index.h"
 #include "ShapedJson/shaped-json.h"
-
-struct TRI_doc_mptr_t;
-struct TRI_document_collection_t;
-struct TRI_index_operator_s;
 
 namespace triagens {
   namespace mvcc {
@@ -48,6 +45,10 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     class SkiplistIndex2 : public Index {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                      public types
+// -----------------------------------------------------------------------------
       
       public:
 
@@ -58,32 +59,35 @@ namespace triagens {
 
         typedef std::vector<TRI_shaped_json_t> Key;
 
-        SkiplistIndex2 (TRI_idx_iid_t id,
+////////////////////////////////////////////////////////////////////////////////
+/// @brief typedef for the skiplist
+////////////////////////////////////////////////////////////////////////////////
+        
+        typedef triagens::basics::SkipList<Key, Element> SkipList_t;
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
+      
+      public:
+
+        SkiplistIndex2 (TRI_idx_iid_t,
                         struct TRI_document_collection_t*,
-                        std::vector<std::string> const& fields,
-                        std::vector<TRI_shape_pid_t> const& paths,
-                        bool unique,
-                        bool sparse);
+                        std::vector<std::string> const&,
+                        std::vector<TRI_shape_pid_t> const&,
+                        bool,
+                        bool);
 
         ~SkiplistIndex2 ();
+
+// -----------------------------------------------------------------------------
+// --SECTION--                            public methods, inherited from Index.h
+// -----------------------------------------------------------------------------
 
       public:
         
         void insert (struct TRI_doc_mptr_t*) override final;
 
-        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection*,
-                                              Transaction*,
-                                              struct TRI_index_operator_s*,
-                                              bool,
-                                              size_t);
-
-        std::vector<TRI_doc_mptr_t*>* lookupContinue (TransactionCollection*,
-                                              Transaction*,
-                                              struct TRI_index_operator_s*,
-                                              TRI_doc_mptr_t*,
-                                              bool,
-                                              size_t);
-  
         void insert (TransactionCollection*,
                      Transaction*,
                      struct TRI_doc_mptr_t*) override final;
@@ -100,10 +104,8 @@ namespace triagens {
         void preCommit (TransactionCollection*,
                         Transaction*) override final;
 
-        // a garbage collection function for the index
         void cleanup () override final;
 
-        // give index a hint about the expected size
         void sizeHint (size_t) override final;
   
         bool hasSelectivity () const override final {
@@ -115,6 +117,7 @@ namespace triagens {
         }
 
         size_t memory () override final;
+
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
@@ -124,7 +127,18 @@ namespace triagens {
         std::string typeName () const override final {
           return "skiplist";
         }
+        
+        void clickLock () override final {
+          _lock.writeLock();
+          _lock.writeUnlock();
+        }
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+      public:
+        
         size_t nrIndexedFields () const {
           return _paths.size();
         }
@@ -133,24 +147,66 @@ namespace triagens {
           return _paths;
         }
 
-      public:
+        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection*,
+                                              Transaction*,
+                                              struct TRI_index_operator_s*,
+                                              bool,
+                                              size_t);
 
-        typedef triagens::basics::SkipList<Key, Element> SkipList_t;
+        std::vector<TRI_doc_mptr_t*>* lookupContinue (TransactionCollection*,
+                                              Transaction*,
+                                              struct TRI_index_operator_s*,
+                                              TRI_doc_mptr_t*,
+                                              bool,
+                                              size_t);
+        
+        void deleteElement (Element*);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+  
+      private:
 
         size_t elementSize () const;
 
-        Element* allocateAndFillElement (TRI_doc_mptr_t* doc,
-                                         bool& includeForSparse);
+        Element* allocateAndFillElement (TRI_doc_mptr_t*,
+                                         bool&);
 
-        void deleteElement (Element*);
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
 
       private:
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the index R/W lock
+////////////////////////////////////////////////////////////////////////////////
+        
+        triagens::basics::ReadWriteLock   _lock;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the attribute paths
+////////////////////////////////////////////////////////////////////////////////
+
         std::vector<TRI_shape_pid_t> const  _paths;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the skiplist
+////////////////////////////////////////////////////////////////////////////////
 
         SkipList_t* _theSkipList;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether the index is unique
+////////////////////////////////////////////////////////////////////////////////
+
         bool _unique;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether the index is sparse
+////////////////////////////////////////////////////////////////////////////////
+
         bool _sparse;
     };
 

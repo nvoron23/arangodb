@@ -31,13 +31,11 @@
 #define ARANGODB_MVCC_EDGE_INDEX_H 1
 
 #include "Basics/Common.h"
-#include "Basics/JsonHelper.h"
 #include "Basics/AssocMulti.h"
+#include "Basics/JsonHelper.h"
+#include "Basics/ReadWriteLock.h"
 #include "Mvcc/Index.h"
 #include "VocBase/edge-collection.h"
-
-struct TRI_doc_mptr_t;
-struct TRI_document_collection_t;
 
 namespace triagens {
   namespace mvcc {
@@ -57,14 +55,34 @@ namespace triagens {
 
     class EdgeIndex : public Index {
 
-      typedef triagens::basics::AssocMulti<struct TRI_edge_header_s, struct TRI_doc_mptr_t, uint32_t> TRI_EdgeIndexHash_t;
+// -----------------------------------------------------------------------------
+// --SECTION--                                                     private types
+// -----------------------------------------------------------------------------
 
+      private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief typedef for the hash tables
+////////////////////////////////////////////////////////////////////////////////
+      
+        typedef triagens::basics::AssocMulti<struct TRI_edge_header_s, 
+                                             struct TRI_doc_mptr_t, 
+                                             uint32_t> TRI_EdgeIndexHash_t;
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
+      
       public:
 
-        EdgeIndex (TRI_idx_iid_t id,
+        EdgeIndex (TRI_idx_iid_t,
                   struct TRI_document_collection_t*);
 
         ~EdgeIndex ();
+
+// -----------------------------------------------------------------------------
+// --SECTION--                            public methods, inherited from Index.h
+// -----------------------------------------------------------------------------
 
       public:
         
@@ -72,30 +90,20 @@ namespace triagens {
   
         void insert (TransactionCollection*,
                      Transaction*,
-                     struct TRI_doc_mptr_t*);
+                     struct TRI_doc_mptr_t*) override final;
+
         struct TRI_doc_mptr_t* remove (TransactionCollection*,
                                        Transaction*,
                                        std::string const&,
-                                       struct TRI_doc_mptr_t*);
+                                       struct TRI_doc_mptr_t*) override final;
+
         void forget (TransactionCollection*,
                      Transaction*,
-                     struct TRI_doc_mptr_t*);
+                     struct TRI_doc_mptr_t*) override final;
 
         void preCommit (TransactionCollection*,
-                        Transaction*);
+                        Transaction*) override final;
 
-        std::vector<TRI_doc_mptr_t*>* lookup (Transaction* trans,
-                                              TRI_edge_direction_e direction,
-                                              TRI_edge_header_t const* lookup,
-                                              size_t limit);
-
-        std::vector<TRI_doc_mptr_t*>* lookupContinue(
-                                          Transaction* trans,
-                                          TRI_edge_direction_e direction,
-                                          TRI_doc_mptr_t* previousLast,
-                                          size_t limit);
-
-        // give index a hint about the expected size
         void sizeHint (size_t) override final;
   
         bool hasSelectivity () const override final {
@@ -107,6 +115,7 @@ namespace triagens {
         }
 
         size_t memory () override final;
+
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
@@ -116,24 +125,69 @@ namespace triagens {
         std::string typeName () const override final {
           return "edge";
         }
+        
+        void clickLock () override final {
+          _lock.writeLock();
+          _lock.writeUnlock();
+        }
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+        
+      public:
+
+        std::vector<TRI_doc_mptr_t*>* lookup (Transaction*,
+                                              TRI_edge_direction_e,
+                                              TRI_edge_header_t const*,
+                                              size_t);
+
+        std::vector<TRI_doc_mptr_t*>* lookupContinue (Transaction*,
+                                                      TRI_edge_direction_e,
+                                                      TRI_doc_mptr_t*,
+                                                      size_t);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
 
       private:
 
-        std::vector<TRI_doc_mptr_t*>* lookupInternal(
-                                          Transaction* trans,
-                                          TRI_edge_direction_e direction,
-                                          TRI_edge_header_t const* lookup,
-                                          TRI_doc_mptr_t* previousLast,
-                                          size_t limit);
+        std::vector<TRI_doc_mptr_t*>* lookupInternal (Transaction*,
+                                                      TRI_edge_direction_e,
+                                                      TRI_edge_header_t const*,
+                                                      TRI_doc_mptr_t*,
+                                                      size_t);
 
-        void lookupPart (TRI_EdgeIndexHash_t* part,
-                         Transaction* trans,
-                         TRI_edge_header_t const* lookup,
-                         std::vector<TRI_doc_mptr_t*>* result,
-                         size_t limit,
-                         bool filterReflexive);
+        void lookupPart (TRI_EdgeIndexHash_t*,
+                         Transaction*,
+                         TRI_edge_header_t const*,
+                         std::vector<TRI_doc_mptr_t*>*,
+                         size_t,
+                         bool);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+      
+      private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the index R/W lock
+////////////////////////////////////////////////////////////////////////////////
+        
+        triagens::basics::ReadWriteLock   _lock;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief hash table for _from
+////////////////////////////////////////////////////////////////////////////////
   
         TRI_EdgeIndexHash_t* _from;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief hash table for _to
+////////////////////////////////////////////////////////////////////////////////
+
         TRI_EdgeIndexHash_t* _to;
     };
 

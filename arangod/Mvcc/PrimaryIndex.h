@@ -31,16 +31,13 @@
 #define ARANGODB_MVCC_PRIMARY_INDEX_H 1
 
 #include "Basics/Common.h"
-#include "Basics/JsonHelper.h"
-#include "Basics/AssocMulti.h"
 #include "Basics/fasthash.h"
-
+#include "Basics/AssocMulti.h"
+#include "Basics/JsonHelper.h"
+#include "Basics/ReadWriteLock.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/TransactionId.h"
 #include "Mvcc/Transaction.h"
-
-struct TRI_doc_mptr_t;
-struct TRI_document_collection_t;
 
 namespace triagens {
   namespace mvcc {
@@ -50,6 +47,10 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     class PrimaryIndex : public Index {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
       
       public:
 
@@ -58,17 +59,14 @@ namespace triagens {
 
         ~PrimaryIndex ();
 
+// -----------------------------------------------------------------------------
+// --SECTION--                            public methods, inherited from Index.h
+// -----------------------------------------------------------------------------
+
       public:
  
-        // special methods only used while opening a collection       
         void insert (struct TRI_doc_mptr_t*) override final;
         
-        struct TRI_doc_mptr_t* remove (std::string const&);
-        
-        struct TRI_doc_mptr_t* lookup (std::string const&);
-
-        void iterate (std::function<void(struct TRI_doc_mptr_t*)>);
-  
         void insert (TransactionCollection*, 
                      Transaction*,
                      struct TRI_doc_mptr_t*) override final;
@@ -78,12 +76,6 @@ namespace triagens {
                                        std::string const&,
                                        struct TRI_doc_mptr_t*) override final;
         
-        struct TRI_doc_mptr_t* remove (
-                TransactionCollection*,
-                Transaction*,
-                std::string const&,
-                TransactionId&);
-
         void forget (TransactionCollection*,
                      Transaction*,
                      struct TRI_doc_mptr_t*) override final;
@@ -91,17 +83,8 @@ namespace triagens {
         void preCommit (TransactionCollection*,
                         Transaction*) override final;
         
-        struct TRI_doc_mptr_t* random (TransactionCollection*,
-                                       Transaction*);
-
-        struct TRI_doc_mptr_t* lookup (TransactionCollection*,
-                                       Transaction*,
-                                       std::string const& key);
-
-        // a garbage collection function for the index
         void cleanup () override final;
 
-        // give index a hint about the expected size
         void sizeHint (size_t) override final;
   
         bool hasSelectivity () const override final {
@@ -113,6 +96,7 @@ namespace triagens {
         }
 
         size_t memory () override final;
+
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
@@ -123,29 +107,119 @@ namespace triagens {
           return "primary";
         }
 
+        void clickLock () override final {
+          _lock.writeLock();
+          _lock.writeUnlock();
+        }
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return a hash value for a key
+////////////////////////////////////////////////////////////////////////////////
+        
         static uint64_t hashKeyString (char const* key, size_t len) {
           return fasthash64(key, len, 0x13579864);
         }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove a document from the index. this is called only when opening
+/// a collection, without concurrency
+////////////////////////////////////////////////////////////////////////////////
+        
+        struct TRI_doc_mptr_t* remove (std::string const&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief lookup a document in the index. this is called only when opening
+/// a collection, without concurrency
+////////////////////////////////////////////////////////////////////////////////
+        
+        struct TRI_doc_mptr_t* lookup (std::string const&);
+        
+////////////////////////////////////////////////////////////////////////////////
+/// @brief iterate over all documents in the index. this is called only when 
+/// opening a collection, without concurrency
+////////////////////////////////////////////////////////////////////////////////
+
+        void iterate (std::function<void(struct TRI_doc_mptr_t*)>);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief lookup method with non-standard signature. this is called for regular
+/// document insertions
+////////////////////////////////////////////////////////////////////////////////
+        
+        struct TRI_doc_mptr_t* lookup (TransactionCollection*,
+                                       Transaction*,
+                                       std::string const& key);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove method with non-standard signature. this is called for regular
+/// document removals
+////////////////////////////////////////////////////////////////////////////////
+        
+        struct TRI_doc_mptr_t* remove (TransactionCollection*,
+                                       Transaction*,
+                                       std::string const&,
+                                       TransactionId&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a random document from the index
+////////////////////////////////////////////////////////////////////////////////
+        
+        struct TRI_doc_mptr_t* random (TransactionCollection*,
+                                       Transaction*);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+
       private:
 
-        typedef triagens::basics::AssocMulti<std::string const, 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns all relevant revisions in a write-operation context
+////////////////////////////////////////////////////////////////////////////////
+
+        TRI_doc_mptr_t* findRelevantRevisionForWrite (TransactionCollection*,
+                                                      Transaction*,
+                                                      std::string const&,
+                                                      bool&) const;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a visible revision for the given key or a nullptr if none
+////////////////////////////////////////////////////////////////////////////////
+
+        TRI_doc_mptr_t* findVisibleRevision (TransactionCollection*,
+                                             Transaction*,
+                                             std::string const&) const;
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+      
+      private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief typedef for the hash table
+////////////////////////////////////////////////////////////////////////////////
+        
+        typedef triagens::basics::AssocMulti<std::string const,
                                              struct TRI_doc_mptr_t,
-                                             uint32_t>
-                PrimaryIndexHash_t;
+                                             uint32_t> PrimaryIndexHash_t;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the index R/W lock
+////////////////////////////////////////////////////////////////////////////////
+        
+        triagens::basics::ReadWriteLock   _lock;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the underlying hash table
+////////////////////////////////////////////////////////////////////////////////
 
         PrimaryIndexHash_t* _theHash;
 
-        TRI_doc_mptr_t* findRelevantRevisionForWrite (
-                    TransactionCollection* transColl,
-                    Transaction*,
-                    std::string const& key,
-                    bool& writeOk) const;
-
-        TRI_doc_mptr_t* findVisibleRevision (
-                    TransactionCollection* transColl,
-                    Transaction*,
-                    std::string const& key) const;
     };
 
   }

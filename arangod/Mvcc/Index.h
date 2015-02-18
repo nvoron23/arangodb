@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC index base class
+/// @brief MVCC index base class / interface
 ///
 /// @file
 ///
@@ -31,7 +31,6 @@
 #define ARANGODB_MVCC_INDEX_H 1
 
 #include "Basics/Common.h"
-#include "Basics/ReadWriteLock.h"
 #include "Basics/JsonHelper.h"
 #include "VocBase/index.h"
 #include "VocBase/voc-types.h"
@@ -43,82 +42,194 @@ struct TRI_json_t;
 namespace triagens {
   namespace mvcc {
 
+    class TransactionCollection;
+    class Transaction;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       class Index
 // -----------------------------------------------------------------------------
 
-    class TransactionCollection;
-    class Transaction;
-
     class Index {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
 
       protected:
 
         Index (Index const&) = delete;
         Index& operator= (Index const&) = delete;
 
-        Index (TRI_idx_iid_t id,
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create the index
+////////////////////////////////////////////////////////////////////////////////
+
+        Index (TRI_idx_iid_t,
                struct TRI_document_collection_t*,
-               std::vector<std::string> const& fields);
+               std::vector<std::string> const&);
 
       public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroy the index
+////////////////////////////////////////////////////////////////////////////////
 
         virtual ~Index ();
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
       public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the index id
+////////////////////////////////////////////////////////////////////////////////
+        
+        inline TRI_idx_iid_t id () const {
+          return _id;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief a cleanup function for the index. TODO: is this still necessary
+/// the default implementation does nothing
+////////////////////////////////////////////////////////////////////////////////
+
+        virtual void cleanup ();
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief provide a size hint for the index. this is called when opening a
+/// collection and the amount of documents in the collection is known. the 
+/// purpose of this method is that the index can allocate enough memory to 
+/// hold the number of documents specified and avoid later reallocations.
+/// the default implementation does nothing
+////////////////////////////////////////////////////////////////////////////////
+
+        virtual void sizeHint (size_t);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief insert a document into the index
+/// this method is called only when opening a collection. it is guaranteed that
+/// there will not be concurrent access to the index. implementations can use
+/// this method to insert the document without acquiring locks
+////////////////////////////////////////////////////////////////////////////////
         
         virtual void insert (struct TRI_doc_mptr_t*) = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief insert a document into the index
+/// this method is called for regular document insertions. it is NOT guaranteed
+/// that there isn't concurrent access to the index.
+////////////////////////////////////////////////////////////////////////////////
 
         virtual void insert (TransactionCollection*,
                              Transaction*,
                              struct TRI_doc_mptr_t*) = 0;
 
-        virtual struct TRI_doc_mptr_t* remove (
-                         TransactionCollection*,
-                         Transaction*,
-                         std::string const&,
-                         struct TRI_doc_mptr_t*) = 0;
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove a document from the index
+/// this method is called for regular document removals. it is NOT guaranteed
+/// that there isn't concurrent access to the index.
+////////////////////////////////////////////////////////////////////////////////
+
+        virtual struct TRI_doc_mptr_t* remove (TransactionCollection*,
+                                               Transaction*,
+                                               std::string const&,
+                                               struct TRI_doc_mptr_t*) = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief forget a just-inserted document
+/// this method is called when an insert or update method aborts and needs to
+/// roll back changes made to the index. it is NOT guaranteed
+/// that there isn't concurrent access to the index.
+////////////////////////////////////////////////////////////////////////////////
 
         virtual void forget (TransactionCollection*,
                              Transaction*,
                              struct TRI_doc_mptr_t*) = 0;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief method called directly before a commit is performed
+////////////////////////////////////////////////////////////////////////////////
+
         virtual void preCommit (TransactionCollection*,
                                 Transaction*) = 0;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the amount of memory used by the index
+////////////////////////////////////////////////////////////////////////////////
+
         virtual size_t memory () = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the index type
+////////////////////////////////////////////////////////////////////////////////
+
         virtual TRI_idx_type_e type () const = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the index type name (e.g. "primary", "hash")
+////////////////////////////////////////////////////////////////////////////////
+
         virtual std::string typeName () const = 0;
         
-        // a garbage collection function for the index
-        virtual void cleanup ();
-        virtual void sizeHint (size_t);
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the index can provide a selectivity estimate
+////////////////////////////////////////////////////////////////////////////////
         
         virtual bool hasSelectivity () const = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief this method provides the selectivity estimate for the index. it 
+/// should only be called for indexes whose hasSelectivity() method returned
+/// `true`. A return value of 1.0 means highest selectivity, 0.0 means lowest
+/// selectivity. Empty indexes may return 1.0.
+////////////////////////////////////////////////////////////////////////////////
+
         virtual double getSelectivity () const = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return index figures in JSON format
+////////////////////////////////////////////////////////////////////////////////
 
         virtual triagens::basics::Json figures () const;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return a JSON representation of the index - this is used to persist
+/// index definitions
+////////////////////////////////////////////////////////////////////////////////
+
         virtual triagens::basics::Json toJson (TRI_memory_zone_t*) const;
 
-        inline TRI_idx_iid_t id () const {
-          return _id;
-        }
+////////////////////////////////////////////////////////////////////////////////
+/// @brief "click" the index lock (if any)
+////////////////////////////////////////////////////////////////////////////////
 
-        inline void clickLock (void) {
-          _lock.writeLock();
-          _lock.writeUnlock();
-        }
+        virtual void clickLock () = 0;
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                               protected variables
+// -----------------------------------------------------------------------------
 
       protected:
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the index id
+////////////////////////////////////////////////////////////////////////////////
+
         TRI_idx_iid_t const               _id;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the underlying collection
+////////////////////////////////////////////////////////////////////////////////
   
         struct TRI_document_collection_t* _collection;
 
-        std::vector<std::string> const    _fields;
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the index attribute names (may be empty if not used by an index)
+////////////////////////////////////////////////////////////////////////////////
 
-        triagens::basics::ReadWriteLock   _lock;
+        std::vector<std::string> const    _fields;
     };
 
   }

@@ -32,15 +32,11 @@
 
 #include "Basics/Common.h"
 #include "Basics/JsonHelper.h"
+#include "Basics/ReadWriteLock.h"
 #include "GeoIndex/GeoIndex.h"
 #include "Mvcc/Index.h"
 #include "ShapedJson/shaped-json.h"
 #include "VocBase/index.h"
-
-struct TRI_doc_mptr_t;
-struct TRI_document_collection_t;
-struct TRI_json_t;
-struct TRI_transaction_collection_s;
 
 namespace triagens {
   namespace mvcc {
@@ -50,6 +46,10 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     class GeoIndex2 : public Index {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
 
       public:
 
@@ -70,18 +70,12 @@ namespace triagens {
 
         ~GeoIndex2 ();
 
+// -----------------------------------------------------------------------------
+// --SECTION--                            public methods, inherited from Index.h
+// -----------------------------------------------------------------------------
+
       public:
 
-        std::vector<std::pair<TRI_doc_mptr_t*, double>>* near (Transaction*,
-                                                               double,
-                                                               double,
-                                                               size_t);
-        
-        std::vector<std::pair<TRI_doc_mptr_t*, double>>* within (Transaction*,
-                                                                 double,
-                                                                 double,
-                                                                 double);
-        
         void insert (struct TRI_doc_mptr_t*) override final;
   
         void insert (TransactionCollection*, 
@@ -109,6 +103,7 @@ namespace triagens {
         }
 
         size_t memory () override final;
+
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
@@ -126,7 +121,32 @@ namespace triagens {
           }
           return "geo2";
         }
+        
+        void clickLock () override final {
+          _lock.writeLock();
+          _lock.writeUnlock();
+        }
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+      public:
+        
+        std::vector<std::pair<TRI_doc_mptr_t*, double>>* near (Transaction*,
+                                                               double,
+                                                               double,
+                                                               size_t);
+        
+        std::vector<std::pair<TRI_doc_mptr_t*, double>>* within (Transaction*,
+                                                                 double,
+                                                                 double,
+                                                                 double);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
+        
       private:
 
         bool extractDoubleArray (struct TRI_shaper_s*,
@@ -142,18 +162,60 @@ namespace triagens {
                                 double*,
                                 bool*);
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+
       private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the index R/W lock
+////////////////////////////////////////////////////////////////////////////////
+        
+        triagens::basics::ReadWriteLock   _lock;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the attribute paths
+////////////////////////////////////////////////////////////////////////////////
  
         std::vector<TRI_shape_pid_t> const _paths; 
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the geo index
+////////////////////////////////////////////////////////////////////////////////
+
         GeoIndex* _geoIndex;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the geo index variant (geo1 or geo2)
+////////////////////////////////////////////////////////////////////////////////
+
         TRI_index_geo_variant_e const _variant;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief attribute paths
+////////////////////////////////////////////////////////////////////////////////
 
         TRI_shape_pid_t _location;
         TRI_shape_pid_t _latitude;
         TRI_shape_pid_t _longitude;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether the index is a geoJson index (latitude / longitude reversed)
+////////////////////////////////////////////////////////////////////////////////
+
         bool _geoJson;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether the index is unique
+////////////////////////////////////////////////////////////////////////////////
+
         bool _unique;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether the index should ignore null attributes
+////////////////////////////////////////////////////////////////////////////////
+
         bool _ignoreNull;
     };
 

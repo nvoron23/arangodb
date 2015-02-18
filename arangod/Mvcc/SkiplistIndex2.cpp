@@ -75,18 +75,17 @@ static int CompareKeyElement (TRI_shaped_json_t const* left,
                               SkiplistIndex2::Element* right,
                               size_t rightPosition,
                               TRI_shaper_t* shaper) {
-  int result;
-
   TRI_ASSERT(nullptr != left);
   TRI_ASSERT(nullptr != right);
-  result = TRI_CompareShapeTypes(nullptr,
-                                 nullptr,
-                                 left,
-                                 shaper,
-                                 right->_document->getShapedJsonPtr(),
-                                 &right->_subObjects[rightPosition],
-                                 nullptr,
-                                 shaper);
+
+  int result = TRI_CompareShapeTypes(nullptr,
+                                     nullptr,
+                                     left,
+                                     shaper,
+                                     right->_document->getShapedJsonPtr(),
+                                     &right->_subObjects[rightPosition],
+                                     nullptr,
+                                     shaper);
 
   // ...........................................................................
   // In the above function CompareShapeTypes we use strcmp which may
@@ -150,6 +149,7 @@ static int CompareElementElement (SkiplistIndex2::Element* left,
 class CmpElmElm {
     TRI_shaper_t* _shaper;
     size_t _numFields;
+
   public:
     CmpElmElm (TRI_shaper_t* shaper, size_t numFields) 
       : _shaper(shaper), _numFields(numFields) {
@@ -283,6 +283,7 @@ SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
                                 bool unique,
                                 bool sparse)
   : Index(id, collection, fields),
+    _lock(),
     _paths(paths),
     _theSkipList(nullptr),
     _unique(unique),
@@ -310,10 +311,7 @@ SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
 ////////////////////////////////////////////////////////////////////////////////
 
 SkiplistIndex2::~SkiplistIndex2 () {
-  if (_theSkipList != nullptr) {
-    delete _theSkipList;
-    _theSkipList = nullptr;
-  }
+  delete _theSkipList;
 }
 
 // -----------------------------------------------------------------------------

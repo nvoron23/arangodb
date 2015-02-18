@@ -62,6 +62,7 @@ FulltextIndex::FulltextIndex (TRI_idx_iid_t id,
                               std::vector<std::string> const& fields,
                               int minWordLength) 
   : Index(id, collection, fields),
+    _lock(),
     _fulltextIndex(nullptr),
     _attribute(0),
     _minWordLength(minWordLength > 0 ? minWordLength : 1) {

@@ -33,9 +33,7 @@
 #include "Basics/Common.h"
 #include "Mvcc/Index.h"
 
-struct TRI_doc_mptr_t;
-struct TRI_document_collection_t;
-struct TRI_json_t;
+struct TRI_transaction_collection_s;
 
 namespace triagens {
   namespace mvcc {
@@ -48,14 +46,22 @@ namespace triagens {
 
     class CapConstraint : public Index {
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
+
       public:
 
-        CapConstraint (TRI_idx_iid_t id,
+        CapConstraint (TRI_idx_iid_t,
                        struct TRI_document_collection_t*,
-                       size_t count,
-                       int64_t size);
+                       size_t,
+                       int64_t);
 
         ~CapConstraint ();
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
 
       public:
         
@@ -63,18 +69,19 @@ namespace triagens {
   
         void insert (TransactionCollection*, 
                      Transaction*,
-                     struct TRI_doc_mptr_t*) = 0;
+                     struct TRI_doc_mptr_t*) override final;
 
         struct TRI_doc_mptr_t* remove (TransactionCollection*,
                                        Transaction*,
                                        std::string const&,
-                                       struct TRI_doc_mptr_t*) = 0;
+                                       struct TRI_doc_mptr_t*) override final;
+
         void forget (TransactionCollection*,
                      Transaction*,
-                     struct TRI_doc_mptr_t*) = 0;
+                     struct TRI_doc_mptr_t*) override final;
 
         void preCommit (TransactionCollection*,
-                        Transaction*) = 0;
+                        Transaction*) override final;
 
         bool hasSelectivity () const override final {
           return false;
@@ -85,6 +92,7 @@ namespace triagens {
         }
 
         size_t memory () override final;
+
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
         TRI_idx_type_e type () const override final {
@@ -94,15 +102,36 @@ namespace triagens {
         std::string typeName () const override final {
           return "cap";
         }
+        
+        void clickLock () override final {
+        }
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                   private methods
+// -----------------------------------------------------------------------------
 
       private:
 
         int initialize ();
+
         int apply (struct TRI_transaction_collection_s*);
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+
       private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief maximum number of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
   
         size_t const _count;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief maximum size of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
         int64_t const _size;
   
     };

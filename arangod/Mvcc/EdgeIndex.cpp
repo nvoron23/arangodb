@@ -400,6 +400,7 @@ static bool IsEqualElementEdgeTo (TRI_doc_mptr_t const* left,
 EdgeIndex::EdgeIndex (TRI_idx_iid_t id,
                       TRI_document_collection_t* collection) 
   : Index(id, collection, std::vector<std::string>({ TRI_VOC_ATTRIBUTE_FROM, TRI_VOC_ATTRIBUTE_TO })),
+    _lock(),
     _from(nullptr),
     _to(nullptr) {
 
@@ -432,10 +433,10 @@ EdgeIndex::~EdgeIndex () {
 ////////////////////////////////////////////////////////////////////////////////
  
 void EdgeIndex::insert (TRI_doc_mptr_t* doc) {
-  _from->insert(doc, false, false); // OUT
+  _from->insert(doc, false, false);
 
   try {
-    _to->insert(doc, false, false);   // IN
+    _to->insert(doc, false, false);
   }
   catch (...) {
     _from->remove(doc);
@@ -453,10 +454,10 @@ void EdgeIndex::insert (TransactionCollection*,
                         TRI_doc_mptr_t* doc) {
   WRITE_LOCKER(_lock);
 
-  _from->insert(doc, false, false); // OUT
+  _from->insert(doc, false, false);
 
   try {
-    _to->insert(doc, false, false);   // IN
+    _to->insert(doc, false, false); 
   }
   catch (...) {
     _from->remove(doc);
@@ -510,12 +511,11 @@ void EdgeIndex::preCommit (TransactionCollection*, Transaction*) {
 /// this will dispatch to using either _from, _to, or both
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<TRI_doc_mptr_t*>* EdgeIndex::lookupInternal (
-                                  Transaction* trans,
-                                  TRI_edge_direction_e direction,
-                                  TRI_edge_header_t const* lookup,
-                                  TRI_doc_mptr_t* previousLast,
-                                  size_t limit) {
+std::vector<TRI_doc_mptr_t*>* EdgeIndex::lookupInternal (Transaction* trans,
+                                                         TRI_edge_direction_e direction,
+                                                         TRI_edge_header_t const* lookup,
+                                                         TRI_doc_mptr_t* previousLast,
+                                                         size_t limit) {
 
   std::unique_ptr<std::vector<TRI_doc_mptr_t*>> theResult(new std::vector<TRI_doc_mptr_t*>);
 

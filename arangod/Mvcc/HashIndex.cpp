@@ -30,9 +30,9 @@
 
 #include "HashIndex.h"
 #include "Basics/fasthash.h"
+#include "Basics/ReadWriteLock.h"
 #include "Basics/ReadLocker.h"
 #include "Basics/WriteLocker.h"
-#include "HashIndex/hash-index.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Utils/Exception.h"
@@ -223,6 +223,7 @@ HashIndex::HashIndex (TRI_idx_iid_t id,
                       bool unique,
                       bool sparse) 
   : Index(id, collection, fields),
+    _lock(),
     _paths(paths),
     _theHash(nullptr),
     _unique(unique),
