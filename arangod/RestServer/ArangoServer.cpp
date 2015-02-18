@@ -288,7 +288,6 @@ ArangoServer::ArangoServer (int argc, char** argv)
     _defaultWaitForSync(false),
     _forceSyncProperties(true),
     _disableReplicationApplier(false),
-    _developmentMode(false),
     _server(nullptr),
     _queryRegistry(nullptr),
     _pairForAql(nullptr) {
@@ -620,11 +619,6 @@ void ArangoServer::buildApplicationServer () {
 
   if (_applicationServer->programOptions().has("temp-path")) {
     TRI_SetUserTempPath((char*) _tempPath.c_str());
-  }
-
-  // configure v8 w/ development-mode
-  if (_applicationServer->programOptions().has("development-mode")) {
-    _applicationV8->enableDevelopmentMode();
   }
 
   // .............................................................................
@@ -1192,7 +1186,6 @@ void ArangoServer::openDatabases (bool checkVersion,
                            _applicationEndpointServer,
                            _databasePath.c_str(),
                            _applicationV8->appPath().c_str(),
-                           _applicationV8->devAppPath().c_str(),
                            &defaults,
                            _disableReplicationApplier,
                            iterateMarkersOnOpen);
