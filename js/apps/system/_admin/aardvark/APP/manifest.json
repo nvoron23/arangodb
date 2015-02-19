@@ -90,11 +90,7 @@
 
     "sharedLibs.js": {
       "files": [
-<<<<<<< HEAD
         "build/sharedLibs.js"
-=======
-        "frontend/build/app.js"
->>>>>>> 4f5b2079a96a19f9f3c13a9070d4bb97cc1797de
       ]
     },
 
