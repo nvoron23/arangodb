@@ -60,6 +60,30 @@ using namespace triagens::basics;
 using namespace triagens::arango;
 
 
+#define MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection)                       \
+  TRI_vocbase_col_t const* collection = nullptr;                                                \
+  TRI_vocbase_t* vocbase = nullptr;                                                             \
+                                                                                                \
+  if (useCollection) {                                                                          \
+    collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE); \
+                                                                                                \
+    if (collection == nullptr) {                                                                \
+      TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");                             \
+    }                                                                                           \
+    vocbase = collection->_vocbase;                                                             \
+  }                                                                                             \
+  else {                                                                                        \
+    vocbase = GetContextVocBase(isolate);                                                       \
+  }                                                                                             \
+                                                                                                \
+  if (vocbase == nullptr) {                                                                     \
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);                                \
+  }                                                                                             \
+                                                                                                \
+  /* need a fake old transaction in order to not throw - can be removed later */                \
+  TransactionBase oldTrx(true);                                                                 \
+
+
 struct LocalCollectionGuard {
   LocalCollectionGuard (TRI_vocbase_col_t* collection)
     : _collection(collection) {
@@ -3280,43 +3304,35 @@ static void JS_MvccCount (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_ASSERT(false);
 }
 
-
-static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void MvccDocument (bool useCollection,
+                          const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
-  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
-
-  if (collection == nullptr) {
-    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
-  }
-  
   uint32_t const argLength = args.Length();
   if (argLength != 1) {
     TRI_V8_THROW_EXCEPTION_USAGE("mvccDocument(<document-handle>)");
   }
 
-  triagens::mvcc::OperationOptions options;
+  MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
 
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(collection->_vocbase, &resolver, collection, key, rid, args[0], args);
-  
-  if (key.get() == nullptr) {
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
-  }
+  CollectionNameResolver resolver(vocbase); // TODO
+  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
   }
 
-  // need a fake old transaction in order to not throw - can be removed later       
-  TransactionBase oldTrx(true);
+  TRI_ASSERT(key.get() != nullptr);
+  TRI_ASSERT(collection != nullptr);
+  TRI_ASSERT(vocbase != nullptr);
 
+  triagens::mvcc::OperationOptions options;
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3341,44 +3357,40 @@ static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_ASSERT(false);
 }
 
+static void JS_MvccDocument (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccDocument(true, args);
+}
 
-static void JS_MvccExists (const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+static void MvccExists (bool useCollection,
+                        const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
-  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
-
-  if (collection == nullptr) {
-    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
-  }
-  
   uint32_t const argLength = args.Length();
   if (argLength != 1) {
     TRI_V8_THROW_EXCEPTION_USAGE("mvccExists(<document-handle>)");
   }
 
-  triagens::mvcc::OperationOptions options;
+  MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
 
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(collection->_vocbase, &resolver, collection, key, rid, args[0], args);
-  
-  if (key.get() == nullptr) {
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
-  }
+  CollectionNameResolver resolver(vocbase); // TODO
+  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
   }
 
-  
-  // need a fake old transaction in order to not throw - can be removed later       
-  TransactionBase oldTrx(true);
+  TRI_ASSERT(key.get() != nullptr);
+  TRI_ASSERT(collection != nullptr);
+  TRI_ASSERT(vocbase != nullptr);
 
+  triagens::mvcc::OperationOptions options;
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3411,6 +3423,9 @@ static void JS_MvccExists (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_ASSERT(false);
 }
 
+static void JS_MvccExists (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccExists(true, args);
+}
 
 static void MvccInsert (TRI_vocbase_col_t const* collection,
                         const v8::FunctionCallbackInfo<v8::Value>& args,
@@ -3562,17 +3577,12 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
   }
 }
 
-static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void MvccRemove (bool useCollection,
+                        const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
   TRI_GET_GLOBALS();
 
-  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
-
-  if (collection == nullptr) {
-    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
-  }
-  
   uint32_t const argLength = args.Length();
   if (argLength < 1 || argLength > 3) {
     TRI_V8_THROW_EXCEPTION_USAGE("mvccRemove(<document-handle>, <options>)");
@@ -3601,26 +3611,24 @@ static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
   
+  MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
+  
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(collection->_vocbase, &resolver, collection, key, rid, args[0], args);
-  
-  if (key.get() == nullptr) {
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
-  }
+  CollectionNameResolver resolver(vocbase); // TODO
+  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
   }
 
+  TRI_ASSERT(key.get() != nullptr);
+  TRI_ASSERT(collection != nullptr);
+  TRI_ASSERT(vocbase != nullptr);
   
-  // need a fake old transaction in order to not throw - can be removed later       
-  TransactionBase oldTrx(true);
-
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3650,18 +3658,17 @@ static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_ASSERT(false);
 }
 
+static void JS_MvccRemove (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccRemove(true, args);
+}
 
-static void JS_MvccReplace (const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+static void MvccReplace (bool useCollection,
+                         const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
   TRI_GET_GLOBALS();
 
-  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
-
-  if (collection == nullptr) {
-    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
-  }
-  
   uint32_t const argLength = args.Length();
   if (argLength < 2 || argLength > 5) {
     TRI_V8_THROW_EXCEPTION_USAGE("mvccReplace(<document-handle>, <document>, <options>)");
@@ -3707,31 +3714,29 @@ static void JS_MvccReplace (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
   
-  // set document key
-  std::unique_ptr<char[]> key;
-  TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(collection->_vocbase, &resolver, collection, key, rid, args[0], args);
-  
-  if (key.get() == nullptr) {
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
-  }
-  
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_THROW_EXCEPTION(res);
-  }
-  
   if (! args[1]->IsObject() || args[1]->IsArray()) {
     // we're only accepting "real" object documents
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
   }
 
+  MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
   
-  // need a fake old transaction in order to not throw - can be removed later       
-  TransactionBase oldTrx(true);
-
+  // set document key
+  std::unique_ptr<char[]> key;
+  TRI_voc_rid_t rid;
+  CollectionNameResolver resolver(vocbase); // TODO
+  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
+  
+  if (res != TRI_ERROR_NO_ERROR) {
+    TRI_V8_THROW_EXCEPTION(res);
+  }
+  
+  TRI_ASSERT(key.get() != nullptr);
+  TRI_ASSERT(collection != nullptr);
+  TRI_ASSERT(vocbase != nullptr);
+  
   try {
-    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3775,16 +3780,17 @@ static void JS_MvccReplace (const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 
-static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_MvccReplace (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccReplace(true, args);
+}
+
+static void MvccUpdate (bool useCollection, 
+                        const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
   TRI_GET_GLOBALS();
 
-  auto const* collection = TRI_UnwrapClass<TRI_vocbase_col_t const>(args.Holder(), WRP_VOCBASE_COL_TYPE);
-
-  if (collection == nullptr) {
-    TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
-  }
+  MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
   
   uint32_t const argLength = args.Length();
   if (argLength < 2 || argLength > 5) {
@@ -3831,35 +3837,31 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   }
   
+  if (! args[1]->IsObject() || args[1]->IsArray()) {
+    // we're only accepting "real" object documents
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
+  }
+  
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(collection->_vocbase, &resolver, collection, key, rid, args[0], args);
-  
-  if (key.get() == nullptr) {
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_HANDLE_BAD);
-  }
+  CollectionNameResolver resolver(vocbase); // TODO
+  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
   }
   
-  if (! args[1]->IsObject() || args[1]->IsArray()) {
-    // we're only accepting "real" object documents
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
-  }
+  TRI_ASSERT(key.get() != nullptr);
+  TRI_ASSERT(collection != nullptr);
+  TRI_ASSERT(vocbase != nullptr);
 
   std::unique_ptr<TRI_json_t> json(TRI_ObjectToJson(isolate, args[1]));
 
   if (json.get() == nullptr) {
     TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_errno(), "<document> is no valid JSON");
   }
-
   
-  // need a fake old transaction in order to not throw - can be removed later       
-  TransactionBase oldTrx(true);
-
   try {
     triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
@@ -3900,6 +3902,10 @@ static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
  
   // unreachable
   TRI_ASSERT(false);
+}
+
+static void JS_MvccUpdate (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  MvccUpdate(true, args);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4689,6 +4695,10 @@ static void JS_RemoveVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   return RemoveVocbaseCol(false, args);
 }
 
+static void JS_MvccRemoveDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  return MvccRemove(false, args);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief looks up a document and returns it
 /// @startDocuBlock documentsDocumentName
@@ -4730,6 +4740,10 @@ static void JS_DocumentVocbase (const v8::FunctionCallbackInfo<v8::Value>& args)
   return DocumentVocbaseCol(false, args);
 }
 
+static void JS_MvccDocumentDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  return MvccDocument(false, args);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief checks whether a document exists
 /// @startDocuBlock documentsDocumentExists
@@ -4753,6 +4767,10 @@ static void JS_DocumentVocbase (const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void JS_ExistsVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   return ExistsVocbaseCol(false, args);
+}
+
+static void JS_MvccExistsDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  return MvccExists(false, args);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4809,6 +4827,10 @@ static void JS_ExistsVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void JS_ReplaceVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   return ReplaceVocbaseCol(false, args);
+}
+
+static void JS_MvccReplaceDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  return MvccReplace(false, args);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4873,6 +4895,10 @@ static void JS_ReplaceVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) 
 
 static void JS_UpdateVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) {
   return UpdateVocbaseCol(false, args);
+}
+
+static void JS_MvccUpdateDatabase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  return MvccUpdate(false, args);
 }
 
 // -----------------------------------------------------------------------------
@@ -5112,6 +5138,12 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
   TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_remove"), JS_RemoveVocbase);
   TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_replace"), JS_ReplaceVocbase);
   TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_update"), JS_UpdateVocbase);
+  
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_mvccDocument"), JS_MvccDocumentDatabase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_mvccExists"), JS_MvccExistsDatabase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_mvccRemove"), JS_MvccRemoveDatabase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_mvccReplace"), JS_MvccReplaceDatabase);
+  TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_mvccUpdate"), JS_MvccUpdateDatabase);
 
   v8::Handle<v8::ObjectTemplate> rt;
   v8::Handle<v8::FunctionTemplate> ft;
