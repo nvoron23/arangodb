@@ -275,7 +275,8 @@
         html: {
           files: [
             'frontend/html/*',
-            'clusterFrontend/html/*'
+            'clusterFrontend/html/*',
+            'clusterFrontend/js/templates/*'
           ],
           tasks: [
             'concat_in_order:htmlCluster',
