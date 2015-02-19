@@ -46,7 +46,11 @@
             "frontend/js/lib/highlight.7.3.pack.js",
             "frontend/js/lib/joi.browser.js",
             "frontend/js/lib/md5.js",
-            "frontend/src/ace.js"
+            "frontend/src/ace.js",
+            "frontend/src/theme-textmate.js",
+            "frontend/src/mode-json.js",
+            "frontend/src/mode-aql.js"
+
           ],
           graphViewer: [
             "frontend/js/graphViewer/graph/*",
@@ -283,8 +287,9 @@
             'clusterFrontend/js/templates/*'
           ],
           tasks: [
-            'concat_in_order:htmlCluster',
-            'concat_in_order:htmlStandalone'
+            'concat_in_order:sharedLibs',
+            'concat_in_order:default',
+            'concat_in_order:jsCluster',
           ]
         }
       }
@@ -314,6 +319,10 @@
 
     grunt.registerTask('coverage', [
       'concat_in_order:coverage'
+    ]);
+
+    grunt.registerTask('peter', [
+      'concat_in_order:default',
     ]);
 
   };

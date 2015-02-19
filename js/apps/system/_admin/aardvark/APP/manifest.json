@@ -90,7 +90,11 @@
 
     "sharedLibs.js": {
       "files": [
+<<<<<<< HEAD
         "build/sharedLibs.js"
+=======
+        "frontend/build/app.js"
+>>>>>>> 4f5b2079a96a19f9f3c13a9070d4bb97cc1797de
       ]
     },
 
@@ -173,7 +177,10 @@
     "/fonts": "frontend/fonts",
     "/img" : "frontend/img",
     "/js/arango/aqltemplates.json" : "frontend/aqltemplates.json",
-    "/" : "frontend/src"
+    "/theme-textmate.js": "frontend/src/theme-textmate.js",
+    "/mode-json.js": "frontend/src/mode-json.js",
+    "/mode-aql.js": "frontend/src/mode-aql.js",
+    "/worker-json.js" : "frontend/src/worker-json.js"
   },
 
   "lib": "."
