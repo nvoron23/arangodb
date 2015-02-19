@@ -136,6 +136,12 @@
       ]
     },
 
+    "css/clusterV2.css": {
+      "files": [
+        "clusterFrontend/build/clusterV2.css"
+      ]
+    },
+
     "css/style.css": {
       "files": [
         "frontend/css/swagger/hightlight.default.css",
@@ -154,8 +160,8 @@
 
     "css/cluster.css": {
         "files": [
-         "frontend/scss/cluster.css",
-         "frontend/scss/generated.css"
+           "frontend/scss/cluster.css",
+           "frontend/scss/generated.css"
         ]
     }
   },

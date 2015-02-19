@@ -1,0 +1,22 @@
+.navbar {
+
+  height: 76px !important;
+
+  .clusterNavbar {
+    background-color: #333333;
+    height: 38px;
+    padding-top: 38px;
+    width: 100%;
+
+    ul {
+
+      font-weight: 100;
+
+      li {
+        float: left;
+        margin-right: 15px;
+      }
+    }
+  }
+
+}

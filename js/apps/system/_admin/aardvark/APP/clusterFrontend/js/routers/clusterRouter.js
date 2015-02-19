@@ -13,7 +13,47 @@ arangoDatabase, btoa, _*/
       "planAsymmetrical"       : "planAsymmetric",
       "shards"                 : "showShards",
       "showCluster"            : "showCluster",
+      "health"                 : "showHealth",
+      "dashboard2"             : "showDashboard2",
+      "explorer"               : "showExplorer",
+      "management"             : "showManagement",
+      "logs"                   : "showLogs",
       "handleClusterDown"      : "handleClusterDown"
+    },
+
+    showHealth: function() {
+      if (!this.healthView) {
+        this.healthView = new window.HealthView();
+      }
+      this.healthView.render();
+    },
+
+    showDashboard2: function() {
+      if (!this.dashboardView2) {
+        this.dashboardView2 = new window.Dashboard2View();
+      }
+      this.dashboardView2.render();
+    },
+
+    showExplorer: function() {
+      if (!this.explorerView) {
+        this.explorerView = new window.ExplorerView();
+      }
+      this.healthView.render();
+    },
+
+    showManagement: function() {
+      if (!this.managementView) {
+        this.managementView = new window.ManagementView();
+      }
+      this.managementView.render();
+    },
+
+    showLogs: function() {
+      if (!this.logsView) {
+        this.logsView = new window.LogsView();
+      }
+      this.logsView.render();
     },
 
     // Quick fix for server authentication
@@ -69,10 +109,8 @@ arangoDatabase, btoa, _*/
       this.footerView = new window.FooterView();
       this.footerView.render();
 
-      this.naviView = new window.NavigationView();
-      this.naviView.render();
-
       var self = this;
+
       this.dygraphConfig = window.dygraphConfig;
       window.modalView = new window.ModalView();
       this.initial = this.planScenario;
@@ -107,12 +145,21 @@ arangoDatabase, btoa, _*/
             {dygraphConfig : this.dygraphConfig}
       );
       }
+
+      if (!this.naviView) {
+        this.naviView = new window.NavigationView();
+      }
+      this.naviView.render();
+
+      //temp disable shutdown button
+      /*
       if (!this.shutdownView) {
         this.shutdownView = new window.ShutdownButtonView({
           overview: this.showClusterView
         });
       }
       this.shutdownView.render();
+      */
       this.showClusterView.render();
     },
 

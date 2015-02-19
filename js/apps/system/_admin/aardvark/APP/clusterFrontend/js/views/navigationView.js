@@ -10,13 +10,18 @@
     },
 
     initialize: function () {
+      jQuery('<div/>', {
+        class: 'clusterNavbar'
+      }).appendTo('.navbar .resizecontainer');
+
+      this.subNavigation = new window.EmbeddedNavigationView();
+      this.subNavigation.render();
     },
 
     template: templateEngine.createTemplate("clusterNavigationView.ejs"),
 
     render: function () {
       $(this.el).html(this.template.render());
-      console.log(123);
     },
 
     selectMenuItem: function (menuItem) {

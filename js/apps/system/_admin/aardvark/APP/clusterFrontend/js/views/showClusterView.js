@@ -167,9 +167,12 @@
         self.getServerStatistics(function() {
           self.updateServerTime();
           self.data = self.generatePieData();
-          self.renderPieChart(self.data);
-          self.renderLineChart();
-          self.updateDBDetailList();
+
+          if (!window.location.hash) {
+            self.renderPieChart(self.data);
+            self.renderLineChart();
+            self.updateDBDetailList();
+          }
         });
       });
     },

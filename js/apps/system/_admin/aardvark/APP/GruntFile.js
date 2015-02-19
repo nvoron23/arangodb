@@ -98,7 +98,10 @@
         },
         cluster: {
           css: [
-            "frontend/scss/cluster.scss"
+            "frontend/scss/style.scss"
+          ],
+          cssCluster: [
+            "clusterFrontend/scss/style.scss"
           ],
           js: [
             "clusterFrontend/js/**"
@@ -113,7 +116,8 @@
           },
           files: {
             'frontend/build/style.css': '<%= project.standalone.css %>',
-            'clusterFrontend/build/style.css': '<%= project.cluster.css %>'
+            'clusterFrontend/build/style.css': '<%= project.cluster.css %>',
+            'clusterFrontend/build/clusterV2.css': '<%= project.cluster.cssCluster %>'
           }
         },
         dist: {
