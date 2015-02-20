@@ -11,6 +11,7 @@
     ul {
 
       font-weight: 100;
+      padding: 0;
 
       li {
         float: left;
@@ -33,6 +34,9 @@
 }
 
 ul.navlist {
+
+  margin: 0;
+
   > li.active,
     li.dropdown-item:hover,
     > li:hover {

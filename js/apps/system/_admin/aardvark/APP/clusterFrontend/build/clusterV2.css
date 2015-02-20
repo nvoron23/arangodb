@@ -5273,11 +5273,36 @@ div .bigtile {
   text-align: left; }
 
 /* States */
+.no-border {
+  border: 0px !important; }
+
 .health-row {
   background: #fafafa;
   margin: 2em auto;
   border-top: 1px solid #ddd;
   border-bottom: 1px solid #ddd; }
+
+.health-state-box p {
+  float: left; }
+.health-state-box p:first-child i {
+  font-size: 70pt; }
+.health-state-box p:last-child {
+  font-size: 14pt;
+  padding-left: 5px;
+  padding-top: 30px; }
+
+.health-box {
+  border-right: 1px solid rgba(0, 0, 0, 0.1); }
+  .health-box h3 {
+    margin-left: 5%; }
+  .health-box .health-table {
+    width: 85%;
+    margin-bottom: 20px;
+    margin-left: 10%; }
+    .health-box .health-table td {
+      height: 20px; }
+    .health-box .health-table i {
+      font-size: 12pt; }
 
 .state-green {
   color: #8aa051; }
@@ -5296,7 +5321,8 @@ div .bigtile {
     padding-top: 38px;
     width: 100%; }
     .navbar .clusterNavbar ul {
-      font-weight: 100; }
+      font-weight: 100;
+      padding: 0; }
       .navbar .clusterNavbar ul li {
         float: left;
         margin-right: 15px; }
@@ -5308,11 +5334,13 @@ div .bigtile {
         .navbar .clusterNavbar ul li i:hover {
           cursor: pointer; }
 
-ul.navlist > li.active,
-ul.navlist li.dropdown-item:hover,
-ul.navlist > li:hover {
-  background-color: #333;
-  border-bottom: 2px solid #8AA051; }
+ul.navlist {
+  margin: 0; }
+  ul.navlist > li.active,
+  ul.navlist li.dropdown-item:hover,
+  ul.navlist > li:hover {
+    background-color: #333;
+    border-bottom: 2px solid #8AA051; }
 
 div.centralRow {
   margin-top: 103px; }
