@@ -26,6 +26,7 @@ arangoDatabase, btoa, _*/
         this.healthView = new window.HealthView();
       }
       this.healthView.render();
+      this.naviView.selectMenuItem('health-menu');
     },
 
     showDashboard2: function() {
@@ -33,13 +34,15 @@ arangoDatabase, btoa, _*/
         this.dashboardView2 = new window.Dashboard2View();
       }
       this.dashboardView2.render();
+      this.naviView.selectMenuItem('dashboard2-menu');
     },
 
     showExplorer: function() {
       if (!this.explorerView) {
         this.explorerView = new window.ExplorerView();
       }
-      this.healthView.render();
+      this.explorerView.render();
+      this.naviView.selectMenuItem('explorer-menu');
     },
 
     showManagement: function() {
@@ -47,6 +50,7 @@ arangoDatabase, btoa, _*/
         this.managementView = new window.ManagementView();
       }
       this.managementView.render();
+      this.naviView.selectMenuItem('management-menu');
     },
 
     showLogs: function() {
@@ -54,6 +58,7 @@ arangoDatabase, btoa, _*/
         this.logsView = new window.LogsView();
       }
       this.logsView.render();
+      this.naviView.selectMenuItem('logs-menu');
     },
 
     // Quick fix for server authentication
