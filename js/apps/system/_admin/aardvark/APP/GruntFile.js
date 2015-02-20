@@ -1,6 +1,7 @@
 (function() {
   "use strict";
 
+  var vName = Date.now();
   module.exports = function(grunt) {
 
     grunt.initConfig({
@@ -208,7 +209,7 @@
             "clusterFrontend/html/scripts.html.part",
             "frontend/html/end.html.part"
           ],
-          dest: 'clusterFrontend/build/cluster.html' 
+          dest: 'clusterFrontend/build/cluster.html'
         },
         htmlStandalone: {
           src: [
@@ -216,7 +217,7 @@
             "frontend/html/head.html.part",
             "frontend/js/templates/*.ejs",
             "frontend/html/body.html.part",
-            "frontend/html/scripts.html.part",
+            "frontend/build/scripts.html.part",
             "frontend/html/end.html.part"
           ],
           dest: 'frontend/build/standalone.html' 
@@ -243,6 +244,18 @@
           }
         }
       },
+
+      replace: {
+        scripts: {
+          src: "frontend/html/scripts.html.part",
+          dest: "frontend/build/scripts.html.part",
+          replacements: [{
+            from: "__VERSION",
+            to: vName
+          }]
+        }
+      },
+
 
       jshint: {
         options: {
@@ -296,9 +309,11 @@
     });
 
     require('matchdep').filterDev('grunt-*').forEach(grunt.loadNpmTasks);
+    grunt.loadNpmTasks('grunt-text-replace');
 
     grunt.registerTask('default', [
       'sass:dev',
+      'replace',
       'concat_in_order:sharedLibs',
       'concat_in_order:default',
       'concat_in_order:jsCluster',

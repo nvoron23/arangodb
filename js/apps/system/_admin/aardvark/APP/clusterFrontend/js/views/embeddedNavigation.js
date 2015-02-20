@@ -9,7 +9,7 @@
     el2: '.clusterNavbar ul',
 
     dummyData: {
-      state: "warning",
+      state: "critical",
       nodes: "6/7",
       data: "100mb",
       cpu: 55,
@@ -40,7 +40,15 @@
 
         var string = key;
         if (typeof val === 'string') {
-          string += ": " + val;
+          if (val === 'okay') {
+            string += ': <span class="state-green">' + val + '</span>';
+          }
+          else if (val === 'warning') {
+            string += ': <span class="state-yellow">' + val + '</span>';
+          }
+          else if (val === 'critical') {
+            string += ': <span class="state-red">' + val + '</span>';
+          }
         }
         else if (typeof val === 'number') {
           if (val < 33) {
