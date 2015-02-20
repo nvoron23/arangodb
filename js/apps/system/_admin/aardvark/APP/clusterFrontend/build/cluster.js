@@ -3471,11 +3471,11 @@ window.StatisticsDescriptionCollection = Backbone.Collection.extend({
     el2: '.clusterNavbar ul',
 
     dummyData: {
-      state: "critical",
-      nodes: "6/7",
+      state: "okay",
+      nodes: "7/7",
       data: "100mb",
-      cpu: 55,
-      ram: 23,
+      cpu: 80,
+      ram: 55,
       uptime: "5 days",
       version: "V1"
     },
@@ -3498,18 +3498,26 @@ window.StatisticsDescriptionCollection = Backbone.Collection.extend({
     rerender: function() {
       var self = this;
 
+      $(self.el2).empty();
+
       _.each(this.dummyData, function(val, key) {
 
         var string = key;
+        var info =
+          '<a href="#health"><i title="You can find detailed health information here"' +
+          'class="fa fa-info-circle"></i></a>';
         if (typeof val === 'string') {
           if (val === 'okay') {
-            string += ': <span class="state-green">' + val + '</span>';
+            string += ': <span class="state-green">' + val + info +'</span>';
           }
           else if (val === 'warning') {
-            string += ': <span class="state-yellow">' + val + '</span>';
+            string += ': <span class="state-yellow">' + val + info + '</span>';
           }
           else if (val === 'critical') {
-            string += ': <span class="state-red">' + val + '</span>';
+            string += ': <span class="state-red">' + val + info +'</span>';
+          }
+          else {
+            string += ": " + val;
           }
         }
         else if (typeof val === 'number') {
@@ -3528,6 +3536,7 @@ window.StatisticsDescriptionCollection = Backbone.Collection.extend({
           html: string
         }).appendTo($(self.el2));
       });
+      $(this.el2).tooltip();
     }
 
   });

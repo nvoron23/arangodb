@@ -303,6 +303,8 @@
             'concat_in_order:sharedLibs',
             'concat_in_order:default',
             'concat_in_order:jsCluster',
+            'concat_in_order:htmlCluster',
+            'concat_in_order:htmlStandalone'
           ]
         }
       }

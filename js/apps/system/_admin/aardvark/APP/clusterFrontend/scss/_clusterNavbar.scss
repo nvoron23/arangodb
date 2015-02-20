@@ -15,8 +15,28 @@
       li {
         float: left;
         margin-right: 15px;
+
+        i {
+          font-size: 16px;
+          margin-left: 5px;
+          margin-top: 2px;
+          position: absolute;
+        }
+
+        i:hover {
+          cursor: pointer;
+        }
+
       }
     }
   }
+}
 
+ul.navlist {
+  > li.active,
+    li.dropdown-item:hover,
+    > li:hover {
+      background-color: #333;
+      border-bottom: 2px solid #8AA051;
+    }
 }
