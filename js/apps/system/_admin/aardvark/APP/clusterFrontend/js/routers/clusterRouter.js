@@ -156,15 +156,13 @@ arangoDatabase, btoa, _*/
       }
       this.naviView.render();
 
-      //temp disable shutdown button
-      /*
       if (!this.shutdownView) {
         this.shutdownView = new window.ShutdownButtonView({
           overview: this.showClusterView
         });
       }
       this.shutdownView.render();
-      */
+
       this.showClusterView.render();
     },
 

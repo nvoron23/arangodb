@@ -32,12 +32,12 @@
     },
 
     render: function () {
-      $(this.el).html(this.template.render({}));
+      //$(this.el).html(this.template.render({}));
       return this;
     },
 
     unrender: function() {
-      $(this.el).html("");
+      //$(this.el).html("");
     }
   });
 }());
