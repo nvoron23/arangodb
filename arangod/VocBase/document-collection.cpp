@@ -120,7 +120,8 @@ TRI_document_collection_t::TRI_document_collection_t ()
     _indexesLock(),
     _indexes(),
     _documentCounterLock(),
-    _documentCounter(0),
+    _documentCount(0),
+    _documentSize(0),
     _revisionId(0),
     _masterpointerManager(nullptr),
     _keyGenerator(nullptr),
@@ -136,9 +137,7 @@ TRI_document_collection_t::TRI_document_collection_t ()
 ////////////////////////////////////////////////////////////////////////////////
 
 TRI_document_collection_t::~TRI_document_collection_t () {
-  if (_keyGenerator != nullptr) {
-    delete _keyGenerator;
-  }
+  delete _keyGenerator;
 
   shutdownIndexes();
 
@@ -258,19 +257,60 @@ void TRI_document_collection_t::writeUnlockIndexes () {
 /// @brief return the number of documents in the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-int64_t TRI_document_collection_t::documentCounter () {
+int64_t TRI_document_collection_t::documentCount () {
   READ_LOCKER(_documentCounterLock);
-  return _documentCounter;
+  return _documentCount;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief update the number of documents in the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-void TRI_document_collection_t::updateDocumentCounter (int64_t value) {
+void TRI_document_collection_t::updateDocumentCount (int64_t value) {
+  if (value == 0) {
+    return;
+  }
+
   WRITE_LOCKER(_documentCounterLock);
-  TRI_ASSERT_EXPENSIVE(_documentCounter + value >= 0);
-  _documentCounter += value;
+  TRI_ASSERT_EXPENSIVE(_documentCount + value >= 0);
+  _documentCount += value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the size of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+int64_t TRI_document_collection_t::documentSize () {
+  READ_LOCKER(_documentCounterLock);
+  return _documentSize;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the size of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::updateDocumentSize (int64_t value) {
+  if (value == 0) {
+    return;
+  }
+
+  WRITE_LOCKER(_documentCounterLock);
+  _documentSize += value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the statistics of the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_document_collection_t::updateDocumentStats (int64_t count,
+                                                     int64_t size) {
+  if (count == 0 && size == 0) {
+    return;
+  }
+
+  WRITE_LOCKER(_documentCounterLock);
+  _documentCount += count;
+  _documentSize  += size;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -306,7 +346,7 @@ triagens::mvcc::MasterpointerManager* TRI_document_collection_t::masterpointerMa
 ////////////////////////////////////////////////////////////////////////////////
 
 void TRI_document_collection_t::fillIndex (triagens::mvcc::Index* index) {
-  size_t const numDocuments = documentCounter();
+  size_t const numDocuments = documentCount();
   index->sizeHint(numDocuments);
 
   auto primaryIndex = lookupIndex(TRI_IDX_TYPE_PRIMARY_INDEX);

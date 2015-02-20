@@ -52,7 +52,8 @@ OpenIteratorState::OpenIteratorState (TRI_document_collection_t* collection)
   : collection(collection),
     datafileId(0),
     revisionId(0),
-    numDocuments(0),
+    documentCount(0),
+    documentSize(0),
     dfi(nullptr),
     primaryIndex(nullptr) {
 
@@ -70,7 +71,7 @@ OpenIteratorState::OpenIteratorState (TRI_document_collection_t* collection)
 ////////////////////////////////////////////////////////////////////////////////
 
 OpenIteratorState::~OpenIteratorState () {
-  collection->updateDocumentCounter(numDocuments);
+  collection->updateDocumentStats(documentCount, documentSize);
   collection->updateRevisionId(revisionId);
 }
 
@@ -97,9 +98,11 @@ void OpenIteratorState::insertDocument (TRI_df_marker_t const* marker) {
   mptr->setFrom(transactionId);
 
   primaryIndex->insert(*mptr);
+  
+  ++documentCount;
+  documentSize += (*mptr)->getDataSize();
+  
   mptr.link();
-
-  ++numDocuments;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +113,8 @@ TRI_doc_mptr_t* OpenIteratorState::removeDocument (char const* key) {
   auto found = primaryIndex->remove(std::string(key));
 
   if (found != nullptr) {
-    --numDocuments;
+    --documentCount;
+    documentSize -= found->getDataSize();
     collection->masterpointerManager()->unlink(found);
   }
 

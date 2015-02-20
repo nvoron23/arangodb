@@ -170,18 +170,43 @@ MasterpointerManager* TransactionCollection::masterpointerManager () {
 /// @brief update the document counter of a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-void TransactionCollection::updateDocumentCounter (int64_t value) {
+void TransactionCollection::updateDocumentCount (int64_t value) {
   TRI_ASSERT(value != 0);
 
-  _collection->_collection->updateDocumentCounter(value); 
+  _collection->_collection->updateDocumentCount(value); 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the number of documents in the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-int64_t TransactionCollection::documentCounter () {
-  return _collection->_collection->documentCounter(); 
+int64_t TransactionCollection::documentCount () {
+  return _collection->_collection->documentCount(); 
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the document size a collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::updateDocumentSize (int64_t value) {
+  _collection->_collection->updateDocumentSize(value); 
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the size of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+int64_t TransactionCollection::documentSize () {
+  return _collection->_collection->documentSize(); 
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief update the statistics of the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::updateDocumentStats (int64_t count, 
+                                                 int64_t size) {
+  _collection->_collection->updateDocumentStats(count, size); 
 }
 
 ////////////////////////////////////////////////////////////////////////////////

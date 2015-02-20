@@ -74,7 +74,8 @@ namespace triagens {
         struct TRI_document_collection_t* collection;
         TRI_voc_fid_t datafileId;
         TRI_voc_rid_t revisionId;
-        int64_t numDocuments;
+        int64_t documentCount;
+        int64_t documentSize;
         struct TRI_doc_datafile_info_s* dfi;
         triagens::mvcc::PrimaryIndex* primaryIndex;
     };

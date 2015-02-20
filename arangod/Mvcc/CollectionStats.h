@@ -46,8 +46,10 @@ namespace triagens {
       }
 
       void merge (CollectionStats const& other) {
-        numInserted += other.numInserted;
-        numRemoved  += other.numRemoved;
+        numInserted  += other.numInserted;
+        numRemoved   += other.numRemoved;
+        sizeInserted += other.sizeInserted;
+        sizeRemoved  += other.sizeRemoved;
 
         updateRevision(other.revisionId);
         
@@ -62,6 +64,8 @@ namespace triagens {
 
       size_t numInserted        = 0;
       size_t numRemoved         = 0;
+      int64_t sizeInserted      = 0;
+      int64_t sizeRemoved       = 0;
       TRI_voc_rid_t revisionId  = 0;
 
       bool   waitForSync        = false;

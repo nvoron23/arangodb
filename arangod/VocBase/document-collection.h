@@ -187,6 +187,19 @@ struct TRI_doc_mptr_t {
     }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief return the size of the marker
+////////////////////////////////////////////////////////////////////////////////
+
+    inline int64_t getDataSize () const {
+      auto data = getDataPtr();
+
+      if (data != nullptr) {
+        return static_cast<int64_t>(static_cast<TRI_df_marker_t const*>(data)->_size);
+      }
+      return 0;
+    }
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief return a pointer to the beginning of the marker
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -492,7 +505,8 @@ public:
 
   // TODO: use an atomic variable for this so the lock can go away
   triagens::basics::ReadWriteLock     _documentCounterLock;
-  int64_t                             _documentCounter;
+  int64_t                             _documentCount;
+  int64_t                             _documentSize;
   TRI_voc_rid_t                       _revisionId;
  
   void shutdownIndexes ();
@@ -504,14 +518,16 @@ public:
   void readUnlockIndexes();
   void writeLockIndexes();
   void writeUnlockIndexes();
-  int64_t documentCounter ();
-  void updateDocumentCounter (int64_t);
+  int64_t documentCount ();
+  void updateDocumentCount (int64_t);
+  int64_t documentSize ();
+  void updateDocumentSize (int64_t);
+  void updateDocumentStats (int64_t, int64_t);
   TRI_voc_rid_t revisionId ();
   void updateRevisionId (TRI_voc_rid_t);
   triagens::mvcc::MasterpointerManager* masterpointerManager () const;
   void fillIndex (triagens::mvcc::Index*);
   triagens::mvcc::MasterpointerManager* _masterpointerManager;
-  
   
   inline bool useSecondaryIndexes () const {
     return _useSecondaryIndexes;

@@ -252,15 +252,9 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         void incNumInserted (TransactionCollection const*,
+                             int64_t,
+                             int64_t,
                              bool);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief update the number of removed documents
-/// this is guaranteed to not fail if prepareStats() was called before
-////////////////////////////////////////////////////////////////////////////////
-
-        void incNumRemoved (TransactionCollection const*,
-                            bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief update the number of removed documents
@@ -269,7 +263,8 @@ namespace triagens {
 
         void incNumRemoved (TransactionCollection const*,
                             int64_t,
-                             bool);
+                            int64_t,
+                            bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief update the revision id of the collection

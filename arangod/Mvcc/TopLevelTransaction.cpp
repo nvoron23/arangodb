@@ -136,16 +136,14 @@ void TopLevelTransaction::commit () {
     // finally check how many documents were changed in each collection
     // and update the collection stats
     for (auto const& it : _stats) {
-      int64_t difference = static_cast<int64_t>(it.second.numInserted - it.second.numRemoved);
+      int64_t differenceCounter = static_cast<int64_t>(it.second.numInserted - it.second.numRemoved);
+      int64_t differenceSize    = static_cast<int64_t>(it.second.sizeInserted - it.second.sizeRemoved);
         
       auto it2 = _collectionIds.find(it.first);
 
       if (it2 != _collectionIds.end()) {
         (*it2).second->updateRevisionId(it.second.revisionId);
-
-        if (difference != 0) {
-          (*it2).second->updateDocumentCounter(difference);
-        }
+        (*it2).second->updateDocumentStats(differenceCounter, differenceSize);
       }
     }
   }

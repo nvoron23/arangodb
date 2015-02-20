@@ -263,12 +263,29 @@ int64_t CollectionOperations::Count (TransactionScope* transactionScope,
   auto* transaction = transactionScope->transaction();
 
   // initial value
-  int64_t count = collection->documentCounter();
+  int64_t count = collection->documentCount();
   auto stats = transaction->aggregatedStats(collection->id());
   count += stats.numInserted;
   count -= stats.numRemoved;
 
   return count;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the size of documents in the collection
+////////////////////////////////////////////////////////////////////////////////
+
+int64_t CollectionOperations::Size (TransactionScope* transactionScope,
+                                    TransactionCollection* collection) {
+  auto* transaction = transactionScope->transaction();
+
+  // initial value
+  int64_t size = collection->documentSize();
+  auto stats = transaction->aggregatedStats(collection->id());
+  size += stats.sizeInserted;
+  size -= stats.sizeRemoved;
+
+  return size;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -332,8 +349,9 @@ OperationResult CollectionOperations::Truncate (TransactionScope* transactionSco
   // while the operation is ongoing
   IndexUser indexUser(collection);
 
-  int64_t numRemoved = 0;
-  TRI_voc_rid_t tick = 0;
+  int64_t numRemoved  = 0;
+  int64_t sizeRemoved = 0;
+  TRI_voc_rid_t tick  = 0;
 
   {
     std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), false));
@@ -351,12 +369,14 @@ OperationResult CollectionOperations::Truncate (TransactionScope* transactionSco
       }
         
       numRemoved++;
+      sizeRemoved = result.mptr->getDataSize();
       tick = result.tick;
     }
   }
 
   if (numRemoved > 0) {
-    transaction->incNumRemoved(collection, numRemoved, options.waitForSync);
+    TRI_ASSERT(sizeRemoved > 0);
+    transaction->incNumRemoved(collection, numRemoved, sizeRemoved, options.waitForSync);
     transaction->updateRevisionId(collection, tick);
   }
 
@@ -383,7 +403,7 @@ OperationResult CollectionOperations::InsertDocument (TransactionScope* transact
 
   if (result.code == TRI_ERROR_NO_ERROR) {
     // commit the local operation
-    transaction->incNumInserted(collection, options.waitForSync);
+    transaction->incNumInserted(collection, 1, result.mptr->getDataSize(), options.waitForSync);
     transaction->updateRevisionId(collection, result.tick);
     transactionScope->commit();
   }
@@ -563,7 +583,7 @@ OperationResult CollectionOperations::RemoveDocument (TransactionScope* transact
 
   if (result.code == TRI_ERROR_NO_ERROR) {
     // commit the local operation
-    transaction->incNumRemoved(collection, options.waitForSync);
+    transaction->incNumRemoved(collection, 1, result.mptr->getDataSize(), options.waitForSync);
     transaction->updateRevisionId(collection, result.tick);
     transactionScope->commit();
   }
@@ -628,8 +648,8 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
   
     try {
       // commit the local operation
-      transaction->incNumRemoved(collection, options.waitForSync);
-      transaction->incNumInserted(collection, options.waitForSync);
+      transaction->incNumRemoved(collection, 1, removeResult.mptr->getDataSize(), options.waitForSync);
+      transaction->incNumInserted(collection, 1, result.mptr->getDataSize(), options.waitForSync);
       transaction->updateRevisionId(collection, result.tick);
       transactionScope->commit();
     }
@@ -694,8 +714,8 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
   
     try {
       // commit the local operation
-      transaction->incNumRemoved(collection, options.waitForSync);
-      transaction->incNumInserted(collection, options.waitForSync);
+      transaction->incNumRemoved(collection, 1, removeResult.mptr->getDataSize(), options.waitForSync);
+      transaction->incNumInserted(collection, 1, result.mptr->getDataSize(), options.waitForSync);
       transaction->updateRevisionId(collection, result.tick);
       transactionScope->commit();
     }
