@@ -118,16 +118,17 @@ void TopLevelTransaction::commit () {
       // run pre-commit actions
       preCommit();
 
-
       // write a commit marker
-      triagens::wal::MvccCommitTransactionMarker commitMarker(_vocbase->_id, _id);
+      if (! singleOperation()) {
+        triagens::wal::MvccCommitTransactionMarker commitMarker(_vocbase->_id, _id);
 
-      auto logfileManager = triagens::wal::LogfileManager::instance();
-      int res = logfileManager->allocateAndWrite(commitMarker, waitForSync).errorCode;
+        auto logfileManager = triagens::wal::LogfileManager::instance();
+        int res = logfileManager->allocateAndWrite(commitMarker, waitForSync).errorCode;
       
-      if (res != TRI_ERROR_NO_ERROR) {
-        rollback();
-        THROW_ARANGO_EXCEPTION(res); // will be caught below
+        if (res != TRI_ERROR_NO_ERROR) {
+          rollback();
+          THROW_ARANGO_EXCEPTION(res); // will be caught below
+        }
       }
     }
     catch (...) {

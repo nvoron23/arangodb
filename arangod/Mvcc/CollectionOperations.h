@@ -209,7 +209,8 @@ namespace triagens {
           keepNull(options & KeepNull),
           mergeObjects(options & MergeObjects),
           overwrite(options & Overwrite),
-          silent(options & Silent) {
+          silent(options & Silent),
+          standAlone(options & StandAlone) {
       }
       
       OperationOptions () 
@@ -225,12 +226,14 @@ namespace triagens {
       bool                     mergeObjects;     // merge object attributes on patch or overwrite?
       bool                     overwrite;        // ignore revision conflicts?
       bool                     silent;           // do not produce output, not used here but by caller
+      bool                     standAlone;       // standalone operation
 
       static int const WaitForSync  = 0x1;
       static int const KeepNull     = 0x2;
       static int const MergeObjects = 0x4;
       static int const Overwrite    = 0x8;
       static int const Silent       = 0x10;
+      static int const StandAlone   = 0x20;
     };
     
 // -----------------------------------------------------------------------------

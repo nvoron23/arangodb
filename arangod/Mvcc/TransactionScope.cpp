@@ -116,19 +116,20 @@ TransactionScope::TransactionScope (TRI_vocbase_t* vocbase,
 ////////////////////////////////////////////////////////////////////////////////
 
 TransactionScope::~TransactionScope () {
-  if (isOur()) {
-    removeFromStack();
-    try {
-      if (_shouldCommit) {
-        _transactionManager->commitTransaction(_id);
-      }
-      else {
-        _transactionManager->rollbackTransaction(_id);
-      }
+  if (! hasStartedTransaction()) {
+    return;
+  }
+
+  removeFromStack();
+  try {
+    if (_shouldCommit) {
+      _transactionManager->commitTransaction(_id);
     }
-    catch (...) {
+    else {
+      _transactionManager->rollbackTransaction(_id);
     }
-    _id = 0;
+  }
+  catch (...) {
   }
 }
 
@@ -149,7 +150,7 @@ std::map<std::string, bool> const& TransactionScope::NoCollections () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TransactionScope::commit () {
-  if (isOur()) {
+  if (hasStartedTransaction()) {
     _shouldCommit = true;
   }
 }

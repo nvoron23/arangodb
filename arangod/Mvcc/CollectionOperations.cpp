@@ -48,6 +48,16 @@
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                          private static variables
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief a transaction id used for single-operation transactions
+////////////////////////////////////////////////////////////////////////////////
+
+static TransactionId const DefaultTransactionId = { 0, 0 };
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                                   struct Document
 // -----------------------------------------------------------------------------
 
@@ -225,6 +235,7 @@ Document Document::CreateFromShapedJson (TRI_shaper_t* shaper,
     if (freeShape) {
       TRI_FreeShapedJson(shaper->_memoryZone, const_cast<TRI_shaped_json_t*>(shaped));
     }
+
     throw;
   }
 }
@@ -346,6 +357,8 @@ OperationResult CollectionOperations::Truncate (TransactionScope* transactionSco
   auto* transaction = transactionScope->transaction();
   transaction->prepareStats(collection);
 
+  TRI_ASSERT(! options.standAlone);
+
   // make sure we are holding a read (sic!) lock so we do not interfere with other
   // operations that explicitly lock the collection
   CollectionReadLock lock(collection, transaction);
@@ -407,7 +420,15 @@ OperationResult CollectionOperations::InsertDocument (TransactionScope* transact
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing
   IndexUser indexUser(collection);
-
+ 
+  // if the transaction will only contain this single operation, we can perform an
+  // optimization that will spare the commit marker 
+  if (options.standAlone &&
+      transactionScope->hasStartedTransaction() &&
+      ! indexUser.hasCapConstraint()) {
+    transaction->singleOperation(true);
+  }
+  
   auto result = InsertDocumentWorker(transactionScope, collection, indexUser, document, options);
 
   if (result.code == TRI_ERROR_NO_ERROR) {
@@ -588,6 +609,14 @@ OperationResult CollectionOperations::RemoveDocument (TransactionScope* transact
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing
   IndexUser indexUser(collection);
+  
+  // if the transaction will only contain this single operation, we can perform an
+  // optimization that will spare the commit marker 
+  if (options.standAlone &&
+      transactionScope->hasStartedTransaction() &&
+      ! indexUser.hasCapConstraint()) {
+    transaction->singleOperation(true);
+  }
 
   TransactionId originalTransactionId;
   auto result = RemoveDocumentWorker(transactionScope, collection, indexUser, document, options, originalTransactionId);
@@ -649,7 +678,7 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
       new triagens::wal::MvccRemoveMarker(transaction->vocbase()->_id,
                                           collection->id(),
                                           mptr->_rid,
-                                          transactionId,
+                                          transaction->singleOperation() ? DefaultTransactionId : transactionId,
                                           key)
     );
 
@@ -698,6 +727,14 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing
   IndexUser indexUser(collection);
+  
+  // if the transaction will only contain this single operation, we can perform an
+  // optimization that will spare the commit marker 
+  if (options.standAlone &&
+      transactionScope->hasStartedTransaction() &&
+      ! indexUser.hasCapConstraint()) {
+    transaction->singleOperation(true);
+  }
 
   // first remove the document...
   TransactionId originalTransactionId;
@@ -785,6 +822,14 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing
   IndexUser indexUser(collection);
+  
+  // if the transaction will only contain this single operation, we can perform an
+  // optimization that will spare the commit marker 
+  if (options.standAlone &&
+      transactionScope->hasStartedTransaction() &&
+      ! indexUser.hasCapConstraint()) {
+    transaction->singleOperation(true);
+  }
 
   // first remove the document...
   TransactionId originalTransactionId;
@@ -874,7 +919,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
     marker.reset(new triagens::wal::MvccEdgeMarker(transaction->vocbase()->_id,
                                                    collection->id(),
                                                    document.revision,
-                                                   transactionId,
+                                                   transaction->singleOperation() ? DefaultTransactionId : transactionId,
                                                    document.key,
                                                    document.edge,
                                                    8, /* legendSize */
@@ -885,7 +930,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
     marker.reset(new triagens::wal::MvccDocumentMarker(transaction->vocbase()->_id,
                                                        collection->id(),
                                                        document.revision,
-                                                       transactionId,
+                                                       transaction->singleOperation() ? DefaultTransactionId : transactionId,
                                                        document.key,
                                                        8, /* legendSize */
                                                        document.shaped)
@@ -1049,7 +1094,7 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
       new triagens::wal::MvccRemoveMarker(transaction->vocbase()->_id,
                                           collection->id(),
                                           actualRevision,
-                                          transactionId,
+                                          transaction->singleOperation() ? DefaultTransactionId : transactionId,
                                           document.key)
     );
 
@@ -1134,10 +1179,6 @@ void CollectionOperations::CreateOrValidateKey (TransactionCollection* collectio
     collection->validateKey(document->key); 
   }
 }
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                   private methods
-// -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief append a marker to the WAL

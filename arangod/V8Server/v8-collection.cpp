@@ -3514,10 +3514,15 @@ static void MvccInsert (TRI_vocbase_col_t const* collection,
   try {
     triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
+    if (transactionScope.hasStartedTransaction()) {
+      options.standAlone = true;
+    }
+
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto* shaper = transactionCollection->shaper();
 
+    // note: shaped may be a nullptr, then the CreateFromShapedJson will throw
     TRI_shaped_json_t* shaped = TRI_ShapedJsonV8Object(isolate, args[docArg], shaper, true);  // PROTECTED by trx from above
     auto document = triagens::mvcc::Document::CreateFromShapedJson(shaper, shaped, key.get(), true);
     document.edge = edge; // may be a nullptr!
@@ -3668,6 +3673,10 @@ static void MvccRemove (bool useCollection,
   
   try {
     triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    
+    if (transactionScope.hasStartedTransaction()) {
+      options.standAlone = true;
+    }
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3776,6 +3785,10 @@ static void MvccReplace (bool useCollection,
   
   try {
     triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    
+    if (transactionScope.hasStartedTransaction()) {
+      options.standAlone = true;
+    }
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
@@ -3903,6 +3916,10 @@ static void MvccUpdate (bool useCollection,
   
   try {
     triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    
+    if (transactionScope.hasStartedTransaction()) {
+      options.standAlone = true;
+    }
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);

@@ -69,7 +69,8 @@ Transaction::Transaction (TransactionManager* transactionManager,
     _committedSubTransactions(),
     _stats(),
     _expireTime(0.0),
-    _killed(false) {
+    _killed(false),
+    _singleOperation(false) {
 
   // avoid expensive time call if no ttl was specified
   if (ttl > 0.0) {
