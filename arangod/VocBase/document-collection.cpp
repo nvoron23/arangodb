@@ -37,6 +37,7 @@
 #include "FulltextIndex/fulltext-index.h"
 #include "GeoIndex/geo-index.h"
 #include "HashIndex/hash-index.h"
+#include "Mvcc/CapConstraint.h"
 #include "Mvcc/EdgeIndex.h"
 #include "Mvcc/FulltextIndex.h"
 #include "Mvcc/GeoIndex2.h"
@@ -46,6 +47,9 @@
 #include "Mvcc/OpenIterator.h"
 #include "Mvcc/PrimaryIndex.h"
 #include "Mvcc/SkiplistIndex2.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "ShapedJson/shape-accessor.h"
 #include "Utils/transactions.h"
 #include "Utils/CollectionReadLocker.h"
@@ -3796,6 +3800,25 @@ static TRI_index_t* CreateCapConstraintDocumentCollection (TRI_document_collecti
     TRI_FreeCapConstraint(idx);
 
     return nullptr;
+  }
+
+  auto mvccIndex = new triagens::mvcc::CapConstraint(idx->_iid, document, count, size);
+  
+  try {
+    document->addIndex(mvccIndex);
+  }
+  catch (...) {
+    delete mvccIndex;
+    throw;
+  }
+
+  {
+    triagens::mvcc::TransactionScope transactionScope(document->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(document->_info._cid);
+
+    mvccIndex->apply(transactionCollection, transaction, false);
   }
 
   if (created != nullptr) {

@@ -28,11 +28,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "CapConstraint.h"
+#include "Mvcc/CollectionOperations.h"
+#include "Mvcc/MasterpointerManager.h"
+#include "Mvcc/TransactionCollection.h"
 #include "Utils/Exception.h"
 #include "Utils/transactions.h"
 #include "VocBase/datafile.h"
 #include "VocBase/document-collection.h"
-#include "Mvcc/TransactionCollection.h"
 
 using namespace triagens::basics;
 using namespace triagens::mvcc;
@@ -55,9 +57,8 @@ CapConstraint::CapConstraint (TRI_idx_iid_t id,
                               int64_t size)
   : Index(id, collection, std::vector<std::string>()),
     _count(count),
-    _size(size) {
+    _size(static_cast<int64_t>(size)) {
 
-  initialize();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -82,8 +83,8 @@ void CapConstraint::insert (TRI_doc_mptr_t* doc) {
 /// @brief insert a document
 ////////////////////////////////////////////////////////////////////////////////
 
-void CapConstraint::insert (TransactionCollection*,
-                            Transaction*,
+void CapConstraint::insert (TransactionCollection* collection,
+                            Transaction* transaction,
                             TRI_doc_mptr_t* doc) {
   if (_size > 0) {
     // there is a size restriction
@@ -93,6 +94,12 @@ void CapConstraint::insert (TransactionCollection*,
     if (static_cast<int64_t>(marker->_size) > _size) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TOO_LARGE);
     }
+  }
+
+  int res = apply(collection, transaction, true);
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(res);
   }
 }
 
@@ -143,93 +150,63 @@ Json CapConstraint::toJson (TRI_memory_zone_t* zone) const {
   return json;
 }
 
-// -----------------------------------------------------------------------------
-// --SECTION--                                                 private functions 
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief initialize the cap constraint
-////////////////////////////////////////////////////////////////////////////////
-
-int CapConstraint::initialize () {
-  TRI_ASSERT(_count > 0 || _size > 0);
-
-  TRI_headers_t* headers = _collection->_headersPtr;  // ONLY IN INDEX (CAP)
-  size_t currentCount    = headers->count();
-  int64_t currentSize    = headers->size();
-
-  if ((_count > 0 && currentCount <= _count) &&
-      (_size > 0 && currentSize <= _size)) {
-    // nothing to do
-    return TRI_ERROR_NO_ERROR;
-  }
-    
-  TRI_vocbase_t* vocbase = _collection->_vocbase;
-  TRI_voc_cid_t cid = _collection->_info._cid;
-
-  triagens::arango::SingleCollectionWriteTransaction<UINT64_MAX> trx(new triagens::arango::StandaloneTransactionContext(), vocbase, cid);
-  trx.addHint(TRI_TRANSACTION_HINT_LOCK_NEVER, false);
-  trx.addHint(TRI_TRANSACTION_HINT_NO_BEGIN_MARKER, false);
-  trx.addHint(TRI_TRANSACTION_HINT_NO_ABORT_MARKER, false);
-  trx.addHint(TRI_TRANSACTION_HINT_SINGLE_OPERATION, false); // this is actually not true, but necessary to create trx id 0
-
-  int res = trx.begin();
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    return res;
-  }
-
-  TRI_transaction_collection_t* trxCollection = trx.trxCollection();
-  res = apply(trxCollection);
-
-  res = trx.finish(res);
-
-  return res;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief apply the cap constraint for the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-int CapConstraint::apply (TRI_transaction_collection_t* trxCollection) {
-  TRI_headers_t* headers = _collection->_headersPtr;  // PROTECTED by trx in trxCollection
-  size_t currentCount    = headers->count();
-  int64_t currentSize    = headers->size();
+int CapConstraint::apply (TransactionCollection* collection,
+                          Transaction* transaction,
+                          bool invokedOnInsert) {
+  auto stats = transaction->aggregatedStats(collection->id());
 
-  int res = TRI_ERROR_NO_ERROR;
+  // get number of documents
+  int64_t currentCount = collection->documentCount();
+  currentCount += stats.numInserted;
+  currentCount -= stats.numRemoved;
 
-  // delete while at least one of the constraints is still violated
-  while ((_count > 0 && currentCount > _count) ||
-         (_size > 0 && currentSize > _size)) {
-    TRI_doc_mptr_t* oldest = headers->front();
-
-    if (oldest != nullptr) {
-      TRI_ASSERT(oldest->getDataPtr() != nullptr);  // ONLY IN INDEX, PROTECTED by RUNTIME
-      size_t oldSize = (static_cast<TRI_df_marker_t const*>(oldest->getDataPtr()))->_size;  // ONLY IN INDEX, PROTECTED by RUNTIME
-
-      TRI_ASSERT(oldSize > 0);
-
-      if (trxCollection != nullptr) {
-        res = TRI_DeleteDocumentDocumentCollection(trxCollection, nullptr, oldest);
-
-        if (res != TRI_ERROR_NO_ERROR) {
-          break;
-        }
-      }
-      else {
-        headers->unlink(oldest);
-      }
-
-      currentCount--;
-      currentSize -= (int64_t) oldSize;
-    }
-    else {
-      // we should not get here
-      break;
-    }
+  if (invokedOnInsert) {
+    ++currentCount;
   }
 
-  return res;
+  // get size of documents
+  int64_t currentSize = collection->documentSize();
+  currentSize += stats.sizeInserted;
+  currentSize -= stats.sizeRemoved;
+
+  auto masterpointerManager = collection->masterpointerManager();
+  
+  MasterpointerIterator iterator(transaction, masterpointerManager, false);
+
+  // keep removing while at least one of the constraints is violated
+  while ((_count > 0 && currentCount > _count) ||
+         (_size > 0 && currentSize > _size)) {
+
+    if (! iterator.hasMore()) {
+      return TRI_ERROR_NO_ERROR;
+    }
+
+    auto mptr = iterator.next();
+
+    if (mptr == nullptr) {
+      return TRI_ERROR_NO_ERROR;
+    }
+
+    auto result = CollectionOperations::RemoveDocument(transaction, collection, const_cast<TRI_doc_mptr_t*>(mptr)); 
+
+
+    if (result.code != TRI_ERROR_NO_ERROR) {
+      return result.code;
+    }
+
+    transaction->incNumRemoved(collection, 1, result.mptr->getDataSize(), false);
+    transaction->updateRevisionId(collection, result.tick);
+
+    // update local stats
+    currentSize -= result.mptr->getDataSize();
+    --currentCount;
+  }
+
+  return TRI_ERROR_NO_ERROR;
 }
 
 // -----------------------------------------------------------------------------

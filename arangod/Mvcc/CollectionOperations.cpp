@@ -590,6 +590,79 @@ OperationResult CollectionOperations::RemoveDocument (TransactionScope* transact
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief remove a document
+////////////////////////////////////////////////////////////////////////////////
+
+OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
+                                                      TransactionCollection* collection,
+                                                      TRI_doc_mptr_t* document) {
+  auto const transactionId = transaction->id();
+
+  // remove document from primary index
+  // this fetches the master pointer of the to-be-deleted revision
+  // and sets its _to value to our transaction id
+  IndexUser indexUser(collection);
+
+  auto primaryIndex = indexUser.primaryIndex();
+  TransactionId originalTransactionId;
+  
+  auto key = TRI_EXTRACT_MARKER_KEY(document);
+  TRI_ASSERT(key != nullptr);
+
+  // this throws on error
+  auto mptr = primaryIndex->remove(collection, transaction, key, originalTransactionId);
+  TRI_ASSERT(mptr != nullptr);
+  indexUser.mustClick();
+
+  TRI_voc_tick_t tick;
+  try {
+    // iterate over all secondary indexes while holding the index read-lock
+    auto indexes = indexUser.indexes();
+
+    for (size_t i = 1; i < indexes.size(); ++i) {
+      // call remove for each secondary indexes
+      indexes[i]->remove(collection, transaction, key, mptr);
+    }
+    
+    // when we are here, the document has been removed from all indexes 
+
+    // create a temporary remove marker on the heap
+    // the marker memory will be freed automatically when we leave this method
+    std::unique_ptr<triagens::wal::MvccRemoveMarker> marker(
+      new triagens::wal::MvccRemoveMarker(transaction->vocbase()->_id,
+                                          collection->id(),
+                                          mptr->_rid,
+                                          transactionId,
+                                          key)
+    );
+
+    // now append the marker to the WAL
+    WriteResult writeResult;
+    int res = WriteMarker(marker.get(), collection, writeResult);
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(res);
+    }
+
+    tick = writeResult.tick;
+  }
+  catch (...) {
+    // revert the value of the _to attribute
+    if (! mptr->changeTo(transactionId, originalTransactionId)) {
+      // oops, should not happen
+      TRI_ASSERT(false);
+    }
+
+    // TODO: do we need to undo the remove() in the secondary indexes, too??
+    throw;
+  }
+
+  TRI_ASSERT(mptr != nullptr);
+
+  return OperationResult(mptr, tick);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief update a document
 ////////////////////////////////////////////////////////////////////////////////
 

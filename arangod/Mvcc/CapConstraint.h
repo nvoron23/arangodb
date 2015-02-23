@@ -33,11 +33,10 @@
 #include "Basics/Common.h"
 #include "Mvcc/Index.h"
 
-struct TRI_transaction_collection_s;
-
 namespace triagens {
   namespace mvcc {
 
+    class Transaction;
     class TransactionCollection;
 
 // -----------------------------------------------------------------------------
@@ -60,7 +59,7 @@ namespace triagens {
         ~CapConstraint ();
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                                    public methods
+// --SECTION--                            public methods, inherited from Index.h
 // -----------------------------------------------------------------------------
 
       public:
@@ -107,14 +106,12 @@ namespace triagens {
         }
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                                   private methods
+// --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
 
-      private:
-
-        int initialize ();
-
-        int apply (struct TRI_transaction_collection_s*);
+        int apply (TransactionCollection*,
+                   Transaction*,
+                   bool);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
@@ -126,7 +123,7 @@ namespace triagens {
 /// @brief maximum number of documents in the collection
 ////////////////////////////////////////////////////////////////////////////////
   
-        size_t const _count;
+        int64_t const _count;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief maximum size of documents in the collection
