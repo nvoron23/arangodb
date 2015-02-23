@@ -374,7 +374,7 @@ OperationResult CollectionOperations::Truncate (TransactionScope* transactionSco
       }
         
       numRemoved++;
-      sizeRemoved = result.mptr->getDataSize();
+      sizeRemoved += result.mptr->getDataSize();
       tick = result.tick;
     }
   }
