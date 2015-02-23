@@ -118,8 +118,8 @@ void TopLevelTransaction::commit () {
       // run pre-commit actions
       preCommit();
 
-      // write a commit marker
       if (! singleOperation()) {
+        // write a commit marker
         triagens::wal::MvccCommitTransactionMarker commitMarker(_vocbase->_id, _id);
 
         auto logfileManager = triagens::wal::LogfileManager::instance();
@@ -175,7 +175,7 @@ void TopLevelTransaction::rollback () {
 
   bool const hasModifications = this->hasModifications();
   
-  if (hasModifications) {
+  if (hasModifications && ! singleOperation()) {
     try {
       // write an abort marker
       triagens::wal::MvccAbortTransactionMarker abortMarker(_vocbase->_id, _id);
