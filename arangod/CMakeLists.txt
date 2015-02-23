@@ -90,6 +90,7 @@ add_executable(
     HashIndex/hash-index.cpp
     IndexOperators/index-operator.cpp
     Mvcc/CapConstraint.cpp
+    Mvcc/CollectionReadLock.cpp
     Mvcc/CollectionOperations.cpp
     Mvcc/EdgeIndex.cpp
     Mvcc/FulltextIndex.cpp

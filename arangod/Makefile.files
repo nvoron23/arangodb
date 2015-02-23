@@ -71,6 +71,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/HashIndex/hash-index.cpp \
 	arangod/IndexOperators/index-operator.cpp \
 	arangod/Mvcc/CapConstraint.cpp \
+	arangod/Mvcc/CollectionReadLock.cpp \
 	arangod/Mvcc/CollectionOperations.cpp \
 	arangod/Mvcc/EdgeIndex.cpp \
 	arangod/Mvcc/FulltextIndex.cpp \

@@ -30,6 +30,7 @@
 #include "CollectionOperations.h"
 #include "Basics/json.h"
 #include "Basics/json-utilities.h"
+#include "Mvcc/CollectionReadLock.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/PrimaryIndex.h"
@@ -344,6 +345,10 @@ OperationResult CollectionOperations::Truncate (TransactionScope* transactionSco
                                                 OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
   transaction->prepareStats(collection);
+
+  // make sure we are holding a read (sic!) lock so we do not interfere with other
+  // operations that explicitly lock the collection
+  CollectionReadLock lock(collection, transaction);
   
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing
@@ -394,6 +399,10 @@ OperationResult CollectionOperations::InsertDocument (TransactionScope* transact
                                                       OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
   transaction->prepareStats(collection);
+  
+  // make sure we are holding a read (sic!) lock so we do not interfere with other
+  // operations that explicitly lock the collection
+  CollectionReadLock lock(collection, transaction);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing
@@ -571,6 +580,10 @@ OperationResult CollectionOperations::RemoveDocument (TransactionScope* transact
                                                       OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
   transaction->prepareStats(collection);
+  
+  // make sure we are holding a read (sic!) lock so we do not interfere with other
+  // operations that explicitly lock the collection
+  CollectionReadLock lock(collection, transaction);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing
@@ -597,6 +610,10 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
                                                       TransactionCollection* collection,
                                                       TRI_doc_mptr_t* document) {
   auto const transactionId = transaction->id();
+  
+  // make sure we are holding a read (sic!) lock so we do not interfere with other
+  // operations that explicitly lock the collection
+  CollectionReadLock lock(collection, transaction);
 
   // remove document from primary index
   // this fetches the master pointer of the to-be-deleted revision
@@ -673,6 +690,10 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
                                                       OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
   transaction->prepareStats(collection);
+  
+  // make sure we are holding a read (sic!) lock so we do not interfere with other
+  // operations that explicitly lock the collection
+  CollectionReadLock lock(collection, transaction);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing
@@ -756,6 +777,10 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
                                                        OperationOptions const& options) {
   auto* transaction = transactionScope->transaction();
   transaction->prepareStats(collection);
+  
+  // make sure we are holding a read (sic!) lock so we do not interfere with other
+  // operations that explicitly lock the collection
+  CollectionReadLock lock(collection, transaction);
 
   // acquire a read-lock on the list of indexes so no one else creates or drops indexes
   // while the operation is ongoing

@@ -43,6 +43,12 @@ using namespace triagens::mvcc;
 // --SECTION--                                       class TransactionCollection
 // -----------------------------------------------------------------------------
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief sleep time when waiting to acquire a lock (in microseconds)
+////////////////////////////////////////////////////////////////////////////////
+
+uint64_t const TransactionCollection::LockWaitSleepTime = 1000; 
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -118,6 +124,31 @@ void TransactionCollection::lockRead () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief read-lock the collection, using a timeout (in microseconds)
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::lockRead (uint64_t timeout) {
+  TRI_ASSERT(_locked == TransactionCollection::LockType::UNLOCKED);
+  
+  uint64_t waited = 0;
+
+  while (! TRI_TryReadLockReadWriteLock(&_collection->_collection->_lock)) {
+#ifdef _WIN32
+    usleep(static_cast<unsigned long>(LockWaitSleepTime));
+#else
+    usleep(static_cast<useconds_t>(LockWaitSleepTime));
+#endif
+    waited += LockWaitSleepTime;
+
+    if (waited > timeout) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_LOCK_TIMEOUT);
+    }
+  }
+
+  _locked = TransactionCollection::LockType::LOCKED_READ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief write-lock the collection
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -125,6 +156,31 @@ void TransactionCollection::lockWrite () {
   TRI_ASSERT(_locked == TransactionCollection::LockType::UNLOCKED);
 
   TRI_WriteLockReadWriteLock(&_collection->_collection->_lock);
+  _locked = TransactionCollection::LockType::LOCKED_WRITE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief write-lock the collection, using a timeout (in microseconds)
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::lockWrite (uint64_t timeout) {
+  TRI_ASSERT(_locked == TransactionCollection::LockType::UNLOCKED);
+
+  uint64_t waited = 0;
+
+  while (! TRI_TryWriteLockReadWriteLock(&_collection->_collection->_lock)) {
+#ifdef _WIN32
+    usleep(static_cast<unsigned long>(LockWaitSleepTime));
+#else
+    usleep(static_cast<useconds_t>(LockWaitSleepTime));
+#endif
+    waited += LockWaitSleepTime;
+
+    if (waited > timeout) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_LOCK_TIMEOUT);
+    }
+  }
+
   _locked = TransactionCollection::LockType::LOCKED_WRITE;
 }
 
