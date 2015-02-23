@@ -174,7 +174,9 @@ int CapConstraint::apply (TransactionCollection* collection,
   currentSize -= stats.sizeRemoved;
 
   auto masterpointerManager = collection->masterpointerManager();
-  
+
+  // starting from the beginning of the master pointer list is very expensive  
+  // some sort of caching of the last found "visible" pointer would help here
   MasterpointerIterator iterator(transaction, masterpointerManager, false);
 
   // keep removing while at least one of the constraints is violated
