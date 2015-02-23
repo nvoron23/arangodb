@@ -136,7 +136,6 @@ LocalTransactionManager::LocalTransactionManager ()
 ////////////////////////////////////////////////////////////////////////////////
 
 LocalTransactionManager::~LocalTransactionManager () {
-  // TODO: abort all open transactions on shutdown!
   if (_cleanupThread) {
     _cleanupThread->stop();
     _cleanupThread->join();
@@ -144,6 +143,7 @@ LocalTransactionManager::~LocalTransactionManager () {
 
   delete _cleanupThread;
 
+  // abort all open transactions on shutdown!
   try {
     killAllRunningTransactions();
     deleteKilledTransactions();
@@ -254,7 +254,6 @@ void LocalTransactionManager::commitTransaction (TransactionId::InternalType id)
     transaction = (*it).second;
   }
 
-  // TODO: assert that the transaction does not have any active subtransactions, or cancel them
   transaction->commit();
 }
 
@@ -277,7 +276,6 @@ void LocalTransactionManager::rollbackTransaction (TransactionId::InternalType i
     transaction = (*it).second;
   }
   
-  // TODO: assert that the transaction does not have any active subtransactions, or cancel them
   transaction->rollback();
 }
 

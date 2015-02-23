@@ -456,7 +456,6 @@ OperationResult CollectionOperations::ReadAllDocuments (TransactionScope* transa
     std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), reverse));
     auto it = iterator.get();
    
-    // TODO: implement skip
     while (it->hasMore()) {
       it->next(foundDocuments, skip, limit, 1000);
     }
@@ -535,7 +534,6 @@ OperationResult CollectionOperations::ReadByExample (TransactionScope* transacti
     std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), reverse));
     auto it = iterator.get();
    
-    // TODO: implement skip
     while (it->hasMore()) {
       auto document = it->next(skip, limit);
 
@@ -1035,7 +1033,7 @@ void CollectionOperations::CreateOrValidateKey (TransactionCollection* collectio
   }
   else {
     // key was specified, now validate it
-    collection->validateKey(document->key); // TODO: handle case isRestore
+    collection->validateKey(document->key); 
   }
 }
 

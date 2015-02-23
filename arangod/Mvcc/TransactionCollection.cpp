@@ -241,7 +241,6 @@ std::string TransactionCollection::generateKey (TRI_voc_tick_t tick) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TransactionCollection::validateKey (std::string const& key) const {
-  // TODO: handle case isRestore
   int res = _collection->_collection->_keyGenerator->validate(key.c_str(), false);
 
   if (res != TRI_ERROR_NO_ERROR) {

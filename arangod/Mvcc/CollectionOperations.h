@@ -125,7 +125,6 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     struct OperationResult {
-      // TODO: implement copy ctor & copy assignment ctor
       OperationResult (OperationResult const& other) {
         mptr = other.mptr;
         tick = other.tick;
