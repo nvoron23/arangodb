@@ -181,7 +181,20 @@ void TRI_document_collection_t::shutdownIndexes () {
 triagens::mvcc::Index* TRI_document_collection_t::addIndex (triagens::mvcc::Index* index) {
   WRITE_LOCKER(_indexesLock);
 
-  _indexes.push_back(index);
+  if (! _indexes.empty() && _indexes.back()->type() == TRI_IDX_TYPE_CAP_CONSTRAINT) {
+    // we have a cap constraint as the last present index in the vector
+    // make sure the cap constraint stays at the end of the list after our insertion
+    _indexes.push_back(_indexes.back());
+
+    TRI_ASSERT(_indexes.size() >= 2);
+    _indexes[_indexes.size() - 2] = index;
+
+    TRI_ASSERT(_indexes.back()->type() == TRI_IDX_TYPE_CAP_CONSTRAINT);
+  }
+  else {
+    _indexes.push_back(index);
+  }
+
   return index;
 }
 
