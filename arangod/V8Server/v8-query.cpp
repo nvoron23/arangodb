@@ -512,8 +512,6 @@ static void JS_MvccByExampleHash (const v8::FunctionCallbackInfo<v8::Value>& arg
     auto const& foundDocuments = *(indexResult.get());
 
     size_t total = indexResult->size();
-    size_t count = 0;
-
     auto result = v8::Array::New(isolate);
 
     if (total > 0) {
@@ -522,6 +520,8 @@ static void JS_MvccByExampleHash (const v8::FunctionCallbackInfo<v8::Value>& arg
       CalculateSkipLimitSlice(total, skip, limit, s, e);
 
       if (s < e) {
+        size_t count = 0;
+
         for (size_t i = s;  i < e;  ++i) {
           v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[i]->getDataPtr());
 
