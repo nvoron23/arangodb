@@ -115,6 +115,10 @@ void TopLevelTransaction::commit () {
 
   if (hasModifications) {
     try {
+      // run pre-commit actions
+      preCommit();
+
+
       // write a commit marker
       triagens::wal::MvccCommitTransactionMarker commitMarker(_vocbase->_id, _id);
 

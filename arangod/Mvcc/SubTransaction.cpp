@@ -92,6 +92,14 @@ void SubTransaction::commit () {
     }
   }
 
+  try {
+    // run pre-commit actions
+    preCommit();
+  }
+  catch (...) {
+    return rollback();
+  }
+
   _status = StatusType::COMMITTED;
   _parentTransaction->subTransactionFinished(this);
   _transactionManager->deleteRunningTransaction(this);

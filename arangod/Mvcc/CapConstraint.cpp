@@ -115,7 +115,7 @@ TRI_doc_mptr_t* CapConstraint::remove (TransactionCollection*,
 }  
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief forget a document (does nothing)
+/// @brief forget a document
 ////////////////////////////////////////////////////////////////////////////////
 
 void CapConstraint::forget (TransactionCollection*, 
@@ -124,11 +124,12 @@ void CapConstraint::forget (TransactionCollection*,
 }  
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief preCommit a document (does nothing so far)
+/// @brief preCommit a transaction
 ////////////////////////////////////////////////////////////////////////////////
 
-void CapConstraint::preCommit (TransactionCollection*,
-                               Transaction*) {
+void CapConstraint::preCommit (TransactionCollection* collection,
+                               Transaction* transaction) {
+  apply(collection, transaction, false);
 }  
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -181,7 +182,7 @@ int CapConstraint::apply (TransactionCollection* collection,
 
   // keep removing while at least one of the constraints is violated
   while ((_count > 0 && currentCount > _count) ||
-         (_size > 0 && currentSize > _size)) {
+         (_size > 0  && currentSize > _size)) {
 
     if (! iterator.hasMore()) {
       return TRI_ERROR_NO_ERROR;
@@ -195,6 +196,12 @@ int CapConstraint::apply (TransactionCollection* collection,
 
     auto result = CollectionOperations::RemoveDocument(transaction, collection, const_cast<TRI_doc_mptr_t*>(mptr)); 
 
+    if (result.code == TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT) {
+      // when there is a write conflict, we cannot delete the document we found
+      // still, this is probably not a real error. we can go on and delete the
+      // next document
+      continue;
+    }
 
     if (result.code != TRI_ERROR_NO_ERROR) {
       return result.code;

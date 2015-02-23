@@ -267,6 +267,23 @@ void Transaction::subTransactionFinished (Transaction* transaction) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief called directly before commit
+////////////////////////////////////////////////////////////////////////////////
+
+void Transaction::preCommit () {
+  auto top = topLevelTransaction();
+
+  for (auto const& it : _stats) {
+    // look up collection
+    auto collection = top->collection(it.first);
+
+    if (collection != nullptr) {
+      collection->preCommit(this);
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief visibility, this implements the MVCC logic of what this transaction
 /// can see, returns the visibility of the other transaction for this one.
 /// The result can be INVISIBLE, CONCURRENT or VISIBLE. We guarantee
@@ -275,15 +292,19 @@ void Transaction::subTransactionFinished (Transaction* transaction) {
 ////////////////////////////////////////////////////////////////////////////////
     
 Transaction::VisibilityType Transaction::visibility (TransactionId const& other) const {
-  if (other.own() == 0) {
+  auto const otherOwn = other.own();
+
+  if (otherOwn == 0) {
     return VisibilityType::INVISIBLE;
   }
-  if (other.own() == 1) {
+  if (otherOwn == 1) {
     return VisibilityType::VISIBLE;
   }
+  
+  auto const otherTop = other.top();
 
-  if (_id.top() == other.top()) {   // same top level transaction?
-    if (other.own() > _id.own()) {
+  if (_id.top() == otherTop) {   // same top level transaction?
+    if (otherOwn > _id.own()) {
       if (_transactionManager->statusTransaction(other) == StatusType::ROLLED_BACK) {
         return VisibilityType::INVISIBLE;
       }
@@ -293,7 +314,7 @@ Transaction::VisibilityType Transaction::visibility (TransactionId const& other)
       return VisibilityType::CONCURRENT;
     }
 
-    if (other.own() < _id.own()) {
+    if (otherOwn < _id.own()) {
       if (_transactionManager->statusTransaction(other) == StatusType::ROLLED_BACK) {
         return VisibilityType::INVISIBLE;
       }
@@ -304,8 +325,8 @@ Transaction::VisibilityType Transaction::visibility (TransactionId const& other)
     return VisibilityType::VISIBLE;
   }
 
-  if (other.top() > _id.top() || 
-      topLevelTransaction()->wasOngoingAtStart(other.top())) {
+  if (otherTop > _id.top() || 
+      topLevelTransaction()->wasOngoingAtStart(otherTop)) {
     if (_transactionManager->statusTransaction(other) == StatusType::ROLLED_BACK) {
       return VisibilityType::INVISIBLE;
     }
@@ -313,7 +334,7 @@ Transaction::VisibilityType Transaction::visibility (TransactionId const& other)
     return VisibilityType::CONCURRENT;
   }
 
-  TRI_ASSERT(other.top() < _id.top());
+  TRI_ASSERT(otherTop < _id.top());
     
   if (_transactionManager->statusTransaction(other) == StatusType::ROLLED_BACK) {
     return VisibilityType::INVISIBLE;

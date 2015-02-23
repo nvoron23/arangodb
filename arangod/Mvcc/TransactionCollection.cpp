@@ -29,7 +29,9 @@
 
 #include "TransactionCollection.h"
 #include "Mvcc/Index.h"
+#include "Mvcc/IndexUser.h"
 #include "Mvcc/MasterpointerManager.h"
+#include "Mvcc/Transaction.h"
 #include "ShapedJson/json-shaper.h"
 #include "Utils/Exception.h"
 #include "VocBase/barrier.h"
@@ -338,6 +340,25 @@ void TransactionCollection::freeBarrier () {
 
     // we're done with this barrier
     _barrier = nullptr;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief run pre-commit actions for the collection
+////////////////////////////////////////////////////////////////////////////////
+
+void TransactionCollection::preCommit (Transaction* transaction) {
+  IndexUser indexUser(this);
+
+  if (! indexUser.hasCapConstraint()) {
+    // no need for pre-commit if there are no cap constraints
+    return;
+  }
+    
+  auto indexes = indexUser.indexes();
+  for (size_t i = 0; i < indexes.size(); ++i) {
+    // call preCommit for each indexes
+    indexes[i]->preCommit(this, transaction);
   }
 }
 
