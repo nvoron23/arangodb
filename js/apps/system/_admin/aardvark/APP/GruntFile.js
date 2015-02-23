@@ -320,6 +320,17 @@
       'concat_in_order:default',
       'concat_in_order:jsCluster',
       'concat_in_order:htmlCluster',
+      'concat_in_order:htmlStandalone'
+    ]);
+
+
+    grunt.registerTask('devel', [
+      'sass:dev',
+      'replace',
+      'concat_in_order:sharedLibs',
+      'concat_in_order:default',
+      'concat_in_order:jsCluster',
+      'concat_in_order:htmlCluster',
       'concat_in_order:htmlStandalone',
       'watch'
     ]);
@@ -336,10 +347,6 @@
 
     grunt.registerTask('coverage', [
       'concat_in_order:coverage'
-    ]);
-
-    grunt.registerTask('peter', [
-      'concat_in_order:default',
     ]);
 
   };
