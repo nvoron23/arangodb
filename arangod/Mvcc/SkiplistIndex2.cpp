@@ -318,33 +318,480 @@ SkiplistIndex2::~SkiplistIndex2 () {
 // --SECTION--                                                  public functions
 // -----------------------------------------------------------------------------
         
-std::vector<TRI_doc_mptr_t*>* SkiplistIndex2::lookup (TransactionCollection* coll,
-                                                      Transaction* trans,
-                                                      TRI_index_operator_t* op,
-                                                      bool reverse,
-                                                      size_t limit) {
-  
-  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> theResult(new std::vector<TRI_doc_mptr_t*>);
-  // TODO: this has to be implemented still!
+////////////////////////////////////////////////////////////////////////////////
+/// @brief lookup method, constructing an iterator
+////////////////////////////////////////////////////////////////////////////////
 
-  return theResult.release();
+SkiplistIndex2::Iterator* SkiplistIndex2::lookup (
+                                  TransactionCollection* coll,
+                                  Transaction* trans,
+                                  TRI_index_operator_t* op,
+                                  bool reverse) const {
+  return new Iterator(this, coll, trans, op, reverse);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief lookup by key with limit, continuation
+/// @brief fillMe, this actually builds up the iterator object
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<TRI_doc_mptr_t*>* SkiplistIndex2::lookupContinue (
-                                                  TransactionCollection* coll,
-                                                  Transaction* trans,
-                                                  TRI_index_operator_t* op,
-                                                  TRI_doc_mptr_t* previousLast,
-                                                  bool reverse,
-                                                  size_t limit) {
-  std::unique_ptr<std::vector<TRI_doc_mptr_t*>> theResult(new std::vector<TRI_doc_mptr_t*>);
-  // TODO: this has to be implemented still!
+void SkiplistIndex2::Iterator::fillMe (TRI_index_operator_t const* op) {
 
-  return theResult.release();
+  fillHelper(op, _intervals);
+
+  size_t const n = _intervals.size();
+
+  // Finally initialise _cursor if the result is not empty:
+  if (0 < n) {
+    if (_reverse) {
+      // start at last interval, right endpoint
+      _currentInterval = n - 1;
+      _cursor = _intervals[n-1]._rightEndPoint;
+    }
+    else {
+      // start at first interval, left endpoint
+      _currentInterval = 0;
+      _cursor = _intervals[0]._leftEndPoint;
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief fillHelper, this actually builds up the iterator object, possibly
+/// calling itself recursively
+////////////////////////////////////////////////////////////////////////////////
+
+void SkiplistIndex2::Iterator::fillHelper (TRI_index_operator_t const* op,
+                                           std::vector<Interval>& result) {
+  Key                               values;
+  std::vector<Interval>             leftResult;
+  std::vector<Interval>             rightResult;
+  TRI_relation_index_operator_t*    relationOperator;
+  TRI_logical_index_operator_t*     logicalOperator;
+  Interval                          interval;
+  SkipList_t::Node*                 temp;
+  SkipList_t::Node*                 prev;
+
+  relationOperator  = (TRI_relation_index_operator_t*) op;
+  logicalOperator   = (TRI_logical_index_operator_t*) op;
+
+  switch (op->_type) {
+    case TRI_EQ_INDEX_OPERATOR:
+    case TRI_LE_INDEX_OPERATOR:
+    case TRI_LT_INDEX_OPERATOR:
+    case TRI_GE_INDEX_OPERATOR:
+    case TRI_GT_INDEX_OPERATOR:
+      for (size_t i = 0; i < relationOperator->_numFields; i++) {
+        values.push_back(relationOperator->_fields[i]);
+      }
+      break;   // this is to silence a compiler warning
+    default: {
+      // must not access relationOperator->xxx if the operator is not a
+      // relational one otherwise we'll get invalid reads and the prog
+      // might crash
+    }
+  }
+
+  switch (op->_type) {
+    case TRI_AND_INDEX_OPERATOR: {
+
+      fillHelper(logicalOperator->_left, leftResult);
+      fillHelper(logicalOperator->_right, rightResult);
+
+      for (size_t i = 0; i < leftResult.size(); ++i) {
+        for (size_t j = 0; j < rightResult.size(); ++j) {
+          if (intervalIntersectionValid(leftResult[i], rightResult[j],
+                                        interval)) {
+            result.push_back(interval);
+          }
+        }
+      }
+      return;
+    }
+
+
+    case TRI_EQ_INDEX_OPERATOR: {
+      temp = _index->_theSkipList->leftKeyLookup(&values);
+      TRI_ASSERT(nullptr != temp);
+      if (_index->_unique) {
+        // At most one hit, but we have to find the exact revision:
+        CmpKeyElm comparer(_collection->shaper(), _index->nrIndexedFields());
+        while (true) {  // will be left by break
+          prev = temp;
+          temp = temp->nextNode();
+          if (nullptr == temp) {
+            break;
+          }
+          triagens::mvcc::TransactionId from 
+              = temp->document()->_document->from();
+          triagens::mvcc::TransactionId to 
+              = temp->document()->_document->to();
+          if (_transaction->isVisibleForRead(from, to)) {
+            if (0 == comparer(&values, temp->document())) {
+              interval._leftEndPoint = prev;
+              interval._rightEndPoint = temp->nextNode();
+              if (intervalValid(interval)) {
+                result.push_back(interval);
+              }
+            }
+          }
+        }
+      }
+      else {
+        // Note that in this case (_unique == false) we return the interval
+        // of all matching documents and all available revisions!
+        interval._leftEndPoint = temp;
+        temp = _index->_theSkipList->rightKeyLookup(&values);
+        interval._rightEndPoint = temp->nextNode();
+        if (intervalValid(interval)) {
+          result.push_back(interval);
+        }
+      }
+      return;
+    }
+
+    case TRI_LE_INDEX_OPERATOR: {
+      interval._leftEndPoint  = _index->_theSkipList->startNode();
+      temp = _index->_theSkipList->rightKeyLookup(&values);
+      interval._rightEndPoint = temp->nextNode();
+
+      if (intervalValid(interval)) {
+        result.push_back(interval);
+      }
+      return;
+    }
+
+    case TRI_LT_INDEX_OPERATOR: {
+      interval._leftEndPoint  = _index->_theSkipList->startNode();
+      temp = _index->_theSkipList->leftKeyLookup(&values);
+      interval._rightEndPoint = temp->nextNode();
+
+      if (intervalValid(interval)) {
+        result.push_back(interval);
+      }
+      return;
+    }
+
+    case TRI_GE_INDEX_OPERATOR: {
+      temp = _index->_theSkipList->leftKeyLookup(&values);
+      interval._leftEndPoint = temp;
+      interval._rightEndPoint = _index->_theSkipList->endNode();
+
+      if (intervalValid(interval)) {
+        result.push_back(interval);
+      }
+      return;
+    }
+
+    case TRI_GT_INDEX_OPERATOR: {
+      temp = _index->_theSkipList->rightKeyLookup(&values);
+      interval._leftEndPoint = temp;
+      interval._rightEndPoint = _index->_theSkipList->endNode();
+
+      if (intervalValid(interval)) {
+        result.push_back(interval);
+      }
+      return;
+    }
+
+    default: {
+      TRI_ASSERT(false);
+    }
+
+  } // end of switch statement
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief intervalValid
+////////////////////////////////////////////////////////////////////////////////
+
+// .............................................................................
+// Tests whether the LeftEndPoint is < than RightEndPoint (-1)
+// Tests whether the LeftEndPoint is == to RightEndPoint (0)    [empty]
+// Tests whether the LeftEndPoint is > than RightEndPoint (1)   [undefined]
+// .............................................................................
+
+bool SkiplistIndex2::Iterator::intervalValid ( Interval const& interval) {
+  int compareResult;
+  SkipList_t::Node* lNode;
+  SkipList_t::Node* rNode;
+
+  lNode = interval._leftEndPoint;
+
+  if (lNode == nullptr) {
+    return false;
+  }
+  // Note that the right end point can be nullptr to indicate the end of
+  // the index.
+
+  rNode = interval._rightEndPoint;
+
+  if (lNode == rNode) {
+    return false;
+  }
+
+  if (lNode->nextNode() == rNode) {
+    // Interval empty, nothing to do with it.
+    return false;
+  }
+
+  if (nullptr != rNode && rNode->nextNode() == lNode) {
+    // Interval empty, nothing to do with it.
+    return false;
+  }
+
+  if (_index->_theSkipList->getNrUsed() == 0) {
+    return false;
+  }
+
+  if ( lNode == _index->_theSkipList->startNode() ||
+       nullptr == rNode ) {
+    // The index is not empty, the nodes are not neighbours, one of them
+    // is at the boundary, so the interval is valid and not empty.
+    return true;
+  }
+
+  CmpElmElm comparer(_collection->shaper(), _index->nrIndexedFields());
+  compareResult = comparer(lNode->document(), rNode->document(), 
+                           SkipList_t::CMP_TOTORDER );
+  return (compareResult == -1);
+  // Since we know that the nodes are not neighbours, we can guarantee
+  // at least one document in the interval.
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief intervalIntersectionValid
+////////////////////////////////////////////////////////////////////////////////
+
+bool SkiplistIndex2::Iterator::intervalIntersectionValid (
+                    Interval const& lInterval,
+                    Interval const& rInterval,
+                    Interval &interval) {
+  SkipList_t::Node* lNode;
+  SkipList_t::Node* rNode;
+
+  lNode = lInterval._leftEndPoint;
+  rNode = rInterval._leftEndPoint;
+
+  if (nullptr == lNode || nullptr == rNode) {
+    // At least one left boundary is the end, intersection is empty.
+    return false;
+  }
+
+  CmpElmElm comparer(_collection->shaper(), _index->nrIndexedFields());
+  int compareResult;
+  // Now find the larger of the two start nodes:
+  if (lNode == _index->_theSkipList->startNode()) {
+    // We take rNode, even if it is the start node as well.
+    compareResult = -1;
+  }
+  else if (rNode == _index->_theSkipList->startNode()) {
+    // We take lNode
+    compareResult = 1;
+  }
+  else {
+    compareResult = comparer(lNode->document(), 
+                             rNode->document(), 
+                             SkipList_t::CMP_TOTORDER);
+  }
+
+  if (compareResult < 1) {
+    interval._leftEndPoint = rNode;
+  }
+  else {
+    interval._leftEndPoint = lNode;
+  }
+
+  lNode = lInterval._rightEndPoint;
+  rNode = rInterval._rightEndPoint;
+
+  // Now find the smaller of the two end nodes:
+  if (nullptr == lNode) {
+    // We take rNode, even is this also the end node.
+    compareResult = 1;
+  }
+  else if (nullptr == rNode) {
+    // We take lNode.
+    compareResult = -1;
+  }
+  else {
+    compareResult = comparer(lNode->document(), 
+                             rNode->document(),
+                             SkipList_t::CMP_TOTORDER);
+  }
+
+  if (compareResult < 1) {
+    interval._rightEndPoint = lNode;
+  }
+  else {
+    interval._rightEndPoint = rNode;
+  }
+
+  return intervalValid(interval);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief getInterval
+////////////////////////////////////////////////////////////////////////////////
+
+SkiplistIndex2::Interval SkiplistIndex2::Iterator::getInterval () const {
+  return _intervals[_currentInterval];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief hasNext - iterator functionality
+////////////////////////////////////////////////////////////////////////////////
+
+bool SkiplistIndex2::Iterator::hasNext () const {
+  if (_intervals.empty()) {
+    return false;
+  }
+  if (_reverse) {  // backward iteration
+    // Note that _cursor == nullptr if we are before the largest
+    // document (i.e. the first one in the iterator)!
+
+    // .........................................................................
+    // if we have more intervals than the one we are currently working
+    // on then of course we have a previous doc, because intervals are nonempty.
+    // .........................................................................
+    if (_currentInterval > 0) {
+      return true;
+    }
+
+    SkipList_t::Node const* leftNode = _index->_theSkipList->prevNode(_cursor);
+
+    // Note that leftNode can be nullptr here!
+    // .........................................................................
+    // If the leftNode == left end point AND there are no more intervals
+    // then we have no next.
+    // .........................................................................
+    if (leftNode == getInterval()._leftEndPoint) {
+      return false;
+    }
+
+    return true;
+  }
+  else {  // forward iteration
+    if (_cursor == nullptr) {
+      return false;  // indicates end of iterator
+    }
+
+    // .........................................................................
+    // if we have more intervals than the one we are currently working
+    // on then of course we have a next doc, since intervals are nonempty.
+    // .........................................................................
+    if (_intervals.size() - 1 > _currentInterval) {
+      return true;
+    }
+
+    SkipList_t::Node const* leftNode = _cursor->nextNode();
+
+    // Note that leftNode can be nullptr here!
+    // .........................................................................
+    // If the left == right end point AND there are no more intervals
+    // then we have no next.
+    // .........................................................................
+    if (leftNode == getInterval()._rightEndPoint) {
+      return false;
+    }
+
+    return true;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief next - iterator functionality
+////////////////////////////////////////////////////////////////////////////////
+
+SkiplistIndex2::Element* SkiplistIndex2::Iterator::next () {
+  // We assume that hasNext() has returned true
+  TRI_ASSERT(_currentInterval < _intervals.size());
+  Interval interval = getInterval();
+  SkipList_t::Node* result = nullptr; 
+  if (_reverse) {  // backward iteration
+
+    // .........................................................................
+    // use the current cursor and move jumpSize backward
+    // .........................................................................
+
+    while (true) {   // will be left by break or return
+      result = _index->_theSkipList->prevNode(_cursor);
+
+      if (result == interval._leftEndPoint) {
+        if (_currentInterval == 0) {
+          _cursor = nullptr;  // exhausted
+          return nullptr;
+        }
+        --_currentInterval;
+        interval = getInterval();
+        _cursor = interval._rightEndPoint;
+        result = _index->_theSkipList->prevNode(_cursor);
+      }
+      _cursor = result;
+
+      triagens::mvcc::TransactionId from 
+          = result->document()->_document->from();
+      triagens::mvcc::TransactionId to
+          = result->document()->_document->to();
+      if (_transaction->isVisibleForRead(from, to)) {
+        break;   // we found a prev one
+      }
+      // Otherwise move on
+    }
+
+    TRI_ASSERT(result != nullptr);
+    return result->document();
+  }
+  else {   // forward iteration
+    TRI_ASSERT(_cursor != nullptr);  // otherwise hasNext would have said false
+    
+    // .........................................................................
+    // use the current cursor and move jumpSize forward
+    // .........................................................................
+
+    while (true) {   // will be left by break
+      _cursor = _cursor->nextNode();
+      result = _cursor;
+      if (result == interval._rightEndPoint) {
+        // Note that _cursor can be nullptr here!
+        if (_currentInterval == _intervals.size() - 1) {
+          _cursor = nullptr;  // exhausted
+          return nullptr;
+        }
+        ++_currentInterval;
+        interval = getInterval();
+        _cursor = interval._leftEndPoint;
+        result = _cursor;
+      }
+      triagens::mvcc::TransactionId from 
+          = result->document()->_document->from();
+      triagens::mvcc::TransactionId to
+          = result->document()->_document->to();
+      if (_transaction->isVisibleForRead(from, to)) {
+        break;   // we found the next one
+      }
+      // Otherwise move on
+    }
+
+    TRI_ASSERT(result != nullptr);
+    return result->document();
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief skip - iterator functionality
+////////////////////////////////////////////////////////////////////////////////
+
+void SkiplistIndex2::Iterator::skip (size_t steps) {
+  Element* elm;
+  for (size_t i = 0; i < steps; i++) {
+    if (! hasNext()) {
+      return;
+    }
+    elm = next();
+    if (elm == nullptr) {
+      return;
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

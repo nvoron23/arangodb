@@ -139,6 +139,75 @@ namespace triagens {
 
       public:
         
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Iterator structure for skip list. We require a start and stop node
+///
+/// Intervals are open in the sense that both end points are not members
+/// of the interval. This means that one has to use SkipList_t::nextNode
+/// on the start node to get the first element and that the stop node
+/// can be NULL. Note that it is ensured that all intervals in an iterator
+/// are non-empty.
+////////////////////////////////////////////////////////////////////////////////
+
+        struct Interval {
+          SkipList_t::Node* _leftEndPoint;
+          SkipList_t::Node* _rightEndPoint;
+
+          Interval ()
+            : _leftEndPoint(nullptr), _rightEndPoint(nullptr) {
+          }
+
+          ~Interval () {
+          }
+        };
+
+        class Iterator {
+            SkiplistIndex2 const* _index;
+            TransactionCollection* _collection;
+            Transaction* _transaction;
+            bool _reverse;
+            std::vector<Interval> _intervals;
+            size_t _currentInterval; // starts with 0, current interval used
+            SkipList_t::Node* _cursor;
+                     // always holds the last node returned, initially equal to
+                     // the _leftEndPoint of the first interval (or the 
+                     // _rightEndPoint of the last interval in the reverse
+                     // case), can be nullptr if there are no intervals
+                     // (yet), or, in the reverse case, if the cursor is
+                     // at the end of the last interval. Additionally
+                     // in the non-reverse case _cursor is set to nullptr
+                     // if the cursor is exhausted.
+                     // See SkiplistNextIterationCallback and
+                     // SkiplistPrevIterationCallback for the exact
+                     // condition for the iterator to be exhausted.
+          public:
+            Iterator (SkiplistIndex2 const* index, TransactionCollection* coll,
+                      Transaction* trans, TRI_index_operator_t const* op,
+                      bool reverse)
+              : _index(index), _collection(coll), _transaction(trans),
+                _reverse(reverse), _currentInterval(0), _cursor(nullptr) {
+              fillMe(op);
+            }
+            ~Iterator () {
+            }
+            // Note due to MVCC hasNext is allowed to return true and
+            // a subsequent call to next() still returns nullptr. This is
+            // because only next() actually invokes the MVCC logic to check
+            // visibility.
+            bool hasNext () const;
+            Element* next ();
+            void skip (size_t);
+          private:
+            void fillMe (TRI_index_operator_t const* op);
+            void fillHelper (TRI_index_operator_t const* op,
+                             std::vector<Interval>& result);
+            bool intervalIntersectionValid(Interval const& left,
+                                           Interval const& right,
+                                           Interval& result);
+            bool intervalValid (Interval const& interval); 
+            Interval getInterval () const;
+        };
+
         size_t nrIndexedFields () const {
           return _paths.size();
         }
@@ -147,18 +216,10 @@ namespace triagens {
           return _paths;
         }
 
-        std::vector<TRI_doc_mptr_t*>* lookup (TransactionCollection*,
-                                              Transaction*,
-                                              struct TRI_index_operator_s*,
-                                              bool,
-                                              size_t);
-
-        std::vector<TRI_doc_mptr_t*>* lookupContinue (TransactionCollection*,
-                                              Transaction*,
-                                              struct TRI_index_operator_s*,
-                                              TRI_doc_mptr_t*,
-                                              bool,
-                                              size_t);
+        Iterator* lookup (TransactionCollection*,
+                          Transaction*,
+                          struct TRI_index_operator_s*,
+                          bool) const;
         
         void deleteElement (Element*);
 

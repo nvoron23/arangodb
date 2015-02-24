@@ -899,7 +899,21 @@ static void MvccSkiplistQuery (QueryType type,
     }
 
     // setup result
-    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(skiplistIndex->lookup(transactionCollection, transaction, skiplistOperator.get(), reverse, limit));
+    std::unique_ptr<triagens::mvcc::SkiplistIndex2::Iterator> iter(skiplistIndex->lookup(transactionCollection, transaction, skiplistOperator.get(), reverse));
+
+    std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult
+        (new std::vector<TRI_doc_mptr_t*>);
+    
+    iter->skip(skip);
+    size_t count = 0;
+    while (count < limit && iter->hasNext()) {
+      TRI_doc_mptr_t* ptr = iter->next()->_document;
+      if (ptr != nullptr) {   // MVCC logic might actually not see something
+                              // that hasNext was suspecting to be a result!
+        indexResult->push_back(ptr);
+        count++;
+      }
+    }
  
     auto const& foundDocuments = *(indexResult.get());
 
