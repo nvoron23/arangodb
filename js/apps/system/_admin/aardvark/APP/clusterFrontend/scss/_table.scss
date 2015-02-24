@@ -13,12 +13,19 @@
   border-top-right-radius: 5px;
 
   .t-row {
+    font-weight: 100;
     width: 100%;
     height: 80px;
     border-bottom: 1px solid rgba(0,0,0,0.1);
 
+    .l-from {
+      font-size: 10pt;
+      font-weight: 100;
+      font-style: italic;
+    }
+
     .l-icon {
-      margin-left: 10px;
+      margin-left: 15px;
       width: 21px;
       height: 21px;
       border: 2px solid $c-table-border;

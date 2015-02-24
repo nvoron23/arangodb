@@ -3777,17 +3777,17 @@ window.StatisticsDescriptionCollection = Backbone.Collection.extend({
       $(this.el).html(this.template.render());
       this.renderRow(
         '<p class="l-icon"><i class="fa fa-database"></i></p>',
-        '<p class="l-message">No message</p><p class="l-from">From: Node1</p>',
+        '<p class="l-message">No message</p><p class="l-from"> - Node1</p>',
         '<i class="fa fa-clock-o"></i>' + moment("20150224", "YYYYMMDD").fromNow()
       );
       this.renderRow(
         '<p class="l-icon"><i class="fa fa-database"></i></p>',
-        '<p class="l-message">No message</p><p class="l-from">From: Node1</p>',
+        '<p class="l-message">No message</p><p class="l-from"> - Node2</p>',
         '<i class="fa fa-clock-o"></i>' + moment("20150620", "YYYYMMDD").fromNow()
       );
       this.renderRow(
         '<p class="l-icon"><i class="fa fa-database"></i></p>',
-        '<p class="l-message">No message</p><p class="l-from">From: Node1</p>',
+        '<p class="l-message">No message</p><p class="l-from"> - Node3</p>',
         '<i class="fa fa-clock-o"></i>' + moment("20150620", "YYYYMMDD").fromNow()
       );
     },
