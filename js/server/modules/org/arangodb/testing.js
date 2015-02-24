@@ -392,6 +392,7 @@ function readImportantLogLines(logPath) {
   var i, j;
   var importantLines = {};
   var list=fs.list(logPath);
+  var jasmineTest = fs.join("jasmine", "core");
   for (i = 0; i < list.length; i++) {
     var fnLines = [];
     if (list[i].slice(0,3) === 'log') {
@@ -403,7 +404,8 @@ function readImportantLogLines(logPath) {
           var line = buf.asciiSlice(lineStart, j - 1);
           // filter out regular INFO lines, and test related messages
           if ((line.search(" INFO ") < 0) &&
-              (line.search("WARNING about to execute:") < 0)) {
+            (line.search("WARNING about to execute:") < 0) &&
+            (line.search(jasmineTest) < 0)) {
             fnLines.push(line);
           }
           lineStart = j + 1;
@@ -1393,11 +1395,12 @@ testFuncs.upgrade = function (options) {
   result.first = executeAndWait(fs.join("bin","arangod"), args);
 
   if (result.first !== 0 && !options.force) {
+    print("not removing " + tmpDataDir);
     return result;
   }
   result.second = executeAndWait(fs.join("bin","arangod"), args);
 
-  fs.removeDirectoryRecursive(tmpDataDir);
+  cleanupDirectories.push(tmpDataDir);
 
   return result;
 };
