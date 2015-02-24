@@ -3491,6 +3491,7 @@ window.StatisticsDescriptionCollection = Backbone.Collection.extend({
     template: templateEngine.createTemplate("embeddedNavigationView.ejs"),
 
     render: function () {
+
       $(this.el).html(this.template.render());
 
       //just for dev
@@ -3539,6 +3540,40 @@ window.StatisticsDescriptionCollection = Backbone.Collection.extend({
         }).appendTo($(self.el2));
       });
       $(this.el2).tooltip();
+    }
+
+  });
+}());
+
+/*jshint browser: true */
+/*jshint unused: false */
+/*global Backbone, templateEngine, $, window, arangoHelper*/
+(function () {
+  "use strict";
+  window.ErrorView = Backbone.View.extend({
+
+    events: {
+    },
+
+    template: templateEngine.createTemplate("errorView.ejs"),
+
+    show: function (errorMsg) {
+
+      if ($('.errorNavbar')) {
+        $('.errorNavbar').remove();
+      }
+
+      if (errorMsg) {
+        $('.clusterNavbar ul').before(this.template.render({message: errorMsg}));
+        $('.health-menu').addClass('error');
+        $('.health-menu').addClass('border-top');
+      }
+    },
+
+    hide: function () {
+      $('.errorNavbar').remove();
+      $('.health-menu').removeClass('error');
+      $('.health-menu').removeClass('border-top');
     }
 
   });
@@ -5083,6 +5118,8 @@ arangoDatabase, btoa, _*/
       $(window).resize(function() {
         self.handleResize();
       });
+
+      this.errorView = new window.ErrorView();
     },
 
     showCluster: function() {

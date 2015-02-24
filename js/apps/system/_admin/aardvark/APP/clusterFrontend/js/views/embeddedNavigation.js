@@ -27,6 +27,7 @@
     template: templateEngine.createTemplate("embeddedNavigationView.ejs"),
 
     render: function () {
+
       $(this.el).html(this.template.render());
 
       //just for dev

@@ -142,6 +142,8 @@ arangoDatabase, btoa, _*/
       $(window).resize(function() {
         self.handleResize();
       });
+
+      this.errorView = new window.ErrorView();
     },
 
     showCluster: function() {

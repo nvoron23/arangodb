@@ -5273,8 +5273,15 @@ div .bigtile {
   text-align: left; }
 
 /* States */
+.error {
+  background-color: #da4f49; }
+
 .no-border {
   border: 0px !important; }
+
+.border-top {
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px; }
 
 .health-row {
   background: #fafafa;
@@ -5314,7 +5321,7 @@ div .bigtile {
   color: #da4f49; }
 
 .navbar {
-  height: 76px !important; }
+  height: auto !important; }
   .navbar .clusterNavbar {
     background-color: #333333;
     height: 38px;
@@ -5322,10 +5329,13 @@ div .bigtile {
     width: 100%; }
     .navbar .clusterNavbar ul {
       font-weight: 100;
-      padding: 0; }
+      padding: 0;
+      margin-bottom: 10px;
+      margin-top: 18px; }
       .navbar .clusterNavbar ul li {
         float: left;
-        margin-right: 15px; }
+        margin-right: 15px;
+        padding-bottom: 10px; }
         .navbar .clusterNavbar ul li i {
           font-size: 16px;
           margin-left: 5px;
@@ -5333,6 +5343,16 @@ div .bigtile {
           position: absolute; }
         .navbar .clusterNavbar ul li i:hover {
           cursor: pointer; }
+    .navbar .clusterNavbar .errorNavbar {
+      background: #da4f49;
+      border-radius: 5px;
+      height: 30px;
+      margin-bottom: -10px; }
+      .navbar .clusterNavbar .errorNavbar p {
+        float: left;
+        padding-top: 4px;
+        margin-top: 0px;
+        padding-left: 4px; }
 
 ul.navlist {
   margin: 0; }
