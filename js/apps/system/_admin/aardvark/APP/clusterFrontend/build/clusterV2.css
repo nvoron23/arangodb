@@ -4956,9 +4956,27 @@ div .bigtile {
 .no-border {
   border: 0px !important; }
 
+.border, .t-cluster-body, .management-content .pure-g .management-box {
+  border: 1px solid #cfcfcf;
+  border-radius: 5px; }
+
+.border-left-right, .border-top, .border-bottom {
+  border-left: 1px solid #cfcfcf;
+  border-right: 1px solid #cfcfcf; }
+
 .border-top {
+  border-top: 1px solid #cfcfcf;
   border-top-left-radius: 5px;
   border-top-right-radius: 5px; }
+
+.border-bottom {
+  border-bottom: 1px solid #cfcfcf;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px; }
+
+.icon-border, .t-cluster-body .t-row .l-icon {
+  border: 2px solid #cfcfcf;
+  border-radius: 5px; }
 
 .health-row {
   background: #fafafa;
@@ -5049,15 +5067,7 @@ div.centralRow {
   font-weight: 100; }
 
 .t-cluster-body {
-  background-color: #fbfbfb;
-  border-bottom: 1px solid #cfcfcf;
-  border-top: 1px solid #cfcfcf;
-  border-left: 1px solid #cfcfcf;
-  border-right: 1px solid #cfcfcf;
-  border-bottom-left-radius: 5px;
-  border-bottom-right-radius: 5px;
-  border-top-left-radius: 5px;
-  border-top-right-radius: 5px; }
+  background-color: #fbfbfb; }
   .t-cluster-body .t-row {
     font-weight: 100;
     width: 100%;
@@ -5070,9 +5080,7 @@ div.centralRow {
     .t-cluster-body .t-row .l-icon {
       margin-left: 15px;
       width: 21px;
-      height: 21px;
-      border: 2px solid #cfcfcf;
-      border-radius: 5px; }
+      height: 21px; }
       .t-cluster-body .t-row .l-icon i {
         margin-left: 4px;
         margin-top: 2px;
@@ -5081,6 +5089,14 @@ div.centralRow {
       margin-right: 5px; }
   .t-cluster-body .t-row:last-child {
     border-bottom: 0; }
+
+.management-content .pure-g .management-right {
+  margin-left: 5px; }
+.management-content .pure-g .management-left {
+  margin-right: 5px; }
+.management-content .pure-g .management-box {
+  height: 100%;
+  min-height: 400px; }
 
 /*!
 Pure v0.5.0

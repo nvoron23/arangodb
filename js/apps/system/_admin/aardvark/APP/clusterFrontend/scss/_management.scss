@@ -1,0 +1,20 @@
+.management-content {
+
+  .pure-g {
+     .management-right {
+       margin-left: 5px;
+     }
+
+     .management-left {
+       margin-right: 5px;
+     }
+
+     .management-box {
+       @extend .border;
+
+        height: 100%;
+        min-height: 400px;
+
+     }
+   }
+}
