@@ -1,7 +1,9 @@
 .t-head {
+  border-bottom: 1px solid rgba(0,0,0,0.3);
+  background-color: $c-table-bg;
 }
 
-.t-cluster-body {
+.t-body {
   @extend .border;
   background-color: $c-table-bg;
 

@@ -28,6 +28,18 @@
   border-bottom-right-radius: 5px;
 }
 
+.no-border-top {
+  border-top: none;
+  border-top-left-radius: 0px;
+  border-top-right-radius: 0px;
+}
+
+.no-border-bottom {
+  border-bottom: none;
+  border-bottom-left-radius: 0px;
+  border-bottom-right-radius: 0px;
+}
+
 .icon-border {
   border: 2px solid $c-table-border;
   border-radius: 5px;
