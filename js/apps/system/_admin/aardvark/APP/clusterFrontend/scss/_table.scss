@@ -2,15 +2,8 @@
 }
 
 .t-cluster-body {
+  @extend .border;
   background-color: $c-table-bg;
-  border-bottom: 1px solid $c-table-border;
-  border-top: 1px solid $c-table-border;
-  border-left: 1px solid $c-table-border;
-  border-right: 1px solid $c-table-border;
-  border-bottom-left-radius: 5px;
-  border-bottom-right-radius: 5px;
-  border-top-left-radius: 5px;
-  border-top-right-radius: 5px;
 
   .t-row {
     font-weight: 100;
@@ -25,11 +18,11 @@
     }
 
     .l-icon {
+      @extend .icon-border;
+
       margin-left: 15px;
       width: 21px;
       height: 21px;
-      border: 2px solid $c-table-border;
-      border-radius: 5px;
 
      i {
        margin-left: 4px;

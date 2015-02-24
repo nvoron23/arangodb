@@ -2,7 +2,33 @@
   border: 0px !important;
 }
 
+.border {
+  border: 1px solid $c-table-border;
+  border-radius: 5px;
+}
+
+.border-left-right {
+  border-left: 1px solid $c-table-border;
+  border-right: 1px solid $c-table-border;
+}
+
 .border-top {
+  @extend .border-left-right;
+
+  border-top: 1px solid $c-table-border;
   border-top-left-radius: 5px;
   border-top-right-radius: 5px;
+}
+
+.border-bottom {
+  @extend .border-left-right;
+
+  border-bottom: 1px solid $c-table-border;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+.icon-border {
+  border: 2px solid $c-table-border;
+  border-radius: 5px;
 }
