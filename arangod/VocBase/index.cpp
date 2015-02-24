@@ -1171,7 +1171,6 @@ TRI_skiplist_iterator_t* TRI_LookupSkiplistIndex (TRI_index_t* idx,
 
   TRI_skiplist_iterator_t* iteratorResult;
   iteratorResult = SkiplistIndex_find(skiplistIndex->_skiplistIndex,
-                                      &skiplistIndex->_paths,
                                       slOperator, 
                                       reverse);
 
