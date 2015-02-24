@@ -311,6 +311,8 @@
       }
     });
 
+    grunt.loadNpmTasks("grunt-sass");
+
     require('matchdep').filterDev('grunt-*').forEach(grunt.loadNpmTasks);
     grunt.loadNpmTasks('grunt-text-replace');
 
