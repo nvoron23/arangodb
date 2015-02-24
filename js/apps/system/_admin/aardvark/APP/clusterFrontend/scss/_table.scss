@@ -1,0 +1,44 @@
+.t-head {
+}
+
+.t-cluster-body {
+  background-color: $c-table-bg;
+  border-bottom: 1px solid $c-table-border;
+  border-top: 1px solid $c-table-border;
+  border-left: 1px solid $c-table-border;
+  border-right: 1px solid $c-table-border;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+
+  .t-row {
+    width: 100%;
+    height: 80px;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+
+    .l-icon {
+      margin-left: 10px;
+      width: 21px;
+      height: 21px;
+      border: 2px solid $c-table-border;
+      border-radius: 5px;
+
+     i {
+       margin-left: 4px;
+       margin-top: 2px;
+       font-size: 12pt;
+     }
+
+
+    }
+
+    .fa-clock-o {
+      margin-right: 5px;
+    }
+  }
+
+  .t-row:last-child {
+    border-bottom: 0;
+  }
+}
