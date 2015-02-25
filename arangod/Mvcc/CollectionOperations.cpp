@@ -402,7 +402,7 @@ OperationResult CollectionOperations::Truncate (TransactionScope* transactionSco
     transaction->updateRevisionId(collection, tick);
   }
 
-  return OperationResult(TRI_ERROR_NO_ERROR);
+  return OperationResult(TRI_ERROR_NO_ERROR, transaction->hasWaitForSync());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -708,7 +708,7 @@ OperationResult CollectionOperations::RemoveDocument (Transaction* transaction,
 
   TRI_ASSERT(mptr != nullptr);
 
-  return OperationResult(mptr, tick);
+  return OperationResult(mptr, tick, transaction->hasWaitForSync());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -987,10 +987,12 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
 
   // now append the marker to the WAL
   WriteResult writeResult;
-  int res = WriteMarker(marker.get(), collection, writeResult);
+  {
+    int res = WriteMarker(marker.get(), collection, writeResult);
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    THROW_ARANGO_EXCEPTION(res);
+    if (res != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(res);
+    }
   }
 
   // make the master pointer point to the WAL location
@@ -1002,7 +1004,7 @@ OperationResult CollectionOperations::InsertDocumentWorker (TransactionScope* tr
 
   TRI_ASSERT(mptr.get() != nullptr); 
   
-  return OperationResult(mptr.get(), writeResult.tick);
+  return OperationResult(mptr.get(), writeResult.tick, transaction->hasWaitForSync());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1124,7 +1126,7 @@ OperationResult CollectionOperations::RemoveDocumentWorker (TransactionScope* tr
 
   TRI_ASSERT(mptr != nullptr);
 
-  return OperationResult(mptr, tick);
+  return OperationResult(mptr, tick, transaction->hasWaitForSync());
 }
 
 ////////////////////////////////////////////////////////////////////////////////

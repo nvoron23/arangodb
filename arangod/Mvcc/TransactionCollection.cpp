@@ -82,12 +82,21 @@ TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
 
 TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
                                               std::string const& name) 
+  : TransactionCollection(vocbase, name.c_str()) {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create the collection, using a collection name
+////////////////////////////////////////////////////////////////////////////////
+
+TransactionCollection::TransactionCollection (TRI_vocbase_t* vocbase,
+                                              char const* name) 
   : _vocbase(vocbase),
     _collection(nullptr),
     _barrier(nullptr),
     _locked(TransactionCollection::LockType::UNLOCKED) {
 
-  _collection = TRI_UseCollectionByNameVocBase(_vocbase, name.c_str());
+  _collection = TRI_UseCollectionByNameVocBase(_vocbase, name);
 
   if (_collection == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
@@ -198,6 +207,14 @@ void TransactionCollection::unlock () {
     TRI_WriteUnlockReadWriteLock(&_collection->_collection->_lock);
   }
   _locked = TransactionCollection::LockType::UNLOCKED;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the underlying collection type
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_col_type_e TransactionCollection::type () const {
+  return _collection->_collection->_info._type;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

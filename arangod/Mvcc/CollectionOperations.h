@@ -125,11 +125,12 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     struct OperationResult {
-      OperationResult (OperationResult const& other) {
-        mptr = other.mptr;
-        tick = other.tick;
-        actualRevision = other.actualRevision;
-        code = other.code;
+      OperationResult (OperationResult const& other) 
+        : mptr(other.mptr),
+          tick(other.tick),
+          actualRevision(other.actualRevision),
+          code(other.code),
+          waitForSync(other.waitForSync) {
       }
 
       OperationResult& operator= (OperationResult const& other) {
@@ -137,6 +138,7 @@ namespace triagens {
         tick = other.tick;
         actualRevision = other.actualRevision;
         code = other.code;
+        waitForSync = other.waitForSync;
         return *this;
       }
 
@@ -144,22 +146,26 @@ namespace triagens {
         : mptr(nullptr),
           tick(0),
           actualRevision(0),
-          code(TRI_ERROR_NO_ERROR) {
+          code(TRI_ERROR_NO_ERROR),
+          waitForSync(false) {
       }
       
       explicit OperationResult (TRI_doc_mptr_t* mptr) 
         : mptr(mptr),
           tick(0),
           actualRevision(0),
-          code(TRI_ERROR_NO_ERROR) {
+          code(TRI_ERROR_NO_ERROR),
+          waitForSync(false) {
       }
       
       OperationResult (TRI_doc_mptr_t* mptr,
-                       TRI_voc_tick_t tick) 
+                       TRI_voc_tick_t tick,
+                       bool waitForSync) 
         : mptr(mptr),
           tick(tick),
           actualRevision(0),
-          code(TRI_ERROR_NO_ERROR) {
+          code(TRI_ERROR_NO_ERROR),
+          waitForSync(waitForSync) {
       }
       
       OperationResult (int code, 
@@ -167,20 +173,23 @@ namespace triagens {
         : mptr(nullptr),
           tick(0),
           actualRevision(actualRevision),
-          code(code) {
+          code(code),
+          waitForSync(false) {
       }
       
       explicit OperationResult (int code)
         : mptr(nullptr),
           tick(0),
           actualRevision(0),
-          code(code) {
+          code(code),
+          waitForSync(false) {
       }
 
       TRI_doc_mptr_t* mptr;
       TRI_voc_tick_t  tick;
       TRI_voc_rid_t   actualRevision;
       int             code;
+      bool            waitForSync;
     
     };
 

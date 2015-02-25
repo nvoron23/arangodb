@@ -77,6 +77,12 @@ const string RestVocbaseBaseHandler::DOCUMENT_IMPORT_PATH = "/_api/import";
 const string RestVocbaseBaseHandler::EDGE_PATH = "/_api/edge";
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief mvcc document path
+////////////////////////////////////////////////////////////////////////////////
+
+const string RestVocbaseBaseHandler::MVCC_DOCUMENT_PATH = "/_api/mvccDocument";
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief replication path
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -145,14 +151,12 @@ bool RestVocbaseBaseHandler::checkCreateCollection (string const& name,
     return true;
   }
 
-
   if (ServerState::instance()->isCoordinator() ||
       ServerState::instance()->isDBserver()) {
     // create-collection is not supported in a cluster
     generateTransactionError(name, TRI_ERROR_CLUSTER_UNSUPPORTED);
     return false;
   }
-
 
   TRI_vocbase_col_t* collection = TRI_FindCollectionByNameOrCreateVocBase(_vocbase,
                                                                           name.c_str(),

@@ -33,14 +33,12 @@
 #include "Basics/Common.h"
 
 #include "Admin/RestBaseHandler.h"
-
 #include "Basics/json.h"
 #include "Basics/logging.h"
 #include "Basics/json-utilities.h"
-
 #include "Rest/HttpResponse.h"
-#include "Utils/transactions.h"
 #include "RestServer/VocbaseContext.h"
+#include "Utils/transactions.h"
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                              forward declarations
@@ -97,6 +95,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         static const std::string EDGE_PATH;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief mvcc document path
+////////////////////////////////////////////////////////////////////////////////
+
+        static const std::string MVCC_DOCUMENT_PATH;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief replication path
