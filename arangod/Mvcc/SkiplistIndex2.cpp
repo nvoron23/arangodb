@@ -833,6 +833,7 @@ void SkiplistIndex2::insert (TransactionCollection* coll,
     try {
       WRITE_LOCKER(_lock);
       _theSkipList->insert(listElement);
+      return;
     }
     catch (...) {
       deleteElement(listElement);
@@ -848,6 +849,7 @@ void SkiplistIndex2::insert (TransactionCollection* coll,
   try {
     // Find the last element in the list whose key is less than ours:
     SkipList_t::Node* node = _theSkipList->leftLookup(listElement);
+    CmpElmElm comparer(coll->shaper(), nrIndexedFields());
     while (true) {   // will be left by break
       node = node->nextNode();
       if (node == nullptr) {
@@ -855,7 +857,6 @@ void SkiplistIndex2::insert (TransactionCollection* coll,
       }
 
       Element* p = node->document();
-      CmpElmElm comparer(coll->shaper(), nrIndexedFields());
       if (comparer(listElement, p, SkipList_t::CMP_PREORDER) != 0) {
         break;
       }
