@@ -959,17 +959,14 @@ void SkiplistIndex2::insert (TransactionCollection* coll,
           continue;  // Ignore, has been made obsolete for us
         }
         else if (visTo == Transaction::VisibilityType::CONCURRENT) {
-          deleteElement(listElement);
           THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
         }
         else {  // INVISIBLE, this includes to == 0
-          deleteElement(listElement);
           THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED);
         }
       }
       else if (visFrom == Transaction::VisibilityType::CONCURRENT) {
         if (visTo != Transaction::VisibilityType::VISIBLE ) {
-          deleteElement(listElement);
           THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_MVCC_WRITE_CONFLICT);
         }
         else {
