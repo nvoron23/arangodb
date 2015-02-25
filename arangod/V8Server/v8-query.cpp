@@ -1130,9 +1130,12 @@ static void JS_MvccChecksum (const v8::FunctionCallbackInfo<v8::Value>& args) {
       std::unique_ptr<triagens::mvcc::MasterpointerIterator> iterator(new triagens::mvcc::MasterpointerIterator(transaction, transactionCollection->masterpointerManager(), false));
     
       auto it = iterator.get();
-      while (it->hasMore()) {
+      while (true) {
         TRI_doc_mptr_t const* found = it->next();
-        TRI_ASSERT(found != nullptr);
+
+        if (found == nullptr) {
+          break;
+        }
 
         helper.update(found);
       }

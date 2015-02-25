@@ -245,11 +245,7 @@ namespace triagens {
         manager->shutdownIterator();
       }
 
-      bool hasMore () const {
-        return (current != nullptr);
-      }
-
-      void next (std::vector<TRI_doc_mptr_t const*>& result,
+      bool next (std::vector<TRI_doc_mptr_t const*>& result,
                  int64_t& skip,
                  int64_t& limit,
                  int64_t batchSize) {
@@ -294,6 +290,8 @@ namespace triagens {
         if (limit == 0) {
           current = nullptr;
         }
+
+        return (current != nullptr);
       }
       
       TRI_doc_mptr_t const* next (int64_t& skip,

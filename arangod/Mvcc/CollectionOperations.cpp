@@ -377,8 +377,12 @@ OperationResult CollectionOperations::Truncate (TransactionScope* transactionSco
   
     TransactionId originalTransactionId;
    
-    while (it->hasMore()) {
+    while (true) {
       TRI_doc_mptr_t const* found = it->next();
+
+      if (found == nullptr) {
+        break;
+      }
   
       auto result = RemoveDocumentWorker(transactionScope, collection, indexUser, Document::CreateFromMptr(found), options, originalTransactionId);
   
@@ -486,9 +490,8 @@ OperationResult CollectionOperations::ReadAllDocuments (TransactionScope* transa
     std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), reverse));
     auto it = iterator.get();
    
-    while (it->hasMore()) {
-      it->next(foundDocuments, skip, limit, 1000);
-    }
+    while (it->next(foundDocuments, skip, limit, 1000))
+      ;
   }
 
   OperationResult result(TRI_ERROR_NO_ERROR);
@@ -564,7 +567,7 @@ OperationResult CollectionOperations::ReadByExample (TransactionScope* transacti
     std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), reverse));
     auto it = iterator.get();
    
-    while (it->hasMore()) {
+    while (true) {
       auto document = it->next(skip, limit);
 
       if (document == nullptr) {
