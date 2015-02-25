@@ -31,6 +31,7 @@
 #define ARANGODB_BASICS_C_SKIP__LIST_H 1
 
 #include "Basics/Common.h"
+#include "Basics/Exceptions.h"
 #include "Basics/random.h"
 
 // We will probably never see more than 2^48 documents in a skip list
