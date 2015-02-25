@@ -331,11 +331,99 @@ SkiplistIndex2::Iterator* SkiplistIndex2::lookup (
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief Helper function for fillMe
+////////////////////////////////////////////////////////////////////////////////
+
+static int FillLookupSLOperator (TRI_index_operator_t* slOperator,
+                                 TRI_document_collection_t* document) {
+  if (slOperator == nullptr) {
+    return TRI_ERROR_INTERNAL;
+  }
+
+  switch (slOperator->_type) {
+    case TRI_AND_INDEX_OPERATOR:
+    case TRI_NOT_INDEX_OPERATOR:
+    case TRI_OR_INDEX_OPERATOR: {
+      TRI_logical_index_operator_t* logicalOperator = (TRI_logical_index_operator_t*) slOperator;
+      int result = FillLookupSLOperator(logicalOperator->_left, document);
+
+      if (result == TRI_ERROR_NO_ERROR) {
+        result = FillLookupSLOperator(logicalOperator->_right, document);
+      }
+      if (result != TRI_ERROR_NO_ERROR) {
+        return result;
+      }
+      break;
+    }
+
+    case TRI_EQ_INDEX_OPERATOR:
+    case TRI_GE_INDEX_OPERATOR:
+    case TRI_GT_INDEX_OPERATOR:
+    case TRI_NE_INDEX_OPERATOR:
+    case TRI_LE_INDEX_OPERATOR:
+    case TRI_LT_INDEX_OPERATOR: {
+      TRI_relation_index_operator_t* relationOperator = (TRI_relation_index_operator_t*) slOperator;
+      relationOperator->_numFields = relationOperator->_parameters->_value._objects._length;
+      relationOperator->_fields = static_cast<TRI_shaped_json_t*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(TRI_shaped_json_t) * relationOperator->_numFields, false));
+
+      if (relationOperator->_fields != nullptr) {
+        for (size_t j = 0; j < relationOperator->_numFields; ++j) {
+          TRI_json_t const* jsonObject = static_cast<TRI_json_t* const>(TRI_AtVector(&(relationOperator->_parameters->_value._objects), j));
+
+          // find out if the search value is a list or an array
+          if ((TRI_IsArrayJson(jsonObject) || TRI_IsObjectJson(jsonObject)) &&
+              slOperator->_type != TRI_EQ_INDEX_OPERATOR) {
+            // non-equality operator used on list or array data type, this is disallowed
+            // because we need to shape these objects first. however, at this place (index lookup)
+            // we never want to create new shapes so we will have a problem if we cannot find an
+            // existing shape for the search value. in this case we would need to raise an error
+            // but then the query results would depend on the state of the shaper and if it had
+            // seen previous such objects
+
+            // we still allow looking for list or array values using equality. this is safe.
+            TRI_Free(TRI_UNKNOWN_MEM_ZONE, relationOperator->_fields);
+            relationOperator->_fields = nullptr;
+            return TRI_ERROR_BAD_PARAMETER;
+          }
+
+          // now shape the search object (but never create any new shapes)
+          TRI_shaped_json_t* shapedObject = TRI_ShapedJsonJson(document->getShaper(), jsonObject, false);  // ONLY IN INDEX, PROTECTED by RUNTIME
+
+          if (shapedObject != nullptr) {
+            // found existing shape
+            relationOperator->_fields[j] = *shapedObject; // shallow copy here is ok
+            TRI_Free(TRI_UNKNOWN_MEM_ZONE, shapedObject); // don't require storage anymore
+          }
+          else {
+            // shape not found
+            TRI_Free(TRI_UNKNOWN_MEM_ZONE, relationOperator->_fields);
+            relationOperator->_fields = nullptr;
+            return TRI_RESULT_ELEMENT_NOT_FOUND;
+          }
+        }
+      }
+      else {
+        relationOperator->_numFields = 0; // out of memory?
+      }
+      break;
+    }
+  }
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief fillMe, this actually builds up the iterator object
 ////////////////////////////////////////////////////////////////////////////////
 
-void SkiplistIndex2::Iterator::fillMe (TRI_index_operator_t const* op) {
+void SkiplistIndex2::Iterator::fillMe (TRI_index_operator_t* op) {
 
+  int errorResult = FillLookupSLOperator(op, _collection->documentCollection());
+  if (errorResult != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(errorResult);
+  }
+
+  // Now actually fill ourselves:
   fillHelper(op, _intervals);
 
   size_t const n = _intervals.size();
@@ -360,7 +448,7 @@ void SkiplistIndex2::Iterator::fillMe (TRI_index_operator_t const* op) {
 /// calling itself recursively
 ////////////////////////////////////////////////////////////////////////////////
 
-void SkiplistIndex2::Iterator::fillHelper (TRI_index_operator_t const* op,
+void SkiplistIndex2::Iterator::fillHelper (TRI_index_operator_t* op,
                                            std::vector<Interval>& result) {
   Key                               values;
   std::vector<Interval>             leftResult;

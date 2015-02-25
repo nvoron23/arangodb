@@ -182,7 +182,7 @@ namespace triagens {
                      // condition for the iterator to be exhausted.
           public:
             Iterator (SkiplistIndex2 const* index, TransactionCollection* coll,
-                      Transaction* trans, TRI_index_operator_t const* op,
+                      Transaction* trans, TRI_index_operator_t* op,
                       bool reverse)
               : _index(index), _collection(coll), _transaction(trans),
                 _reverse(reverse), _currentInterval(0), _cursor(nullptr) {
@@ -198,8 +198,8 @@ namespace triagens {
             Element* next ();
             void skip (size_t);
           private:
-            void fillMe (TRI_index_operator_t const* op);
-            void fillHelper (TRI_index_operator_t const* op,
+            void fillMe (TRI_index_operator_t* op);
+            void fillHelper (TRI_index_operator_t* op,
                              std::vector<Interval>& result);
             bool intervalIntersectionValid(Interval const& left,
                                            Interval const& right,
