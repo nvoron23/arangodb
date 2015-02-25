@@ -249,11 +249,13 @@ HashIndex::HashIndex (TRI_idx_iid_t id,
 ////////////////////////////////////////////////////////////////////////////////
 
 HashIndex::~HashIndex () {
-  _theHash->iterate(
-      [this] (HashIndex::Element* elm) { 
-        deleteElement(elm); 
-      } 
-  );
+  if (_theHash != nullptr) {
+    _theHash->iterate(
+        [this] (HashIndex::Element* elm) { 
+          deleteElement(elm); 
+        } 
+    );
+  }
   delete _theHash;
 }
 
@@ -524,8 +526,20 @@ void HashIndex::cleanup () {
 void HashIndex::sizeHint (size_t size) {
   WRITE_LOCKER(_lock);
 
-  int res = _theHash->resize(3 * size + 1);  
-  // Take into account old revisions
+  int res;
+  if (_sparse) {
+    // we expect a sparse index to exclude some documents
+    size /= 4;
+    if (size % 1 == 0) {
+      ++size;
+    }
+    res = _theHash->resize(size);
+  }
+  else {
+    // Take into account old revisions
+    res = _theHash->resize(3 * size + 1); 
+  }
+
   if (res == TRI_ERROR_OUT_OF_MEMORY) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
