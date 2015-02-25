@@ -533,24 +533,27 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         Node* allocNode (int height) {
-          Node* newNode = new Node();
+          if (0 == height) {
+            height = randomHeight();
+          }
+
+          // allocate enough memory for skiplist node plus all the next nodes in one go:
+          void* ptr = TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, 
+                            sizeof(Node) + sizeof(Node*) * height, false);
+
+          if (ptr == nullptr) {
+            THROW_OUT_OF_MEMORY_ERROR();
+          }
+
+          Node* newNode;
+
+          // use placement new
+          newNode = new(ptr) Node();
 
           newNode->_doc = nullptr;
-
-          if (0 == height) {
-            newNode->_height = randomHeight();
-          }
-          else {
-            newNode->_height = height;
-          }
-
-          try {
-            newNode->_next = new Node*[newNode->_height];
-          }
-          catch (...) {
-            delete newNode;
-            throw;
-          }
+          newNode->_height = height;
+          newNode->_next = reinterpret_cast<Node**>
+                                (static_cast<char*>(ptr) + sizeof(Node));
           for (int i = 0; i < newNode->_height; i++) {
             newNode->_next[i] = nullptr;
           }
@@ -570,8 +573,8 @@ namespace triagens {
           // update memory usage
           _memoryUsed -= sizeof(Node) +
                          sizeof(Node*) * node->_height;
-          delete[] node->_next;
-          delete node;
+          node->~Node();
+          TRI_Free(TRI_UNKNOWN_MEM_ZONE, node);
         }
 
 ////////////////////////////////////////////////////////////////////////////////
