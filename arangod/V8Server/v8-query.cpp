@@ -907,9 +907,10 @@ static void MvccSkiplistQuery (QueryType type,
     iter->skip(skip);
     size_t count = 0;
     while (count < limit && iter->hasNext()) {
-      TRI_doc_mptr_t* ptr = iter->next()->_document;
-      if (ptr != nullptr) {   // MVCC logic might actually not see something
+      triagens::mvcc::SkiplistIndex2::Element* elm = iter->next();
+      if (elm != nullptr) {   // MVCC logic might actually not see something
                               // that hasNext was suspecting to be a result!
+        TRI_doc_mptr_t* ptr = elm->_document;
         indexResult->push_back(ptr);
         count++;
       }
