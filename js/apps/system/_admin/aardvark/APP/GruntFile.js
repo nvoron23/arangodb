@@ -162,6 +162,7 @@
             "frontend/js/lib/underscore.js",
             "frontend/js/lib/backbone.js",
             "frontend/js/lib/moment.min.js",
+            "frontend/js/lib/jquery.sparkline.min.js",
             "frontend/js/lib/bootstrap.js"
           ],
           dest: 'build/sharedLibs.js',
