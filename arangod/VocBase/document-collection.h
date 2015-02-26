@@ -1017,7 +1017,8 @@ TRI_document_collection_t* TRI_OpenDocumentCollection (TRI_vocbase_t*,
 /// @brief closes an open collection
 ////////////////////////////////////////////////////////////////////////////////
 
-int TRI_CloseDocumentCollection (TRI_document_collection_t*);
+int TRI_CloseDocumentCollection (TRI_document_collection_t*,
+                                 bool);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                           INDEXES
