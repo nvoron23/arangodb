@@ -30,18 +30,15 @@
 #include "RestMvccDocumentHandler.h"
 
 #include "Basics/StringUtils.h"
-#include "Basics/conversions.h"
 #include "Basics/json.h"
-#include "Basics/string-buffer.h"
 #include "Basics/json-utilities.h"
-#include "Cluster/ServerState.h"
 #include "Cluster/ClusterInfo.h"
 #include "Cluster/ClusterComm.h"
 #include "Cluster/ClusterMethods.h"
+#include "Cluster/ServerState.h"
 #include "Mvcc/CollectionOperations.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
-#include "Mvcc/TransactionManager.h"
 #include "Mvcc/TransactionScope.h"
 #include "Rest/HttpRequest.h"
 #include "VocBase/document-collection.h"
@@ -304,7 +301,7 @@ bool RestMvccDocumentHandler::insertDocument () {
   std::unique_ptr<TRI_json_t> json(parseJsonBody());
 
   if (json.get() == nullptr) {
-    generateError(TRI_ERROR_OUT_OF_MEMORY);
+    // error message already set in parseJsonBody()
     return false;
   }
 
@@ -765,7 +762,7 @@ bool RestMvccDocumentHandler::readAllDocuments () {
       if (returnType != "id") {
         // default return type: paths to documents
         if (transactionCollection->type() == TRI_COL_TYPE_EDGE) {
-          prefix += StringUtils::replace(EDGE_PATH, "/", "\\/") + "\\/";
+          prefix += StringUtils::replace(MVCC_EDGE_PATH, "/", "\\/") + "\\/";
         }
         else {
           prefix += StringUtils::replace(MVCC_DOCUMENT_PATH, "/", "\\/") + "\\/";

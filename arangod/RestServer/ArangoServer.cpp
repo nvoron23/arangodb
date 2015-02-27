@@ -61,6 +61,7 @@
 #include "RestHandler/RestEdgeHandler.h"
 #include "RestHandler/RestImportHandler.h"
 #include "RestHandler/RestMvccDocumentHandler.h"
+#include "RestHandler/RestMvccEdgeHandler.h"
 #include "RestHandler/RestPleaseUpgradeHandler.h"
 #include "RestHandler/RestReplicationHandler.h"
 #include "RestHandler/RestUploadHandler.h"
@@ -120,6 +121,10 @@ void ArangoServer::defineHandlers (HttpHandlerFactory* factory) {
   // add "/mvccDocument" handler
   factory->addPrefixHandler(RestVocbaseBaseHandler::MVCC_DOCUMENT_PATH,
                             RestHandlerCreator<RestMvccDocumentHandler>::createNoData);
+  
+  // add "/mvccEdge" handler
+  factory->addPrefixHandler(RestVocbaseBaseHandler::MVCC_EDGE_PATH,
+                            RestHandlerCreator<RestMvccEdgeHandler>::createNoData);
 
   // add "/edge" handler
   factory->addPrefixHandler(RestVocbaseBaseHandler::EDGE_PATH,

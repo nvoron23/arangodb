@@ -103,6 +103,12 @@ namespace triagens {
         static const std::string MVCC_DOCUMENT_PATH;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief mvcc edge path
+////////////////////////////////////////////////////////////////////////////////
+
+        static const std::string MVCC_EDGE_PATH;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief replication path
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -368,6 +374,17 @@ namespace triagens {
                              std::string const&,
                              TRI_voc_cid_t&,
                              TRI_voc_key_t&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief parses a document handle, on a cluster this will parse the
+/// collection name as a cluster-wide collection name and return a
+/// cluster-wide collection ID in `cid`.
+////////////////////////////////////////////////////////////////////////////////
+
+        int parseDocumentId (triagens::arango::CollectionNameResolver const*,
+                             std::string const&,
+                             TRI_voc_cid_t&,
+                             std::unique_ptr<char[]>&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                               protected variables
