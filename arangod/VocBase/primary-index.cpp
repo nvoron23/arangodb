@@ -281,7 +281,7 @@ void TRI_InsertKeyPrimaryIndex (TRI_primary_index_t* idx,
   uint64_t const n = idx->_nrAlloc;
   uint64_t i, k;
 
-  i = k = header->_hash % n;
+  i = k = header->getHash() % n;
 
   for (; i < n && idx->_table[i] != nullptr && IsDifferentKeyElement(header, idx->_table[i]); ++i);
   if (i == n) {

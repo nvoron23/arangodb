@@ -128,7 +128,7 @@ struct TRI_doc_mptr_t {
     TRI_doc_mptr_t*        _prev;    // previous master pointer
     TRI_doc_mptr_t*        _next;    // next master pointer
   protected:
-    std::atomic<void const*> _dataptr; // pointer to the beginning of the raw marker
+    std::atomic<void const*>   _dataptr; // pointer to the beginning of the raw marker
     std::atomic<TRI_voc_tid_t> _from;
     std::atomic<TRI_voc_tid_t> _fromTop;
     std::atomic<TRI_voc_tid_t> _to;

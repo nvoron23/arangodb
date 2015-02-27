@@ -808,8 +808,15 @@ static TRI_index_operator_t* SetupSkiplistExample (v8::Isolate* isolate,
   size_t const n = TRI_LengthArrayJson(parameters.get());
 
   if (n == 0) {
-    // JSON is empty
-    return nullptr;
+    // JSON is empty. now create an operator for the full range
+    TRI_PushBack3ArrayJson(TRI_UNKNOWN_MEM_ZONE, parameters.get(), TRI_CreateNullJson(TRI_UNKNOWN_MEM_ZONE));
+
+    return TRI_CreateIndexOperator(TRI_GE_INDEX_OPERATOR, 
+                                   nullptr,
+                                   nullptr, 
+                                   parameters.release(), 
+                                   shaper, 
+                                   1);
   }
   
   // example means equality comparisons only

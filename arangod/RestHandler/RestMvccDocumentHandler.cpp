@@ -304,11 +304,12 @@ bool RestMvccDocumentHandler::insertDocument () {
   std::unique_ptr<TRI_json_t> json(parseJsonBody());
 
   if (json.get() == nullptr) {
+    generateError(TRI_ERROR_OUT_OF_MEMORY);
     return false;
   }
 
   if (json.get()->_type != TRI_JSON_OBJECT) {
-    generateTransactionError(collectionName, TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
+    generateError(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
     return false;
   }
 
@@ -353,7 +354,7 @@ bool RestMvccDocumentHandler::insertDocument () {
     return false;
   }
   catch (...) {
-    generateError(HttpResponse::SERVER_ERROR, TRI_ERROR_INTERNAL);
+    generateError(TRI_ERROR_INTERNAL);
     return false;
   }
  
@@ -549,6 +550,9 @@ bool RestMvccDocumentHandler::readSingleDocument (bool generateBody) {
   if (ServerState::instance()->isCoordinator()) {
     return getDocumentCoordinator(collectionName, key, generateBody);
   }
+  
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
 
   try {
     triagens::mvcc::OperationOptions options;
@@ -590,7 +594,7 @@ bool RestMvccDocumentHandler::readSingleDocument (bool generateBody) {
     return false;
   }
   catch (...) {
-    generateError(HttpResponse::SERVER_ERROR, TRI_ERROR_INTERNAL);
+    generateError(TRI_ERROR_INTERNAL);
     return false;
   }
  
@@ -733,8 +737,8 @@ bool RestMvccDocumentHandler::getDocumentCoordinator (string const& collname,
 
 bool RestMvccDocumentHandler::readAllDocuments () {
   bool found;
-  string collectionName = _request->value("collection", found);
-  string returnType = _request->value("type", found);
+  std::string collectionName = _request->value("collection", found);
+  std::string returnType = _request->value("type", found);
 
   if (returnType.empty()) {
     returnType = "path";
@@ -761,10 +765,10 @@ bool RestMvccDocumentHandler::readAllDocuments () {
       if (returnType != "id") {
         // default return type: paths to documents
         if (transactionCollection->type() == TRI_COL_TYPE_EDGE) {
-          prefix += EDGE_PATH + "\\/";
+          prefix += StringUtils::replace(EDGE_PATH, "/", "\\/") + "\\/";
         }
         else {
-          prefix += MVCC_DOCUMENT_PATH + "\\/";
+          prefix += StringUtils::replace(MVCC_DOCUMENT_PATH, "/", "\\/") + "\\/";
         }
       }
       prefix += transactionCollection->name() + "\\/";
@@ -774,7 +778,7 @@ bool RestMvccDocumentHandler::readAllDocuments () {
     auto readResult = triagens::mvcc::CollectionOperations::ReadAllDocuments(&transactionScope, transactionCollection, documents, options);
 
     if (readResult.code != TRI_ERROR_NO_ERROR) {
-      generateError(HttpResponse::BAD, readResult.code);
+      generateError(readResult.code);
       return false;
     }
   
@@ -784,7 +788,7 @@ bool RestMvccDocumentHandler::readAllDocuments () {
     result.reserve(20 + (prefix.size() + 1 + 10) * documents.size());
     result.append("{\"documents\":[");
 
-    bool first = false;
+    bool first = true;
     for (auto const& document : documents) {
       // collection names do not need to be JSON-escaped
       // keys do not need to be JSON-escaped
@@ -810,7 +814,7 @@ bool RestMvccDocumentHandler::readAllDocuments () {
     return false;
   }
   catch (...) {
-    generateError(HttpResponse::SERVER_ERROR, TRI_ERROR_INTERNAL);
+    generateError(TRI_ERROR_INTERNAL);
     return false;
   }
  
@@ -1343,236 +1347,105 @@ bool RestMvccDocumentHandler::modifyDocument (bool isPatch) {
   }
 
   // split the document reference
-  string const& collection = suffix[0];
-  string const& key = suffix[1];
+  string const& collectionName = suffix[0];
+  string const& key            = suffix[1];
 
-  TRI_json_t* json = parseJsonBody();
-
-  if (json == nullptr) {
+  std::unique_ptr<TRI_json_t> json(parseJsonBody());
+  
+  if (json.get() == nullptr) {
+    generateError(TRI_ERROR_OUT_OF_MEMORY);
     return false;
   }
 
-  if (json->_type != TRI_JSON_OBJECT) {
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-    generateTransactionError(collection, TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
+  if (json.get()->_type != TRI_JSON_OBJECT) {
+    generateError(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
     return false;
   }
+  
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
 
   // extract the revision
   bool isValidRevision;
   TRI_voc_rid_t const revision = extractRevision("if-match", "rev", isValidRevision);
+
   if (! isValidRevision) {
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_BAD_PARAMETER,
                   "invalid revision number");
     return false;
   }
 
-  // extract or chose the update policy
-  TRI_doc_update_policy_e const policy = extractUpdatePolicy();
-  bool const waitForSync = extractWaitForSync();
-
   if (ServerState::instance()->isCoordinator()) {
     // json will be freed inside
-    return modifyDocumentCoordinator(collection, key, revision, policy,
-                                     waitForSync, isPatch, json);
+    return modifyDocumentCoordinator(collectionName, key, revision, extractUpdatePolicy(), extractWaitForSync(), isPatch, json.get());
   }
 
-  TRI_doc_mptr_copy_t mptr;
+  try {
+    triagens::mvcc::OperationOptions options;
+    
+    triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collectionName);
+      
+    if (isPatch) {
+      // patching an existing document
 
-  // find and load collection given by name or identifier
-  SingleCollectionWriteTransaction<1> trx(new StandaloneTransactionContext(), _vocbase, collection);
+      {
+        // read extra options
+        bool found;
+        char const* valueStr = _request->value("keepNull", found);
+        if (! found || StringUtils::boolean(valueStr)) {
+          // default: null values are saved as Null
+          options.keepNull = true;
+        }
+        else {
+          // delete null attributes
+          options.keepNull = false;
+        }
 
-  // .............................................................................
-  // inside write transaction
-  // .............................................................................
+        valueStr = _request->value("mergeObjects", found);
+        if (! found || StringUtils::boolean(valueStr)) {
+          // the default is true
+          options.mergeObjects = true;
+        }
+        else {
+          options.mergeObjects = false;
+        }
+      }
 
-  int res = trx.begin();
+      auto document = triagens::mvcc::Document::CreateFromKey(key, revision);
+      auto updateResult = triagens::mvcc::CollectionOperations::UpdateDocument(&transactionScope, transactionCollection, document, json.get(), options);
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-    generateTransactionError(collection, res);
-    return false;
-  }
-
-  TRI_voc_cid_t const cid = trx.cid();
-  // If we are a DBserver, we want to use the cluster-wide collection
-  // name for error reporting:
-  string collectionName = collection;
-  if (ServerState::instance()->isDBserver()) {
-    collectionName = trx.resolver()->getCollectionName(cid);
-  }
-
-  TRI_voc_rid_t rid = 0;
-  TRI_document_collection_t* document = trx.documentCollection();
-  TRI_ASSERT(document != nullptr);
-  TRI_shaper_t* shaper = document->getShaper();  // PROTECTED by trx here
-
-  string const&& cidString = StringUtils::itoa(document->_info._planId);
-
-  if (trx.orderBarrier(trx.trxCollection()) == nullptr) {
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-    generateTransactionError(collectionName, TRI_ERROR_OUT_OF_MEMORY);
-    return false;
-  }
-
-  if (isPatch) {
-    // patching an existing document
-    bool nullMeansRemove;
-    bool mergeObjects;
-    bool found;
-    char const* valueStr = _request->value("keepNull", found);
-    if (! found || StringUtils::boolean(valueStr)) {
-      // default: null values are saved as Null
-      nullMeansRemove = false;
+      if (updateResult.code != TRI_ERROR_NO_ERROR) {
+        THROW_ARANGO_EXCEPTION(updateResult.code);
+      }
+      generate20x(insertResponseCode(updateResult.waitForSync), transactionCollection, &updateResult);
     }
     else {
-      // delete null attributes
-      nullMeansRemove = true;
-    }
+      auto document = triagens::mvcc::Document::CreateFromJson(transactionCollection->shaper(), json.get(), key, revision);
+      auto replaceResult = triagens::mvcc::CollectionOperations::ReplaceDocument(&transactionScope, transactionCollection, document, options);
 
-    valueStr = _request->value("mergeObjects", found);
-    if (! found || StringUtils::boolean(valueStr)) {
-      // the default is true
-      mergeObjects = true;
-    }
-    else {
-      mergeObjects = false;
-    }
-
-    // read the existing document
-    TRI_doc_mptr_copy_t oldDocument;
-
-    // create a write lock that spans the initial read and the update
-    // otherwise the update is not atomic
-    trx.lockWrite();
-
-    // do not lock again
-    res = trx.read(&oldDocument, key);
-    if (res != TRI_ERROR_NO_ERROR) {
-      trx.abort();
-      generateTransactionError(collectionName, res, (TRI_voc_key_t) key.c_str(), rid);
-      TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-
-      return false;
-    }
-
-    if (oldDocument.getDataPtr() == nullptr) {  // PROTECTED by trx here
-      trx.abort();
-      generateTransactionError(collectionName, TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND, (TRI_voc_key_t) key.c_str(), rid);
-      TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-
-      return false;
-    }
-
-    TRI_shaped_json_t shapedJson;
-    TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, oldDocument.getDataPtr()); // PROTECTED by trx here
-    TRI_json_t* old = TRI_JsonShapedJson(shaper, &shapedJson);
-
-    if (old == nullptr) {
-      trx.abort();
-      generateTransactionError(collectionName, TRI_ERROR_OUT_OF_MEMORY);
-      TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-
-      return false;
-    }
-
-    if (ServerState::instance()->isDBserver()) {
-      // compare attributes in shardKeys
-      if (shardKeysChanged(_request->databaseName(), cidString, old, json, true)) {
-        TRI_FreeJson(shaper->_memoryZone, old);
-        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-
-        trx.abort();
-        generateTransactionError(collectionName, TRI_ERROR_CLUSTER_MUST_NOT_CHANGE_SHARDING_ATTRIBUTES);
-
-        return false;
+      if (replaceResult.code != TRI_ERROR_NO_ERROR) {
+        THROW_ARANGO_EXCEPTION(replaceResult.code);
       }
+
+      generate20x(insertResponseCode(replaceResult.waitForSync), transactionCollection, &replaceResult);
     }
 
-    TRI_json_t* patchedJson = TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, old, json, nullMeansRemove, mergeObjects);
-    TRI_FreeJson(shaper->_memoryZone, old);
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-
-    if (patchedJson == nullptr) {
-      trx.abort();
-      generateTransactionError(collectionName, TRI_ERROR_OUT_OF_MEMORY);
-
-      return false;
-    }
-
-
-    // do not acquire an extra lock
-    res = trx.updateDocument(key, &mptr, patchedJson, policy, waitForSync, revision, &rid);
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, patchedJson);
+    return true;
   }
-  else {
-    // replacing an existing document, using a lock
-
-    if (ServerState::instance()->isDBserver()) {
-      // compare attributes in shardKeys
-      // read the existing document
-      TRI_doc_mptr_copy_t oldDocument;
-
-      // do not lock again
-      trx.lockWrite();
-
-      res = trx.read(&oldDocument, key);
-      if (res != TRI_ERROR_NO_ERROR) {
-        trx.abort();
-        generateTransactionError(collectionName, res, (TRI_voc_key_t) key.c_str(), rid);
-        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-
-        return false;
-      }
-
-      if (oldDocument.getDataPtr() == nullptr) {  // PROTECTED by trx here
-        trx.abort();
-        generateTransactionError(collectionName, TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND, (TRI_voc_key_t) key.c_str(), rid);
-        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-
-        return false;
-      }
-
-      TRI_shaped_json_t shapedJson;
-      TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, oldDocument.getDataPtr()); // PROTECTED by trx here
-      TRI_json_t* old = TRI_JsonShapedJson(shaper, &shapedJson);
-
-      if (shardKeysChanged(_request->databaseName(), cidString, old, json, false)) {
-        TRI_FreeJson(shaper->_memoryZone, old);
-        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-
-        trx.abort();
-        generateTransactionError(collectionName, TRI_ERROR_CLUSTER_MUST_NOT_CHANGE_SHARDING_ATTRIBUTES);
-
-        return false;
-      }
-
-      if (old != nullptr) {
-        TRI_FreeJson(shaper->_memoryZone, old);
-      }
-    }
-
-    res = trx.updateDocument(key, &mptr, json, policy, waitForSync, revision, &rid);
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
+  catch (triagens::arango::Exception const& ex) { 
+    generateError(HttpResponse::responseCode(ex.code()), ex.code(), ex.what());
+    return false;
   }
-
-  res = trx.finish(res);
-
-  // .............................................................................
-  // outside write transaction
-  // .............................................................................
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collectionName, res, (TRI_voc_key_t) key.c_str(), rid);
-
+  catch (...) {
+    generateError(TRI_ERROR_INTERNAL);
     return false;
   }
 
-  RestVocbaseBaseHandler::generateSaved(trx, cid, mptr);
-
-  return true;
+  // unreachable
+  TRI_ASSERT(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

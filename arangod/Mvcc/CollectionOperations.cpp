@@ -30,6 +30,7 @@
 #include "CollectionOperations.h"
 #include "Basics/json.h"
 #include "Basics/json-utilities.h"
+#include "Cluster/ClusterMethods.h"
 #include "Mvcc/CollectionReadLock.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/MasterpointerManager.h"
@@ -50,6 +51,12 @@ using namespace triagens::mvcc;
 // -----------------------------------------------------------------------------
 // --SECTION--                                          private static variables
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief default search options used when none are specified
+////////////////////////////////////////////////////////////////////////////////
+
+static SearchOptions const DefaultSearchOptions;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief a transaction id used for single-operation transactions
@@ -126,6 +133,18 @@ Document::~Document () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief get the internals as JSON
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_json_t* Document::toJson () const {
+  if (shaper == nullptr || shaped == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+      
+  return TRI_JsonShapedJson(shaper, shaped);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create a document from JSON
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -176,7 +195,8 @@ Document Document::CreateFromJson (TRI_shaper_t* shaper,
 
 Document Document::CreateFromJson (TRI_shaper_t* shaper,
                                    TRI_json_t const* json,
-                                   std::string const& key) {
+                                   std::string const& key,
+                                   TRI_voc_rid_t revisionId) {
          
   if (! TRI_IsObjectJson(json)) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
@@ -192,7 +212,7 @@ Document Document::CreateFromJson (TRI_shaper_t* shaper,
     return Document(shaper, 
                     shaped, 
                     key,
-                    0, // TODO: revision 
+                    revisionId,
                     CollectionOperations::KeySpecified, 
                     true);
   }
@@ -480,11 +500,14 @@ OperationResult CollectionOperations::ReadAllDocuments (TransactionScope* transa
   auto* transaction = transactionScope->transaction();
 
   // must have search options!
-  TRI_ASSERT(options.searchOptions != nullptr);
+  SearchOptions const* searchOptions = options.searchOptions;
+  if (options.searchOptions == nullptr) {
+    searchOptions = &DefaultSearchOptions;
+  }
 
-  auto skip = options.searchOptions->skip;
-  auto limit = options.searchOptions->limit;
-  bool reverse = options.searchOptions->reverse;
+  auto skip = searchOptions->skip;
+  auto limit = searchOptions->limit;
+  bool reverse = searchOptions->reverse;
 
   {
     std::unique_ptr<MasterpointerIterator> iterator(new MasterpointerIterator(transaction, collection->masterpointerManager(), reverse));
@@ -759,6 +782,13 @@ OperationResult CollectionOperations::UpdateDocument (TransactionScope* transact
     if (previous.get() == nullptr) {
       THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
     }
+  
+    if (triagens::arango::ServerState::instance()->isDBserver()) {
+      // compare attributes in shardKeys
+      if (triagens::arango::shardKeysChanged(collection->dbName(), std::to_string(collection->planId()), previous.get(), update, true)) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_CLUSTER_MUST_NOT_CHANGE_SHARDING_ATTRIBUTES);
+      }
+    }
 
     // merge existing document with new data
     std::unique_ptr<TRI_json_t> merged(TRI_MergeJson(TRI_UNKNOWN_MEM_ZONE, previous.get(), update, ! options.keepNull, options.mergeObjects));
@@ -846,6 +876,25 @@ OperationResult CollectionOperations::ReplaceDocument (TransactionScope* transac
   TRI_ASSERT(removeResult.mptr != nullptr);
 
   try {
+    if (triagens::arango::ServerState::instance()->isDBserver()) {
+      // compare attributes in shardKeys
+
+      // extract existing document
+      TRI_shaped_json_t shaped;
+      TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, removeResult.mptr->getDataPtr());
+      std::unique_ptr<TRI_json_t> previous(TRI_JsonShapedJson(collection->shaper(), &shaped));
+      
+      std::unique_ptr<TRI_json_t> replace(document.toJson());
+
+      if (previous.get() == nullptr || replace.get() == nullptr) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
+      }
+
+      if (triagens::arango::shardKeysChanged(collection->dbName(), std::to_string(collection->planId()), previous.get(), replace.get(), false)) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_CLUSTER_MUST_NOT_CHANGE_SHARDING_ATTRIBUTES);
+      }
+    }
+
     // now insert the replacement document
     auto result = InsertDocumentWorker(transactionScope, collection, indexUser, document, options);
 

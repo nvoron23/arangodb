@@ -73,6 +73,12 @@ namespace triagens {
         ~Document ();
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief get the internals as JSON
+////////////////////////////////////////////////////////////////////////////////
+
+        TRI_json_t* toJson () const;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create a document from JSON
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -85,7 +91,8 @@ namespace triagens {
 
         static Document CreateFromJson (struct TRI_shaper_s*,
                                         struct TRI_json_t const*,
-                                        std::string const&);
+                                        std::string const&,
+                                        TRI_voc_rid_t = 0);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a document from ShapedJson
@@ -436,8 +443,9 @@ namespace triagens {
 
       public:
        
-        static int const KeySpecified = true;
+        static int const KeySpecified   = true;
         static int const NoKeySpecified = false;
+
     };
   }
 }

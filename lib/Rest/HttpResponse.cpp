@@ -225,6 +225,8 @@ HttpResponse::HttpResponseCode HttpResponse::responseCode (int code) {
     case TRI_ERROR_CLUSTER_UNSUPPORTED:
       return NOT_IMPLEMENTED;
 
+    case TRI_ERROR_OUT_OF_MEMORY:
+    case TRI_ERROR_INTERNAL:
     default:
       return SERVER_ERROR;
   }
