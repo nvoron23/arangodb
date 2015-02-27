@@ -89,6 +89,12 @@ const string RestVocbaseBaseHandler::MVCC_DOCUMENT_PATH = "/_api/mvccDocument";
 const string RestVocbaseBaseHandler::MVCC_EDGE_PATH = "/_api/mvccEdge";
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief mvcc import path
+////////////////////////////////////////////////////////////////////////////////
+
+const string RestVocbaseBaseHandler::MVCC_IMPORT_PATH = "/_api/mvccImport";
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief replication path
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -131,6 +137,22 @@ RestVocbaseBaseHandler::~RestVocbaseBaseHandler () {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return a boolean value from the request
+////////////////////////////////////////////////////////////////////////////////
+
+bool RestVocbaseBaseHandler::extractBoolValue (char const* name,
+                                               bool defaultValue) const {
+  bool found;
+  char const* value = _request->value(name, found);
+
+  if (found) {
+    return StringUtils::boolean(value);
+  }
+
+  return defaultValue;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief check if a collection needs to be created on the fly
@@ -523,21 +545,6 @@ TRI_doc_update_policy_e RestVocbaseBaseHandler::extractUpdatePolicy () const {
   else {
     return TRI_DOC_UPDATE_ERROR;
   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief extracts the waitForSync value
-////////////////////////////////////////////////////////////////////////////////
-
-bool RestVocbaseBaseHandler::extractWaitForSync () const {
-  bool found;
-  char const* forceStr = _request->value("waitForSync", found);
-
-  if (found) {
-    return StringUtils::boolean(forceStr);
-  }
-
-  return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

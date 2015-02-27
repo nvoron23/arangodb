@@ -204,7 +204,7 @@ bool RestMvccEdgeHandler::insertDocument () {
 
   if (ServerState::instance()->isCoordinator()) {
     // json will be freed inside!
-    return insertDocumentCoordinator(collectionName, extractWaitForSync(), json.release(), from, to);
+    return insertDocumentCoordinator(collectionName, extractBoolValue("waitForSync", false), json.release(), from, to);
   }
 
   if (! checkCreateCollection(collectionName, getCollectionType())) {
@@ -259,7 +259,7 @@ bool RestMvccEdgeHandler::insertDocument () {
   
   try {
     triagens::mvcc::OperationOptions options;
-    options.waitForSync = extractWaitForSync();
+    options.waitForSync = extractBoolValue("waitForSync", false);
 
     triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections());
     auto* transaction = transactionScope.transaction();
@@ -274,6 +274,10 @@ bool RestMvccEdgeHandler::insertDocument () {
     auto document = triagens::mvcc::Document::CreateFromJson(shaper, json.get());
     document.edge = &edge; 
     auto insertResult = triagens::mvcc::CollectionOperations::InsertDocument(&transactionScope, transactionCollection, document, options);
+    
+    if (insertResult.code != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(insertResult.code);
+    }
     
     generate20x(insertResponseCode(insertResult.waitForSync), transactionCollection, &insertResult);
     return true;

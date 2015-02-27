@@ -312,7 +312,7 @@ bool RestMvccDocumentHandler::insertDocument () {
 
   if (ServerState::instance()->isCoordinator()) {
     // json will be freed inside!
-    return insertDocumentCoordinator(collectionName, extractWaitForSync(), json.release());
+    return insertDocumentCoordinator(collectionName, extractBoolValue("waitForSync", false), json.release());
   }
 
   if (! checkCreateCollection(collectionName, getCollectionType())) {
@@ -324,7 +324,7 @@ bool RestMvccDocumentHandler::insertDocument () {
   
   try {
     triagens::mvcc::OperationOptions options;
-    options.waitForSync = extractWaitForSync();
+    options.waitForSync = extractBoolValue("waitForSync", false);
 
     triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections());
     auto* transaction = transactionScope.transaction();
@@ -1375,7 +1375,7 @@ bool RestMvccDocumentHandler::modifyDocument (bool isPatch) {
 
   if (ServerState::instance()->isCoordinator()) {
     // json will be freed inside
-    return modifyDocumentCoordinator(collectionName, key, revision, extractUpdatePolicy(), extractWaitForSync(), isPatch, json.get());
+    return modifyDocumentCoordinator(collectionName, key, revision, extractUpdatePolicy(), extractBoolValue("waitForSync", false), isPatch, json.get());
   }
 
   try {
@@ -1388,28 +1388,9 @@ bool RestMvccDocumentHandler::modifyDocument (bool isPatch) {
     if (isPatch) {
       // patching an existing document
 
-      {
-        // read extra options
-        bool found;
-        char const* valueStr = _request->value("keepNull", found);
-        if (! found || StringUtils::boolean(valueStr)) {
-          // default: null values are saved as Null
-          options.keepNull = true;
-        }
-        else {
-          // delete null attributes
-          options.keepNull = false;
-        }
-
-        valueStr = _request->value("mergeObjects", found);
-        if (! found || StringUtils::boolean(valueStr)) {
-          // the default is true
-          options.mergeObjects = true;
-        }
-        else {
-          options.mergeObjects = false;
-        }
-      }
+      // read extra options
+      options.keepNull = extractBoolValue("keepNull", true);
+      options.keepNull = extractBoolValue("mergeObjects", true);
 
       auto document = triagens::mvcc::Document::CreateFromKey(key, revision);
       auto updateResult = triagens::mvcc::CollectionOperations::UpdateDocument(&transactionScope, transactionCollection, document, json.get(), options);
@@ -1647,7 +1628,7 @@ bool RestMvccDocumentHandler::removeDocument () {
   }
 
   if (ServerState::instance()->isCoordinator()) {
-    return removeDocumentCoordinator(collectionName, key, revision, policy, extractWaitForSync());
+    return removeDocumentCoordinator(collectionName, key, revision, policy, extractBoolValue("waitForSync", false));
   }
   
   // need a fake old transaction in order to not throw - can be removed later       
@@ -1655,7 +1636,7 @@ bool RestMvccDocumentHandler::removeDocument () {
 
   try {
     triagens::mvcc::OperationOptions options;
-    options.waitForSync = extractWaitForSync();
+    options.waitForSync = extractBoolValue("waitForSync", false);
 
     triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections());
     auto* transaction = transactionScope.transaction();
@@ -1681,7 +1662,7 @@ bool RestMvccDocumentHandler::removeDocument () {
   }
  
   // unreachable
-  TRI_ASSERT(false); /// diesen auch uebernehmen.
+  TRI_ASSERT(false); 
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -27,11 +27,12 @@
 /// @author Copyright 2010-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "RestImportHandler.h"
+#include "RestMvccImportHandler.h"
 
 #include "Basics/JsonHelper.h"
 #include "Basics/StringUtils.h"
-#include "Basics/tri-strings.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "Rest/HttpRequest.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/edge-collection.h"
@@ -50,7 +51,7 @@ using namespace triagens::arango;
 /// @brief constructor
 ////////////////////////////////////////////////////////////////////////////////
 
-RestImportHandler::RestImportHandler (HttpRequest* request)
+RestMvccImportHandler::RestMvccImportHandler (HttpRequest* request)
   : RestVocbaseBaseHandler(request) {
 }
 
@@ -62,7 +63,7 @@ RestImportHandler::RestImportHandler (HttpRequest* request)
 /// {@inheritDoc}
 ////////////////////////////////////////////////////////////////////////////////
 
-HttpHandler::status_t RestImportHandler::execute () {
+HttpHandler::status_t RestMvccImportHandler::execute () {
   if (ServerState::instance()->isCoordinator()) {
     generateError(HttpResponse::NOT_IMPLEMENTED,
                   TRI_ERROR_CLUSTER_UNSUPPORTED,
@@ -73,29 +74,25 @@ HttpHandler::status_t RestImportHandler::execute () {
   // extract the sub-request type
   HttpRequest::HttpRequestType type = _request->requestType();
 
-  switch (type) {
-    case HttpRequest::HTTP_REQUEST_POST: {
-      // extract the import type
-      bool found;
-      string const documentType = _request->value("type", found);
+  if (type != HttpRequest::HTTP_REQUEST_POST) {
+    generateNotImplemented("ILLEGAL " + DOCUMENT_IMPORT_PATH);
+  }
+  else {
+    // extract the import type
+    bool found;
+    std::string const documentType = _request->value("type", found);
 
-      if (found &&
-          (documentType == "documents" ||
-           documentType == "array" ||
-           documentType == "list" ||
-           documentType == "auto")) {
-        createFromJson(documentType);
-      }
-      else {
-        // CSV
-        createFromKeyValueList();
-      }
-      break;
+    if (found &&
+        (documentType == "documents" ||
+         documentType == "array" ||
+         documentType == "list" ||
+         documentType == "auto")) {
+      createFromJson(documentType);
     }
-
-    default:
-      generateNotImplemented("ILLEGAL " + DOCUMENT_IMPORT_PATH);
-      break;
+    else {
+      // CSV
+      createFromKeyValueList();
+    }
   }
 
   // this handler is done
@@ -107,51 +104,20 @@ HttpHandler::status_t RestImportHandler::execute () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief extracts the "overwrite" value
-////////////////////////////////////////////////////////////////////////////////
-
-bool RestImportHandler::extractOverwrite () const {
-  bool found;
-  char const* overwrite = _request->value("overwrite", found);
-
-  if (found) {
-    return StringUtils::boolean(overwrite);
-  }
-
-  return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief extracts the "complete" value
-////////////////////////////////////////////////////////////////////////////////
-
-bool RestImportHandler::extractComplete () const {
-  bool found;
-  char const* forceStr = _request->value("complete", found);
-
-  if (found) {
-    return StringUtils::boolean(forceStr);
-  }
-
-  return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief create a position string
 ////////////////////////////////////////////////////////////////////////////////
 
-std::string RestImportHandler::positionise (size_t i) const {
-  return string("at position " + StringUtils::itoa(i) + ": ");
+std::string RestMvccImportHandler::positionize (size_t i) const {
+  return std::string("at position " + std::to_string(i) + ": ");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief register an error
 ////////////////////////////////////////////////////////////////////////////////
 
-void RestImportHandler::registerError (RestImportResult& result,
-                                       std::string const& errorMsg) {
+void RestMvccImportHandler::registerError (RestMvccImportResult& result,
+                                           std::string const& errorMsg) {
   ++result._numErrors;
-
   result._errors.push_back(errorMsg);
 }
 
@@ -159,8 +125,8 @@ void RestImportHandler::registerError (RestImportResult& result,
 /// @brief construct an error message
 ////////////////////////////////////////////////////////////////////////////////
 
-std::string RestImportHandler::buildParseError (size_t i,
-                                                char const* lineStart) {
+std::string RestMvccImportHandler::buildParseError (size_t i,
+                                                    char const* lineStart) {
   if (lineStart != nullptr) {
     string part(lineStart);
     if (part.size() > 255) {
@@ -168,32 +134,34 @@ std::string RestImportHandler::buildParseError (size_t i,
       part = part.substr(0, 255) + "...";
     }
     
-    return positionise(i) + "invalid JSON type (expecting object, probably parse error), offending context: " + part;
+    return positionize(i) + "invalid JSON type (expecting object, probably parse error), offending context: " + part;
   }
     
-  return positionise(i) + "invalid JSON type (expecting object, probably parse error)";
+  return positionize(i) + "invalid JSON type (expecting object, probably parse error)";
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief process a single JSON document
 ////////////////////////////////////////////////////////////////////////////////
 
-int RestImportHandler::handleSingleDocument (RestImportTransaction& trx,
-                                             char const* lineStart,
-                                             TRI_json_t const* json,
-                                             string& errorMsg,
-                                             bool isEdgeCollection,
-                                             bool waitForSync,
-                                             size_t i) {
+int RestMvccImportHandler::handleSingleDocument (triagens::mvcc::TransactionScope* transactionScope,
+                                                 triagens::mvcc::TransactionCollection* transactionCollection,
+                                                 triagens::mvcc::OperationOptions const& options,
+                                                 triagens::arango::CollectionNameResolver const* resolver,
+                                                 char const* lineStart,
+                                                 TRI_json_t const* json,
+                                                 std::string& errorMsg,
+                                                 size_t i) {
   if (! TRI_IsObjectJson(json)) {
     if (json != nullptr) {
-      string part = JsonHelper::toString(json);
+      std::string part = JsonHelper::toString(json);
+
       if (part.size() > 255) {
         // UTF-8 chars in string will be escaped so we can truncate it at any point
         part = part.substr(0, 255) + "...";
       }
     
-      errorMsg = positionise(i) + "invalid JSON type (expecting object), offending document: " + part;
+      errorMsg = positionize(i) + "invalid JSON type (expecting object), offending document: " + part;
     }
     else {
       errorMsg = buildParseError(i, lineStart);
@@ -203,64 +171,60 @@ int RestImportHandler::handleSingleDocument (RestImportTransaction& trx,
   }
 
   // document ok, now import it
-  TRI_doc_mptr_copy_t document;
   int res = TRI_ERROR_NO_ERROR;
 
-  if (isEdgeCollection) {
+  if (transactionCollection->isEdgeCollection()) {
     char const* from = extractJsonStringValue(json, TRI_VOC_ATTRIBUTE_FROM);
     char const* to   = extractJsonStringValue(json, TRI_VOC_ATTRIBUTE_TO);
 
     if (from == nullptr || to == nullptr) {
-      string part = JsonHelper::toString(json);
+      std::string part = JsonHelper::toString(json);
       if (part.size() > 255) {
         // UTF-8 chars in string will be escaped so we can truncate it at any point
         part = part.substr(0, 255) + "...";
       }
     
-      errorMsg = positionise(i) + "missing '_from' or '_to' attribute, offending document: " + part;
+      errorMsg = positionize(i) + "missing '_from' or '_to' attribute, offending document: " + part;
 
       return TRI_ERROR_ARANGO_INVALID_EDGE_ATTRIBUTE;
     }
 
-    TRI_document_edge_t edge;
-
-    edge._fromCid = 0;
-    edge._toCid   = 0;
-    edge._fromKey = nullptr;
-    edge._toKey   = nullptr;
+    TRI_document_edge_t edge = { 0, nullptr, 0, nullptr };
+    std::unique_ptr<char[]> fromKey;
+    std::unique_ptr<char[]> toKey;
 
     // Note that in a DBserver in a cluster the following two calls will
     // parse the first part as a cluster-wide collection name:
-    int res1 = parseDocumentId(trx.resolver(), from, edge._fromCid, edge._fromKey);
-    int res2 = parseDocumentId(trx.resolver(), to, edge._toCid, edge._toKey);
+    int res1 = parseDocumentId(resolver, from, edge._fromCid, fromKey);
+    int res2 = parseDocumentId(resolver, to, edge._toCid, toKey);
+    
+    edge._fromKey = fromKey.get();
+    edge._toKey   = toKey.get();
 
     if (res1 == TRI_ERROR_NO_ERROR && res2 == TRI_ERROR_NO_ERROR) {
-      res = trx.createEdge(&document, json, waitForSync, &edge);
+      auto document = triagens::mvcc::Document::CreateFromJson(transactionCollection->shaper(), json);
+      document.edge = &edge; 
+      auto insertResult = triagens::mvcc::CollectionOperations::InsertDocument(transactionScope, transactionCollection, document, options);
+      res = insertResult.code;
     }
     else {
       res = (res1 != TRI_ERROR_NO_ERROR ? res1 : res2);
     }
-
-    if (edge._fromKey != nullptr) {
-      TRI_Free(TRI_CORE_MEM_ZONE, edge._fromKey);
-    }
-    if (edge._toKey != nullptr) {
-      TRI_Free(TRI_CORE_MEM_ZONE, edge._toKey);
-    }
   }
   else {
-    // do not acquire an extra lock
-    res = trx.createDocument(&document, json, waitForSync);
+    auto document = triagens::mvcc::Document::CreateFromJson(transactionCollection->shaper(), json);
+    auto insertResult = triagens::mvcc::CollectionOperations::InsertDocument(transactionScope, transactionCollection, document, options);
+    res = insertResult.code;
   }
 
   if (res != TRI_ERROR_NO_ERROR) {
-    string part = JsonHelper::toString(json);
+    std::string part = JsonHelper::toString(json);
     if (part.size() > 255) {
       // UTF-8 chars in string will be escaped so we can truncate it at any point
       part = part.substr(0, 255) + "...";
     }
 
-    errorMsg = positionise(i) +
+    errorMsg = positionize(i) +
                "creating document failed with error '" + TRI_errno_string(res) +
                "', offending document: " + part;
   }
@@ -585,34 +549,30 @@ int RestImportHandler::handleSingleDocument (RestImportTransaction& trx,
 /// @END_EXAMPLE_ARANGOSH_RUN
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RestImportHandler::createFromJson (string const& type) {
-  RestImportResult result;
+bool RestMvccImportHandler::createFromJson (std::string const& type) {
+  RestMvccImportResult result;
 
   vector<string> const& suffix = _request->suffix();
 
-  if (suffix.size() != 0) {
+  if (! suffix.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_SUPERFLUOUS_SUFFICES,
-                  "superfluous suffix, expecting " + DOCUMENT_IMPORT_PATH + "?collection=<identifier>");
+                  "superfluous suffix, expecting " + MVCC_IMPORT_PATH + "?collection=<identifier>");
     return false;
   }
-
-  bool const waitForSync = extractBoolValue("waitForSync", false);
-  bool const complete = extractComplete();
-  bool const overwrite = extractOverwrite();
 
   // extract the collection name
   bool found;
-  string const& collection = _request->value("collection", found);
+  string const& collectionName = _request->value("collection", found);
 
-  if (! found || collection.empty()) {
+  if (! found || collectionName.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_ARANGO_COLLECTION_PARAMETER_MISSING,
-                  "'collection' is missing, expecting " + DOCUMENT_IMPORT_PATH + "?collection=<identifier>");
+                  "'collection' is missing, expecting " + MVCC_IMPORT_PATH + "?collection=<identifier>");
     return false;
   }
 
-  if (! checkCreateCollection(collection, TRI_COL_TYPE_DOCUMENT)) {
+  if (! checkCreateCollection(collectionName, TRI_COL_TYPE_DOCUMENT)) {
     return false;
   }
 
@@ -652,163 +612,152 @@ bool RestImportHandler::createFromJson (string const& type) {
                   "invalid value for 'type'");
     return false;
   }
+  
+  CollectionNameResolver resolver(_vocbase); // TODO: remove
+  
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+    
+  try {
+    // force a sub-transaction so we can rollback the entire truncate operation easily
+    triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true, true);
 
-  // find and load collection given by name or identifier
-  RestImportTransaction trx(new StandaloneTransactionContext(), _vocbase, collection);
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collectionName);
+  
+    triagens::mvcc::OperationOptions options;
+  
+    if (extractBoolValue("overwrite", false)) {
+      // truncate collection first
+      auto truncateResult = triagens::mvcc::CollectionOperations::Truncate(&transactionScope, transactionCollection, options);
+    
+      if (truncateResult.code != TRI_ERROR_NO_ERROR) {
+        THROW_ARANGO_EXCEPTION(truncateResult.code);
+      }
+    }
+    
+    options.waitForSync = extractBoolValue("waitForSync", false);
+    bool const complete = extractBoolValue("complete", false);
 
-  // .............................................................................
-  // inside write transaction
-  // .............................................................................
+    if (linewise) {
+      // each line is a separate JSON document
+      char const* ptr = _request->body();
+      char const* end = ptr + _request->bodySize();
+      size_t i = 0;
+      std::string errorMsg;
 
-  int res = trx.begin();
+      while (ptr < end) {
+        // read line until done
+        i++;
+          
+        TRI_ASSERT(ptr != nullptr);
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collection, res);
+        // trim whitespace at start of line
+        while (ptr < end && 
+              (*ptr == ' ' || *ptr == '\t' || *ptr == '\r' || *ptr == '\b' || *ptr == '\f')) {
+          ++ptr;
+        }
+
+        if (ptr == end || *ptr == '\0') {
+          break;
+        }
+
+        // now find end of line
+        char const* pos = strchr(ptr, '\n');
+        char const* oldPtr = nullptr;
+
+        if (pos == ptr) {
+          // line starting with \n, i.e. empty line
+          ptr = pos + 1;
+          ++result._numEmpty;
+          continue;
+        }
+        
+        std::unique_ptr<TRI_json_t> json;
+
+        if (pos != nullptr) {
+          // non-empty line
+          *(const_cast<char*>(pos)) = '\0';
+          TRI_ASSERT(ptr != nullptr);
+          oldPtr = ptr;
+          json.reset(parseJsonLine(ptr, pos));
+          ptr = pos + 1;
+        }
+        else {
+          // last-line, non-empty
+          TRI_ASSERT(pos == nullptr);
+          TRI_ASSERT(ptr != nullptr);
+          oldPtr = ptr;
+          json.reset(parseJsonLine(ptr));
+          ptr = end;
+        }
+
+        int res = handleSingleDocument(&transactionScope, transactionCollection, options, &resolver, oldPtr, json.get(), errorMsg, i);
+
+        if (res == TRI_ERROR_NO_ERROR) {
+          ++result._numCreated;
+        }
+        else {
+          registerError(result, errorMsg);
+
+          if (complete) {
+            // only perform a full import: abort
+            THROW_ARANGO_EXCEPTION(res);
+          }
+        }
+      }
+    }
+
+    else {
+      // the entire request body is one JSON document
+      std::unique_ptr<TRI_json_t> documents(TRI_Json2String(TRI_UNKNOWN_MEM_ZONE, _request->body(), nullptr));
+
+      if (! TRI_IsArrayJson(documents.get())) {
+        generateError(HttpResponse::BAD,
+                      TRI_ERROR_HTTP_BAD_PARAMETER,
+                      "expecting a JSON array in the request");
+        return false;
+      }
+
+      std::string errorMsg;
+      auto const* json = documents.get(); 
+      size_t const n = TRI_LengthArrayJson(json);
+
+      for (size_t i = 0; i < n; ++i) {
+        auto document = static_cast<TRI_json_t const*>(TRI_AtVector(&json->_value._objects, i));
+
+        int res = handleSingleDocument(&transactionScope, transactionCollection, options, &resolver, nullptr, document, errorMsg, i + 1);
+
+        if (res == TRI_ERROR_NO_ERROR) {
+          ++result._numCreated;
+        }
+        else {
+          registerError(result, errorMsg);
+
+          if (complete) {
+            // only perform a full import: abort
+            THROW_ARANGO_EXCEPTION(res);
+          }
+        }
+      }
+    }
+
+    transactionScope.commit();
+    // generate result
+    generateDocumentsCreated(result);
+    return true;
+  }
+  catch (triagens::arango::Exception const& ex) {
+    generateError(HttpResponse::responseCode(ex.code()), ex.code(), ex.what());
+    return false;
+  }
+  catch (...) {
+    generateError(HttpResponse::SERVER_ERROR, TRI_ERROR_INTERNAL);
     return false;
   }
 
-  TRI_document_collection_t* document = trx.documentCollection();
-  bool const isEdgeCollection = (document->_info._type == TRI_COL_TYPE_EDGE);
-
-  trx.lockWrite();
-
-  if (overwrite) {
-    // truncate collection first
-    trx.truncate(false);
-  }
-
-  if (linewise) {
-    // each line is a separate JSON document
-    char const* ptr = _request->body();
-    char const* end = ptr + _request->bodySize();
-    size_t i = 0;
-    string errorMsg;
-
-    while (ptr < end) {
-      // read line until done
-      i++;
-        
-      TRI_ASSERT(ptr != nullptr);
-
-      // trim whitespace at start of line
-      while (ptr < end && 
-             (*ptr == ' ' || *ptr == '\t' || *ptr == '\r' || *ptr == '\b' || *ptr == '\f')) {
-        ++ptr;
-      }
-
-      if (ptr == end || *ptr == '\0') {
-        break;
-      }
-
-      // now find end of line
-      char const* pos = strchr(ptr, '\n');
-      char const* oldPtr = nullptr;
-
-      TRI_json_t* json = nullptr;
-
-      if (pos == ptr) {
-        // line starting with \n, i.e. empty line
-        ptr = pos + 1;
-        ++result._numEmpty;
-        continue;
-      }
-      else if (pos != nullptr) {
-        // non-empty line
-        *(const_cast<char*>(pos)) = '\0';
-        TRI_ASSERT(ptr != nullptr);
-        oldPtr = ptr;
-        json = parseJsonLine(ptr, pos);
-        ptr = pos + 1;
-      }
-      else {
-        // last-line, non-empty
-        TRI_ASSERT(pos == nullptr);
-        TRI_ASSERT(ptr != nullptr);
-        oldPtr = ptr;
-        json = parseJsonLine(ptr);
-        ptr = end;
-      }
-
-      res = handleSingleDocument(trx, oldPtr, json, errorMsg, isEdgeCollection, waitForSync, i);
-
-      if (json != nullptr) {
-        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-      }
-
-      if (res == TRI_ERROR_NO_ERROR) {
-        ++result._numCreated;
-      }
-      else {
-        registerError(result, errorMsg);
-
-        if (complete) {
-          // only perform a full import: abort
-          break;
-        }
-        // perform partial import: continue
-        res = TRI_ERROR_NO_ERROR;
-      }
-    }
-  }
-
-  else {
-    // the entire request body is one JSON document
-    TRI_json_t* documents = TRI_Json2String(TRI_UNKNOWN_MEM_ZONE, _request->body(), nullptr);
-
-    if (! TRI_IsArrayJson(documents)) {
-      if (documents != nullptr) {
-        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, documents);
-      }
-
-      generateError(HttpResponse::BAD,
-                    TRI_ERROR_HTTP_BAD_PARAMETER,
-                    "expecting a JSON array in the request");
-      return false;
-    }
-
-    string errorMsg;
-    size_t const n = documents->_value._objects._length;
-
-    for (size_t i = 0; i < n; ++i) {
-      TRI_json_t const* json = static_cast<TRI_json_t const*>(TRI_AtVector(&documents->_value._objects, i));
-
-      res = handleSingleDocument(trx, nullptr, json, errorMsg, isEdgeCollection, waitForSync, i + 1);
-
-      if (res == TRI_ERROR_NO_ERROR) {
-        ++result._numCreated;
-      }
-      else {
-        registerError(result, errorMsg);
-
-        if (complete) {
-          // only perform a full import: abort
-          break;
-        }
-        // perform partial import: continue
-        res = TRI_ERROR_NO_ERROR;
-      }
-    }
-
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, documents);
-  }
-
-
-  // this may commit, even if previous errors occurred
-  res = trx.finish(res);
-
-  // .............................................................................
-  // outside write transaction
-  // .............................................................................
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collection, res);
-  }
-  else {
-    // generate result
-    generateDocumentsCreated(result);
-  }
-
-  return true;
+  // unreachable
+  TRI_ASSERT(false); 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1053,40 +1002,36 @@ bool RestImportHandler::createFromJson (string const& type) {
 /// @END_EXAMPLE_ARANGOSH_RUN
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RestImportHandler::createFromKeyValueList () {
-  RestImportResult result;
+bool RestMvccImportHandler::createFromKeyValueList () {
+  RestMvccImportResult result;
 
   vector<string> const& suffix = _request->suffix();
 
-  if (suffix.size() != 0) {
+  if (! suffix.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_SUPERFLUOUS_SUFFICES,
                   "superfluous suffix, expecting " + DOCUMENT_IMPORT_PATH + "?collection=<identifier>");
     return false;
   }
 
-  bool const waitForSync = extractBoolValue("waitForSync", false);
-  bool const complete = extractComplete();
-  bool const overwrite = extractOverwrite();
-
   // extract the collection name
   bool found;
-  string const& collection = _request->value("collection", found);
+  string const& collectionName = _request->value("collection", found);
 
-  if (! found || collection.empty()) {
+  if (! found || collectionName.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_ARANGO_COLLECTION_PARAMETER_MISSING,
                   "'collection' is missing, expecting " + DOCUMENT_IMPORT_PATH + "?collection=<identifier>");
     return false;
   }
 
-  if (! checkCreateCollection(collection, TRI_COL_TYPE_DOCUMENT)) {
+  if (! checkCreateCollection(collectionName, TRI_COL_TYPE_DOCUMENT)) {
     return false;
   }
 
   // read line number (optional)
   int64_t lineNumber = 0;
-  string const& lineNumValue = _request->value("line", found);
+  std::string const& lineNumValue = _request->value("line", found);
   if (found) {
     lineNumber = StringUtils::int64(lineNumValue);
   }
@@ -1119,182 +1064,173 @@ bool RestImportHandler::createFromKeyValueList () {
   }
 
   *(const_cast<char*>(lineEnd)) = '\0';
-  TRI_json_t* keys = parseJsonLine(lineStart, lineEnd);
 
-  if (! checkKeys(keys)) {
+  // read first line with attribute names
+  std::unique_ptr<TRI_json_t> keys(parseJsonLine(lineStart, lineEnd));
+
+  if (! checkKeys(keys.get())) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_BAD_PARAMETER,
                   "no JSON string array found in first line");
-
-    if (keys != nullptr) {
-      TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, keys);
-    }
     return false;
   }
 
   current = next + 1;
+  
+  CollectionNameResolver resolver(_vocbase);
+  
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+    
+  try {
+    // force a sub-transaction so we can rollback the entire truncate operation easily
+    triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true, true);
 
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collectionName);
+    
+    triagens::mvcc::OperationOptions options;
+  
+    if (extractBoolValue("overwrite", false)) {
+      // truncate collection first
+      auto truncateResult = triagens::mvcc::CollectionOperations::Truncate(&transactionScope, transactionCollection, options);
+    
+      if (truncateResult.code != TRI_ERROR_NO_ERROR) {
+        THROW_ARANGO_EXCEPTION(truncateResult.code);
+      }
+    }
+ 
+    options.waitForSync = extractBoolValue("waitForSync", false);
+    bool const complete    = extractBoolValue("complete", false);
 
-  // find and load collection given by name or identifier
-  RestImportTransaction trx(new StandaloneTransactionContext(), _vocbase, collection);
+    size_t i = static_cast<size_t>(lineNumber);
 
-  // .............................................................................
-  // inside write transaction
-  // .............................................................................
+    while (current != nullptr && current < bodyEnd) {
+      i++;
 
-  int res = trx.begin();
+      next = static_cast<char const*>(memchr(current, '\n', bodyEnd - current));
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, keys);
-    generateTransactionError(collection, res);
+      char const* lineStart = current;
+      char const* lineEnd   = next;
+
+      if (next == nullptr) {
+        // reached the end
+        lineEnd = bodyEnd;
+        current = nullptr;
+      }
+      else {
+        // got more to read
+        current = next + 1;
+        *(const_cast<char*>(lineEnd)) = '\0';
+      }
+
+      // trim line
+      while (lineStart < bodyEnd &&
+            (*lineStart == ' ' || *lineStart == '\t' || *lineStart == '\r' || *lineStart == '\n' || *lineStart == '\b' || *lineStart == '\f')) {
+        ++lineStart;
+      }
+      
+      while (lineEnd > lineStart &&
+            (*(lineEnd - 1) == ' ' || *(lineEnd - 1) == '\t' || *(lineEnd - 1) == '\r' || *(lineEnd - 1) == '\n' || *(lineEnd - 1) == '\b' || *(lineEnd - 1) == '\f')) {
+        --lineEnd;
+      }
+
+      if (lineStart == lineEnd) {
+        ++result._numEmpty;
+        continue;
+      }
+
+      std::unique_ptr<TRI_json_t> values(parseJsonLine(lineStart, lineEnd));
+
+      if (values.get() != nullptr) {
+        // build the json object from the array
+        std::string errorMsg;
+
+        std::unique_ptr<TRI_json_t> json(createJsonObject(keys.get(), values.get(), errorMsg, i));
+
+        int res;
+        if (json.get() != nullptr) {
+          res = handleSingleDocument(&transactionScope, transactionCollection, options, &resolver, lineStart, json.get(), errorMsg, i);
+        }
+        else {
+          // raise any error
+          res = TRI_ERROR_INTERNAL;
+        }
+
+        if (res == TRI_ERROR_NO_ERROR) {
+          ++result._numCreated;
+        }
+        else {
+          registerError(result, errorMsg);
+
+          if (complete) {
+            // only perform a full import: abort
+            THROW_ARANGO_EXCEPTION(res);
+          }
+        }
+      }
+      else {
+        string errorMsg = buildParseError(i, lineStart);
+        registerError(result, errorMsg);
+        // TODO: throw here?
+      }
+    }
+
+    transactionScope.commit();
+    // generate result
+    generateDocumentsCreated(result);
+    return true;
+  }
+  catch (triagens::arango::Exception const& ex) {
+    generateError(HttpResponse::responseCode(ex.code()), ex.code(), ex.what());
+    return false;
+  }
+  catch (...) {
+    generateError(HttpResponse::SERVER_ERROR, TRI_ERROR_INTERNAL);
     return false;
   }
 
-  TRI_document_collection_t* document = trx.documentCollection();
-  bool const isEdgeCollection = (document->_info._type == TRI_COL_TYPE_EDGE);
-
-  trx.lockWrite();
-
-  if (overwrite) {
-    // truncate collection first
-    trx.truncate(false);
-  }
-
-  size_t i = (size_t) lineNumber;
-
-  while (current != nullptr && current < bodyEnd) {
-    i++;
-
-    next = static_cast<char const*>(memchr(current, '\n', bodyEnd - current));
-
-    char const* lineStart = current;
-    char const* lineEnd   = next;
-
-    if (next == nullptr) {
-      // reached the end
-      lineEnd = bodyEnd;
-      current = nullptr;
-    }
-    else {
-      // got more to read
-      current = next + 1;
-      *(const_cast<char*>(lineEnd)) = '\0';
-    }
-
-    // trim line
-    while (lineStart < bodyEnd &&
-           (*lineStart == ' ' || *lineStart == '\t' || *lineStart == '\r' || *lineStart == '\n' || *lineStart == '\b' || *lineStart == '\f')) {
-      ++lineStart;
-    }
-    
-    while (lineEnd > lineStart &&
-           (*(lineEnd - 1) == ' ' || *(lineEnd - 1) == '\t' || *(lineEnd - 1) == '\r' || *(lineEnd - 1) == '\n' || *(lineEnd - 1) == '\b' || *(lineEnd - 1) == '\f')) {
-      --lineEnd;
-    }
-
-    if (lineStart == lineEnd) {
-      ++result._numEmpty;
-      continue;
-    }
-
-    TRI_json_t* values = parseJsonLine(lineStart, lineEnd);
-
-    if (values != nullptr) {
-      // build the json object from the array
-      string errorMsg;
-
-      TRI_json_t* json = createJsonObject(keys, values, errorMsg, i);
-      TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, values);
-
-      if (json != nullptr) {
-        res = handleSingleDocument(trx, lineStart, json, errorMsg, isEdgeCollection, waitForSync, i);
-        TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, json);
-      }
-      else {
-        // raise any error
-        res = TRI_ERROR_INTERNAL;
-      }
-
-      if (res == TRI_ERROR_NO_ERROR) {
-        ++result._numCreated;
-      }
-      else {
-        registerError(result, errorMsg);
-
-        if (complete) {
-          // only perform a full import: abort
-          break;
-        }
-
-        // perform partial import: continue
-        res = TRI_ERROR_NO_ERROR;
-      }
-    }
-    else {
-      string errorMsg = buildParseError(i, lineStart);
-      registerError(result, errorMsg);
-    }
-  }
-
-  // we'll always commit, even if previous errors occurred
-  res = trx.finish(res);
-
-  TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, keys);
-
-  // .............................................................................
-  // outside write transaction
-  // .............................................................................
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collection, res);
-  }
-  else {
-    // generate result
-    generateDocumentsCreated(result);
-  }
-
-  return true;
+  // unreachable
+  TRI_ASSERT(false); 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create response for number of documents created / failed
 ////////////////////////////////////////////////////////////////////////////////
 
-void RestImportHandler::generateDocumentsCreated (RestImportResult const& result) {
+void RestMvccImportHandler::generateDocumentsCreated (RestMvccImportResult const& result) {
   _response = createResponse(HttpResponse::CREATED);
   _response->setContentType("application/json; charset=utf-8");
 
-  TRI_json_t json;
-
-  TRI_InitObjectJson(TRI_CORE_MEM_ZONE, &json);
-  TRI_Insert3ObjectJson(TRI_CORE_MEM_ZONE, &json, "error", TRI_CreateBooleanJson(TRI_CORE_MEM_ZONE, false));
-  TRI_Insert3ObjectJson(TRI_CORE_MEM_ZONE, &json, "created", TRI_CreateNumberJson(TRI_CORE_MEM_ZONE, (double) result._numCreated));
-  TRI_Insert3ObjectJson(TRI_CORE_MEM_ZONE, &json, "errors", TRI_CreateNumberJson(TRI_CORE_MEM_ZONE, (double) result._numErrors));
-  TRI_Insert3ObjectJson(TRI_CORE_MEM_ZONE, &json, "empty", TRI_CreateNumberJson(TRI_CORE_MEM_ZONE, (double) result._numEmpty));
+  triagens::basics::Json json(triagens::basics::Json::Object, 5);
+  json("error", triagens::basics::Json(false));
+  json("created", triagens::basics::Json(static_cast<double>(result._numCreated)));
+  json("errors", triagens::basics::Json(static_cast<double>(result._numErrors)));
+  json("empty", triagens::basics::Json(static_cast<double>(result._numEmpty)));
 
   bool found;
   char const* detailsStr = _request->value("details", found);
 
   // include failure details?
   if (found && StringUtils::boolean(detailsStr)) {
-    TRI_json_t* messages = TRI_CreateArrayJson(TRI_CORE_MEM_ZONE);
+    size_t const n = result._errors.size(); 
+    triagens::basics::Json messages(triagens::basics::Json::Array, n);
 
-    for (size_t i = 0, n = result._errors.size(); i < n; ++i) {
-      string const& msg = result._errors[i];
-      TRI_PushBack3ArrayJson(TRI_CORE_MEM_ZONE, messages, TRI_CreateStringCopyJson(TRI_CORE_MEM_ZONE, msg.c_str(), msg.size()));
+    for (size_t i = 0; i < n; ++i) {
+      messages.add(triagens::basics::Json(result._errors[i]));
     }
-    TRI_Insert3ObjectJson(TRI_CORE_MEM_ZONE, &json, "details", messages);
+
+    json("details", messages);
   }
 
-  generateResult(HttpResponse::CREATED, &json);
-  TRI_DestroyJson(TRI_CORE_MEM_ZONE, &json);
+  generateResult(HttpResponse::CREATED, json.json());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief parse a single document line
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_json_t* RestImportHandler::parseJsonLine (string const& line) {
+TRI_json_t* RestMvccImportHandler::parseJsonLine (std::string const& line) {
   return parseJsonLine(line.c_str(), line.c_str() + line.size());
 }
 
@@ -1302,52 +1238,43 @@ TRI_json_t* RestImportHandler::parseJsonLine (string const& line) {
 /// @brief parse a single document line
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_json_t* RestImportHandler::parseJsonLine (char const* start,
-                                              char const* end) {
-  char* errmsg = nullptr;
-  TRI_json_t* json = TRI_Json2String(TRI_UNKNOWN_MEM_ZONE, start, &errmsg);
-
-  if (errmsg != nullptr) {
-    // must free this error message, otherwise we'll have a memleak
-    TRI_FreeString(TRI_CORE_MEM_ZONE, errmsg);
-  }
-  return json;
+TRI_json_t* RestMvccImportHandler::parseJsonLine (char const* start,
+                                                  char const* end) {
+  return TRI_Json2String(TRI_UNKNOWN_MEM_ZONE, start, nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a JSON object from a line containing a document
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_json_t* RestImportHandler::createJsonObject (TRI_json_t const* keys,
-                                                 TRI_json_t const* values,
-                                                 string& errorMsg,
-                                                 size_t lineNumber) {
+TRI_json_t* RestMvccImportHandler::createJsonObject (TRI_json_t const* keys,
+                                                     TRI_json_t const* values,
+                                                     std::string& errorMsg,
+                                                     size_t lineNumber) {
 
-  if (values->_type != TRI_JSON_ARRAY) {
-    errorMsg = positionise(lineNumber) + "no valid JSON array data";
+  if (! TRI_IsArrayJson(values)) {
+    errorMsg = positionize(lineNumber) + "no valid JSON array data";
     return nullptr;
   }
 
-  size_t const n = keys->_value._objects._length;
+  size_t const n = TRI_LengthArrayJson(keys);
 
-  if (n !=  values->_value._objects._length) {
-    errorMsg = positionise(lineNumber) + "wrong number of JSON values";
+  if (n != TRI_LengthArrayJson(values)) {
+    errorMsg = positionize(lineNumber) + "wrong number of JSON values";
     return nullptr;
   }
 
   TRI_json_t* result = TRI_CreateObjectJson(TRI_UNKNOWN_MEM_ZONE, n);
 
   if (result == nullptr) {
-    LOG_ERROR("out of memory");
     return nullptr;
   }
 
   for (size_t i = 0;  i < n;  ++i) {
+    auto key   = static_cast<TRI_json_t const*>(TRI_AtVector(&keys->_value._objects, i));
+    auto value = static_cast<TRI_json_t const*>(TRI_AtVector(&values->_value._objects, i));
 
-    TRI_json_t const* key   = static_cast<TRI_json_t const*>(TRI_AtVector(&keys->_value._objects, i));
-    TRI_json_t const* value = static_cast<TRI_json_t const*>(TRI_AtVector(&values->_value._objects, i));
-
-    if (JsonHelper::isString(key) && value->_type > TRI_JSON_NULL) {
+    if (TRI_IsStringJson(key) && value != nullptr && value->_type > TRI_JSON_NULL) {
       TRI_InsertObjectJson(TRI_UNKNOWN_MEM_ZONE, result, key->_value._string.data, value);
     }
   }
@@ -1359,21 +1286,21 @@ TRI_json_t* RestImportHandler::createJsonObject (TRI_json_t const* keys,
 /// @brief validate keys
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RestImportHandler::checkKeys (TRI_json_t const* keys) const {
+bool RestMvccImportHandler::checkKeys (TRI_json_t const* keys) const {
   if (! TRI_IsArrayJson(keys)) {
     return false;
   }
 
-  size_t const n = keys->_value._objects._length;
+  size_t const n = TRI_LengthArrayJson(keys);
 
   if (n == 0) {
     return false;
   }
 
   for (size_t i = 0;  i < n;  ++i) {
-    TRI_json_t const* key = static_cast<TRI_json_t* const>(TRI_AtVector(&keys->_value._objects, i));
+    auto key = static_cast<TRI_json_t* const>(TRI_AtVector(&keys->_value._objects, i));
 
-    if (! JsonHelper::isString(key)) {
+    if (! TRI_IsStringJson(key)) {
       return false;
     }
   }

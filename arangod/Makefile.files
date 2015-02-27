@@ -101,6 +101,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/RestHandler/RestImportHandler.cpp \
 	arangod/RestHandler/RestMvccDocumentHandler.cpp \
 	arangod/RestHandler/RestMvccEdgeHandler.cpp \
+	arangod/RestHandler/RestMvccImportHandler.cpp \
 	arangod/RestHandler/RestPleaseUpgradeHandler.cpp \
 	arangod/RestHandler/RestReplicationHandler.cpp \
 	arangod/RestHandler/RestUploadHandler.cpp \
