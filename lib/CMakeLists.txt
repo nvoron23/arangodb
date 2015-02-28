@@ -45,6 +45,7 @@ add_library(
     ${LIB_ARANGO_APPLE}
     ${LIB_ARANGO_MSVC}
     ${LIB_ARANGO_POSIX}
+    Basics/Allocator.cpp
     Basics/application-exit.cpp
     Basics/associative.cpp
     Basics/ConditionLocker.cpp
