@@ -169,6 +169,15 @@ TransactionCollection* SubTransaction::collection (std::string const& name) {
 /// this registers the collection in the transaction if not yet present
 ////////////////////////////////////////////////////////////////////////////////
         
+TransactionCollection* SubTransaction::collection (char const* name) {
+  return _topLevelTransaction->collection(name);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a collection used in the transaction
+/// this registers the collection in the transaction if not yet present
+////////////////////////////////////////////////////////////////////////////////
+        
 TransactionCollection* SubTransaction::collection (TRI_voc_cid_t cid) {
   return _topLevelTransaction->collection(cid);
 }

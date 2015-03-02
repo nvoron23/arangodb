@@ -117,6 +117,9 @@ add_executable(
     RestHandler/RestDocumentHandler.cpp
     RestHandler/RestEdgeHandler.cpp
     RestHandler/RestImportHandler.cpp
+    RestHandler/RestMvccDocumentHandler.cpp
+    RestHandler/RestMvccEdgeHandler.cpp
+    RestHandler/RestMvccImportHandler.cpp
     RestHandler/RestPleaseUpgradeHandler.cpp
     RestHandler/RestReplicationHandler.cpp
     RestHandler/RestUploadHandler.cpp

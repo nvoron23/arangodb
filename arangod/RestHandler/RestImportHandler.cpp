@@ -597,7 +597,7 @@ bool RestImportHandler::createFromJson (string const& type) {
     return false;
   }
 
-  bool const waitForSync = extractWaitForSync();
+  bool const waitForSync = extractBoolValue("waitForSync", false);
   bool const complete = extractComplete();
   bool const overwrite = extractOverwrite();
 
@@ -1065,7 +1065,7 @@ bool RestImportHandler::createFromKeyValueList () {
     return false;
   }
 
-  bool const waitForSync = extractWaitForSync();
+  bool const waitForSync = extractBoolValue("waitForSync", false);
   bool const complete = extractComplete();
   bool const overwrite = extractOverwrite();
 

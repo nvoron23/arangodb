@@ -33,14 +33,12 @@
 #include "Basics/Common.h"
 
 #include "Admin/RestBaseHandler.h"
-
 #include "Basics/json.h"
 #include "Basics/logging.h"
 #include "Basics/json-utilities.h"
-
 #include "Rest/HttpResponse.h"
-#include "Utils/transactions.h"
 #include "RestServer/VocbaseContext.h"
+#include "Utils/transactions.h"
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                              forward declarations
@@ -99,6 +97,24 @@ namespace triagens {
         static const std::string EDGE_PATH;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief mvcc document path
+////////////////////////////////////////////////////////////////////////////////
+
+        static const std::string MVCC_DOCUMENT_PATH;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief mvcc edge path
+////////////////////////////////////////////////////////////////////////////////
+
+        static const std::string MVCC_EDGE_PATH;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief mvcc import
+////////////////////////////////////////////////////////////////////////////////
+
+        static const std::string MVCC_IMPORT_PATH;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief replication path
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -139,6 +155,13 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
       protected:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return a boolean value from the request
+////////////////////////////////////////////////////////////////////////////////
+
+        bool extractBoolValue (char const*,
+                               bool) const;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief check if a collection needs to be created on the fly
@@ -334,12 +357,6 @@ namespace triagens {
         TRI_doc_update_policy_e extractUpdatePolicy () const;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief extracts the waitForSync value
-////////////////////////////////////////////////////////////////////////////////
-
-        bool extractWaitForSync () const;
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief parses the body
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -364,6 +381,17 @@ namespace triagens {
                              std::string const&,
                              TRI_voc_cid_t&,
                              TRI_voc_key_t&);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief parses a document handle, on a cluster this will parse the
+/// collection name as a cluster-wide collection name and return a
+/// cluster-wide collection ID in `cid`.
+////////////////////////////////////////////////////////////////////////////////
+
+        int parseDocumentId (triagens::arango::CollectionNameResolver const*,
+                             std::string const&,
+                             TRI_voc_cid_t&,
+                             std::unique_ptr<char[]>&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                               protected variables

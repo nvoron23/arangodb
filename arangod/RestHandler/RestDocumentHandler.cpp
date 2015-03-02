@@ -296,7 +296,7 @@ bool RestDocumentHandler::createDocument () {
     return false;
   }
 
-  bool const waitForSync = extractWaitForSync();
+  bool const waitForSync = extractBoolValue("waitForSync", false);
 
   TRI_json_t* json = parseJsonBody();
 
@@ -1400,7 +1400,7 @@ bool RestDocumentHandler::modifyDocument (bool isPatch) {
 
   // extract or chose the update policy
   TRI_doc_update_policy_e const policy = extractUpdatePolicy();
-  bool const waitForSync = extractWaitForSync();
+  bool const waitForSync = extractBoolValue("waitForSync", false);
 
   if (ServerState::instance()->isCoordinator()) {
     // json will be freed inside
@@ -1796,7 +1796,7 @@ bool RestDocumentHandler::deleteDocument () {
 
   // extract or choose the update policy
   TRI_doc_update_policy_e const policy = extractUpdatePolicy();
-  bool const waitForSync = extractWaitForSync();
+  bool const waitForSync = extractBoolValue("waitForSync", false);
 
   if (policy == TRI_DOC_UPDATE_ILLEGAL) {
     generateError(HttpResponse::BAD,

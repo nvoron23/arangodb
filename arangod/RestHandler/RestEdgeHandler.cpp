@@ -200,7 +200,7 @@ bool RestEdgeHandler::createDocument () {
     return false;
   }
 
-  const bool waitForSync = extractWaitForSync();
+  bool const waitForSync = extractBoolValue("waitForSync", false);
 
   TRI_json_t* json = parseJsonBody();
   

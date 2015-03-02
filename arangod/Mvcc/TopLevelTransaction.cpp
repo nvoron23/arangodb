@@ -242,6 +242,41 @@ TransactionCollection* TopLevelTransaction::collection (std::string const& name)
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns a collection used in the transaction
 /// this registers the collection in the transaction if not yet present
+/// TODO: make this cluster-aware!
+////////////////////////////////////////////////////////////////////////////////
+        
+TransactionCollection* TopLevelTransaction::collection (char const* name) {
+  if (name == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+
+  if (*name >= '0' && *name <= '9') {
+    // name is a numeric id
+    try {
+      // convert string to number, and call the function for numeric collection id
+      TRI_voc_cid_t cid = static_cast<TRI_voc_cid_t>(std::stoull(name));
+      return collection(cid);
+    }
+    catch (...) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
+    }
+  }
+ 
+  // look up the collection name in our cache
+  auto it = _collectionNames.find(name);
+
+  if (it != _collectionNames.end()) {
+    // collection name is in cache already
+    return (*it).second;
+  }
+
+  // not found. now create it. note: this may throw 
+  return registerCollection(new TransactionCollection(_vocbase, name));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief returns a collection used in the transaction
+/// this registers the collection in the transaction if not yet present
 ////////////////////////////////////////////////////////////////////////////////
         
 TransactionCollection* TopLevelTransaction::collection (TRI_voc_cid_t id) {

@@ -116,6 +116,15 @@ void RestBaseHandler::generateCanceled () {
 
   TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
 }
+    
+////////////////////////////////////////////////////////////////////////////////
+/// @brief generates an error
+////////////////////////////////////////////////////////////////////////////////
+
+void RestBaseHandler::generateError (int errorCode) {
+  auto responseCode = triagens::rest::HttpResponse::responseCode(errorCode);
+  return generateError(responseCode, errorCode);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief generates an error
@@ -125,7 +134,7 @@ void RestBaseHandler::generateError (HttpResponse::HttpResponseCode code,
                                      int errorCode) {
   char const* message = TRI_errno_string(errorCode);
 
-  if (message) {
+  if (message != nullptr) {
     generateError(code, errorCode, string(message));
   }
   else {

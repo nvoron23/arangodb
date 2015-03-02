@@ -236,13 +236,19 @@ namespace triagens {
           static const std::string boundary = "XXXarangob-benchmarkXXX";
 
           StringBuffer batchPayload(TRI_UNKNOWN_MEM_ZONE);
-
+          int ret = batchPayload.reserve(numOperations * 1024);
+          if (ret != TRI_ERROR_NO_ERROR) {
+            LOG_FATAL_AND_EXIT("Failed to reserve %lu bytes for %lu batch operations: %d",
+                               numOperations * 1024,
+                               numOperations,
+                               ret);
+          }
           for (unsigned long i = 0; i < numOperations; ++i) {
             // append boundary
             batchPayload.appendText("--" + boundary + "\r\n");
             // append content-type, this will also begin the body
             batchPayload.appendText("Content-Type: ", 14);
-            batchPayload.appendText(rest::HttpRequest::getPartContentType());
+            batchPayload.appendText(rest::HttpRequest::BatchContentType);
             batchPayload.appendText("\r\n\r\n", 4);
 
             // everything else (i.e. part request header & body) will get into the body
@@ -272,7 +278,7 @@ namespace triagens {
           batchPayload.appendText("--" + boundary + "--\r\n");
 
           _headers.erase("Content-Type");
-          _headers["Content-Type"] = rest::HttpRequest::getMultipartContentType() +
+          _headers["Content-Type"] = rest::HttpRequest::MultiPartContentType +
                                      "; boundary=" + boundary;
 
           double start = TRI_microtime();
@@ -304,6 +310,7 @@ namespace triagens {
                           (int) result->getHttpReturnCode(),
                           result->getHttpReturnMessage().c_str());
 #ifdef TRI_ENABLE_MAINTAINER_MODE
+              LOG_WARNING("We tried to send this size:\n %llu", (unsigned long long) batchPayload.length());
               LOG_WARNING("We tried to send this:\n %s", batchPayload.c_str());
 #endif
             }

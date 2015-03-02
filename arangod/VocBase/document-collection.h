@@ -128,7 +128,7 @@ struct TRI_doc_mptr_t {
     TRI_doc_mptr_t*        _prev;    // previous master pointer
     TRI_doc_mptr_t*        _next;    // next master pointer
   protected:
-    std::atomic<void const*> _dataptr; // pointer to the beginning of the raw marker
+    std::atomic<void const*>   _dataptr; // pointer to the beginning of the raw marker
     std::atomic<TRI_voc_tid_t> _from;
     std::atomic<TRI_voc_tid_t> _fromTop;
     std::atomic<TRI_voc_tid_t> _to;
@@ -1017,7 +1017,8 @@ TRI_document_collection_t* TRI_OpenDocumentCollection (TRI_vocbase_t*,
 /// @brief closes an open collection
 ////////////////////////////////////////////////////////////////////////////////
 
-int TRI_CloseDocumentCollection (TRI_document_collection_t*);
+int TRI_CloseDocumentCollection (TRI_document_collection_t*,
+                                 bool);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                           INDEXES

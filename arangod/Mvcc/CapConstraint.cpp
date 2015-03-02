@@ -184,10 +184,6 @@ int CapConstraint::apply (TransactionCollection* collection,
   while ((_count > 0 && currentCount > _count) ||
          (_size > 0  && currentSize > _size)) {
 
-    if (! iterator.hasMore()) {
-      return TRI_ERROR_NO_ERROR;
-    }
-
     auto mptr = iterator.next();
 
     if (mptr == nullptr) {
