@@ -171,13 +171,12 @@ class CmpElmElm {
         return 0;
       }
 
-      int compareResult;
       for (size_t j = 0;  j < _numFields;  j++) {
-        compareResult = CompareElementElement(leftElement,
-                                              j,
-                                              rightElement,
-                                              j,
-                                              _shaper);
+        int compareResult = CompareElementElement(leftElement,
+                                                  j,
+                                                  rightElement,
+                                                  j,
+                                                  _shaper);
 
         if (compareResult != 0) {
           return compareResult;
@@ -197,8 +196,8 @@ class CmpElmElm {
       }
 
       // We break this tie in the key comparison by first looking at the key...
-      compareResult = strcmp(TRI_EXTRACT_MARKER_KEY(leftElement->_document),
-                             TRI_EXTRACT_MARKER_KEY(rightElement->_document));
+      int compareResult = strcmp(TRI_EXTRACT_MARKER_KEY(leftElement->_document),
+                                 TRI_EXTRACT_MARKER_KEY(rightElement->_document));
 
       if (compareResult < 0) {
         return -1;
