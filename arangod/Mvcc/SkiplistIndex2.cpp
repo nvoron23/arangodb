@@ -72,7 +72,7 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 static int CompareKeyElement (TRI_shaped_json_t const* left,
-                              SkiplistIndex2::Element* right,
+                              SkiplistIndex2::Element const* right,
                               size_t rightPosition,
                               TRI_shaper_t* shaper) {
   TRI_ASSERT(nullptr != left);
@@ -108,9 +108,9 @@ static int CompareKeyElement (TRI_shaped_json_t const* left,
 /// @brief compares elements, version with proper types
 ////////////////////////////////////////////////////////////////////////////////
 
-static int CompareElementElement (SkiplistIndex2::Element* left,
+static int CompareElementElement (SkiplistIndex2::Element const* left,
                                   size_t leftPosition,
-                                  SkiplistIndex2::Element* right,
+                                  SkiplistIndex2::Element const* right,
                                   size_t rightPosition,
                                   TRI_shaper_t* shaper) {
   TRI_ASSERT(nullptr != left);
@@ -156,8 +156,8 @@ class CmpElmElm {
     }
     ~CmpElmElm () {
     }
-    int operator() (SkiplistIndex2::Element* leftElement, 
-                    SkiplistIndex2::Element* rightElement, 
+    int operator() (SkiplistIndex2::Element const* leftElement, 
+                    SkiplistIndex2::Element const* rightElement, 
                     SkiplistIndex2::SkipList_t::CmpType cmptype) {
       TRI_ASSERT(nullptr != leftElement);
       TRI_ASSERT(nullptr != rightElement);
@@ -229,8 +229,8 @@ class CmpKeyElm {
     }
     ~CmpKeyElm () {
     }
-    int operator() (SkiplistIndex2::Key*     leftKey, 
-                    SkiplistIndex2::Element* rightElement) {
+    int operator() (SkiplistIndex2::Key const*     leftKey, 
+                    SkiplistIndex2::Element const* rightElement) {
       TRI_ASSERT(nullptr != leftKey);
       TRI_ASSERT(nullptr != rightElement);
 
