@@ -81,7 +81,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1);
 
     // Two documents:
     c.mvccInsert({value : 1});
@@ -92,7 +92,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(2);
 
     // Three documents, different values:
     c.mvccInsert({value : 2});
@@ -103,7 +103,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(3);
 
     // A thousand documents:
     var i;
@@ -117,7 +117,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1003);
 
     // A thousand more documents:
     for (i = 0; i < 1000; i++) {
@@ -130,7 +130,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(2003);
 
     // Some documents with value: null
     c.mvccInsert({value : null});
@@ -143,7 +143,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(3);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(3);
+    expect(r.length).toEqual(2006);
 
     // Some documents without a bound value
     c.mvccInsert({});
@@ -156,7 +156,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(6);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(6);
+    expect(r.length).toEqual(2009);
 
     // Now delete again:
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
@@ -170,7 +170,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(6);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(6);
+    expect(r.length).toEqual(1006);
 
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
     for (i = 0; i < r.length; i++) {
@@ -183,7 +183,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(6);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(6);
+    expect(r.length).toEqual(1004);
 
     r = c.mvccByExampleSkiplist(idx, { value : null });
     for (i = 0; i < r.length; i++) {
@@ -196,7 +196,7 @@ describe("MVCC skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(998);
   });
       
 });
@@ -248,7 +248,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1);
 
     // Two documents:
     c.mvccInsert({value : 1});
@@ -259,7 +259,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(2);
 
     // Three documents, different values:
     c.mvccInsert({value : 2});
@@ -270,7 +270,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(3);
 
     // A thousand documents:
     var i;
@@ -284,7 +284,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1003);
 
     // A thousand more documents:
     for (i = 0; i < 1000; i++) {
@@ -297,7 +297,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(2003);
 
     // Some documents with value: null
     c.mvccInsert({value : null});
@@ -310,7 +310,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(2003);
 
     // Some documents without a bound value
     c.mvccInsert({});
@@ -323,7 +323,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(2003);
 
     // Now delete again:
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
@@ -337,7 +337,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     r = c.mvccByExampleSkiplist(idx, { value : 2 });
     for (i = 0; i < r.length; i++) {
@@ -350,7 +350,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(998);
 
     r = c.mvccAllQuery();
     for (i = 0; i < r.length; i++) {
@@ -363,7 +363,7 @@ describe("MVCC skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(998);
   });
 
 });
@@ -415,7 +415,7 @@ describe("MVCC unique skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1);
 
     // Two documents unique constraint violated:
     var error;
@@ -434,9 +434,9 @@ describe("MVCC unique skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1);
 
-    // Three documents, different values:
+    // Another document, different values:
     c.mvccInsert({value : 2});
     r = c.mvccByExampleSkiplist(idx, { value : 1 });
     expect(r.length).toEqual(1);
@@ -445,7 +445,7 @@ describe("MVCC unique skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(2);
 
     // A thousand documents:
     var i;
@@ -461,7 +461,7 @@ describe("MVCC unique skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     // A document with value: null
     c.mvccInsert({value : null});
@@ -472,7 +472,7 @@ describe("MVCC unique skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(1);
+    expect(r.length).toEqual(1001);
 
     // Another document with value: null
     try {
@@ -507,7 +507,7 @@ describe("MVCC unique skiplist index non-sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(1);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(1);
+    expect(r.length).toEqual(1001);
 
     // Another document with value: null
     try {
@@ -619,7 +619,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1);
 
     // Two documents unique constraint violated:
     var error;
@@ -638,7 +638,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1);
 
     // Three documents, different values:
     c.mvccInsert({value : 2});
@@ -649,7 +649,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(2);
 
     // A thousand documents:
     var i;
@@ -665,7 +665,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     // A document with value: null
     c.mvccInsert({value : null});
@@ -676,7 +676,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     // Another document with value: null
     try {
@@ -694,7 +694,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     // A document without a bound value
     try {
@@ -712,7 +712,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     // A document with unbound value:
     c.mvccInsert({});
@@ -723,7 +723,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     // Another document with value: null
     try {
@@ -741,7 +741,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     // A document without a bound value
     try {
@@ -759,7 +759,7 @@ describe("MVCC unique skiplist index sparse", function () {
     r = c.mvccByExampleSkiplist(idx, { value : null });
     expect(r.length).toEqual(0);
     r = c.mvccByExampleSkiplist(idx, { });
-    expect(r.length).toEqual(0);
+    expect(r.length).toEqual(1000);
 
     // Now delete again:
     var j;
