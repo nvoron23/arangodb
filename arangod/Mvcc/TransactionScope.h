@@ -164,6 +164,7 @@ namespace triagens {
         bool _shouldCommit;
 
     };
+        
   }
 }
 

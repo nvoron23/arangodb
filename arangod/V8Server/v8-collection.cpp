@@ -36,6 +36,7 @@
 #include "Mvcc/CollectionOperations.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/ScopedResolver.h"
 #include "Mvcc/TopLevelTransaction.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
@@ -54,11 +55,9 @@
 #include "VocBase/key-generator.h"
 #include "Wal/LogfileManager.h"
 
-
 using namespace std;
 using namespace triagens::basics;
 using namespace triagens::arango;
-
 
 #define MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection)                       \
   TRI_vocbase_col_t const* collection = nullptr;                                                \
@@ -3358,8 +3357,10 @@ static void MvccDocument (bool useCollection,
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
+
+  triagens::mvcc::ScopedResolver resolver(vocbase);
+
+  int res = ParseDocumentOrDocumentHandle(vocbase, resolver.get(), collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
@@ -3374,6 +3375,7 @@ static void MvccDocument (bool useCollection,
     triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
+    transaction->resolver(resolver.get()); // inject resolver into other transaction
     auto* transactionCollection = transaction->collection(collection->_cid);
 
     auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
@@ -3383,7 +3385,7 @@ static void MvccDocument (bool useCollection,
       THROW_ARANGO_EXCEPTION(readResult.code);
     }
      
-    TRI_V8_RETURN(TRI_WrapShapedJson(isolate, &resolver, transactionCollection, readResult.mptr->getDataPtr()));
+    TRI_V8_RETURN(TRI_WrapShapedJson(isolate, resolver.get(), transactionCollection, readResult.mptr->getDataPtr()));
   }
   catch (triagens::arango::Exception const& ex) {
     TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
@@ -3412,12 +3414,13 @@ static void MvccExists (bool useCollection,
   }
 
   MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
+  
+  triagens::mvcc::ScopedResolver resolver(vocbase);
 
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
+  int res = ParseDocumentOrDocumentHandle(vocbase, resolver.get(), collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
@@ -3432,6 +3435,7 @@ static void MvccExists (bool useCollection,
     triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
+    transaction->resolver(resolver.get()); // inject resolver into other transaction
     auto* transactionCollection = transaction->collection(collection->_cid);
 
     auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
@@ -3467,6 +3471,7 @@ static void JS_MvccExists (const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 static void MvccInsert (TRI_vocbase_col_t const* collection,
+                        triagens::arango::CollectionNameResolver const* resolver,
                         const v8::FunctionCallbackInfo<v8::Value>& args,
                         uint32_t docArg,
                         TRI_document_edge_t const* edge) {
@@ -3519,6 +3524,7 @@ static void MvccInsert (TRI_vocbase_col_t const* collection,
     }
 
     auto* transaction = transactionScope.transaction();
+    transaction->resolver(resolver); // inject resolver into other transaction
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto* shaper = transactionCollection->shaper();
 
@@ -3571,6 +3577,8 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (collection == nullptr) {
     TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
+  
+  triagens::mvcc::ScopedResolver resolver(collection->_vocbase);
 
   if ((TRI_col_type_e) collection->_type == TRI_COL_TYPE_DOCUMENT) {
     // regular document
@@ -3578,7 +3586,7 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
       TRI_V8_THROW_EXCEPTION_USAGE("mvccInsert(<document>, <options>)");
     }
     
-    MvccInsert(collection, args, 0, nullptr);
+    MvccInsert(collection, resolver.get(), args, 0, nullptr);
   }
   else {
     // edge
@@ -3586,8 +3594,6 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
       TRI_V8_THROW_EXCEPTION_USAGE("mvccInsert(<from>, <to>, <document>, <options>)");
     }
   
-    CollectionNameResolver resolver(collection->_vocbase); // TODO
-
     // extract _from and _to
     // ---------------------
   
@@ -3599,7 +3605,7 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     // extract from
     {
-      int res = TRI_ParseVertex(args, &resolver, edge._fromCid, fromKey, args[0]);
+      int res = TRI_ParseVertex(args, resolver.get(), edge._fromCid, fromKey, args[0]);
 
       if (res != TRI_ERROR_NO_ERROR) {
         TRI_V8_THROW_EXCEPTION(res);
@@ -3609,7 +3615,7 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     // extract to
     {
-      int res = TRI_ParseVertex(args, &resolver, edge._toCid, toKey, args[1]);
+      int res = TRI_ParseVertex(args, resolver.get(), edge._toCid, toKey, args[1]);
 
       if (res != TRI_ERROR_NO_ERROR) {
         TRI_V8_THROW_EXCEPTION(res);
@@ -3617,7 +3623,7 @@ static void JS_MvccInsert (const v8::FunctionCallbackInfo<v8::Value>& args) {
       edge._toKey = toKey.get();
     }
 
-    MvccInsert(collection, args, 2, &edge);
+    MvccInsert(collection, resolver.get(), args, 2, &edge);
   }
 }
 
@@ -3657,11 +3663,12 @@ static void MvccRemove (bool useCollection,
   
   MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
   
+  triagens::mvcc::ScopedResolver resolver(vocbase);
+  
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
+  int res = ParseDocumentOrDocumentHandle(vocbase, resolver.get(), collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
@@ -3679,6 +3686,7 @@ static void MvccRemove (bool useCollection,
     }
 
     auto* transaction = transactionScope.transaction();
+    transaction->resolver(resolver.get()); // inject resolver into other transaction
     auto* transactionCollection = transaction->collection(collection->_cid);
 
     auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
@@ -3769,11 +3777,12 @@ static void MvccReplace (bool useCollection,
 
   MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
   
+  triagens::mvcc::ScopedResolver resolver(vocbase);
+  
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
+  int res = ParseDocumentOrDocumentHandle(vocbase, resolver.get(), collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
@@ -3791,6 +3800,7 @@ static void MvccReplace (bool useCollection,
     }
 
     auto* transaction = transactionScope.transaction();
+    transaction->resolver(resolver.get()); // inject resolver into other transaction
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto* shaper = transactionCollection->shaper();
 
@@ -3842,8 +3852,6 @@ static void MvccUpdate (bool useCollection,
   v8::HandleScope scope(isolate);
   TRI_GET_GLOBALS();
 
-  MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
-  
   uint32_t const argLength = args.Length();
   if (argLength < 2 || argLength > 5) {
     TRI_V8_THROW_EXCEPTION_USAGE("mvccUpdate(<document-handle>, <document>, <options>)");
@@ -3894,11 +3902,14 @@ static void MvccUpdate (bool useCollection,
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID);
   }
   
+  MVCC_COLLECTION_INIT(isolate, useCollection, vocbase, collection);
+ 
+  triagens::mvcc::ScopedResolver resolver(vocbase);
+  
   // set document key
   std::unique_ptr<char[]> key;
   TRI_voc_rid_t rid;
-  CollectionNameResolver resolver(vocbase); // TODO
-  int res = ParseDocumentOrDocumentHandle(vocbase, &resolver, collection, key, rid, args[0], args);
+  int res = ParseDocumentOrDocumentHandle(vocbase, resolver.get(), collection, key, rid, args[0], args);
   
   if (res != TRI_ERROR_NO_ERROR) {
     TRI_V8_THROW_EXCEPTION(res);
@@ -3922,6 +3933,7 @@ static void MvccUpdate (bool useCollection,
     }
 
     auto* transaction = transactionScope.transaction();
+    transaction->resolver(resolver.get()); // inject resolver into other transaction
     auto* transactionCollection = transaction->collection(collection->_cid);
 
     auto document = triagens::mvcc::Document::CreateFromKey(key.get(), rid);
@@ -3997,12 +4009,13 @@ static void JS_MvccAllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   // need a fake old transaction in order to not throw - can be removed later       
   TransactionBase oldTrx(true);
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
+  triagens::mvcc::ScopedResolver resolver(collection->_vocbase);
 
   try {
     triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
+    transaction->resolver(resolver.get()); // inject resolver into other transaction
     auto* transactionCollection = transaction->collection(collection->_cid);
 
     std::vector<TRI_doc_mptr_t const*> foundDocuments;
@@ -4021,7 +4034,7 @@ static void JS_MvccAllQuery (const v8::FunctionCallbackInfo<v8::Value>& args) {
     v8::Handle<v8::Array> documents = v8::Array::New(isolate, static_cast<int>(n));
   
     for (size_t i = 0; i < n; ++i) {
-      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[i]->getDataPtr());
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, transaction->resolver(), transactionCollection, foundDocuments[i]->getDataPtr());
 
       if (document.IsEmpty()) {
         TRI_V8_THROW_EXCEPTION_MEMORY();
@@ -4069,7 +4082,6 @@ static void JS_MvccTruncate (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   // need a fake old transaction in order to not throw - can be removed later       
   TransactionBase oldTrx(true);
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
 
   try {
     // force a sub-transaction so we can rollback the entire truncate operation easily

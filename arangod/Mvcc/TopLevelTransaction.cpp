@@ -30,6 +30,7 @@
 #include "TopLevelTransaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionManager.h"
+#include "Utils/CollectionNameResolver.h"
 #include "Utils/Exception.h"
 #include "VocBase/vocbase.h"
 #include "Wal/LogfileManager.h"
@@ -54,7 +55,9 @@ TopLevelTransaction::TopLevelTransaction (TransactionManager* transactionManager
                                           std::map<std::string, bool> const& collections,
                                           double ttl)
   : Transaction(transactionManager, id, vocbase, ttl),
-    _runningTransactions(nullptr) {
+    _runningTransactions(nullptr),
+    _resolver(nullptr),
+    _ownsResolver(false) {
 
   // register and lock all collections
   // note that this is not required for transactions, but it is a feature kept
@@ -83,6 +86,11 @@ TopLevelTransaction::~TopLevelTransaction () {
   // go through all the collections that have been registered and close them properly
   for (auto it : _collectionIds) {
     delete it.second;
+  }
+
+  if (_ownsResolver) {
+    TRI_ASSERT(_resolver != nullptr);
+    delete _resolver;
   }
 }
 
@@ -290,6 +298,29 @@ TransactionCollection* TopLevelTransaction::collection (TRI_voc_cid_t id) {
 
   // not found. now create it. note: this may throw 
   return registerCollection(new TransactionCollection(_vocbase, id));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return a collection name resolver instance
+////////////////////////////////////////////////////////////////////////////////
+
+triagens::arango::CollectionNameResolver const* TopLevelTransaction::resolver () {
+  if (_resolver == nullptr) {
+    _resolver = new triagens::arango::CollectionNameResolver(_vocbase);
+    _ownsResolver = true;
+  }
+
+  return _resolver;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief register an external collection name resolver instance
+////////////////////////////////////////////////////////////////////////////////
+        
+void TopLevelTransaction::resolver (triagens::arango::CollectionNameResolver const* resolver) {
+  if (_resolver != nullptr) {
+    _resolver = resolver;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

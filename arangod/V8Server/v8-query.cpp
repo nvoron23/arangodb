@@ -172,8 +172,6 @@ static void JS_MvccAny (const v8::FunctionCallbackInfo<v8::Value>& args) {
     TRI_V8_THROW_EXCEPTION_INTERNAL("cannot extract collection");
   }
     
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
-  
   try {
     triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
@@ -192,7 +190,7 @@ static void JS_MvccAny (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
 
     // convert to v8
-    v8::Handle<v8::Value> result = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, readResult.mptr->getDataPtr());
+    v8::Handle<v8::Value> result = TRI_WrapShapedJson(isolate, transaction->resolver(), transactionCollection, readResult.mptr->getDataPtr());
 
     if (result.IsEmpty()) {
       TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -209,7 +207,6 @@ static void JS_MvccAny (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
   TRI_ASSERT(false);
 }
-
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  by example query
@@ -328,13 +325,12 @@ static void JS_MvccByExample (const v8::FunctionCallbackInfo<v8::Value>& args) {
   triagens::mvcc::OperationOptions options;
   options.searchOptions = &searchOptions;
     
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
-
   try {
     triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
+    auto resolver = transaction->resolver();
   
     std::vector<TRI_shape_pid_t> pids;
     std::vector<TRI_shaped_json_t*> values;
@@ -362,7 +358,7 @@ static void JS_MvccByExample (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto result = v8::Array::New(isolate, static_cast<int>(n));
 
     for (size_t i = 0; i < n; ++i) {
-      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[i]->getDataPtr());
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, resolver, transactionCollection, foundDocuments[i]->getDataPtr());
 
       if (document.IsEmpty()) {
         TRI_V8_THROW_EXCEPTION_MEMORY();
@@ -475,10 +471,10 @@ static void JS_MvccByExampleHash (const v8::FunctionCallbackInfo<v8::Value>& arg
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
+    auto resolver = transaction->resolver();
   
     // extract the index
-    CollectionNameResolver resolver(collection->_vocbase); // TODO
-    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+    auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
 
     if (index == nullptr ||
         index->type() != TRI_IDX_TYPE_HASH_INDEX) {
@@ -523,7 +519,7 @@ static void JS_MvccByExampleHash (const v8::FunctionCallbackInfo<v8::Value>& arg
         size_t count = 0;
 
         for (size_t i = s;  i < e;  ++i) {
-          v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[i]->getDataPtr());
+          v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, resolver, transactionCollection, foundDocuments[i]->getDataPtr());
 
           if (document.IsEmpty()) {
             TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -878,10 +874,10 @@ static void MvccSkiplistQuery (QueryType type,
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
+    auto resolver = transaction->resolver();
   
     // extract the index
-    CollectionNameResolver resolver(collection->_vocbase); // TODO
-    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+    auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
 
     if (index == nullptr ||
         index->type() != TRI_IDX_TYPE_SKIPLIST_INDEX) {
@@ -929,7 +925,7 @@ static void MvccSkiplistQuery (QueryType type,
     uint32_t i = 0;
 
     for (auto const& it : foundDocuments) {
-      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, it->getDataPtr());
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, resolver, transactionCollection, it->getDataPtr());
 
       if (document.IsEmpty()) {
         TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -1130,8 +1126,7 @@ static void JS_MvccChecksum (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto* transactionCollection = transaction->collection(collection->_cid);
   
     // extract the index
-    CollectionNameResolver resolver(collection->_vocbase); // TODO
-    CollectionChecksumHelper helper(&resolver, transactionCollection->shaper(), withRevisions, withData);
+    CollectionChecksumHelper helper(transaction->resolver(), transactionCollection->shaper(), withRevisions, withData);
   
     {
       std::unique_ptr<triagens::mvcc::MasterpointerIterator> iterator(new triagens::mvcc::MasterpointerIterator(transaction, transactionCollection->masterpointerManager(), false));
@@ -1179,10 +1174,12 @@ static int AddEdges (v8::Isolate* isolate,
                      TRI_edge_direction_e direction, 
                      triagens::mvcc::Transaction* transaction,
                      triagens::mvcc::TransactionCollection* transactionCollection,
-                     CollectionNameResolver const* resolver,
                      triagens::mvcc::EdgeIndex* edgeIndex,
                      v8::Handle<v8::Array>& result,
                      v8::Handle<v8::Value> const vertex) {
+
+  auto resolver = transaction->resolver();
+
   TRI_voc_cid_t cid;
   std::unique_ptr<char[]> key;
 
@@ -1258,8 +1255,6 @@ static void MvccEdgesQuery (TRI_edge_direction_e direction,
     }
   }
     
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
-
   try {
     triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
 
@@ -1280,7 +1275,7 @@ static void MvccEdgesQuery (TRI_edge_direction_e direction,
       uint32_t const length = vertices->Length();
 
       for (uint32_t i = 0; i < length; ++i) {
-        int res = AddEdges(isolate, direction, transaction, transactionCollection, &resolver, edgeIndex, result, vertices->Get(i));
+        int res = AddEdges(isolate, direction, transaction, transactionCollection, edgeIndex, result, vertices->Get(i));
 
         if (res != TRI_ERROR_NO_ERROR) {
           // ignore error
@@ -1289,7 +1284,7 @@ static void MvccEdgesQuery (TRI_edge_direction_e direction,
       }
     }
     else {
-      int res = AddEdges(isolate, direction, transaction, transactionCollection, &resolver, edgeIndex, result, args[0]);
+      int res = AddEdges(isolate, direction, transaction, transactionCollection, edgeIndex, result, args[0]);
 
       if (res != TRI_ERROR_NO_ERROR && res != TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND) {
         // do not ignore error
@@ -1374,7 +1369,6 @@ static void MvccTemporalQuery (const v8::FunctionCallbackInfo<v8::Value>& args,
   
   // need a fake old transaction in order to not throw - can be removed later       
   TransactionBase oldTrx(true);
-  CollectionNameResolver resolver(collection->_vocbase); // TODO
   
   triagens::mvcc::OperationOptions options;
   options.searchOptions = &searchOptions;
@@ -1384,6 +1378,7 @@ static void MvccTemporalQuery (const v8::FunctionCallbackInfo<v8::Value>& args,
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
+    auto resolver = transaction->resolver();
 
     std::vector<TRI_doc_mptr_t const*> foundDocuments;
     auto searchResult = triagens::mvcc::CollectionOperations::ReadAllDocuments(&transactionScope, transactionCollection, foundDocuments, options);
@@ -1397,7 +1392,7 @@ static void MvccTemporalQuery (const v8::FunctionCallbackInfo<v8::Value>& args,
       auto result = v8::Array::New(isolate, static_cast<int>(n));
 
       for (size_t i = 0; i < n; ++i) {
-        v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[i]->getDataPtr());
+        v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, resolver, transactionCollection, foundDocuments[i]->getDataPtr());
 
         if (document.IsEmpty()) {
           TRI_V8_THROW_EXCEPTION_MEMORY();
@@ -1412,7 +1407,7 @@ static void MvccTemporalQuery (const v8::FunctionCallbackInfo<v8::Value>& args,
       TRI_V8_RETURN_NULL();
     }
       
-    v8::Handle<v8::Value> result = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, foundDocuments[0]->getDataPtr());
+    v8::Handle<v8::Value> result = TRI_WrapShapedJson(isolate, resolver, transactionCollection, foundDocuments[0]->getDataPtr());
     
     if (result.IsEmpty()) {
       TRI_V8_THROW_EXCEPTION_MEMORY();
@@ -1491,10 +1486,10 @@ static void JS_MvccNear (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
+    auto resolver = transaction->resolver();
   
     // extract the index
-    CollectionNameResolver resolver(collection->_vocbase); // TODO
-    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+    auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
   
     if (index == nullptr ||
         (index->type() != TRI_IDX_TYPE_GEO1_INDEX &&
@@ -1521,7 +1516,7 @@ static void JS_MvccNear (const v8::FunctionCallbackInfo<v8::Value>& args) {
  
     uint32_t i = 0;
     for (auto const& it : *indexResult) {
-      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, it.first->getDataPtr());
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, resolver, transactionCollection, it.first->getDataPtr());
 
       if (document.IsEmpty()) {
         TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -1572,10 +1567,10 @@ static void JS_MvccWithin (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
+    auto resolver = transaction->resolver();
   
     // extract the index
-    CollectionNameResolver resolver(collection->_vocbase); // TODO
-    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+    auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
   
     if (index == nullptr ||
         (index->type() != TRI_IDX_TYPE_GEO1_INDEX &&
@@ -1597,7 +1592,7 @@ static void JS_MvccWithin (const v8::FunctionCallbackInfo<v8::Value>& args) {
  
     uint32_t i = 0;
     for (auto const& it : *indexResult) {
-      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, it.first->getDataPtr());
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, resolver, transactionCollection, it.first->getDataPtr());
 
       if (document.IsEmpty()) {
         TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -1652,10 +1647,10 @@ static void JS_MvccFulltext (const v8::FunctionCallbackInfo<v8::Value>& args) {
 
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
+    auto resolver = transaction->resolver();
   
     // extract the index
-    CollectionNameResolver resolver(collection->_vocbase); // TODO
-    auto index = TRI_LookupMvccIndexByHandle(isolate, &resolver, collection, args[0]);
+    auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
  
     if (index == nullptr ||
         index->type() != TRI_IDX_TYPE_FULLTEXT_INDEX) {
@@ -1671,7 +1666,7 @@ static void JS_MvccFulltext (const v8::FunctionCallbackInfo<v8::Value>& args) {
  
     uint32_t i = 0;
     for (auto const& it : *indexResult) {
-      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, &resolver, transactionCollection, it->getDataPtr());
+      v8::Handle<v8::Value> document = TRI_WrapShapedJson(isolate, resolver, transactionCollection, it->getDataPtr());
 
       if (document.IsEmpty()) {
         TRI_V8_THROW_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);

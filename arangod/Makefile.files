@@ -83,6 +83,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/MasterpointerManager.cpp \
 	arangod/Mvcc/OpenIterator.cpp \
 	arangod/Mvcc/PrimaryIndex.cpp \
+	arangod/Mvcc/ScopedResolver.cpp \
 	arangod/Mvcc/SkiplistIndex2.cpp \
 	arangod/Mvcc/SubTransaction.cpp \
 	arangod/Mvcc/TopLevelTransaction.cpp \
