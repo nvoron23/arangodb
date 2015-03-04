@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief please upgrade handler
+/// @brief barrier for synchronization
 ///
 /// @file
 ///
@@ -22,68 +22,76 @@
 ///
 /// Copyright holder is ArangoDB GmbH, Cologne, Germany
 ///
-/// @author Dr. Frank Celler
-/// @author Copyright 2014, triAGENS GmbH, Cologne, Germany
+/// @author Jan Steemann
+/// @author Copyright 2014, ArangoDB GmbH, Cologne, Germany
+/// @author Copyright 2013-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "RestPleaseUpgradeHandler.h"
+#include "Barrier.h"
+#include "Basics/ConditionLocker.h"
 
 using namespace triagens::basics;
-using namespace triagens::rest;
-using namespace triagens::arango;
-using namespace std;
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                      constructors and destructors
+// --SECTION--                                                           Barrier
 // -----------------------------------------------------------------------------
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief constructor
-////////////////////////////////////////////////////////////////////////////////
-
-RestPleaseUpgradeHandler::RestPleaseUpgradeHandler (HttpRequest* request)
-  : HttpHandler(request) {
-}
-
 // -----------------------------------------------------------------------------
-// --SECTION--                                                   Handler methods
+// --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// {@inheritDoc}
+/// @brief create a barrier for the specified number of waiters
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RestPleaseUpgradeHandler::isDirect () {
-  return true;
+Barrier::Barrier (size_t size)
+  : _condition(),
+    _missing(size) {
+ 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// {@inheritDoc}
+/// @brief destroy the barrier. this will call synchronize() to ensure all tasks
+/// are joined
 ////////////////////////////////////////////////////////////////////////////////
 
-HttpHandler::status_t RestPleaseUpgradeHandler::execute () {
-  _response = createResponse(HttpResponse::OK);
-  _response->setContentType("text/plain; charset=utf-8");
+Barrier::~Barrier () {
+  synchronize();
+}
 
-  auto& buffer = _response->body();
-  buffer.appendText("Database: ");
-  buffer.appendText(_request->databaseName());
-  buffer.appendText("\r\n\r\n");
-  buffer.appendText("It appears that your database must be upgraded. ");
-  buffer.appendText("Normally this can be done using\r\n\r\n");
-  buffer.appendText("  /etc/init.d/arangodb stop\r\n");
-  buffer.appendText("  /etc/init.d/arangodb upgrade\r\n");
-  buffer.appendText("  /etc/init.d/arangodb start\r\n\r\n");
-  buffer.appendText("Please check the log file for details.\r\n");
+// -----------------------------------------------------------------------------
+// --SECTION--                                                  public functions
+// -----------------------------------------------------------------------------
 
-  return status_t(HANDLER_DONE);
+////////////////////////////////////////////////////////////////////////////////
+/// @brief join a single task. reduces the number of waiting tasks and wakes
+/// up the barrier's synchronize() routine
+////////////////////////////////////////////////////////////////////////////////
+
+void Barrier::join () {
+  {
+    CONDITION_LOCKER(guard, _condition);
+    TRI_ASSERT(_missing > 0);
+    --_missing;
+  }
+
+  _condition.signal();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// {@inheritDoc}
+/// @brief wait for all tasks to join
 ////////////////////////////////////////////////////////////////////////////////
 
-void RestPleaseUpgradeHandler::handleError (TriagensError const&) {
+void Barrier::synchronize () {
+  while (true) {
+    CONDITION_LOCKER(guard, _condition);
+
+    if (_missing == 0) {
+      break;
+    }
+
+    guard.wait(100000);
+  }
 }
 
 // -----------------------------------------------------------------------------
