@@ -480,7 +480,6 @@ void SkiplistIndex2::Iterator::fillHelper (TRI_index_operator_t* op,
 
   switch (op->_type) {
     case TRI_AND_INDEX_OPERATOR: {
-
       fillHelper(logicalOperator->_left, leftResult);
       fillHelper(logicalOperator->_right, rightResult);
 
@@ -494,7 +493,6 @@ void SkiplistIndex2::Iterator::fillHelper (TRI_index_operator_t* op,
       }
       return;
     }
-
 
     case TRI_EQ_INDEX_OPERATOR: {
       temp = _index->_theSkipList->leftKeyLookup(&values);
@@ -512,6 +510,7 @@ void SkiplistIndex2::Iterator::fillHelper (TRI_index_operator_t* op,
               = temp->document()->_document->from();
           triagens::mvcc::TransactionId to 
               = temp->document()->_document->to();
+
           if (_transaction->isVisibleForRead(from, to)) {
             if (0 == comparer(&values, temp->document())) {
               interval._leftEndPoint = prev;
@@ -869,12 +868,11 @@ SkiplistIndex2::Element* SkiplistIndex2::Iterator::next () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void SkiplistIndex2::Iterator::skip (size_t steps) {
-  Element* elm;
   for (size_t i = 0; i < steps; i++) {
     if (! hasNext()) {
       return;
     }
-    elm = next();
+    Element* elm = next();
     if (elm == nullptr) {
       return;
     }
@@ -931,9 +929,9 @@ void SkiplistIndex2::insert (TransactionCollection* coll,
   // _unique == true
   // See whether or not we find any revision that is in conflict with us.
   // Note that this could be a revision which we are not allowed to see!
-  WRITE_LOCKER(_lock);
-
   try {
+    WRITE_LOCKER(_lock);
+
     // Find the last element in the list whose key is less than ours:
     SkipList_t::Node* node = _theSkipList->leftLookup(listElement);
     CmpElmElm comparer(coll->shaper(), nrIndexedFields());

@@ -918,7 +918,7 @@ static void MvccSkiplistQuery (QueryType type,
       if (elm != nullptr) {   // MVCC logic might actually not see something
                               // that hasNext was suspecting to be a result!
         TRI_doc_mptr_t* ptr = elm->_document;
-        indexResult->push_back(ptr);
+        indexResult->emplace_back(ptr);
         count++;
       }
     }

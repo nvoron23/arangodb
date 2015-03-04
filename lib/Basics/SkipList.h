@@ -277,16 +277,13 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         int insert (Element* doc) {
-          int lev;
           Node* pos[TRI_SKIPLIST_MAX_HEIGHT];
           Node* next = nullptr;  // to please the compiler
-          Node* newNode;
-          int cmp;
 
-          cmp = lookupLess(doc,&pos,&next,CMP_TOTORDER);
+          int cmp = lookupLess(doc, &pos, &next, CMP_TOTORDER);
           // Now pos[0] points to the largest node whose document is
           // less than doc. next is the next node and can be nullptr if
-          // there is none. doc is in the skiplist iff next != nullptr
+          // there is none. doc is in the skiplist if next != nullptr
           // and cmp == 0 and in this case it is stored at the node
           // next.
           if (nullptr != next && 0 == cmp) {
@@ -297,13 +294,14 @@ namespace triagens {
           // Uniqueness test if wanted:
           if (_unique) {
             if ((pos[0] != _start &&
-                 0 == _cmp_elm_elm(doc,pos[0]->_doc,CMP_PREORDER)) ||
+                 0 == _cmp_elm_elm(doc, pos[0]->_doc, CMP_PREORDER)) ||
                 (nullptr != next &&
-                 0 == _cmp_elm_elm(doc,next->_doc,CMP_PREORDER))) {
+                 0 == _cmp_elm_elm(doc, next->_doc, CMP_PREORDER))) {
               return TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED;
             }
           }
 
+          Node* newNode;
           try {
             newNode = allocNode(0);
           }
@@ -314,7 +312,7 @@ namespace triagens {
           if (newNode->_height > _start->_height) {
             // The new levels where not considered in the above search,
             // therefore pos is not set on these levels.
-            for (lev = _start->_height; lev < newNode->_height; lev++) {
+            for (int lev = _start->_height; lev < newNode->_height; lev++) {
               pos[lev] = _start;
             }
             // Note that _start is already initialised with nullptr to the top!
@@ -337,7 +335,7 @@ namespace triagens {
 
           // Now the element is successfully inserted, the rest is performance
           // optimisation:
-          for (lev = 1; lev < newNode->_height; lev++) {
+          for (int lev = 1; lev < newNode->_height; lev++) {
             newNode->_next[lev] = pos[lev]->_next[lev];
             pos[lev]->_next[lev] = newNode;
           }
@@ -357,12 +355,10 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         int remove (Element* doc) {
-          int lev;
           Node* pos[TRI_SKIPLIST_MAX_HEIGHT];
           Node* next = nullptr;  // to please the compiler
-          int cmp;
 
-          cmp = lookupLess(doc,&pos,&next,CMP_TOTORDER);
+          int cmp = lookupLess(doc, &pos, &next, CMP_TOTORDER);
           // Now pos[0] points to the largest node whose document is
           // less than doc. next points to the next node and can be
           // nullptr if there is none. doc is in the skiplist iff next
@@ -378,7 +374,7 @@ namespace triagens {
           }
 
           // Now delete where next points to:
-          for (lev = next->_height - 1; lev >= 0; lev--) {
+          for (int lev = next->_height - 1; lev >= 0; lev--) {
             // Note the order from top to bottom. The element remains in
             // the skiplist as long as we are at a level > 0, only some
             // optimisations in performance vanish before that. Only
@@ -453,7 +449,7 @@ namespace triagens {
           Node* pos[TRI_SKIPLIST_MAX_HEIGHT];
           Node* next;
 
-          lookupLess(doc,&pos,&next,CMP_PREORDER);
+          lookupLess(doc, &pos, &next, CMP_PREORDER);
           // Now pos[0] points to the largest node whose document is
           // less than doc in the preorder. next points to the next node
           // and can be nullptr if there is none. doc is in the skiplist
@@ -599,12 +595,10 @@ namespace triagens {
                         Node* (*pos)[TRI_SKIPLIST_MAX_HEIGHT],
                         Node** next,
                         CmpType cmptype) const {
-          int lev;
           int cmp = 0;  // just in case to avoid undefined values
-          Node* cur;
 
-          cur = _start;
-          for (lev = _start->_height-1; lev >= 0; lev--) {
+          Node* cur = _start;
+          for (int lev = _start->_height - 1; lev >= 0; lev--) {
             while (true) {   // will be left by break
               *next = cur->_next[lev];
               if (nullptr == *next) {

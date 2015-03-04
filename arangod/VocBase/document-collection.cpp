@@ -187,7 +187,7 @@ triagens::mvcc::Index* TRI_document_collection_t::addIndex (triagens::mvcc::Inde
   if (! _indexes.empty() && _indexes.back()->type() == TRI_IDX_TYPE_CAP_CONSTRAINT) {
     // we have a cap constraint as the last present index in the vector
     // make sure the cap constraint stays at the end of the list after our insertion
-    _indexes.push_back(_indexes.back());
+    _indexes.emplace_back(_indexes.back());
 
     TRI_ASSERT(_indexes.size() >= 2);
     _indexes[_indexes.size() - 2] = index;
@@ -195,7 +195,7 @@ triagens::mvcc::Index* TRI_document_collection_t::addIndex (triagens::mvcc::Inde
     TRI_ASSERT(_indexes.back()->type() == TRI_IDX_TYPE_CAP_CONSTRAINT);
   }
   else {
-    _indexes.push_back(index);
+    _indexes.emplace_back(index);
   }
 
   return index;
@@ -4762,7 +4762,7 @@ static TRI_index_t* CreateSkiplistIndexDocumentCollection (TRI_document_collecti
 
     return nullptr;
   }
-  
+
   auto mvccIndex = new triagens::mvcc::SkiplistIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, sparse);
   
   try {

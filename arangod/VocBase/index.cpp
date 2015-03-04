@@ -1496,8 +1496,6 @@ TRI_index_t* TRI_CreateSkiplistIndex (TRI_document_collection_t* document,
     return nullptr;
   }
 
-  document->addIndex(new triagens::mvcc::SkiplistIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, sparse));
-
   return idx;
 }
 
