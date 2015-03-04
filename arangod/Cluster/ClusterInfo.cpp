@@ -45,6 +45,17 @@
 using namespace std;
 using namespace triagens::arango;
 using triagens::basics::JsonHelper;
+  
+// -----------------------------------------------------------------------------
+// --SECTION--                                                  static variables
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief single instance of ClusterInfo - will live as long as the server is
+/// running
+////////////////////////////////////////////////////////////////////////////////
+
+static ClusterInfo Instance;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
@@ -243,27 +254,7 @@ void CollectionInfoCurrent::copyAllJsons () {
 ////////////////////////////////////////////////////////////////////////////////
 
 ClusterInfo* ClusterInfo::instance () {
-  static ClusterInfo* Instance = new ClusterInfo();
-  return Instance;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief initialise the cluster info singleton object
-////////////////////////////////////////////////////////////////////////////////
-
-void ClusterInfo::initialise () {
-  instance();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief cleanup function to call once when shutting down
-////////////////////////////////////////////////////////////////////////////////
-
-void ClusterInfo::cleanup () {
-  auto i = instance();
-  TRI_ASSERT(i != nullptr);
-
-  delete i;
+  return &Instance;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -473,9 +464,8 @@ void ClusterInfo::clearCurrentDatabases () {
 /// @brief (re-)load the information about planned databases
 /// Usually one does not have to call this directly.
 ////////////////////////////////////////////////////////////////////////////////
-
+static const std::string prefixPlannedDatabases = "Plan/Databases";
 void ClusterInfo::loadPlannedDatabases () {
-  static const std::string prefix = "Plan/Databases";
 
   AgencyCommResult result;
 
@@ -483,12 +473,12 @@ void ClusterInfo::loadPlannedDatabases () {
     AgencyCommLocker locker("Plan", "READ");
 
     if (locker.successful()) {
-      result = _agency.getValues(prefix, true);
+      result = _agency.getValues(prefixPlannedDatabases, true);
     }
   }
 
   if (result.successful()) {
-    result.parse(prefix + "/", false);
+    result.parse(prefixPlannedDatabases + "/", false);
 
     WRITE_LOCKER(_lock);
     clearPlannedDatabases();
@@ -509,7 +499,7 @@ void ClusterInfo::loadPlannedDatabases () {
     return;
   }
 
-  LOG_TRACE("Error while loading %s", prefix.c_str());
+  LOG_TRACE("Error while loading %s", prefixPlannedDatabases.c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -517,8 +507,8 @@ void ClusterInfo::loadPlannedDatabases () {
 /// Usually one does not have to call this directly.
 ////////////////////////////////////////////////////////////////////////////////
 
+static const std::string prefixCurrentDatabases = "Current/Databases";
 void ClusterInfo::loadCurrentDatabases () {
-  static const std::string prefix = "Current/Databases";
 
   AgencyCommResult result;
 
@@ -526,12 +516,12 @@ void ClusterInfo::loadCurrentDatabases () {
     AgencyCommLocker locker("Plan", "READ");
 
     if (locker.successful()) {
-      result = _agency.getValues(prefix, true);
+      result = _agency.getValues(prefixCurrentDatabases, true);
     }
   }
 
   if (result.successful()) {
-    result.parse(prefix + "/", false);
+    result.parse(prefixCurrentDatabases + "/", false);
 
     WRITE_LOCKER(_lock);
     clearCurrentDatabases();
@@ -572,7 +562,7 @@ void ClusterInfo::loadCurrentDatabases () {
     return;
   }
 
-  LOG_TRACE("Error while loading %s", prefix.c_str());
+  LOG_TRACE("Error while loading %s", prefixCurrentDatabases.c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -580,8 +570,8 @@ void ClusterInfo::loadCurrentDatabases () {
 /// Usually one does not have to call this directly.
 ////////////////////////////////////////////////////////////////////////////////
 
+static const std::string prefixPlannedCollections = "Plan/Collections";
 void ClusterInfo::loadPlannedCollections (bool acquireLock) {
-  static const std::string prefix = "Plan/Collections";
 
   AgencyCommResult result;
 
@@ -590,16 +580,16 @@ void ClusterInfo::loadPlannedCollections (bool acquireLock) {
       AgencyCommLocker locker("Plan", "READ");
 
       if (locker.successful()) {
-        result = _agency.getValues(prefix, true);
+        result = _agency.getValues(prefixPlannedCollections, true);
       }
     }
     else {
-      result = _agency.getValues(prefix, true);
+      result = _agency.getValues(prefixPlannedCollections, true);
     }
   }
 
   if (result.successful()) {
-    result.parse(prefix + "/", false);
+    result.parse(prefixPlannedCollections + "/", false);
 
     WRITE_LOCKER(_lock);
     _collections.clear();
@@ -663,7 +653,7 @@ void ClusterInfo::loadPlannedCollections (bool acquireLock) {
     return;
   }
 
-  LOG_TRACE("Error while loading %s", prefix.c_str());
+  LOG_TRACE("Error while loading %s", prefixPlannedCollections.c_str());
   _collectionsValid = false;
 }
 
@@ -787,8 +777,8 @@ const std::vector<shared_ptr<CollectionInfo> > ClusterInfo::getCollections
 /// about all shards of a collection.
 ////////////////////////////////////////////////////////////////////////////////
 
+static const std::string prefixCurrentCollections = "Current/Collections";
 void ClusterInfo::loadCurrentCollections (bool acquireLock) {
-  static const std::string prefix = "Current/Collections";
 
   AgencyCommResult result;
 
@@ -797,16 +787,16 @@ void ClusterInfo::loadCurrentCollections (bool acquireLock) {
       AgencyCommLocker locker("Current", "READ");
 
       if (locker.successful()) {
-        result = _agency.getValues(prefix, true);
+        result = _agency.getValues(prefixCurrentCollections, true);
       }
     }
     else {
-      result = _agency.getValues(prefix, true);
+      result = _agency.getValues(prefixCurrentCollections, true);
     }
   }
 
   if (result.successful()) {
-    result.parse(prefix + "/", false);
+    result.parse(prefixCurrentCollections + "/", false);
 
     WRITE_LOCKER(_lock);
     _collectionsCurrent.clear();
@@ -876,7 +866,7 @@ void ClusterInfo::loadCurrentCollections (bool acquireLock) {
     return;
   }
 
-  LOG_TRACE("Error while loading %s", prefix.c_str());
+  LOG_TRACE("Error while loading %s", prefixCurrentCollections.c_str());
   _collectionsCurrentValid = false;
 }
 
@@ -1841,8 +1831,8 @@ int ClusterInfo::dropIndexCoordinator (string const& databaseName,
 /// Usually one does not have to call this directly.
 ////////////////////////////////////////////////////////////////////////////////
 
+static const std::string prefixServers = "Current/ServersRegistered";
 void ClusterInfo::loadServers () {
-  static const std::string prefix = "Current/ServersRegistered";
 
   AgencyCommResult result;
 
@@ -1850,12 +1840,12 @@ void ClusterInfo::loadServers () {
     AgencyCommLocker locker("Current", "READ");
 
     if (locker.successful()) {
-      result = _agency.getValues(prefix, true);
+      result = _agency.getValues(prefixServers, true);
     }
   }
 
   if (result.successful()) {
-    result.parse(prefix + "/", false);
+    result.parse(prefixServers + "/", false);
 
     WRITE_LOCKER(_lock);
     _servers.clear();
@@ -1879,7 +1869,7 @@ void ClusterInfo::loadServers () {
     return;
   }
 
-  LOG_TRACE("Error while loading %s", prefix.c_str());
+  LOG_TRACE("Error while loading %s", prefixServers.c_str());
 
   _serversValid = false;
 
@@ -1922,8 +1912,8 @@ std::string ClusterInfo::getServerEndpoint (ServerID const& serverID) {
 /// Usually one does not have to call this directly.
 ////////////////////////////////////////////////////////////////////////////////
 
+static const std::string prefixCurrentDBServers = "Current/DBServers";
 void ClusterInfo::loadCurrentDBServers () {
-  static const std::string prefix = "Current/DBServers";
 
   AgencyCommResult result;
 
@@ -1931,12 +1921,12 @@ void ClusterInfo::loadCurrentDBServers () {
     AgencyCommLocker locker("Current", "READ");
 
     if (locker.successful()) {
-      result = _agency.getValues(prefix, true);
+      result = _agency.getValues(prefixCurrentDBServers, true);
     }
   }
 
   if (result.successful()) {
-    result.parse(prefix + "/", false);
+    result.parse(prefixCurrentDBServers + "/", false);
 
     WRITE_LOCKER(_lock);
     _DBServers.clear();
@@ -1951,7 +1941,7 @@ void ClusterInfo::loadCurrentDBServers () {
     return;
   }
 
-  LOG_TRACE("Error while loading %s", prefix.c_str());
+  LOG_TRACE("Error while loading %s", prefixCurrentDBServers.c_str());
 
   _DBServersValid = false;
 
@@ -1996,8 +1986,8 @@ std::vector<ServerID> ClusterInfo::getCurrentDBServers () {
 /// our id
 ////////////////////////////////////////////////////////////////////////////////
 
+static const std::string prefixTargetServerEndoint = "Target/MapIDToEndpoint/";
 std::string ClusterInfo::getTargetServerEndpoint (ServerID const& serverID) {
-  static const std::string prefix = "Target/MapIDToEndpoint/";
 
   AgencyCommResult result;
 
@@ -2006,12 +1996,12 @@ std::string ClusterInfo::getTargetServerEndpoint (ServerID const& serverID) {
     AgencyCommLocker locker("Target", "READ");
 
     if (locker.successful()) {
-      result = _agency.getValues(prefix + serverID, false);
+      result = _agency.getValues(prefixTargetServerEndoint + serverID, false);
     }
   }
 
   if (result.successful()) {
-    result.parse(prefix, false);
+    result.parse(prefixTargetServerEndoint, false);
 
     // check if we can find ourselves in the list returned by the agency
     std::map<std::string, AgencyCommResultEntry>::const_iterator it = result._values.find(serverID);
