@@ -169,15 +169,6 @@ static TRI_json_t* JsonCapConstraint (TRI_index_t const* idx) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief removes a cap constraint from collection
-////////////////////////////////////////////////////////////////////////////////
-
-static void RemoveIndexCapConstraint (TRI_index_t* idx,
-                                      TRI_document_collection_t* document) {
-  document->_capConstraint = nullptr;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief inserts a document
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -250,7 +241,6 @@ TRI_index_t* TRI_CreateCapConstraint (TRI_document_collection_t* document,
 
   idx->memory      = MemoryCapConstraint;
   idx->json        = JsonCapConstraint;
-  idx->removeIndex = RemoveIndexCapConstraint;
   idx->insert      = InsertCapConstraint;
   idx->postInsert  = PostInsertCapConstraint;
   idx->remove      = RemoveCapConstraint;

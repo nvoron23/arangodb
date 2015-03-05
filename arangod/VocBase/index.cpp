@@ -97,7 +97,6 @@ void TRI_InitIndex (TRI_index_t* idx,
   // init common functions
   idx->selectivityEstimate    = nullptr;
   idx->memory                 = nullptr;
-  idx->removeIndex            = nullptr;
   idx->cleanup                = nullptr;
   idx->sizeHint               = nullptr;
   idx->postInsert             = nullptr;

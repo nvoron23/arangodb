@@ -111,7 +111,6 @@ typedef struct TRI_index_s {
   double (*selectivityEstimate) (struct TRI_index_s const*);
   size_t (*memory) (struct TRI_index_s const*);
   TRI_json_t* (*json) (struct TRI_index_s const*);
-  void (*removeIndex) (struct TRI_index_s*, struct TRI_document_collection_t*);
 
   // .........................................................................................
   // the following functions are called for document/collection administration

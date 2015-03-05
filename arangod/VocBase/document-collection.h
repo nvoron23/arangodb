@@ -547,7 +547,6 @@ public:
   TRI_primary_index_t          _primaryIndex;
   TRI_headers_t*               _headersPtr;
   KeyGenerator*                _keyGenerator;
-  struct TRI_cap_constraint_s* _capConstraint;
 
   std::vector<TRI_index_t*>    _allIndexes;
   std::set<TRI_voc_tid_t>*     _failedTransactions;
@@ -584,9 +583,6 @@ public:
 
   TRI_doc_collection_info_t* (*figures) (struct TRI_document_collection_t* collection);
   TRI_voc_size_t (*size) (struct TRI_document_collection_t* collection);
-
-  // function that is called to garbage-collect the collection's indexes
-  int (*cleanupIndexes)(struct TRI_document_collection_t*);
 
   TRI_document_collection_t ();
 

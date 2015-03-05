@@ -54,12 +54,6 @@ static int const CLEANUP_INTERVAL = (1 * 1000 * 1000);
 
 static int const CLEANUP_SHADOW_ITERATIONS = 3;
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief how many cleanup iterations until indexes are cleaned
-////////////////////////////////////////////////////////////////////////////////
-
-static int const CLEANUP_INDEX_ITERATIONS = 5;
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
@@ -292,13 +286,6 @@ void TRI_CleanupVocBase (void* data) {
 
         // we're the only ones that can unload the collection, so using
         // the collection pointer outside the lock is ok
-
-        // maybe cleanup indexes, unload the collection or some datafiles
-        // clean indexes?
-        if (iterations % (uint64_t) CLEANUP_INDEX_ITERATIONS == 0) {
-          document->cleanupIndexes(document);
-        }
-
         CleanupDocumentCollection(collection, document);
       }
 

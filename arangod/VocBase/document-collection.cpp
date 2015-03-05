@@ -697,19 +697,6 @@ static void UpdateHeader (TRI_voc_fid_t fid,
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief set the index cleanup flag for the collection
-////////////////////////////////////////////////////////////////////////////////
-
-static void SetIndexCleanupFlag (TRI_document_collection_t* document,
-                                 bool value) {
-  document->_cleanupIndexes = value;
-
-  LOG_DEBUG("setting cleanup indexes flag for collection '%s' to %d",
-             document->_info._name,
-             (int) value);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief adds an index to the collection
 ///
 /// The caller must hold the index lock for the collection
@@ -730,57 +717,7 @@ static int AddIndex (TRI_document_collection_t* document,
     return TRI_ERROR_OUT_OF_MEMORY;
   }
 
-  if (idx->cleanup != nullptr) {
-    SetIndexCleanupFlag(document, true);
-  }
-
   return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief gather aggregate information about the collection's indexes
-///
-/// The caller must hold the index lock for the collection
-////////////////////////////////////////////////////////////////////////////////
-
-static void RebuildIndexInfo (TRI_document_collection_t* document) {
-  bool result = false;
-
-  for (auto idx : document->_allIndexes) {
-    if (idx->cleanup != nullptr) {
-      result = true;
-      break;
-    }
-  }
-
-  SetIndexCleanupFlag(document, result);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief garbage-collect a collection's indexes
-////////////////////////////////////////////////////////////////////////////////
-
-static int CleanupIndexes (TRI_document_collection_t* document) {
-  int res = TRI_ERROR_NO_ERROR;
-
-  // cleaning indexes is expensive, so only do it if the flag is set for the
-  // collection
-  if (document->_cleanupIndexes) {
-    TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-    for (auto idx : document->_allIndexes) {
-      if (idx->cleanup != nullptr) {
-        res = idx->cleanup(idx);
-        if (res != TRI_ERROR_NO_ERROR) {
-          break;
-        }
-      }
-    }
-
-    TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-  }
-
-  return res;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2169,7 +2106,6 @@ static TRI_doc_collection_info_t* Figures (TRI_document_collection_t* document) 
 static int InitBaseDocumentCollection (TRI_document_collection_t* document,
                                        TRI_shaper_t* shaper) {
   document->setShaper(shaper);
-  document->_capConstraint      = nullptr;
   document->_numberDocuments    = 0;
   document->_lastCompaction     = 0.0;
 
@@ -2251,7 +2187,6 @@ static void DestroyBaseDocumentCollection (TRI_document_collection_t* document) 
 
 static bool InitDocumentCollection (TRI_document_collection_t* document,
                                     TRI_shaper_t* shaper) {
-  document->_cleanupIndexes   = false;
   document->_failedTransactions = nullptr;
 
   document->_uncollectedLogfileEntries = 0;
@@ -2350,9 +2285,6 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
   document->beginWriteTimed   = BeginWriteTimed;
 
   document->figures           = Figures;
-
-  // crud methods
-  document->cleanupIndexes    = CleanupIndexes;
 
   return true;
 }
@@ -3691,20 +3623,11 @@ bool TRI_DropIndexDocumentCollection (TRI_document_collection_t* document,
         break;
       }
 
-      if (idx->removeIndex != nullptr) {
-        // notify the index about its removal
-        idx->removeIndex(idx, document);
-      }
-      
       // remove the element
       found = idx;
       document->_allIndexes.erase(document->_allIndexes.begin() + i);
       break;
     }
-  }
-
-  if (found != nullptr) {
-    RebuildIndexInfo(document);
   }
 
   TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
@@ -3863,18 +3786,6 @@ static TRI_index_t* CreateCapConstraintDocumentCollection (TRI_document_collecti
     *created = false;
   }
 
-  // check if we already know a cap constraint
-  if (document->_capConstraint != nullptr) {
-    if (document->_capConstraint->_count == count &&
-        document->_capConstraint->_size == size) {
-      return &document->_capConstraint->base;
-    }
-    else {
-      TRI_set_errno(TRI_ERROR_ARANGO_CAP_CONSTRAINT_ALREADY_DEFINED);
-      return nullptr;
-    }
-  }
-
   // create a new index
   TRI_index_t* idx = TRI_CreateCapConstraint(document, iid, count, size);
 
@@ -3924,8 +3835,6 @@ static TRI_index_t* CreateCapConstraintDocumentCollection (TRI_document_collecti
   if (created != nullptr) {
     *created = true;
   }
-
-  document->_capConstraint = (TRI_cap_constraint_t*) idx;
 
   return idx;
 }
@@ -3989,9 +3898,12 @@ static int CapConstraintFromJson (TRI_document_collection_t* document,
 
 TRI_index_t* TRI_LookupCapConstraintDocumentCollection (TRI_document_collection_t* document) {
   // check if we already know a cap constraint
+#if 0
+  // TODO
   if (document->_capConstraint != nullptr) {
     return &document->_capConstraint->base;
   }
+#endif
 
   return nullptr;
 }
