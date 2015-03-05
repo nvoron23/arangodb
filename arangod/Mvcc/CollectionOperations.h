@@ -242,7 +242,7 @@ namespace triagens {
       bool                     mergeObjects;     // merge object attributes on patch or overwrite?
       bool                     overwrite;        // ignore revision conflicts?
       bool                     silent;           // do not produce output, not used here but by caller
-      bool                     standAlone;       // standalone operation
+      mutable bool             standAlone;       // standalone operation
 
       static int const WaitForSync  = 0x1;
       static int const KeepNull     = 0x2;

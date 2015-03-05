@@ -157,7 +157,7 @@ bool RestMvccEdgeHandler::insertDocument () {
   if (! suffix.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_SUPERFLUOUS_SUFFICES,
-                  "superfluous suffix, expecting " + MVCC_EDGE_PATH + "?collection=<identifier>");
+                  "superfluous suffix, expecting " + EDGE_PATH + "?collection=<identifier>");
     return false;
   }
   
@@ -167,16 +167,17 @@ bool RestMvccEdgeHandler::insertDocument () {
   if (! found || *collectionName == '\0') {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_ARANGO_COLLECTION_PARAMETER_MISSING,
-                  "'collection' is missing, expecting " + MVCC_EDGE_PATH + "?collection=<identifier>");
+                  "'collection' is missing, expecting " + EDGE_PATH + "?collection=<identifier>");
     return false;
   }
 
   // extract from
   char const* from = _request->value("from", found);
+
   if (! found || *from == '\0') {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_BAD_PARAMETER,
-                  "'from' is missing, expecting " + MVCC_EDGE_PATH + "?collection=<identifier>&from=<from-handle>&to=<to-handle>");
+                  "'from' is missing, expecting " + EDGE_PATH + "?collection=<identifier>&from=<from-handle>&to=<to-handle>");
     return false;
   }
 
@@ -186,9 +187,10 @@ bool RestMvccEdgeHandler::insertDocument () {
   if (! found || *to == '\0') {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_BAD_PARAMETER,
-                  "'to' is missing, expecting " + MVCC_EDGE_PATH + "?collection=<identifier>&from=<from-handle>&to=<to-handle>");
+                  "'to' is missing, expecting " + EDGE_PATH + "?collection=<identifier>&from=<from-handle>&to=<to-handle>");
     return false;
   }
+
 
   std::unique_ptr<TRI_json_t> json(parseJsonBody());
 
@@ -211,20 +213,28 @@ bool RestMvccEdgeHandler::insertDocument () {
     return false;
   }
     
-  std::unique_ptr<char[]> fromKey;
-  std::unique_ptr<char[]> toKey;
+  // need a fake old transaction in order to not throw - can be removed later       
+  TransactionBase oldTrx(true);
+  
+  try {
+    triagens::mvcc::OperationOptions options;
+    options.waitForSync = extractBoolValue("waitForSync", false);
 
-  // the following values are defaults that will be overridden below
-  TRI_document_edge_t edge = { 0, nullptr, 0, nullptr };
- 
-  { 
-    CollectionNameResolver resolver(_vocbase); // TODO: remove
+    triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collectionName);
+    auto* shaper = transactionCollection->shaper();
+    
+     // the following values are defaults that will be overridden below
+    TRI_document_edge_t edge = { 0, nullptr, 0, nullptr };
+    std::unique_ptr<char[]> fromKey;
+    std::unique_ptr<char[]> toKey;
 
     std::string wrongPart;
     // Note that in a DBserver in a cluster, the following call will
     // actually parse the first part of *from* as a cluster-wide
     // collection name, exactly as it is needed here!
-    int res = parseDocumentId(&resolver, from, edge._fromCid, fromKey);
+    int res = parseDocumentId(transaction->resolver(), from, edge._fromCid, fromKey);
 
     if (res != TRI_ERROR_NO_ERROR) {
       wrongPart = "'from'";
@@ -233,7 +243,7 @@ bool RestMvccEdgeHandler::insertDocument () {
       // Note that in a DBserver in a cluster, the following call will
       // actually parse the first part of *from* as a cluster-wide
       // collection name, exactly as it is needed here!
-      res = parseDocumentId(&resolver, to, edge._toCid, toKey);
+      res = parseDocumentId(transaction->resolver(), to, edge._toCid, toKey);
 
       if (res != TRI_ERROR_NO_ERROR) {
         wrongPart = "'to'";
@@ -252,19 +262,6 @@ bool RestMvccEdgeHandler::insertDocument () {
   
     edge._fromKey = fromKey.get();
     edge._toKey   = toKey.get();
-  }
-      
-  // need a fake old transaction in order to not throw - can be removed later       
-  TransactionBase oldTrx(true);
-  
-  try {
-    triagens::mvcc::OperationOptions options;
-    options.waitForSync = extractBoolValue("waitForSync", false);
-
-    triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections());
-    auto* transaction = transactionScope.transaction();
-    auto* transactionCollection = transaction->collection(collectionName);
-    auto* shaper = transactionCollection->shaper();
 
     if (transactionCollection->type() != TRI_COL_TYPE_EDGE) {
       // check if we are inserting with the EDGE handler into a non-EDGE collection
@@ -304,25 +301,33 @@ bool RestMvccEdgeHandler::insertDocumentCoordinator (string const& collname,
                                                      TRI_json_t* json,
                                                      char const* from,
                                                      char const* to) {
-  string const& dbname = _request->databaseName();
+  std::string const& dbname = _request->databaseName();
 
   triagens::rest::HttpResponse::HttpResponseCode responseCode;
-  map<string, string> resultHeaders;
-  string resultBody;
+  map<std::string, std::string> resultHeaders;
+  std::string resultBody;
 
-  int error = triagens::arango::createEdgeOnCoordinator(
-            dbname, collname, waitForSync, json, from, to,
-            responseCode, resultHeaders, resultBody);
+  int res = triagens::arango::createEdgeOnCoordinator(dbname, 
+                                                      collname, 
+                                                      waitForSync, 
+                                                      json, 
+                                                      from, 
+                                                      to,
+                                                      responseCode, 
+                                                      resultHeaders, 
+                                                      resultBody);
 
-  if (error != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collname.c_str(), error);
+  if (res != TRI_ERROR_NO_ERROR) {
+    generateError(res);
     return false;
   }
+
   // Essentially return the response we got from the DBserver, be it
   // OK or an error:
   _response = createResponse(responseCode);
   triagens::arango::mergeResponseHeaders(_response, resultHeaders);
   _response->body().appendText(resultBody.c_str(), resultBody.size());
+
   return responseCode >= triagens::rest::HttpResponse::BAD;
 }
 

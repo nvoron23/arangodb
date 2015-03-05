@@ -67,10 +67,7 @@ extern int32_t const WRP_VOCBASE_COL_TYPE;
 #define PREVENT_EMBEDDED_TRANSACTION()                                  \
   if (! triagens::mvcc::TransactionStackAccessor::IsEmpty()) {          \
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_TRANSACTION_DISALLOWED_OPERATION); \
-  }                                                                     \
-  if (triagens::arango::V8TransactionContext::IsEmbedded()) {           \
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_TRANSACTION_DISALLOWED_OPERATION); \
-  }
+  }                                                                     
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create a v8 document id value from the parameters

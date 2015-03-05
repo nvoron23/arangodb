@@ -36,6 +36,7 @@
 #include "Admin/ApplicationAdminServer.h"
 #include "Admin/RestHandlerCreator.h"
 #include "Admin/RestShutdownHandler.h"
+#include "Aql/RestAqlHandler.h"
 #include "Basics/FileUtils.h"
 #include "Basics/Nonce.h"
 #include "Basics/ProgramOptions.h"
@@ -48,6 +49,9 @@
 #include "Basics/messages.h"
 #include "Basics/ThreadPool.h"
 #include "Basics/tri-strings.h"
+#include "Cluster/ApplicationCluster.h"
+#include "Cluster/RestShardHandler.h"
+#include "Cluster/ClusterComm.h"
 #include "Cluster/HeartbeatThread.h"
 #include "Dispatcher/ApplicationDispatcher.h"
 #include "Dispatcher/Dispatcher.h"
@@ -58,9 +62,6 @@
 #include "Rest/OperationMode.h"
 #include "Rest/Version.h"
 #include "RestHandler/RestBatchHandler.h"
-#include "RestHandler/RestDocumentHandler.h"
-#include "RestHandler/RestEdgeHandler.h"
-#include "RestHandler/RestImportHandler.h"
 #include "RestHandler/RestMvccDocumentHandler.h"
 #include "RestHandler/RestMvccEdgeHandler.h"
 #include "RestHandler/RestMvccImportHandler.h"
@@ -78,10 +79,6 @@
 #include "VocBase/auth.h"
 #include "VocBase/server.h"
 #include "Wal/LogfileManager.h"
-#include "Cluster/ApplicationCluster.h"
-#include "Cluster/RestShardHandler.h"
-#include "Cluster/ClusterComm.h"
-#include "Aql/RestAqlHandler.h"
 
 using namespace std;
 using namespace triagens::basics;
@@ -94,86 +91,6 @@ bool ALLOW_USE_DATABASE_IN_REST_ACTIONS;
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief define "_api" and "_admin" handlers
-////////////////////////////////////////////////////////////////////////////////
-
-void ArangoServer::defineHandlers (HttpHandlerFactory* factory) {
-  // First the "_api" handlers:
- 
-  // add "/version" handler
-  _applicationAdminServer->addBasicHandlers(
-      factory, "/_api",
-      _applicationDispatcher->dispatcher(),
-      _jobManager);
-
-  // add a upgrade warning
-  factory->addPrefixHandler("/_msg/please-upgrade",
-                            RestHandlerCreator<RestPleaseUpgradeHandler>::createNoData);
-
-  // add "/batch" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::BATCH_PATH,
-                            RestHandlerCreator<RestBatchHandler>::createNoData);
-
-  // add "/document" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::DOCUMENT_PATH,
-                            RestHandlerCreator<RestDocumentHandler>::createNoData);
-
-  // add "/mvccDocument" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::MVCC_DOCUMENT_PATH,
-                            RestHandlerCreator<RestMvccDocumentHandler>::createNoData);
-  
-  // add "/mvccEdge" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::MVCC_EDGE_PATH,
-                            RestHandlerCreator<RestMvccEdgeHandler>::createNoData);
-  
-  // add "/mvccImport" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::MVCC_IMPORT_PATH,
-                            RestHandlerCreator<RestMvccImportHandler>::createNoData);
-
-  // add "/edge" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::EDGE_PATH,
-                            RestHandlerCreator<RestEdgeHandler>::createNoData);
-
-  // add "/import" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::DOCUMENT_IMPORT_PATH,
-                            RestHandlerCreator<RestImportHandler>::createNoData);
-
-  // add "/replication" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::REPLICATION_PATH,
-                            RestHandlerCreator<RestReplicationHandler>::createNoData);
-
-  // add "/upload" handler
-  factory->addPrefixHandler(RestVocbaseBaseHandler::UPLOAD_PATH,
-                            RestHandlerCreator<RestUploadHandler>::createNoData);
-
-  // add "/shard-comm" handler
-  factory->addPrefixHandler("/_api/shard-comm",
-                            RestHandlerCreator<RestShardHandler>::createData<Dispatcher*>,
-                            _applicationDispatcher->dispatcher());
-
-  // add "/aql" handler
-  factory->addPrefixHandler("/_api/aql",
-                            RestHandlerCreator<aql::RestAqlHandler>::createData<std::pair<ApplicationV8*, aql::QueryRegistry*>*>,
-                            _pairForAql);
-
-  // And now the "_admin" handlers
-
-  // add "/_admin/version" handler
-  _applicationAdminServer->addBasicHandlers(
-      factory, "/_admin", 
-      _applicationDispatcher->dispatcher(),
-      _jobManager);
-
-  // add "/_admin/shutdown" handler
-  factory->addPrefixHandler("/_admin/shutdown",
-                   RestHandlerCreator<RestShutdownHandler>::createData<void*>,
-                   static_cast<void*>(_applicationServer));
-
-  // add admin handlers
-  _applicationAdminServer->addHandlers(factory, "/_admin");
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief determine the requested database from the request URL
@@ -1256,6 +1173,74 @@ void ArangoServer::closeDatabases () {
   TRI_StopServer(_server);
 
   LOG_INFO("ArangoDB has been shut down");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief define "_api" and "_admin" handlers
+////////////////////////////////////////////////////////////////////////////////
+
+void ArangoServer::defineHandlers (HttpHandlerFactory* factory) {
+  // First the "_api" handlers:
+ 
+  // add "/version" handler
+  _applicationAdminServer->addBasicHandlers(
+      factory, "/_api",
+      _applicationDispatcher->dispatcher(),
+      _jobManager);
+
+  // add a upgrade warning
+  factory->addPrefixHandler("/_msg/please-upgrade",
+                            RestHandlerCreator<RestPleaseUpgradeHandler>::createNoData);
+
+  // add "/batch" handler
+  factory->addPrefixHandler(RestVocbaseBaseHandler::BATCH_PATH,
+                            RestHandlerCreator<RestBatchHandler>::createNoData);
+
+  // add "/document" handler
+  factory->addPrefixHandler(RestVocbaseBaseHandler::DOCUMENT_PATH,
+                            RestHandlerCreator<RestMvccDocumentHandler>::createNoData);
+  
+  // add "/edge" handler
+  factory->addPrefixHandler(RestVocbaseBaseHandler::EDGE_PATH,
+                            RestHandlerCreator<RestMvccEdgeHandler>::createNoData);
+  
+  // add "/import" handler
+  factory->addPrefixHandler(RestVocbaseBaseHandler::IMPORT_PATH,
+                            RestHandlerCreator<RestMvccImportHandler>::createNoData);
+
+  // add "/replication" handler
+  factory->addPrefixHandler(RestVocbaseBaseHandler::REPLICATION_PATH,
+                            RestHandlerCreator<RestReplicationHandler>::createNoData);
+
+  // add "/upload" handler
+  factory->addPrefixHandler(RestVocbaseBaseHandler::UPLOAD_PATH,
+                            RestHandlerCreator<RestUploadHandler>::createNoData);
+
+  // add "/shard-comm" handler
+  factory->addPrefixHandler("/_api/shard-comm",
+                            RestHandlerCreator<RestShardHandler>::createData<Dispatcher*>,
+                            _applicationDispatcher->dispatcher());
+
+  // add "/aql" handler
+  factory->addPrefixHandler("/_api/aql",
+                            RestHandlerCreator<aql::RestAqlHandler>::createData<std::pair<ApplicationV8*, aql::QueryRegistry*>*>,
+                            _pairForAql);
+
+  // And now the "_admin" handlers
+
+  // add "/_admin/version" handler
+  _applicationAdminServer->addBasicHandlers(
+      factory, "/_admin", 
+      _applicationDispatcher->dispatcher(),
+      _jobManager);
+
+  // add "/_admin/shutdown" handler
+  factory->addPrefixHandler("/_admin/shutdown",
+                   RestHandlerCreator<RestShutdownHandler>::createData<void*>,
+                   static_cast<void*>(_applicationServer));
+
+  // add admin handlers
+  _applicationAdminServer->addHandlers(factory, "/_admin");
 }
 
 // -----------------------------------------------------------------------------

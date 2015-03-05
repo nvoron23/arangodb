@@ -75,7 +75,7 @@ HttpHandler::status_t RestMvccImportHandler::execute () {
   HttpRequest::HttpRequestType type = _request->requestType();
 
   if (type != HttpRequest::HTTP_REQUEST_POST) {
-    generateNotImplemented("ILLEGAL " + DOCUMENT_IMPORT_PATH);
+    generateNotImplemented("ILLEGAL " + IMPORT_PATH);
   }
   else {
     // extract the import type
@@ -147,7 +147,6 @@ std::string RestMvccImportHandler::buildParseError (size_t i,
 int RestMvccImportHandler::handleSingleDocument (triagens::mvcc::TransactionScope* transactionScope,
                                                  triagens::mvcc::TransactionCollection* transactionCollection,
                                                  triagens::mvcc::OperationOptions const& options,
-                                                 triagens::arango::CollectionNameResolver const* resolver,
                                                  char const* lineStart,
                                                  TRI_json_t const* json,
                                                  std::string& errorMsg,
@@ -195,6 +194,7 @@ int RestMvccImportHandler::handleSingleDocument (triagens::mvcc::TransactionScop
 
     // Note that in a DBserver in a cluster the following two calls will
     // parse the first part as a cluster-wide collection name:
+    auto resolver = transactionScope->transaction()->resolver();
     int res1 = parseDocumentId(resolver, from, edge._fromCid, fromKey);
     int res2 = parseDocumentId(resolver, to, edge._toCid, toKey);
     
@@ -557,7 +557,7 @@ bool RestMvccImportHandler::createFromJson (std::string const& type) {
   if (! suffix.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_SUPERFLUOUS_SUFFICES,
-                  "superfluous suffix, expecting " + MVCC_IMPORT_PATH + "?collection=<identifier>");
+                  "superfluous suffix, expecting " + IMPORT_PATH + "?collection=<identifier>");
     return false;
   }
 
@@ -568,7 +568,7 @@ bool RestMvccImportHandler::createFromJson (std::string const& type) {
   if (! found || collectionName.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_ARANGO_COLLECTION_PARAMETER_MISSING,
-                  "'collection' is missing, expecting " + MVCC_IMPORT_PATH + "?collection=<identifier>");
+                  "'collection' is missing, expecting " + IMPORT_PATH + "?collection=<identifier>");
     return false;
   }
 
@@ -612,8 +612,6 @@ bool RestMvccImportHandler::createFromJson (std::string const& type) {
                   "invalid value for 'type'");
     return false;
   }
-  
-  CollectionNameResolver resolver(_vocbase); // TODO: remove
   
   // need a fake old transaction in order to not throw - can be removed later       
   TransactionBase oldTrx(true);
@@ -692,7 +690,7 @@ bool RestMvccImportHandler::createFromJson (std::string const& type) {
           ptr = end;
         }
 
-        int res = handleSingleDocument(&transactionScope, transactionCollection, options, &resolver, oldPtr, json.get(), errorMsg, i);
+        int res = handleSingleDocument(&transactionScope, transactionCollection, options, oldPtr, json.get(), errorMsg, i);
 
         if (res == TRI_ERROR_NO_ERROR) {
           ++result._numCreated;
@@ -726,7 +724,7 @@ bool RestMvccImportHandler::createFromJson (std::string const& type) {
       for (size_t i = 0; i < n; ++i) {
         auto document = static_cast<TRI_json_t const*>(TRI_AtVector(&json->_value._objects, i));
 
-        int res = handleSingleDocument(&transactionScope, transactionCollection, options, &resolver, nullptr, document, errorMsg, i + 1);
+        int res = handleSingleDocument(&transactionScope, transactionCollection, options, nullptr, document, errorMsg, i + 1);
 
         if (res == TRI_ERROR_NO_ERROR) {
           ++result._numCreated;
@@ -1010,7 +1008,7 @@ bool RestMvccImportHandler::createFromKeyValueList () {
   if (! suffix.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_SUPERFLUOUS_SUFFICES,
-                  "superfluous suffix, expecting " + DOCUMENT_IMPORT_PATH + "?collection=<identifier>");
+                  "superfluous suffix, expecting " + IMPORT_PATH + "?collection=<identifier>");
     return false;
   }
 
@@ -1021,7 +1019,7 @@ bool RestMvccImportHandler::createFromKeyValueList () {
   if (! found || collectionName.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_ARANGO_COLLECTION_PARAMETER_MISSING,
-                  "'collection' is missing, expecting " + DOCUMENT_IMPORT_PATH + "?collection=<identifier>");
+                  "'collection' is missing, expecting " + IMPORT_PATH + "?collection=<identifier>");
     return false;
   }
 
@@ -1076,8 +1074,6 @@ bool RestMvccImportHandler::createFromKeyValueList () {
   }
 
   current = next + 1;
-  
-  CollectionNameResolver resolver(_vocbase);
   
   // need a fake old transaction in order to not throw - can be removed later       
   TransactionBase oldTrx(true);
@@ -1150,7 +1146,7 @@ bool RestMvccImportHandler::createFromKeyValueList () {
 
         int res;
         if (json.get() != nullptr) {
-          res = handleSingleDocument(&transactionScope, transactionCollection, options, &resolver, lineStart, json.get(), errorMsg, i);
+          res = handleSingleDocument(&transactionScope, transactionCollection, options, lineStart, json.get(), errorMsg, i);
         }
         else {
           // raise any error
@@ -1306,6 +1302,27 @@ bool RestMvccImportHandler::checkKeys (TRI_json_t const* keys) const {
   }
 
   return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief extract a string attribute from a JSON array
+///
+/// if the attribute is not there or not a string, this returns 0
+////////////////////////////////////////////////////////////////////////////////
+
+char const* RestMvccImportHandler::extractJsonStringValue (TRI_json_t const* json,
+                                                           char const* name) {
+  if (! TRI_IsObjectJson(json)) {
+    return nullptr;
+  }
+
+  auto value = TRI_LookupObjectJson(json, name);
+
+  if (! TRI_IsStringJson(value)) {
+    return nullptr;
+  }
+
+  return value->_value._string.data;
 }
 
 // -----------------------------------------------------------------------------

@@ -209,7 +209,8 @@ namespace triagens {
 /// @brief generates a document response
 ////////////////////////////////////////////////////////////////////////////////
 
-        void generateDocument (triagens::mvcc::TransactionCollection*,
+        void generateDocument (triagens::mvcc::Transaction*,
+                               triagens::mvcc::TransactionCollection*,
                                triagens::mvcc::OperationResult const*,
                                bool);
 

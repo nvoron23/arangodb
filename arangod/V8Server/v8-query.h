@@ -31,7 +31,6 @@
 #define ARANGODB_V8SERVER_V8__QUERY_H 1
 
 #include "Basics/Common.h"
-
 #include "V8/v8-globals.h"
 
 // -----------------------------------------------------------------------------

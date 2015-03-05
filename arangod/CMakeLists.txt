@@ -115,9 +115,6 @@ add_executable(
     Replication/InitialSyncer.cpp
     Replication/Syncer.cpp
     RestHandler/RestBatchHandler.cpp
-    RestHandler/RestDocumentHandler.cpp
-    RestHandler/RestEdgeHandler.cpp
-    RestHandler/RestImportHandler.cpp
     RestHandler/RestMvccDocumentHandler.cpp
     RestHandler/RestMvccEdgeHandler.cpp
     RestHandler/RestMvccImportHandler.cpp

@@ -41,7 +41,10 @@
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionScope.h"
 #include "Rest/HttpRequest.h"
+#include "Utils/CollectionNameResolver.h"
+#include "Utils/DocumentHelper.h"
 #include "VocBase/document-collection.h"
+#include "VocBase/voc-shaper.h"
 #include "VocBase/vocbase.h"
 
 using namespace std;
@@ -283,7 +286,7 @@ bool RestMvccDocumentHandler::insertDocument () {
   if (! suffix.empty()) {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_HTTP_SUPERFLUOUS_SUFFICES,
-                  "superfluous suffix, expecting " + MVCC_DOCUMENT_PATH + "?collection=<identifier>");
+                  "superfluous suffix, expecting " + DOCUMENT_PATH + "?collection=<identifier>");
     return false;
   }
 
@@ -294,7 +297,7 @@ bool RestMvccDocumentHandler::insertDocument () {
   if (! found || *collectionName == '\0') {
     generateError(HttpResponse::BAD,
                   TRI_ERROR_ARANGO_COLLECTION_PARAMETER_MISSING,
-                  "'collection' is missing, expecting " + MVCC_DOCUMENT_PATH + "?collection=<identifier>");
+                  "'collection' is missing, expecting " + DOCUMENT_PATH + "?collection=<identifier>");
     return false;
   }
 
@@ -366,19 +369,24 @@ bool RestMvccDocumentHandler::insertDocument () {
 bool RestMvccDocumentHandler::insertDocumentCoordinator (char const* collection,
                                                          bool waitForSync,
                                                          TRI_json_t* json) {
-  string const& dbname = _request->databaseName();
-  string const collname(collection);
+  std::string const& dbname = _request->databaseName();
+  std::string const collname(collection);
   triagens::rest::HttpResponse::HttpResponseCode responseCode;
-  map<string, string> headers = triagens::arango::getForwardableRequestHeaders(_request);
-  map<string, string> resultHeaders;
-  string resultBody;
+  map<std::string, std::string> headers = triagens::arango::getForwardableRequestHeaders(_request);
+  map<std::string, std::string> resultHeaders;
+  std::string resultBody;
 
-  int res = triagens::arango::createDocumentOnCoordinator( 
-            dbname, collname, waitForSync, json, headers,
-            responseCode, resultHeaders, resultBody);
+  int res = triagens::arango::createDocumentOnCoordinator(dbname, 
+                                                          collname, 
+                                                          waitForSync, 
+                                                          json, 
+                                                          headers,
+                                                          responseCode, 
+                                                          resultHeaders, 
+                                                          resultBody);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collection, res);
+    generateError(res);
     return false;
   }
 
@@ -570,7 +578,7 @@ bool RestMvccDocumentHandler::readSingleDocument (bool generateBody) {
 
     if (ifNoneRid == 0 || ifNoneRid != rid) {
       if (ifRid == 0 || ifRid == rid) {
-        generateDocument(transactionCollection, &readResult, generateBody);
+        generateDocument(transaction, transactionCollection, &readResult, generateBody);
       }
       else {
         generatePreconditionFailed(transactionCollection, &readResult);
@@ -603,31 +611,37 @@ bool RestMvccDocumentHandler::readSingleDocument (bool generateBody) {
 /// @brief reads a single a document, coordinator case in a cluster
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RestMvccDocumentHandler::getDocumentCoordinator (string const& collname,
-                                                      string const& key,
+bool RestMvccDocumentHandler::getDocumentCoordinator (std::string const& collname,
+                                                      std::string const& key,
                                                       bool generateBody) {
-  string const& dbname = _request->databaseName();
+  std::string const& dbname = _request->databaseName();
   triagens::rest::HttpResponse::HttpResponseCode responseCode;
-  map<string, string> headers = triagens::arango::getForwardableRequestHeaders(_request);
-  map<string, string> resultHeaders;
-  string resultBody;
+  map<std::string, std::string> headers = triagens::arango::getForwardableRequestHeaders(_request);
+  map<std::string, std::string> resultHeaders;
+  std::string resultBody;
 
-  // TODO: check if this is ok
-  TRI_voc_rid_t rev = 0;
+  TRI_voc_rid_t revisionId = 0;
   bool found;
   char const* revstr = _request->value("rev", found);
   if (found) {
-    rev = StringUtils::uint64(revstr);
+    revisionId = StringUtils::uint64(revstr);
   }
 
-  int error = triagens::arango::getDocumentOnCoordinator(
-            dbname, collname, key, rev, headers, generateBody,
-            responseCode, resultHeaders, resultBody);
+  int res = triagens::arango::getDocumentOnCoordinator(dbname, 
+                                                       collname, 
+                                                       key, 
+                                                       revisionId, 
+                                                       headers, 
+                                                       generateBody,
+                                                       responseCode, 
+                                                       resultHeaders, 
+                                                       resultBody);
 
-  if (error != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collname, error);
+  if (res != TRI_ERROR_NO_ERROR) {
+    generateError(res);
     return false;
   }
+
   // Essentially return the response we got from the DBserver, be it
   // OK or an error:
   _response = createResponse(responseCode);
@@ -762,10 +776,10 @@ bool RestMvccDocumentHandler::readAllDocuments () {
       if (returnType != "id") {
         // default return type: paths to documents
         if (transactionCollection->type() == TRI_COL_TYPE_EDGE) {
-          prefix += StringUtils::replace(MVCC_EDGE_PATH, "/", "\\/") + "\\/";
+          prefix += StringUtils::replace(EDGE_PATH, "/", "\\/") + "\\/";
         }
         else {
-          prefix += StringUtils::replace(MVCC_DOCUMENT_PATH, "/", "\\/") + "\\/";
+          prefix += StringUtils::replace(DOCUMENT_PATH, "/", "\\/") + "\\/";
         }
       }
       prefix += transactionCollection->name() + "\\/";
@@ -823,25 +837,25 @@ bool RestMvccDocumentHandler::readAllDocuments () {
 /// @brief reads a single a document, coordinator case in a cluster
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RestMvccDocumentHandler::getAllDocumentsCoordinator (string const& collname,
-                                                          string const& returnType) {
-  string const& dbname = _request->databaseName();
-
+bool RestMvccDocumentHandler::getAllDocumentsCoordinator (std::string const& collname,
+                                                          std::string const& returnType) {
+  std::string const& dbname = _request->databaseName();
   triagens::rest::HttpResponse::HttpResponseCode responseCode;
-  string contentType;
-  string resultBody;
+  std::string contentType;
+  std::string resultBody;
 
-  int error = triagens::arango::getAllDocumentsOnCoordinator(dbname, 
-                                                             collname, 
-                                                             returnType, 
-                                                             responseCode, 
-                                                             contentType, 
-                                                             resultBody);
+  int res = triagens::arango::getAllDocumentsOnCoordinator(dbname, 
+                                                           collname, 
+                                                           returnType, 
+                                                           responseCode, 
+                                                           contentType, 
+                                                           resultBody);
 
-  if (error != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collname, error);
+  if (res != TRI_ERROR_NO_ERROR) {
+    generateError(res);
     return false;
   }
+
   // Return the response we got:
   _response = createResponse(responseCode);
   _response->setContentType(contentType);
@@ -1430,19 +1444,18 @@ bool RestMvccDocumentHandler::modifyDocument (bool isPatch) {
 /// @brief modifies a document, coordinator case in a cluster
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RestMvccDocumentHandler::modifyDocumentCoordinator (
-                              string const& collname,
-                              string const& key,
-                              TRI_voc_rid_t const rev,
-                              TRI_doc_update_policy_e policy,
-                              bool waitForSync,
-                              bool isPatch,
-                              TRI_json_t* json) {
-  string const& dbname = _request->databaseName();
-  map<string, string> headers = triagens::arango::getForwardableRequestHeaders(_request);
+bool RestMvccDocumentHandler::modifyDocumentCoordinator (std::string const& collname,
+                                                         std::string const& key,
+                                                         TRI_voc_rid_t const revisionId,
+                                                         TRI_doc_update_policy_e policy,
+                                                         bool waitForSync,
+                                                         bool isPatch,
+                                                         TRI_json_t* json) {
+  std::string const& dbname = _request->databaseName();
+  map<std::string, std::string> headers = triagens::arango::getForwardableRequestHeaders(_request);
   triagens::rest::HttpResponse::HttpResponseCode responseCode;
-  map<string, string> resultHeaders;
-  string resultBody;
+  map<std::string, std::string> resultHeaders;
+  std::string resultBody;
 
   bool keepNull = true;
   if (! strcmp(_request->value("keepNull"), "false")) {
@@ -1453,12 +1466,23 @@ bool RestMvccDocumentHandler::modifyDocumentCoordinator (
     mergeObjects = false;
   }
 
-  int error = triagens::arango::modifyDocumentOnCoordinator(
-            dbname, collname, key, rev, policy, waitForSync, isPatch,
-            keepNull, mergeObjects, json, headers, responseCode, resultHeaders, resultBody);
+  int res = triagens::arango::modifyDocumentOnCoordinator(dbname, 
+                                                          collname, 
+                                                          key, 
+                                                          revisionId, 
+                                                          policy, 
+                                                          waitForSync, 
+                                                          isPatch,
+                                                          keepNull, 
+                                                          mergeObjects, 
+                                                          json, 
+                                                          headers, 
+                                                          responseCode, 
+                                                          resultHeaders, 
+                                                          resultBody);
 
-  if (error != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collname, error);
+  if (res != TRI_ERROR_NO_ERROR) {
+    generateError(res);
     return false;
   }
 
@@ -1674,18 +1698,25 @@ bool RestMvccDocumentHandler::removeDocumentCoordinator (string const& collname,
                                                          TRI_voc_rid_t const rev,
                                                          TRI_doc_update_policy_e policy,
                                                          bool waitForSync) {
-  string const& dbname = _request->databaseName();
+  std::string const& dbname = _request->databaseName();
   triagens::rest::HttpResponse::HttpResponseCode responseCode;
-  map<string, string> headers = triagens::arango::getForwardableRequestHeaders(_request);
-  map<string, string> resultHeaders;
-  string resultBody;
+  map<std::string, std::string> headers = triagens::arango::getForwardableRequestHeaders(_request);
+  map<std::string, std::string> resultHeaders;
+  std::string resultBody;
 
-  int error = triagens::arango::deleteDocumentOnCoordinator(
-            dbname, collname, key, rev, policy, waitForSync, headers,
-            responseCode, resultHeaders, resultBody);
+  int res = triagens::arango::deleteDocumentOnCoordinator(dbname, 
+                                                          collname, 
+                                                          key, 
+                                                          rev, 
+                                                          policy, 
+                                                          waitForSync, 
+                                                          headers,
+                                                          responseCode, 
+                                                          resultHeaders, 
+                                                          resultBody);
 
-  if (error != TRI_ERROR_NO_ERROR) {
-    generateTransactionError(collname, error);
+  if (res != TRI_ERROR_NO_ERROR) {
+    generateError(res);
     return false;
   }
   // Essentially return the response we got from the DBserver, be it
@@ -1731,11 +1762,11 @@ void RestMvccDocumentHandler::generate20x (triagens::rest::HttpResponse::HttpRes
 
     if (_request->compatibility() < 10400L) {
       // pre-1.4 location header (e.g. /_api/document/xyz)
-      _response->setHeader("location", strlen("location"), string(MVCC_DOCUMENT_PATH + "/" + handle));
+      _response->setHeader("location", strlen("location"), std::string(DOCUMENT_PATH + "/" + handle));
     }
     else {
       // 1.4+ location header (e.g. /_db/_system/_api/document/xyz)
-      _response->setHeader("location", strlen("location"), string("/_db/" + _request->databaseName() + MVCC_DOCUMENT_PATH + "/" + handle));
+      _response->setHeader("location", strlen("location"), std::string("/_db/" + _request->databaseName() + DOCUMENT_PATH + "/" + handle));
     }
   }
 
@@ -1765,14 +1796,19 @@ void RestMvccDocumentHandler::generateNotModified (TRI_voc_rid_t rid) {
 /// @brief generates a document response
 ////////////////////////////////////////////////////////////////////////////////
 
-void RestMvccDocumentHandler::generateDocument (triagens::mvcc::TransactionCollection* collection,
+void RestMvccDocumentHandler::generateDocument (triagens::mvcc::Transaction* transaction,
+                                                triagens::mvcc::TransactionCollection* collection,
                                                 triagens::mvcc::OperationResult const* result,
                                                 bool generateBody) {
+
+  auto resolver = transaction->resolver();
+
   auto const mptr = result->mptr;
   void const* ptr = mptr->getDataPtr();
-
-  TRI_ASSERT(ptr != nullptr); 
+  TRI_ASSERT(ptr != nullptr);
+   
   auto key = TRI_EXTRACT_MARKER_KEY(mptr);
+  TRI_ASSERT(key != nullptr);
   
   string const&& handle = DocumentHelper::assembleDocumentId(collection->name(), key);
   string const&& rev    = std::to_string(mptr->_rid);
@@ -1789,28 +1825,25 @@ void RestMvccDocumentHandler::generateDocument (triagens::mvcc::TransactionColle
   TRI_df_marker_type_t type = static_cast<TRI_df_marker_t const*>(ptr)->_type;
 
   if (type == TRI_DOC_MARKER_KEY_EDGE) {
-    CollectionNameResolver resolver(_vocbase); // TODO: remove
     auto* marker = static_cast<TRI_doc_edge_key_marker_t const*>(ptr);
-    string const&& from = DocumentHelper::assembleDocumentId(resolver.getCollectionNameCluster(marker->_fromCid), string((char*) marker + marker->_offsetFromKey));
-    string const&& to = DocumentHelper::assembleDocumentId(resolver.getCollectionNameCluster(marker->_toCid), string((char*) marker +  marker->_offsetToKey));
+    string const&& from = DocumentHelper::assembleDocumentId(resolver->getCollectionNameCluster(marker->_fromCid), string((char*) marker + marker->_offsetFromKey));
+    string const&& to = DocumentHelper::assembleDocumentId(resolver->getCollectionNameCluster(marker->_toCid), string((char*) marker +  marker->_offsetToKey));
 
     json(TRI_VOC_ATTRIBUTE_FROM, triagens::basics::Json(from));
     json(TRI_VOC_ATTRIBUTE_TO, triagens::basics::Json(to));
   }
   else if (type == TRI_WAL_MARKER_EDGE) {
-    CollectionNameResolver resolver(_vocbase); // TODO: remove
     auto* marker = static_cast<triagens::wal::edge_marker_t const*>(ptr);
-    string const&& from = DocumentHelper::assembleDocumentId(resolver.getCollectionNameCluster(marker->_fromCid), string((char*) marker + marker->_offsetFromKey));
-    string const&& to = DocumentHelper::assembleDocumentId(resolver.getCollectionNameCluster(marker->_toCid), string((char*) marker +  marker->_offsetToKey));
+    string const&& from = DocumentHelper::assembleDocumentId(resolver->getCollectionNameCluster(marker->_fromCid), string((char*) marker + marker->_offsetFromKey));
+    string const&& to = DocumentHelper::assembleDocumentId(resolver->getCollectionNameCluster(marker->_toCid), string((char*) marker +  marker->_offsetToKey));
 
     json(TRI_VOC_ATTRIBUTE_FROM, triagens::basics::Json(from));
     json(TRI_VOC_ATTRIBUTE_TO, triagens::basics::Json(to));
   }
   else if (type == TRI_WAL_MARKER_MVCC_EDGE) {
-    CollectionNameResolver resolver(_vocbase); // TODO: remove
     auto* marker = static_cast<triagens::wal::mvcc_edge_marker_t const*>(ptr);
-    string const&& from = DocumentHelper::assembleDocumentId(resolver.getCollectionNameCluster(marker->_fromCid), string((char*) marker + marker->_offsetFromKey));
-    string const&& to = DocumentHelper::assembleDocumentId(resolver.getCollectionNameCluster(marker->_toCid), string((char*) marker +  marker->_offsetToKey));
+    string const&& from = DocumentHelper::assembleDocumentId(resolver->getCollectionNameCluster(marker->_fromCid), string((char*) marker + marker->_offsetFromKey));
+    string const&& to = DocumentHelper::assembleDocumentId(resolver->getCollectionNameCluster(marker->_toCid), string((char*) marker +  marker->_offsetToKey));
 
     json(TRI_VOC_ATTRIBUTE_FROM, triagens::basics::Json(from));
     json(TRI_VOC_ATTRIBUTE_TO, triagens::basics::Json(to));

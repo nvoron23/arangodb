@@ -97,9 +97,6 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Replication/InitialSyncer.cpp \
 	arangod/Replication/Syncer.cpp \
 	arangod/RestHandler/RestBatchHandler.cpp \
-	arangod/RestHandler/RestDocumentHandler.cpp \
-	arangod/RestHandler/RestEdgeHandler.cpp \
-	arangod/RestHandler/RestImportHandler.cpp \
 	arangod/RestHandler/RestMvccDocumentHandler.cpp \
 	arangod/RestHandler/RestMvccEdgeHandler.cpp \
 	arangod/RestHandler/RestMvccImportHandler.cpp \

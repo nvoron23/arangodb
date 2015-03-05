@@ -465,7 +465,7 @@ int TRI_StopCompactorVocBase (TRI_vocbase_t*);
 /// @brief returns all known collections
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_vector_pointer_t TRI_CollectionsVocBase (TRI_vocbase_t*);
+std::vector<TRI_vocbase_col_t*> TRI_CollectionsVocBase (TRI_vocbase_t*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns names of all known collections

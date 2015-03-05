@@ -46,7 +46,6 @@
 #include "Mvcc/TransactionStackAccessor.h"
 #include "RestServer/ConsoleThread.h"
 #include "Utils/transactions.h"
-#include "Utils/V8ResolverGuard.h"
 #include "Utils/Exception.h"
 #include "VocBase/auth.h"
 #include "VocBase/general-cursor.h"

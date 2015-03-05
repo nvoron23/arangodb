@@ -226,6 +226,22 @@ triagens::mvcc::Index* TRI_document_collection_t::lookupIndex (TRI_idx_iid_t id)
 } 
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief get index statistics
+////////////////////////////////////////////////////////////////////////////////
+  
+void TRI_document_collection_t::indexStats (int64_t& totalSize,
+                                            TRI_voc_ssize_t& count) {
+  totalSize = 0;
+
+  READ_LOCKER(_indexesLock);
+ 
+  count = static_cast<TRI_voc_ssize_t>(_indexes.size());
+  for (auto idx : _indexes) {
+    totalSize += static_cast<int64_t>(idx->memory());
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief lookup an index by type
 ////////////////////////////////////////////////////////////////////////////////
   
@@ -2036,7 +2052,7 @@ static TRI_doc_collection_info_t* Figures (TRI_document_collection_t* document) 
   }
 
   for (size_t i = 0;  i < document->_datafileInfo._nrAlloc;  ++i) {
-    TRI_doc_datafile_info_t* d = static_cast<TRI_doc_datafile_info_t*>(document->_datafileInfo._table[i]);
+    auto d = static_cast<TRI_doc_datafile_info_t const*>(document->_datafileInfo._table[i]);
 
     if (d != nullptr) {
       info->_numberAlive        += d->_numberAlive;
@@ -2058,36 +2074,28 @@ static TRI_doc_collection_info_t* Figures (TRI_document_collection_t* document) 
   TRI_collection_t* base = document;
 
   for (size_t i = 0; i < base->_datafiles._length; ++i) {
-    TRI_datafile_t* df = (TRI_datafile_t*) base->_datafiles._buffer[i];
+    auto df = static_cast<TRI_datafile_t const*>(base->_datafiles._buffer[i]);
 
     info->_datafileSize += (int64_t) df->_maximalSize;
     ++info->_numberDatafiles;
   }
 
   for (size_t i = 0; i < base->_journals._length; ++i) {
-    TRI_datafile_t* df = (TRI_datafile_t*) base->_journals._buffer[i];
+    auto df = static_cast<TRI_datafile_t const*>(base->_journals._buffer[i]);
 
     info->_journalfileSize += (int64_t) df->_maximalSize;
     ++info->_numberJournalfiles;
   }
 
   for (size_t i = 0; i < base->_compactors._length; ++i) {
-    TRI_datafile_t* df = (TRI_datafile_t*) base->_compactors._buffer[i];
+    auto df = static_cast<TRI_datafile_t const*>(base->_compactors._buffer[i]);
 
     info->_compactorfileSize += (int64_t) df->_maximalSize;
     ++info->_numberCompactorfiles;
   }
 
   // add index information
-  info->_numberIndexes = 0;
-  info->_sizeIndexes   = 0;
-
-  for (auto idx : document->_allIndexes) {
-    if (idx->memory != nullptr) {
-      info->_sizeIndexes += idx->memory(idx);
-    }
-    info->_numberIndexes++;
-  }
+  document->indexStats(info->_sizeIndexes, info->_numberIndexes);
 
   // get information about shape files (DEPRECATED, thus hard-coded to 0)
   info->_shapefileSize    = 0;

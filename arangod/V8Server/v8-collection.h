@@ -27,14 +27,13 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-
 #ifndef ARANGODB_V8SERVER_V8__COLLECTION_H
 #define ARANGODB_V8SERVER_V8__COLLECTION_H 1
 
 #include "Basics/Common.h"
+#include "Utils/CollectionNameResolver.h"
 #include "v8-vocbase.h"
 #include "VocBase/server.h"
-#include "Utils/CollectionNameResolver.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief free a coordinator collection
@@ -77,6 +76,6 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
                            const size_t threadNumber,
                            TRI_v8_global_t* v8g,
                            v8::Isolate* isolate,
-                           v8::Handle<v8::ObjectTemplate>  ArangoDBNS);
+                           v8::Handle<v8::ObjectTemplate> ArangoDBNS);
 
 #endif

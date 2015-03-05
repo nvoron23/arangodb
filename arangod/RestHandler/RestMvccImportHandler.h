@@ -46,8 +46,6 @@ namespace triagens {
 
   namespace arango {
 
-    class CollectionNameResolver;
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                              RestMvccImportResult
 // -----------------------------------------------------------------------------
@@ -134,7 +132,6 @@ namespace triagens {
       int handleSingleDocument (triagens::mvcc::TransactionScope*,
                                 triagens::mvcc::TransactionCollection*,
                                 triagens::mvcc::OperationOptions const&,
-                                triagens::arango::CollectionNameResolver const*,
                                 char const*,
                                 TRI_json_t const*,
                                 std::string&,
@@ -193,6 +190,15 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
       bool checkKeys (TRI_json_t const*) const;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief extract a string attribute from a JSON array
+///
+/// if the attribute is not there or not a string, this returns 0
+////////////////////////////////////////////////////////////////////////////////
+
+        char const* extractJsonStringValue (TRI_json_t const*,
+                                            char const*);
 
     };
   }

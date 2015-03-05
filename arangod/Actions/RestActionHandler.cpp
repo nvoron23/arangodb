@@ -96,7 +96,8 @@ HttpHandler::status_t RestActionHandler::execute () {
 
   // check the request path
   if (_request->databaseName() == "_system") {
-    if (TRI_IsPrefixString(_request->requestPath(), "/_admin/aardvark")) {
+    if (strncmp(_request->requestPath(), "/_admin/aardvark", strlen("/_admin/aardvark")) == 0) {
+      // ignore requests to web interface
       RequestStatisticsAgentSetIgnore(this);
     }
   }

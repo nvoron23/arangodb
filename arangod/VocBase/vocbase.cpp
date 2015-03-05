@@ -1625,24 +1625,28 @@ int TRI_StopCompactorVocBase (TRI_vocbase_t* vocbase) {
 /// @brief returns all known (document) collections
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_vector_pointer_t TRI_CollectionsVocBase (TRI_vocbase_t* vocbase) {
-  TRI_vector_pointer_t result;
-
-  TRI_InitVectorPointer(&result, TRI_UNKNOWN_MEM_ZONE);
+std::vector<TRI_vocbase_col_t*> TRI_CollectionsVocBase (TRI_vocbase_t* vocbase) {
+  std::vector<TRI_vocbase_col_t*> result;
 
   TRI_READ_LOCK_COLLECTIONS_VOCBASE(vocbase);
 
-  for (size_t i = 0;  i < vocbase->_collectionsById._nrAlloc;  ++i) {
-    TRI_vocbase_col_t* found = static_cast<TRI_vocbase_col_t*>(vocbase->_collectionsById._table[i]);
+  try {
+    for (size_t i = 0;  i < vocbase->_collectionsById._nrAlloc;  ++i) {
+      auto found = static_cast<TRI_vocbase_col_t*>(vocbase->_collectionsById._table[i]);
 
-    if (found != nullptr) {
-      TRI_PushBackVectorPointer(&result, found);
+      if (found != nullptr) {
+        result.emplace_back(found);
+      }
     }
+
+    TRI_READ_UNLOCK_COLLECTIONS_VOCBASE(vocbase);
+  
+    return result;
   }
-
-  TRI_READ_UNLOCK_COLLECTIONS_VOCBASE(vocbase);
-
-  return result;
+  catch (...) {
+    TRI_READ_UNLOCK_COLLECTIONS_VOCBASE(vocbase);
+    throw;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

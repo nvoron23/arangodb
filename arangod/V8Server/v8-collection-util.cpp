@@ -28,15 +28,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "v8-collection.h"
-#include "v8-vocbaseprivate.h"
-
 #include "Basics/conversions.h"
 #include "V8/v8-conv.h"
+#include "V8Server/v8-vocbaseprivate.h"
 
 using namespace std;
 using namespace triagens::basics;
 using namespace triagens::arango;
-using namespace triagens::rest;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief slot for a "collection"
