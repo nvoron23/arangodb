@@ -32,6 +32,10 @@
 #include "Basics/conversions.h"
 #include "CapConstraint/cap-constraint.h"
 #include "Mvcc/Index.h"
+#include "Mvcc/IndexesReadLocker.h"
+#include "Mvcc/IndexesWriteLocker.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "Utils/transactions.h"
 #include "Utils/V8TransactionContext.h"
 #include "V8/v8-conv.h"
@@ -482,13 +486,13 @@ static void EnsureIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& a
   TRI_ASSERT(collection != nullptr);
   TRI_ASSERT(json != nullptr);
 
-  string const databaseName(collection->_dbName);
-  string const cid = StringUtils::itoa(collection->_cid);
+  std::string const databaseName(collection->_dbName);
+  std::string const cid = StringUtils::itoa(collection->_cid);
   // TODO: protect against races on _name
-  string const collectionName(collection->_name);
+  std::string const collectionName(collection->_name);
 
   TRI_json_t* resultJson = nullptr;
-  string errorMsg;
+  std::string errorMsg;
   int res = ClusterInfo::instance()->ensureIndexCoordinator(databaseName,
                                                             cid,
                                                             json,
@@ -532,7 +536,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
   TRI_ASSERT(json != nullptr);
 
   // extract type
-  TRI_json_t* value = TRI_LookupObjectJson(json, "type");
+  auto value = TRI_LookupObjectJson(json, "type");
   if (! TRI_IsStringJson(value)) {
     TRI_V8_THROW_EXCEPTION_MEMORY();
   }
@@ -575,7 +579,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
 
     // copy all field names (attributes)
     for (size_t i = 0; i < value->_value._objects._length; ++i) {
-      TRI_json_t const* v = static_cast<TRI_json_t const*>(TRI_AtVector(&value->_value._objects, i));
+      auto v = static_cast<TRI_json_t const*>(TRI_AtVector(&value->_value._objects, i));
 
       if (TRI_IsStringJson(v)) {
         TRI_PushBackVectorPointer(&attributes, v->_value._string.data);
@@ -1190,7 +1194,7 @@ static void CreateCollectionCoordinator (const v8::FunctionCallbackInfo<v8::Valu
 /// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
 
-static void JS_EnsureIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_EnsureIndex (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
@@ -1203,7 +1207,7 @@ static void JS_EnsureIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>&
 /// @brief looks up an index
 ////////////////////////////////////////////////////////////////////////////////
 
-static void JS_LookupIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_LookupIndex (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
@@ -1306,10 +1310,9 @@ static void DropIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& arg
 /// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
 
-static void JS_DropIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_DropIndex (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
 
   PREVENT_EMBEDDED_TRANSACTION();
 
@@ -1328,64 +1331,69 @@ static void JS_DropIndexVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& a
     return;
   }
 
-  SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), collection->_vocbase, collection->_cid);
+  try {
+    // create a new transaction to ensure the underlying collection keeps loaded
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true, false);
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+    auto resolver = transaction->resolver();
+ 
+    triagens::mvcc::Index* index = nullptr;
+    {
+      // prevent indexes from being changed by others while we're modifying them
+      triagens::mvcc::IndexesWriteLocker indexesWriteLocker(transactionCollection);
+      index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
 
-  int res = trx.begin();
+      if (index == nullptr) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_INDEX_NOT_FOUND);
+      }
+  
+      if (index->type() == TRI_IDX_TYPE_PRIMARY_INDEX ||
+          index->type() == TRI_IDX_TYPE_EDGE_INDEX) {
+        TRI_V8_THROW_EXCEPTION(TRI_ERROR_FORBIDDEN);
+      }
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_THROW_EXCEPTION(res);
-  }
+      if (! transactionCollection->documentCollection()->unlinkIndex(index)) {
+        TRI_V8_RETURN_FALSE();
+      }
+    }
 
-  TRI_document_collection_t* document = trx.documentCollection();
+    // by here, the index should have been removed from the list of indexes of the collection
+    // now drop it
+    TRI_ASSERT(index != nullptr);
+    int res = transactionCollection->documentCollection()->dropIndex(index, true);
 
-  TRI_index_t* idx = TRI_LookupIndexByHandle(isolate, trx.resolver(), collection, args[0], true);
+    if (res != TRI_ERROR_NO_ERROR) {
+      TRI_V8_RETURN_FALSE();
+    }
 
-  if (idx == nullptr) {
-    return;
-  }
-
-  if (idx->_iid == 0) {
-    TRI_V8_RETURN_FALSE();
-  }
-
-  if (idx->_type == TRI_IDX_TYPE_PRIMARY_INDEX ||
-      idx->_type == TRI_IDX_TYPE_EDGE_INDEX) {
-    TRI_V8_THROW_EXCEPTION(TRI_ERROR_FORBIDDEN);
-  }
-
-  // .............................................................................
-  // inside a write transaction, write-lock is acquired by TRI_DropIndex...
-  // .............................................................................
-
-  bool ok = TRI_DropIndexDocumentCollection(document, idx->_iid, true);
-
-  // .............................................................................
-  // outside a write transaction
-  // .............................................................................
-
-  if (ok) {
     TRI_V8_RETURN_TRUE();
   }
-  else {
-    TRI_V8_RETURN_FALSE();
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
   }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief returns information about the indexes, coordinator case
 ////////////////////////////////////////////////////////////////////////////////
 
-static void GetIndexesCoordinator (const v8::FunctionCallbackInfo<v8::Value>& args,
-                                   TRI_vocbase_col_t const* collection) {
+static void IndexesCoordinator (const v8::FunctionCallbackInfo<v8::Value>& args,
+                                TRI_vocbase_col_t const* collection) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
+  std::string const databaseName(collection->_dbName);
+  std::string const cid = StringUtils::itoa(collection->_cid);
+  std::string const collectionName(collection->_name);
 
-  string const databaseName(collection->_dbName);
-  string const cid = StringUtils::itoa(collection->_cid);
-  string const collectionName(collection->_name);
-
-  shared_ptr<CollectionInfo> c = ClusterInfo::instance()->getCollection(databaseName, cid);
+  std::shared_ptr<CollectionInfo> c = ClusterInfo::instance()->getCollection(databaseName, cid);
 
   if ((*c).empty()) {
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
@@ -1394,11 +1402,12 @@ static void GetIndexesCoordinator (const v8::FunctionCallbackInfo<v8::Value>& ar
   v8::Handle<v8::Array> ret = v8::Array::New(isolate);
 
   TRI_json_t const* json = (*c).getIndexes();
+
   if (TRI_IsArrayJson(json)) {
     uint32_t j = 0;
 
     for (size_t i = 0;  i < json->_value._objects._length; ++i) {
-      TRI_json_t const* v = TRI_LookupArrayJson(json, i);
+      auto const v = TRI_LookupArrayJson(json, i);
 
       if (v != nullptr) {
         ret->Set(j++, IndexRep(isolate, collectionName, v));
@@ -1449,10 +1458,9 @@ static void GetIndexesCoordinator (const v8::FunctionCallbackInfo<v8::Value>& ar
 /// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
 
-static void JS_GetIndexesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_GetIndexes (const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
-
 
   TRI_vocbase_col_t* collection = TRI_UnwrapClass<TRI_vocbase_col_t>(args.Holder(), WRP_VOCBASE_COL_TYPE);
 
@@ -1461,52 +1469,39 @@ static void JS_GetIndexesVocbaseCol (const v8::FunctionCallbackInfo<v8::Value>& 
   }
 
   if (ServerState::instance()->isCoordinator()) {
-    GetIndexesCoordinator(args, collection);
+    IndexesCoordinator(args, collection);
     return;
   }
 
-  SingleCollectionReadOnlyTransaction trx(new V8TransactionContext(true), collection->_vocbase, collection->_cid);
+  try {
+    // create a new transaction to ensure the underlying collection keeps loaded
+    triagens::mvcc::TransactionScope transactionScope(collection->_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true, false);
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collection->_cid);
+    std::string const collectionName = transactionCollection->name();
 
-  int res = trx.begin();
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_V8_THROW_EXCEPTION(res);
-  }
-
-  // READ-LOCK start
-  trx.lockRead();
-
-  TRI_document_collection_t* document = trx.documentCollection();
-  const string collectionName = string(collection->_name);
-
-  // get list of indexes
-  TRI_vector_pointer_t* indexes = TRI_IndexesDocumentCollection(document);
-
-  trx.finish(res);
-  // READ-LOCK end
-
-  if (indexes == nullptr) {
-    TRI_V8_THROW_EXCEPTION_MEMORY();
-  }
-
-  v8::Handle<v8::Array> result = v8::Array::New(isolate);
-
-  uint32_t n = (uint32_t) indexes->_length;
-
-  for (uint32_t i = 0, j = 0;  i < n;  ++i) {
-    TRI_json_t* idx = static_cast<TRI_json_t*>(indexes->_buffer[i]);
-
-    if (idx != nullptr) {
-      result->Set(j++, IndexRep(isolate, collectionName, idx));
-      TRI_FreeJson(TRI_CORE_MEM_ZONE, idx);
+    // prevent indexes from being changed while we're looking at them
+    triagens::mvcc::IndexesReadLocker indexesReadLocker(transactionCollection);
+ 
+    uint32_t i = 0;   
+    auto result = v8::Array::New(isolate);
+    for (auto it : indexesReadLocker.indexes()) {
+      auto indexJson = it->toJson(TRI_UNKNOWN_MEM_ZONE);
+      result->Set(i++, IndexRep(isolate, collectionName, indexJson.json()));
     }
+
+    TRI_V8_RETURN(result);
   }
-
-  TRI_FreeVectorPointer(TRI_CORE_MEM_ZONE, indexes);
-
-  TRI_V8_RETURN(result);
+  catch (triagens::arango::Exception const& ex) {
+    TRI_V8_THROW_EXCEPTION_MESSAGE(ex.code(), ex.what());
+  }
+  catch (...) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
+  }
+ 
+  // unreachable
+  TRI_ASSERT(false);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief looks up an index identifier
@@ -1908,7 +1903,7 @@ static void JS_CreateVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) {
 /// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
 
-static void JS_CreateDocumentCollectionVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_CreateDocumentCollection (const v8::FunctionCallbackInfo<v8::Value>& args) {
   CreateVocBase(args, TRI_COL_TYPE_DOCUMENT);
 }
 
@@ -1935,26 +1930,30 @@ static void JS_CreateDocumentCollectionVocbase (const v8::FunctionCallbackInfo<v
 /// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
 
-static void JS_CreateEdgeCollectionVocbase (const v8::FunctionCallbackInfo<v8::Value>& args) {
+static void JS_CreateEdgeCollection (const v8::FunctionCallbackInfo<v8::Value>& args) {
   CreateVocBase(args, TRI_COL_TYPE_EDGE);
 }
 
-void TRI_InitV8indexArangoDB (v8::Isolate* isolate,
-                              v8::Handle<v8::ObjectTemplate> rt){
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initializer for database index management functions
+////////////////////////////////////////////////////////////////////////////////
 
+void TRI_InitV8IndexArangoDB (v8::Isolate* isolate,
+                              v8::Handle<v8::ObjectTemplate> rt) {
   TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("_create"), JS_CreateVocbase, true);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("_createEdgeCollection"), JS_CreateEdgeCollectionVocbase);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("_createDocumentCollection"), JS_CreateDocumentCollectionVocbase);
-
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("_createEdgeCollection"), JS_CreateEdgeCollection);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("_createDocumentCollection"), JS_CreateDocumentCollection);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initializer for collection index management functions
+////////////////////////////////////////////////////////////////////////////////
 
-void TRI_InitV8indexCollection (v8::Isolate* isolate,
-                                v8::Handle<v8::ObjectTemplate> rt){
-
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("dropIndex"), JS_DropIndexVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("ensureIndex"), JS_EnsureIndexVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("lookupIndex"), JS_LookupIndexVocbaseCol);
-  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getIndexes"), JS_GetIndexesVocbaseCol);
+void TRI_InitV8IndexCollection (v8::Isolate* isolate,
+                                v8::Handle<v8::ObjectTemplate> rt) {
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("dropIndex"), JS_DropIndex);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("ensureIndex"), JS_EnsureIndex);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("lookupIndex"), JS_LookupIndex);
+  TRI_AddMethodVocbase(isolate, rt, TRI_V8_ASCII_STRING("getIndexes"), JS_GetIndexes);
 
 }

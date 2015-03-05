@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC index user class
+/// @brief MVCC indexes write locker class
 ///
 /// @file
 ///
@@ -27,17 +27,15 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "IndexUser.h"
+#include "IndexesWriteLocker.h"
 #include "Mvcc/Index.h"
-#include "Mvcc/PrimaryIndex.h"
 #include "Mvcc/TransactionCollection.h"
-#include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
 
 using namespace triagens::mvcc;
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                                   class IndexUser
+// --SECTION--                                          class IndexesWriteLocker
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -45,28 +43,21 @@ using namespace triagens::mvcc;
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief read-locks the lists of indexes of a collection
+/// @brief write-locks the lists of indexes of a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-IndexUser::IndexUser (TransactionCollection* collection)
-  : _collection(collection),
-    _indexes(),
-    _mustClick(false) {
+IndexesWriteLocker::IndexesWriteLocker (TransactionCollection* collection)
+  : _collection(collection) {
 
-  _collection->documentCollection()->readLockIndexes();
-  _indexes = _collection->documentCollection()->indexes();
+  _collection->documentCollection()->writeLockIndexes();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief give up index usage
 ////////////////////////////////////////////////////////////////////////////////
 
-IndexUser::~IndexUser () {
-  if (_mustClick) {
-    click();
-  }
-
-  _collection->documentCollection()->readUnlockIndexes();
+IndexesWriteLocker::~IndexesWriteLocker () {
+  _collection->documentCollection()->writeUnlockIndexes();
 }
 
 // -----------------------------------------------------------------------------
@@ -74,57 +65,11 @@ IndexUser::~IndexUser () {
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the collection has a cap constraint
+/// @brief return the list of indexes
 ////////////////////////////////////////////////////////////////////////////////
 
-bool IndexUser::hasCapConstraint () const {
-  size_t const n = _indexes.size();
-  for (size_t i = 1; i < n; ++i) {
-    if (_indexes[i]->type() == TRI_IDX_TYPE_CAP_CONSTRAINT) {
-      return true;
-    }
-  }
-  return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the collection has secondary indexes
-////////////////////////////////////////////////////////////////////////////////
-
-bool IndexUser::hasSecondaryIndexes () const {
-  return _indexes.size() > 1;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return a reference to the primary index
-////////////////////////////////////////////////////////////////////////////////
-
-triagens::mvcc::PrimaryIndex* IndexUser::primaryIndex () const {
-  if (_indexes.empty()) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no primary index found");
-  }
-
-  return static_cast<triagens::mvcc::PrimaryIndex*>(_indexes[0]);
-}
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                    public methods
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief "click" all indexes to enforce a synchronization
-////////////////////////////////////////////////////////////////////////////////
-
-void IndexUser::click () {
-  for (auto it : _indexes) {
-    try {
-      it->clickLock();
-    }
-    catch (...) {
-    }
-  }
-
-  _mustClick = false;
+std::vector<triagens::mvcc::Index*> IndexesWriteLocker::indexes () const {
+  return _collection->documentCollection()->indexes();
 }
 
 // -----------------------------------------------------------------------------

@@ -78,6 +78,8 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/GeoIndex2.cpp \
 	arangod/Mvcc/HashIndex.cpp \
 	arangod/Mvcc/Index.cpp \
+	arangod/Mvcc/IndexesReadLocker.cpp \
+	arangod/Mvcc/IndexesWriteLocker.cpp \
 	arangod/Mvcc/IndexUser.cpp \
 	arangod/Mvcc/LocalTransactionManager.cpp \
 	arangod/Mvcc/MasterpointerManager.cpp \

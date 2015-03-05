@@ -3301,7 +3301,7 @@ void TRI_InitV8VocBridge (v8::Isolate* isolate,
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_popTransaction"), JS_PopTransactionDatabase);
   TRI_AddMethodVocbase(isolate, ArangoNS, TRI_V8_ASCII_STRING("_pushTransaction"), JS_PushTransactionDatabase);
 
-  TRI_InitV8indexArangoDB(isolate, ArangoNS);
+  TRI_InitV8IndexArangoDB(isolate, ArangoNS);
 
   TRI_InitV8collection(context, server, vocbase, loader, threadNumber, v8g, isolate, ArangoNS);
 

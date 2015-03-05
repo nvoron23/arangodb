@@ -31,11 +31,11 @@
 #define ARANGODB_V8SERVER_V8__INDEX_H 1
 
 #include "Basics/Common.h"
+#include "Utils/CollectionNameResolver.h"
+#include "VocBase/index.h"
 #include "VocBase/server.h"
 #include "V8/v8-globals.h"
-#include "VocBase/index.h"
-#include "Utils/CollectionNameResolver.h"
-#include "v8-vocbase.h"
+#include "V8Server/v8-vocbase.h"
 
 namespace triagens {
   namespace mvcc {
@@ -47,24 +47,33 @@ namespace triagens {
 /// @brief looks up a index identifier
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupIndexByHandle (v8::Isolate* isolate,
-                                      triagens::arango::CollectionNameResolver const* resolver,
-                                      TRI_vocbase_col_t const* collection,
-                                      v8::Handle<v8::Value> const val,
+TRI_index_t* TRI_LookupIndexByHandle (v8::Isolate*,
+                                      triagens::arango::CollectionNameResolver const*,
+                                      TRI_vocbase_col_t const*,
+                                      v8::Handle<v8::Value> const,
                                       bool ignoreNotFound);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief looks up a index identifier
 ////////////////////////////////////////////////////////////////////////////////
 
-triagens::mvcc::Index* TRI_LookupMvccIndexByHandle (v8::Isolate* isolate,
-                                                    triagens::arango::CollectionNameResolver const* resolver,
-                                                    TRI_vocbase_col_t const* collection,
-                                                    v8::Handle<v8::Value> const val);
+triagens::mvcc::Index* TRI_LookupMvccIndexByHandle (v8::Isolate*,
+                                                    triagens::arango::CollectionNameResolver const*,
+                                                    TRI_vocbase_col_t const*,
+                                                    v8::Handle<v8::Value> const);
 
-void TRI_InitV8indexArangoDB (v8::Isolate* isolate,
-                              v8::Handle<v8::ObjectTemplate>  ArangoDBNS);
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initializer for database index management functions
+////////////////////////////////////////////////////////////////////////////////
 
-void TRI_InitV8indexCollection (v8::Isolate* isolate,
-                                v8::Handle<v8::ObjectTemplate> rt);
+void TRI_InitV8IndexArangoDB (v8::Isolate*,
+                              v8::Handle<v8::ObjectTemplate>);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initializer for collection index management functions
+////////////////////////////////////////////////////////////////////////////////
+
+void TRI_InitV8IndexCollection (v8::Isolate*,
+                                v8::Handle<v8::ObjectTemplate>);
+
 #endif

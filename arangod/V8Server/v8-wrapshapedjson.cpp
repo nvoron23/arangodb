@@ -28,14 +28,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "v8-wrapshapedjson.h"
-#include "v8-vocbaseprivate.h"
-
 #include "Basics/conversions.h"
 #include "Mvcc/TransactionCollection.h"
-#include "V8/v8-conv.h"
-#include "VocBase/key-generator.h"
 #include "Utils/transactions.h"
-#include "Utils/V8TransactionContext.h"
+#include "V8/v8-conv.h"
+#include "V8Server/v8-vocbaseprivate.h"
+#include "VocBase/key-generator.h"
 
 using namespace std;
 using namespace triagens::basics;

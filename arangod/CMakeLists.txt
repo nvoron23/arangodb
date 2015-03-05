@@ -96,6 +96,8 @@ add_executable(
     Mvcc/FulltextIndex.cpp
     Mvcc/GeoIndex2.cpp
     Mvcc/HashIndex.cpp
+    Mvcc/IndexesReadLocker.cpp
+    Mvcc/IndexesWriteLocker.cpp
     Mvcc/IndexUser.cpp
     Mvcc/LocalTransactionManager.cpp
     Mvcc/MasterpointerManager.cpp

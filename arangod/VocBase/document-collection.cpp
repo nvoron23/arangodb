@@ -202,7 +202,8 @@ triagens::mvcc::Index* TRI_document_collection_t::addIndex (triagens::mvcc::Inde
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief return the list of indexes of the collection
+/// @brief return the list of indexes of the collection, without holding the
+/// lock on the indexes
 ////////////////////////////////////////////////////////////////////////////////
   
 std::vector<triagens::mvcc::Index*> TRI_document_collection_t::indexes () const {
@@ -223,7 +224,69 @@ triagens::mvcc::Index* TRI_document_collection_t::lookupIndex (TRI_idx_iid_t id)
   }
 
   return nullptr;
-} 
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief unlinks an index from the list of indexes, but does not delete the
+/// index itself
+/// note: the caller must have acquired the write-lock on the indexes of the
+/// collection
+////////////////////////////////////////////////////////////////////////////////
+
+bool TRI_document_collection_t::unlinkIndex (triagens::mvcc::Index* index) {
+  if (index == nullptr || 
+      index->type() == TRI_IDX_TYPE_PRIMARY_INDEX ||
+      index->type() == TRI_IDX_TYPE_EDGE_INDEX) {
+    // invalid index id or primary index
+    return false;
+  }
+
+  // TODO: re-add inventoryLock
+
+  size_t i = 0;
+  for (auto it : _indexes) {
+    if (it == index) {
+      _indexes.erase(_indexes.begin() + i);
+      return true;
+    }
+    ++i;
+  }
+
+  return false;
+}
+ 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief drops an index, including index file removal and replication
+////////////////////////////////////////////////////////////////////////////////
+
+bool TRI_document_collection_t::dropIndex (triagens::mvcc::Index* index,
+                                           bool writeMarker) {
+  int res = TRI_RemoveIndexFile(this, index->id());
+
+  if (writeMarker) {
+    try {
+      triagens::wal::DropIndexMarker marker(_vocbase->_id, _info._cid, index->id());
+      triagens::wal::SlotInfoCopy slotInfo = triagens::wal::LogfileManager::instance()->allocateAndWrite(marker, false);
+
+      if (slotInfo.errorCode != TRI_ERROR_NO_ERROR) {
+        THROW_ARANGO_EXCEPTION(slotInfo.errorCode);
+      }
+    }
+    catch (triagens::arango::Exception const& ex) {
+      res = ex.code();
+    }
+    catch (...) {
+      res = TRI_ERROR_INTERNAL;
+    }
+
+    LOG_WARNING("could not save index drop marker in log: %s", TRI_errno_string(res));
+  }
+  
+  delete index;
+
+  // TODO: what to do here if removal failed?
+  return res;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief get index statistics
@@ -3568,32 +3631,6 @@ bool TRI_IsFullyCollectedDocumentCollection (TRI_document_collection_t* document
   TRI_READ_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
 
   return (uncollected == 0);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief returns a description of all indexes
-///
-/// the caller must have read-locked the underlying collection!
-////////////////////////////////////////////////////////////////////////////////
-
-TRI_vector_pointer_t* TRI_IndexesDocumentCollection (TRI_document_collection_t* document) {
-  TRI_vector_pointer_t* vector = static_cast<TRI_vector_pointer_t*>(TRI_Allocate(TRI_CORE_MEM_ZONE, sizeof(TRI_vector_pointer_t), false));
-
-  if (vector == nullptr) {
-    return nullptr;
-  }
-
-  TRI_InitVectorPointer(vector, TRI_CORE_MEM_ZONE);
-
-  for (auto idx : document->_allIndexes) {
-    TRI_json_t* json = idx->json(idx);
-
-    if (json != nullptr) {
-      TRI_PushBackVectorPointer(vector, json);
-    }
-  }
-
-  return vector;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

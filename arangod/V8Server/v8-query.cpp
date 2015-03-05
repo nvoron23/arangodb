@@ -561,7 +561,8 @@ static void JS_MvccByExampleHash (const v8::FunctionCallbackInfo<v8::Value>& arg
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto resolver = transaction->resolver();
   
-    // extract the index
+    // extract the index, and hold a read-lock on the list of indexes while we're using the index
+    triagens::mvcc::IndexUser indexUser(transactionCollection);
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
 
     if (index == nullptr ||
@@ -969,7 +970,8 @@ static void MvccSkiplistQuery (QueryType type,
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto resolver = transaction->resolver();
   
-    // extract the index
+    // extract the index, and hold a read-lock on the list of indexes while we're using the index
+    triagens::mvcc::IndexUser indexUser(transactionCollection);
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
 
     if (index == nullptr ||
@@ -1648,7 +1650,8 @@ static void JS_MvccNear (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto resolver = transaction->resolver();
   
-    // extract the index
+    // extract the index, and hold a read-lock on the list of indexes while we're using the index
+    triagens::mvcc::IndexUser indexUser(transactionCollection);
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
   
     if (index == nullptr ||
@@ -1729,7 +1732,8 @@ static void JS_MvccWithin (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto resolver = transaction->resolver();
   
-    // extract the index
+    // extract the index, and hold a read-lock on the list of indexes while we're using the index
+    triagens::mvcc::IndexUser indexUser(transactionCollection);
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
   
     if (index == nullptr ||
@@ -1830,7 +1834,8 @@ static void JS_MvccFulltext (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto* transactionCollection = transaction->collection(collection->_cid);
     auto resolver = transaction->resolver();
   
-    // extract the index
+    // extract the index, and hold a read-lock on the list of indexes while we're using the index
+    triagens::mvcc::IndexUser indexUser(transactionCollection);
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
  
     if (index == nullptr ||
@@ -1839,7 +1844,6 @@ static void JS_MvccFulltext (const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
   
     std::string const&& queryString = TRI_ObjectToString(args[1]);
-
     std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult(static_cast<triagens::mvcc::FulltextIndex*>(index)->query(transaction, queryString));
     
     // setup result

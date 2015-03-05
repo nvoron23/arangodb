@@ -288,7 +288,30 @@ void TRI_FreeIndex (TRI_index_t* idx) {
 /// @brief removes an index file
 ////////////////////////////////////////////////////////////////////////////////
 
-bool TRI_RemoveIndexFile (TRI_document_collection_t* collection, TRI_index_t* idx) {
+int TRI_RemoveIndexFile (TRI_document_collection_t* collection, 
+                         TRI_idx_iid_t iid) {
+  std::string filename;
+  filename.append(collection->_directory);
+  filename.append(TRI_DIR_SEPARATOR_STR);
+  filename.append("index-");
+  filename.append(std::to_string(iid));
+  filename.append(".json");
+
+  int res = TRI_UnlinkFile(filename.c_str());
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    LOG_ERROR("cannot remove index definition: %s", TRI_last_error());
+  }
+
+  return res;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief removes an index file
+////////////////////////////////////////////////////////////////////////////////
+
+bool TRI_RemoveIndexFile (TRI_document_collection_t* collection, 
+                          TRI_index_t* idx) {
   // construct filename
   char* number = TRI_StringUInt64(idx->_iid);
 

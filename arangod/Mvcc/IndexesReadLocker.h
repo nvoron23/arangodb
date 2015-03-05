@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief MVCC index user class
+/// @brief MVCC indexes list write locker
 ///
 /// @file
 ///
@@ -27,8 +27,8 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef ARANGODB_MVCC_INDEX_USER_H
-#define ARANGODB_MVCC_INDEX_USER_H 1
+#ifndef ARANGODB_MVCC_INDEXES_READ_LOCKER_H
+#define ARANGODB_MVCC_INDEXES_READ_LOCKER_H 1
 
 #include "Basics/Common.h"
 
@@ -36,27 +36,26 @@ namespace triagens {
   namespace mvcc {
 
     class Index;
-    class PrimaryIndex;
     class TransactionCollection;
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                                   class IndexUser
+// --SECTION--                                           class IndexesReadLocker
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
 
-    class IndexUser {
+    class IndexesReadLocker {
 
       public:
 
-        IndexUser (IndexUser const&) = delete;
-        IndexUser& operator= (IndexUser const&) = delete;
+        IndexesReadLocker (IndexesReadLocker const&) = delete;
+        IndexesReadLocker& operator= (IndexesReadLocker const&) = delete;
 
-        IndexUser (TransactionCollection*);
+        IndexesReadLocker (TransactionCollection*);
 
-        ~IndexUser ();
+        ~IndexesReadLocker ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
@@ -65,44 +64,10 @@ namespace triagens {
       public:
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief return a reference to the list of indexes
+/// @brief return the list of indexes
 ////////////////////////////////////////////////////////////////////////////////
 
-        inline std::vector<triagens::mvcc::Index*> const& indexes () const {
-          return _indexes;
-        }
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief note that we need to click
-////////////////////////////////////////////////////////////////////////////////
-
-        inline void mustClick () {
-          _mustClick = true;
-        }
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the collection has a cap constraint
-////////////////////////////////////////////////////////////////////////////////
-
-        bool hasCapConstraint () const;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not the collection has secondary indexes
-////////////////////////////////////////////////////////////////////////////////
-
-        bool hasSecondaryIndexes () const;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return a reference to the primary index
-////////////////////////////////////////////////////////////////////////////////
-
-        triagens::mvcc::PrimaryIndex* primaryIndex () const;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief "click" all indexes to enforce a synchronization
-////////////////////////////////////////////////////////////////////////////////
-
-        void click ();
+        std::vector<triagens::mvcc::Index*> indexes () const;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
@@ -111,8 +76,6 @@ namespace triagens {
       private:
        
         TransactionCollection*     _collection;
-        std::vector<Index*>        _indexes;
-        bool                       _mustClick;
 
     };
 
