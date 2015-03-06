@@ -1,4 +1,6 @@
-/*global module, require, exports */
+/*jshint esnext: true */
+/*global module, require, exports*/
+/*global ArangoServerState, ArangoClusterInfo, ArangoClusterComm */
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Foxx application manager
@@ -383,6 +385,24 @@
   };
 
   ////////////////////////////////////////////////////////////////////////////////
+  /// @brief returns a valid app config for validation purposes
+  ////////////////////////////////////////////////////////////////////////////////
+   
+  var fakeAppConfig = function(path) {
+    var file = fs.join(path, "manifest.json");
+    return {
+      id: "/internal",
+      root: "",
+      path: path,
+      options: {},
+      mount: "/internal",
+      manifest: validateManifestFile(file),
+      isSystem: false,
+      isDevelopment: false
+    };
+  };
+
+  ////////////////////////////////////////////////////////////////////////////////
   /// @brief returns the app path and manifest
   ////////////////////////////////////////////////////////////////////////////////
 
@@ -391,21 +411,15 @@
     var path = transformMountToPath(mount);
 
     var file = fs.join(root, path, "manifest.json");
-    var result = {
+     return {
       id: mount,
-      root: root,
       path: path,
       options: options || {},
       mount: mount,
+      manifest: validateManifestFile(file),
       isSystem: isSystemMount(mount),
       isDevelopment: activateDevelopment || false
     };
-    // try {
-      result.manifest = validateManifestFile(file);
-    // } catch(err) {
-    //   result.error = err;
-    // }
-    return result;
   };
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -735,6 +749,57 @@
   };
 
   ////////////////////////////////////////////////////////////////////////////////
+  /// @brief Build app in path
+  ////////////////////////////////////////////////////////////////////////////////
+
+  var _buildAppInPath = function(appInfo, path, options) {
+    try {
+      if (appInfo === "EMPTY") {
+        // Make Empty app
+        installAppFromGenerator(path, options || {});
+      } else if (/^GIT:/i.test(appInfo)) {
+        installAppFromRemote(buildGithubUrl(appInfo), path);
+      } else if (/^https?:/i.test(appInfo)) {
+        installAppFromRemote(appInfo, path);
+      } else if (utils.pathRegex.test(appInfo)) {
+        installAppFromLocal(appInfo, path);
+      } else if (/^uploads[\/\\]tmp-/.test(appInfo)) {
+        // Install from upload API
+        appInfo = fs.join(fs.getTempPath(), appInfo);
+        installAppFromLocal(appInfo, path);
+      } else {
+        installAppFromRemote(store.buildUrl(appInfo), path);
+      }
+    } catch (e) {
+      try {
+        fs.removeDirectoryRecursive(path, true);
+      } catch (err) {
+      }
+      throw e;
+    }
+  };
+
+  ////////////////////////////////////////////////////////////////////////////////
+  /// @brief Internal app validation function
+  /// Does not check parameters and throws errors.
+  ////////////////////////////////////////////////////////////////////////////////
+
+  var _validateApp = function(appInfo) {
+    var tempPath = fs.getTempFile("apps", false);
+    try {
+      _buildAppInPath(appInfo, tempPath, {});
+      var tmp = new ArangoApp(fakeAppConfig(tempPath));
+      routeApp(tmp);
+      exportApp(tmp);
+    } catch (e) {
+      throw e;
+    } finally {
+      fs.removeDirectoryRecursive(tempPath, true);
+    }
+  };
+
+
+  ////////////////////////////////////////////////////////////////////////////////
   /// @brief Internal install function. Check install.
   /// Does not check parameters and throws errors.
   ////////////////////////////////////////////////////////////////////////////////
@@ -752,41 +817,20 @@
     fs.removeDirectory(targetPath);
 
     initCache();
+    _buildAppInPath(appInfo, targetPath, options);
     try {
-      if (appInfo === "EMPTY") {
-        // Make Empty app
-        installAppFromGenerator(targetPath, options || {});
-      } else if (/^GIT:/i.test(appInfo)) {
-        installAppFromRemote(buildGithubUrl(appInfo), targetPath);
-      } else if (/^https?:/i.test(appInfo)) {
-        installAppFromRemote(appInfo, targetPath);
-      } else if (utils.pathRegex.test(appInfo)) {
-        installAppFromLocal(appInfo, targetPath);
-      } else if (/^uploads[\/\\]tmp-/.test(appInfo)) {
-        // Install from upload API
-        appInfo = fs.join(fs.getTempPath(), appInfo);
-        installAppFromLocal(appInfo, targetPath);
-      } else {
-        installAppFromRemote(store.buildUrl(appInfo), targetPath);
-      }
-    } catch (e) {
-      try {
-        fs.removeDirectoryRecursive(targetPath, true);
-      } catch (err) {
-      }
-      throw e;
-    }
-    try {
-      db._executeTransaction({
-        collections: {
-          write: collection.name()
-        },
-        action: function() {
-          app = _scanFoxx(mount, options);
+      if (!options.__clusterDistribution) {
+        db._executeTransaction({
+          collections: {
+            write: collection.name()
+          },
+          action: function() {
+            app = _scanFoxx(mount, options);
+          }
+        });
+        if (runSetup) {
+          setup(mount);
         }
-      });
-      if (runSetup) {
-        setup(mount);
       }
       // Validate Routing
       routeApp(app);
@@ -798,16 +842,17 @@
       } catch (err) {
       }
       try {
-        db._executeTransaction({
-          collections: {
-            write: collection.name()
-          },
-          action: function() {
-            var definition = collection.firstExample({mount: mount});
-            collection.remove(definition._key);
-          }
-        });
-        
+        if (!options.__clusterDistribution) {
+          db._executeTransaction({
+            collections: {
+              write: collection.name()
+            },
+            action: function() {
+              var definition = collection.firstExample({mount: mount});
+              collection.remove(definition._key);
+            }
+          });
+        }
       } catch (err) {
       }
       throw e;
@@ -829,6 +874,21 @@
       [ appInfo, mount ] );
     utils.validateMount(mount);
     var app = _install(appInfo, mount, options, true);
+    if (ArangoServerState.isCoordinator()) {
+      let coordinators = ArangoClusterInfo.getCoordinators();
+      let req = {appInfo, mount, options};
+      let httpOptions = {};
+      let coordOptions = {
+        coordTransactionID: ArangoClusterInfo.uniqid()
+      };
+      req.options.__clusterDistribution = true;
+      for (let i = 0; i < coordinators.length; ++i) {
+        if (coordinators[i] !== ArangoServerState.id()) {
+          ArangoClusterComm.asyncRequest("POST","server:" + coordinators[i], db._name(),
+            "/_admin/foxx/install", req, httpOptions, coordOptions);
+        }
+      }
+    }
     reloadRouting();
     return app.simpleJSON();
   };
@@ -861,19 +921,21 @@
       });
     }
     delete appCache[dbname][mount];
-    try {
-      db._executeTransaction({
-        collections: {
-          write: collection.name()
-        },
-        action: function() {
-          var definition = collection.firstExample({mount: mount});
-          collection.remove(definition._key);
+    if (!options.__clusterDistribution) {
+      try {
+        db._executeTransaction({
+          collections: {
+            write: collection.name()
+          },
+          action: function() {
+            var definition = collection.firstExample({mount: mount});
+            collection.remove(definition._key);
+          }
+        });
+      } catch (e) {
+        if (!options.force) {
+          throw e;
         }
-      });
-    } catch (e) {
-      if (!options.force) {
-        throw e;
       }
     }
     if (options.teardown !== false && options.teardown !== "false") {
@@ -919,6 +981,21 @@
       [ mount ] );
     utils.validateMount(mount);
     var app = _uninstall(mount, options);
+    if (ArangoServerState.isCoordinator()) {
+      let coordinators = ArangoClusterInfo.getCoordinators();
+      let req = {mount, options};
+      let httpOptions = {};
+      let coordOptions = {
+        coordTransactionID: ArangoClusterInfo.uniqid()
+      };
+      req.options.__clusterDistribution = true;
+      for (let i = 0; i < coordinators.length; ++i) {
+        if (coordinators[i] !== ArangoServerState.id()) {
+          ArangoClusterComm.asyncRequest("POST","server:" + coordinators[i], db._name(),
+            "/_admin/foxx/uninstall", req, httpOptions, coordOptions);
+        }
+      }
+    }
     reloadRouting();
     return app.simpleJSON();
   };
@@ -936,7 +1013,24 @@
         [ "Mount path", "string" ] ],
       [ appInfo, mount ] );
     utils.validateMount(mount);
-    _uninstall(mount, {teardown: true});
+    _validateApp(appInfo);
+    options = options || {};
+    if (ArangoServerState.isCoordinator()) {
+      let coordinators = ArangoClusterInfo.getCoordinators();
+      let req = {appInfo, mount, options};
+      let httpOptions = {};
+      let coordOptions = {
+        coordTransactionID: ArangoClusterInfo.uniqid()
+      };
+      req.options.__clusterDistribution = true;
+      for (let i = 0; i < coordinators.length; ++i) {
+        if (coordinators[i] !== ArangoServerState.id()) {
+          ArangoClusterComm.asyncRequest("POST","server:" + coordinators[i], db._name(),
+            "/_admin/foxx/replace", req, httpOptions, coordOptions);
+        }
+      }
+    }
+    _uninstall(mount, {teardown: false});
     var app = _install(appInfo, mount, options, true);
     reloadRouting();
     return app.simpleJSON();
@@ -955,6 +1049,22 @@
         [ "Mount path", "string" ] ],
       [ appInfo, mount ] );
     utils.validateMount(mount);
+    _validateApp(appInfo);
+    if (ArangoServerState.isCoordinator()) {
+      let coordinators = ArangoClusterInfo.getCoordinators();
+      let req = {appInfo, mount, options};
+      let httpOptions = {};
+      let coordOptions = {
+        coordTransactionID: ArangoClusterInfo.uniqid()
+      };
+      req.options.__clusterDistribution = true;
+      for (let i = 0; i < coordinators.length; ++i) {
+        if (coordinators[i] !== ArangoServerState.id()) {
+          ArangoClusterComm.asyncRequest("POST","server:" + coordinators[i], db._name(),
+            "/_admin/foxx/update", req, httpOptions, coordOptions);
+        }
+      }
+    }
     _uninstall(mount, {teardown: false});
     var app = _install(appInfo, mount, options, false);
     reloadRouting();
