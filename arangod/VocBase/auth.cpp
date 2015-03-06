@@ -28,18 +28,18 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "auth.h"
-
 #include "Basics/json.h"
 #include "Basics/logging.h"
 #include "Basics/tri-strings.h"
 #include "Basics/JsonHelper.h"
+#include "Mvcc/IndexUser.h"
+#include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "Rest/SslInterface.h"
-#include "ShapedJson/shape-accessor.h"
-#include "VocBase/collection.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/vocbase.h"
 #include "VocBase/voc-shaper.h"
-#include "Utils/transactions.h"
 
 using namespace triagens::arango;
 
@@ -399,52 +399,53 @@ bool TRI_InsertInitialAuthInfo (TRI_vocbase_t* vocbase) {
 ////////////////////////////////////////////////////////////////////////////////
 
 bool TRI_LoadAuthInfo (TRI_vocbase_t* vocbase) {
-  LOG_DEBUG("starting to load authentication and authorisation information");
+  LOG_DEBUG("starting to load authentication and authorization information");
 
-  TRI_vocbase_col_t* collection = TRI_LookupCollectionByNameVocBase(vocbase, TRI_COL_NAME_USERS);
+  try {
+    triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(TRI_COL_NAME_USERS);
+    auto document = transactionCollection->documentCollection();
 
-  if (collection == nullptr) {
-    LOG_INFO("collection '_users' does not exist, no authentication available");
-    return false;
-  }
+    triagens::mvcc::IndexUser indexUser(transactionCollection);
+    triagens::mvcc::PrimaryIndex* primaryIndex = indexUser.primaryIndex();
+  
+    TRI_WriteLockReadWriteLock(&vocbase->_authInfoLock);
+    ClearAuthInfo(vocbase);
 
-
-  SingleCollectionReadOnlyTransaction trx(new StandaloneTransactionContext(), vocbase, collection->_cid);
-
-  int res = trx.begin();
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    return false;
-  }
-
-  TRI_document_collection_t* document = trx.documentCollection();
-
-  TRI_WriteLockReadWriteLock(&vocbase->_authInfoLock);
-  ClearAuthInfo(vocbase);
-
-  void** beg = document->_primaryIndex._table;
-  void** end = beg + document->_primaryIndex._nrAlloc;
-  void** ptr = beg;
-
-  for (;  ptr < end;  ++ptr) {
-    if (*ptr) {
-      TRI_vocbase_auth_t* auth = ConvertAuthInfo(vocbase, document, (TRI_doc_mptr_t const*) *ptr);
-
-      if (auth != nullptr) {
-        TRI_vocbase_auth_t* old = static_cast<TRI_vocbase_auth_t*>(TRI_InsertKeyAssociativePointer(&vocbase->_authInfo, auth->_username, auth, true));
-
-        if (old != nullptr) {
-          FreeAuthInfo(old);
+    try {
+      primaryIndex->iterate([&vocbase, &document] (TRI_doc_mptr_t const* doc) -> void {
+        TRI_vocbase_auth_t* auth = ConvertAuthInfo(vocbase, document, doc);
+      
+        if (auth != nullptr) {
+          TRI_vocbase_auth_t* old = static_cast<TRI_vocbase_auth_t*>(TRI_InsertKeyAssociativePointer(&vocbase->_authInfo, auth->_username, auth, true));
+  
+          if (old != nullptr) {
+            FreeAuthInfo(old);
+          }
         }
-      }
+      });
     }
+    catch (...) {
+      // always unlock
+      TRI_WriteUnlockReadWriteLock(&vocbase->_authInfoLock);
+      throw;
+    }
+    
+    TRI_WriteUnlockReadWriteLock(&vocbase->_authInfoLock);
+
+    return true;
   }
-
-  TRI_WriteUnlockReadWriteLock(&vocbase->_authInfoLock);
-
-  trx.finish(TRI_ERROR_NO_ERROR);
-
-  return true;
+  catch (triagens::arango::Exception const& ex) {
+    if (ex.code() == TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND) {
+      LOG_INFO("collection '_users' does not exist, no authentication available");
+      return true;
+    }
+    return false;
+  }
+  catch (...) {
+    return false;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
