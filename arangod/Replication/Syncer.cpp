@@ -44,7 +44,6 @@
 #include "Utils/transactions.h"
 #include "VocBase/collection.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/edge-collection.h"
 #include "VocBase/server.h"
 #include "VocBase/transaction.h"
 #include "VocBase/vocbase.h"
@@ -483,11 +482,11 @@ int Syncer::createIndex (TRI_json_t const* json) {
 
     TRI_document_collection_t* document = guard.collection()->_collection;
   
-    triagens::mvcc::Index* idx;
-    int res = TRI_FromJsonIndexDocumentCollection(document, indexJson, idx);
+    triagens::mvcc::Index* index;
+    int res = TRI_FromJsonIndexDocumentCollection(document, indexJson, index);
 
     if (res == TRI_ERROR_NO_ERROR) {
-      res = TRI_SaveIndex(document, idx, true);
+      res = TRI_SaveIndex(document, index, true);
     }
 
     return res;

@@ -34,49 +34,12 @@
 #define ARANGODB_GEO_INDEX_GEO_INDEX_H 1
 
 #include "Basics/Common.h"
-#include "IndexOperators/index-operator.h"
 
 namespace triagens {
   namespace mvcc {
     class Transaction;
   }
 }
-
-/* first the things that a user might want to change */
-
-/* a GeoString - a signed type of at least 64 bits   */
-typedef long long GeoString;
-
-/* percentage growth of slot or slotslot tables     */
-#define GeoIndexGROW 50
-
-/* maximum number of points in a pot                */
-/*  ***  note - must be even!                       */
-/* smaller takes more space but is a little faster  */
-#define GeoIndexPOTSIZE 6
-
-/* choses the set of fixed points             */
-#define GeoIndexFIXEDSET 6
-/* 1 is just the N pole (doesn't really work) */
-/* 2 is N and S pole - slow but OK            */
-/* 3 is equilateral triangle on 0/180 long    */
-/* 4 is four corners of a tetrahedron         */
-/* 5 is trigonal bipyramid                    */
-/* 6 is the  corners of octahedron (default)  */
-/* 8 is eight corners of a cube               */
-
-/* size of max-dist integer.                           */
-/* 2 is 16-bit - smaller but slow when lots of points  */
-/*     within a few hundred meters of target           */
-/* 4 is 32-bit - larger and fast even when points are  */
-/*     only centimeters apart.  Default                */
-#define GEOFIXLEN 4
-#if GEOFIXLEN == 2
-typedef unsigned short GeoFix;
-#endif
-#if GEOFIXLEN == 4
-typedef unsigned int GeoFix;
-#endif
 
 /* If this #define is there, then the INDEXDUMP and */
 /* INDEXVALID functions are also available.  These  */
@@ -89,50 +52,66 @@ typedef unsigned int GeoFix;
 typedef struct {
   double latitude;
   double longitude;
-  void * data;
+  void* data;
 }
 GeoCoordinate;
 
 typedef struct {
   size_t length;
-  GeoCoordinate * coordinates;
+  GeoCoordinate* coordinates;
   double * distances;
 }
 GeoCoordinates;
 
-typedef char GeoIndex;   /* to keep the structure private  */
+typedef char GeoIndexApiType;   /* to keep the structure private  */
 
 
-size_t GeoIndex_MemoryUsage (void*);
+size_t GeoIndex_MemoryUsage (GeoIndexApiType*);
 
-GeoIndex * GeoIndex_new(void);
-void GeoIndex_free(GeoIndex * gi);
-double GeoIndex_distance(GeoCoordinate * c1, GeoCoordinate * c2);
-int GeoIndex_insert(GeoIndex * gi, GeoCoordinate * c);
-int GeoIndex_remove(GeoIndex * gi, GeoCoordinate * c);
-int GeoIndex_hint(GeoIndex * gi, int hint);
-GeoCoordinates * GeoIndex_PointsWithinRadius(GeoIndex * gi,
-                    GeoCoordinate * c, double d);
+GeoIndexApiType* GeoIndex_new ();
+
+void GeoIndex_free (GeoIndexApiType* gi);
+
+int GeoIndex_insert (GeoIndexApiType* gi, 
+                     GeoCoordinate* c);
+
+int GeoIndex_remove (GeoIndexApiType* gi, 
+                     GeoCoordinate* c);
+
+double GeoIndex_distance (GeoCoordinate*, 
+                          GeoCoordinate*);
+
+// this version is used during tests
+GeoCoordinates* GeoIndex_PointsWithinRadius (GeoIndexApiType*,
+                                             GeoCoordinate*, 
+                                             double);
+
 GeoCoordinates* GeoIndex_PointsWithinRadius (triagens::mvcc::Transaction*,
-                                             GeoIndex*,
+                                             GeoIndexApiType*,
                                              GeoCoordinate*, 
                                              double); 
 
-GeoCoordinates * GeoIndex_NearestCountPoints(GeoIndex * gi,
-                    GeoCoordinate * c, int count);
+// this version is used during tests
+GeoCoordinates* GeoIndex_NearestCountPoints (GeoIndexApiType*,
+                                             GeoCoordinate*, 
+                                             int);
+
 GeoCoordinates* GeoIndex_NearestCountPoints (triagens::mvcc::Transaction*,
-                                             GeoIndex*,
+                                             GeoIndexApiType*,
                                              GeoCoordinate*, 
                                              int); 
-void GeoIndex_CoordinatesFree(GeoCoordinates * clist);
+
+void GeoIndex_CoordinatesFree (GeoCoordinates* clist);
+
 #ifdef TRI_GEO_DEBUG
-void GeoIndex_INDEXDUMP(GeoIndex * gi, FILE * f);
-int  GeoIndex_INDEXVALID(GeoIndex * gi);
+void GeoIndex_INDEXDUMP (GeoIndexApiType* gi, 
+                         FILE* f);
+
+int  GeoIndex_INDEXVALID (GeoIndexApiType* gi);
 #endif
 
 #endif
 
-/* end of GeoIndex.h  */
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       END-OF-FILE
 // -----------------------------------------------------------------------------

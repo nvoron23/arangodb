@@ -33,7 +33,9 @@
 #include "Basics/Common.h"
 #include "Basics/json.h"
 #include "Basics/JsonHelper.h"
+#include "Mvcc/HashIndex.h"
 #include "Mvcc/Index.h"
+#include "Mvcc/SkiplistIndex.h"
 #include "Utils/Exception.h"
 #include "VocBase/index.h"
 
@@ -53,23 +55,26 @@ namespace triagens {
       Index (Index const&) = delete;
       Index& operator= (Index const&) = delete;
       
-      Index (TRI_index_t* idx)
-        : id(idx->_iid),
-          type(idx->_type),
-          unique(idx->_unique),
-          sparse(idx->_sparse),
-          fields(),
-          internals(idx) {
+      Index (triagens::mvcc::Index* index)
+        : id(index->id()),
+          type(index->type()),
+          unique(false),
+          sparse(false),
+          fields(index->fields()),
+          internals(index) {
 
-        size_t const n = idx->_fields._length;
-        fields.reserve(n);
-
-        for (size_t i = 0; i < n; ++i) {
-          char const* field = idx->_fields._buffer[i];
-          fields.emplace_back(std::string(field));
-        }
-        
         TRI_ASSERT(internals != nullptr);
+
+        if (index->type() == TRI_IDX_TYPE_HASH_INDEX) {
+          auto idx = static_cast<triagens::mvcc::HashIndex const*>(index);
+          unique = idx->unique();
+          sparse = idx->sparse();
+        }
+        else if (index->type() == TRI_IDX_TYPE_SKIPLIST_INDEX) {
+          auto idx = static_cast<triagens::mvcc::SkiplistIndex const*>(index);
+          unique = idx->unique();
+          sparse = idx->sparse();
+        }
       }
       
       Index (TRI_json_t const* json)
@@ -127,31 +132,31 @@ namespace triagens {
           return false;
         }
 
-        return getInternals()->_hasSelectivityEstimate;
+        return getInternals()->hasSelectivity();
       }
 
       double selectivityEstimate () const {
-        TRI_index_t* internals = getInternals();
+        auto index = getInternals();
 
-        TRI_ASSERT(internals->_hasSelectivityEstimate);
+        TRI_ASSERT(index->hasSelectivity());
 
-        return internals->selectivityEstimate(internals);
+        return index->getSelectivity();
       }
       
       inline bool hasInternals () const {
         return (internals != nullptr);
       }
 
-      TRI_index_t* getInternals () const {
+      triagens::mvcc::Index* getInternals () const {
         if (internals == nullptr) {
           THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "accessing undefined index internals");
         }
         return internals; 
       }
       
-      void setInternals (TRI_index_t* idx) {
+      void setInternals (triagens::mvcc::Index* index) {
         TRI_ASSERT(internals == nullptr);
-        internals = idx;
+        internals = index;
       }
 
 // -----------------------------------------------------------------------------
@@ -162,13 +167,13 @@ namespace triagens {
 
         TRI_idx_iid_t const        id;
         TRI_idx_type_e const       type;
-        bool const                 unique;
-        bool const                 sparse;
+        bool                       unique;
+        bool                       sparse;
         std::vector<std::string>   fields;
 
       private:
 
-        TRI_index_t*               internals;
+        triagens::mvcc::Index*     internals;
 
     };
 

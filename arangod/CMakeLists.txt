@@ -89,7 +89,7 @@ add_executable(
     Mvcc/CollectionOperations.cpp
     Mvcc/EdgeIndex.cpp
     Mvcc/FulltextIndex.cpp
-    Mvcc/GeoIndex2.cpp
+    Mvcc/GeoIndex.cpp
     Mvcc/HashIndex.cpp
     Mvcc/IndexesReadLocker.cpp
     Mvcc/IndexesWriteLocker.cpp
@@ -99,7 +99,7 @@ add_executable(
     Mvcc/OpenIterator.cpp
     Mvcc/PrimaryIndex.cpp
     Mvcc/ScopedResolver.cpp
-    Mvcc/SkiplistIndex2.cpp
+    Mvcc/SkiplistIndex.cpp
     Mvcc/SubTransaction.cpp
     Mvcc/TopLevelTransaction.cpp
     Mvcc/Transaction.cpp
@@ -154,7 +154,6 @@ add_executable(
     VocBase/compactor.cpp
     VocBase/datafile.cpp
     VocBase/document-collection.cpp
-    VocBase/edge-collection.cpp
     VocBase/general-cursor.cpp
     VocBase/headers.cpp
     VocBase/index.cpp

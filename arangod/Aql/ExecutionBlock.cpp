@@ -32,9 +32,9 @@
 #include "Basics/StringUtils.h"
 #include "Basics/StringBuffer.h"
 #include "Basics/json-utilities.h"
+#include "Mvcc/EdgeIndex.h"
 #include "Utils/Exception.h"
 #include "V8/v8-globals.h"
-#include "VocBase/edge-collection.h"
 #include "VocBase/index.h"
 #include "VocBase/vocbase.h"
 
@@ -1739,6 +1739,9 @@ void IndexRangeBlock::readPrimaryIndex (IndexOrCondition const& ranges) {
 
 void IndexRangeBlock::readEdgeIndex (IndexOrCondition const& ranges) {
   ENTER_BLOCK;
+
+  // TODO TODO TODO: re-add edge index lookup functionality
+#if 0  
   TRI_document_collection_t* document = _collection->documentCollection();
      
   std::string key;
@@ -1787,6 +1790,8 @@ void IndexRangeBlock::readEdgeIndex (IndexOrCondition const& ranges) {
       }
     }
   }
+
+#endif
   LEAVE_BLOCK;
 }
 

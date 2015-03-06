@@ -27,7 +27,7 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "GeoIndex2.h"
+#include "GeoIndex.h"
 #include "Basics/ReadLocker.h"
 #include "Basics/WriteLocker.h"
 #include "Utils/Exception.h"
@@ -49,11 +49,11 @@ using namespace triagens::mvcc;
 /// @brief create a new geo index, type "geo1"
 ////////////////////////////////////////////////////////////////////////////////
 
-GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
-                      TRI_document_collection_t* collection,
-                      std::vector<std::string> const& fields,
-                      std::vector<TRI_shape_pid_t> const& paths,
-                      bool geoJson)
+GeoIndex::GeoIndex (TRI_idx_iid_t id,
+                    TRI_document_collection_t* collection,
+                    std::vector<std::string> const& fields,
+                    std::vector<TRI_shape_pid_t> const& paths,
+                    bool geoJson)
   : Index(id, fields),
     _collection(collection),
     _lock(),
@@ -76,10 +76,10 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
 /// @brief create a new geo index, type "geo2"
 ////////////////////////////////////////////////////////////////////////////////
 
-GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
-                      TRI_document_collection_t* collection,
-                      std::vector<std::string> const& fields,
-                      std::vector<TRI_shape_pid_t> const& paths) 
+GeoIndex::GeoIndex (TRI_idx_iid_t id,
+                    TRI_document_collection_t* collection,
+                    std::vector<std::string> const& fields,
+                    std::vector<TRI_shape_pid_t> const& paths) 
   : Index(id, fields),
     _collection(collection),
     _lock(),
@@ -102,7 +102,7 @@ GeoIndex2::GeoIndex2 (TRI_idx_iid_t id,
 /// @brief destroy the geo index
 ////////////////////////////////////////////////////////////////////////////////
 
-GeoIndex2::~GeoIndex2 () {
+GeoIndex::~GeoIndex () {
   if (_geoIndex != nullptr) {
     GeoIndex_free(_geoIndex);
   }
@@ -112,10 +112,10 @@ GeoIndex2::~GeoIndex2 () {
 /// @brief query documents near a coordinate
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::near (Transaction* transaction,
-                                                                  double latitude,
-                                                                  double longitude,
-                                                                  size_t limit) {
+std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex::near (Transaction* transaction,
+                                                                 double latitude,
+                                                                 double longitude,
+                                                                 size_t limit) {
   
   std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> theResult
         (new std::vector<std::pair<TRI_doc_mptr_t*, double>>);
@@ -168,10 +168,10 @@ std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::near (Transaction* t
 /// @brief query documents within a radius
 ////////////////////////////////////////////////////////////////////////////////
 
-std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::within (Transaction* transaction,
-                                                                    double latitude,
-                                                                    double longitude,
-                                                                    double radius) {
+std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex::within (Transaction* transaction,
+                                                                   double latitude,
+                                                                   double longitude,
+                                                                   double radius) {
   
   std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> theResult
         (new std::vector<std::pair<TRI_doc_mptr_t*, double>>);
@@ -224,7 +224,7 @@ std::vector<std::pair<TRI_doc_mptr_t*, double>>* GeoIndex2::within (Transaction*
 /// @brief insert a document when loading a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-void GeoIndex2::insert (TRI_doc_mptr_t* doc) {
+void GeoIndex::insert (TRI_doc_mptr_t* doc) {
   insert(nullptr, nullptr, doc);
 }
 
@@ -232,7 +232,7 @@ void GeoIndex2::insert (TRI_doc_mptr_t* doc) {
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
 
-void GeoIndex2::insert (TransactionCollection*,
+void GeoIndex::insert (TransactionCollection*,
                         Transaction*,
                         TRI_doc_mptr_t* doc) {
   TRI_shaper_t* shaper = _collection->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
@@ -293,10 +293,10 @@ void GeoIndex2::insert (TransactionCollection*,
 /// @brief remove document from index
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
-                                   Transaction*,
-                                   std::string const&,
-                                   TRI_doc_mptr_t* doc) {
+TRI_doc_mptr_t* GeoIndex::remove (TransactionCollection*,
+                                  Transaction*,
+                                  std::string const&,
+                                  TRI_doc_mptr_t* doc) {
   return nullptr;  
 }
 
@@ -304,9 +304,9 @@ TRI_doc_mptr_t* GeoIndex2::remove (TransactionCollection*,
 /// @brief forget document in index
 ////////////////////////////////////////////////////////////////////////////////
 
-void GeoIndex2::forget (TransactionCollection*,
-                        Transaction*,
-                        TRI_doc_mptr_t* doc) {
+void GeoIndex::forget (TransactionCollection*,
+                       Transaction*,
+                       TRI_doc_mptr_t* doc) {
   bool ok;
   bool missing;
   double latitude;
@@ -344,15 +344,15 @@ void GeoIndex2::forget (TransactionCollection*,
 /// @brief post insert (does nothing) 
 ////////////////////////////////////////////////////////////////////////////////
 
-void GeoIndex2::preCommit (TransactionCollection*,
-                           Transaction*) {
+void GeoIndex::preCommit (TransactionCollection*,
+                          Transaction*) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the amount of memory used by the index
 ////////////////////////////////////////////////////////////////////////////////
 
-size_t GeoIndex2::memory () {
+size_t GeoIndex::memory () {
   READ_LOCKER(_lock);
   return GeoIndex_MemoryUsage(_geoIndex);
 }
@@ -361,7 +361,7 @@ size_t GeoIndex2::memory () {
 /// @brief return a JSON representation of the index
 ////////////////////////////////////////////////////////////////////////////////
 
-Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
+Json GeoIndex::toJson (TRI_memory_zone_t* zone) const {
   std::vector<std::string> f;
 
   auto shaper = _collection->getShaper();
@@ -429,11 +429,11 @@ Json GeoIndex2::toJson (TRI_memory_zone_t* zone) const {
 /// @brief extracts a double value from an array
 ////////////////////////////////////////////////////////////////////////////////
 
-bool GeoIndex2::extractDoubleArray (TRI_shaper_t* shaper,
-                                    TRI_shaped_json_t const* document,
-                                    TRI_shape_pid_t pid,
-                                    double* result,
-                                    bool* missing) {
+bool GeoIndex::extractDoubleArray (TRI_shaper_t* shaper,
+                                   TRI_shaped_json_t const* document,
+                                   TRI_shape_pid_t pid,
+                                   double* result,
+                                   bool* missing) {
   *missing = false;
 
   TRI_shape_t const* shape;
@@ -466,12 +466,12 @@ bool GeoIndex2::extractDoubleArray (TRI_shaper_t* shaper,
 /// @brief extracts a double value from a list
 ////////////////////////////////////////////////////////////////////////////////
 
-bool GeoIndex2::extractDoubleList (TRI_shaper_t* shaper,
-                                   TRI_shaped_json_t const* document,
-                                   TRI_shape_pid_t pid,
-                                   double* latitude,
-                                   double* longitude,
-                                   bool* missing) {
+bool GeoIndex::extractDoubleList (TRI_shaper_t* shaper,
+                                  TRI_shaped_json_t const* document,
+                                  TRI_shape_pid_t pid,
+                                  double* latitude,
+                                  double* longitude,
+                                  bool* missing) {
   TRI_shaped_json_t entry;
 
   *missing = false;

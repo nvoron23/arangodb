@@ -33,11 +33,11 @@
 #include "Mvcc/CollectionOperations.h"
 #include "Mvcc/EdgeIndex.h"
 #include "Mvcc/FulltextIndex.h"
-#include "Mvcc/GeoIndex2.h"
+#include "Mvcc/GeoIndex.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/ScopedResolver.h"
-#include "Mvcc/SkiplistIndex2.h"
+#include "Mvcc/SkiplistIndex.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionScope.h"
@@ -979,7 +979,7 @@ static void MvccSkiplistQuery (QueryType type,
       TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
     }
 
-    auto skiplistIndex = static_cast<triagens::mvcc::SkiplistIndex2*>(index);
+    auto skiplistIndex = static_cast<triagens::mvcc::SkiplistIndex*>(index);
     auto const& paths = skiplistIndex->paths();
 
     auto example = args[1]->ToObject();
@@ -997,7 +997,7 @@ static void MvccSkiplistQuery (QueryType type,
     }
 
     // setup result
-    std::unique_ptr<triagens::mvcc::SkiplistIndex2::Iterator> iter(skiplistIndex->lookup(transactionCollection, transaction, skiplistOperator.get(), reverse));
+    std::unique_ptr<triagens::mvcc::SkiplistIndex::Iterator> iter(skiplistIndex->lookup(transactionCollection, transaction, skiplistOperator.get(), reverse));
 
     std::unique_ptr<std::vector<TRI_doc_mptr_t*>> indexResult
         (new std::vector<TRI_doc_mptr_t*>);
@@ -1005,7 +1005,7 @@ static void MvccSkiplistQuery (QueryType type,
     iter->skip(skip);
     size_t count = 0;
     while (count < limit && iter->hasNext()) {
-      triagens::mvcc::SkiplistIndex2::Element* elm = iter->next();
+      triagens::mvcc::SkiplistIndex::Element* elm = iter->next();
       if (elm != nullptr) {   // MVCC logic might actually not see something
                               // that hasNext was suspecting to be a result!
         TRI_doc_mptr_t* ptr = elm->_document;
@@ -1670,7 +1670,7 @@ static void JS_MvccNear (const v8::FunctionCallbackInfo<v8::Value>& args) {
       limit = 100;
     }
   
-    std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> indexResult(static_cast<triagens::mvcc::GeoIndex2*>(index)->near(transaction, latitude, longitude, limit));
+    std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> indexResult(static_cast<triagens::mvcc::GeoIndex*>(index)->near(transaction, latitude, longitude, limit));
     
     // setup result
     v8::Handle<v8::Object> result = v8::Object::New(isolate);
@@ -1747,7 +1747,7 @@ static void JS_MvccWithin (const v8::FunctionCallbackInfo<v8::Value>& args) {
     double longitude = TRI_ObjectToDouble(args[2]);
     double radius = TRI_ObjectToDouble(args[3]);
   
-    std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> indexResult(static_cast<triagens::mvcc::GeoIndex2*>(index)->within(transaction, latitude, longitude, radius));
+    std::unique_ptr<std::vector<std::pair<TRI_doc_mptr_t*, double>>> indexResult(static_cast<triagens::mvcc::GeoIndex*>(index)->within(transaction, latitude, longitude, radius));
     
     // setup result
     v8::Handle<v8::Object> result = v8::Object::New(isolate);

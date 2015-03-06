@@ -28,20 +28,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "index.h"
-
 #include "Basics/files.h"
 #include "Basics/json.h"
 #include "Basics/logging.h"
-#include "Basics/utf8-helper.h"
 #include "Basics/json-utilities.h"
 #include "Mvcc/Index.h"
-#include "ShapedJson/shape-accessor.h"
-#include "ShapedJson/shaped-json.h"
 #include "Utils/Exception.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/edge-collection.h"
-#include "VocBase/server.h"
-#include "VocBase/voc-shaper.h"
 #include "Wal/LogfileManager.h"
 #include "Wal/Marker.h"
 
@@ -84,24 +77,6 @@ int TRI_RemoveIndexFile (TRI_document_collection_t* collection,
   }
 
   return res;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief removes an index file
-////////////////////////////////////////////////////////////////////////////////
-
-bool TRI_RemoveIndexFile (TRI_document_collection_t* collection, 
-                          TRI_index_t* idx) {
-  std::string&& filename = BuildIndexFilename(collection->_directory, idx->_iid);
-
-  int res = TRI_UnlinkFile(filename.c_str());
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    LOG_ERROR("cannot remove index definition: %s", TRI_last_error());
-    return false;
-  }
-
-  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -155,72 +130,13 @@ int TRI_SaveIndex (TRI_document_collection_t* document,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief saves an index
-////////////////////////////////////////////////////////////////////////////////
-
-int TRI_SaveIndex (TRI_document_collection_t* document,
-                   TRI_index_t* idx,
-                   bool writeMarker) {
-  // convert into JSON
-  TRI_json_t* json = idx->json(idx);
-
-  if (json == nullptr) {
-    LOG_TRACE("cannot save index definition: index cannot be jsonified");
-    return TRI_set_errno(TRI_ERROR_INTERNAL);
-  }
-
-  std::string&& filename = BuildIndexFilename(document->_directory, idx->_iid);
-
-  TRI_vocbase_t* vocbase = document->_vocbase;
-
-  // and save
-  bool ok = TRI_SaveJson(filename.c_str(), json, document->_vocbase->_settings.forceSyncProperties);
-
-  if (! ok) {
-    LOG_ERROR("cannot save index definition: %s", TRI_last_error());
-    TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
-
-    return TRI_errno();
-  }
-
-  if (! writeMarker) {
-    return TRI_ERROR_NO_ERROR;
-  }
-
-  int res = TRI_ERROR_NO_ERROR;
-
-  try {
-    triagens::wal::CreateIndexMarker marker(vocbase->_id, document->_info._cid, idx->_iid, triagens::basics::JsonHelper::toString(json));
-    triagens::wal::SlotInfoCopy slotInfo = triagens::wal::LogfileManager::instance()->allocateAndWrite(marker, false);
-
-    if (slotInfo.errorCode != TRI_ERROR_NO_ERROR) {
-      THROW_ARANGO_EXCEPTION(slotInfo.errorCode);
-    }
-
-    TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
-    return TRI_ERROR_NO_ERROR;
-  }
-  catch (triagens::arango::Exception const& ex) {
-    res = ex.code();
-  }
-  catch (...) {
-    res = TRI_ERROR_INTERNAL;
-  }
-
-  TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
-
-  // TODO: what to do here?
-  return res;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief index comparator, used by the coordinator to detect if two index
 /// contents are the same
 ////////////////////////////////////////////////////////////////////////////////
 
 bool IndexComparator (TRI_json_t const* lhs,
                       TRI_json_t const* rhs) {
-  TRI_json_t* typeJson = TRI_LookupObjectJson(lhs, "type");
+  TRI_json_t const* typeJson = TRI_LookupObjectJson(lhs, "type");
   TRI_ASSERT(TRI_IsStringJson(typeJson));
 
   // type must be identical
@@ -232,7 +148,8 @@ bool IndexComparator (TRI_json_t const* lhs,
 
 
   // unique must be identical if present
-  TRI_json_t* value = TRI_LookupObjectJson(lhs, "unique");
+  TRI_json_t const* value = TRI_LookupObjectJson(lhs, "unique");
+
   if (TRI_IsBooleanJson(value)) {
     if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "unique"))) {
       return false;
@@ -241,6 +158,7 @@ bool IndexComparator (TRI_json_t const* lhs,
 
   // sparse must be identical if present
   value = TRI_LookupObjectJson(lhs, "sparse");
+
   if (TRI_IsBooleanJson(value)) {
     if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "sparse"))) {
       return false;
@@ -251,6 +169,7 @@ bool IndexComparator (TRI_json_t const* lhs,
   if (type == TRI_IDX_TYPE_GEO1_INDEX) {
     // geoJson must be identical if present
     value = TRI_LookupObjectJson(lhs, "geoJson");
+
     if (TRI_IsBooleanJson(value)) {
       if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "geoJson"))) {
         return false;
@@ -260,6 +179,7 @@ bool IndexComparator (TRI_json_t const* lhs,
   else if (type == TRI_IDX_TYPE_FULLTEXT_INDEX) {
     // minLength
     value = TRI_LookupObjectJson(lhs, "minLength");
+
     if (TRI_IsNumberJson(value)) {
       if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "minLength"))) {
         return false;
@@ -269,6 +189,7 @@ bool IndexComparator (TRI_json_t const* lhs,
   else if (type == TRI_IDX_TYPE_CAP_CONSTRAINT) {
     // size, byteSize
     value = TRI_LookupObjectJson(lhs, "size");
+
     if (TRI_IsNumberJson(value)) {
       if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "size"))) {
         return false;
@@ -276,6 +197,7 @@ bool IndexComparator (TRI_json_t const* lhs,
     }
 
     value = TRI_LookupObjectJson(lhs, "byteSize");
+
     if (TRI_IsNumberJson(value)) {
       if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "byteSize"))) {
         return false;

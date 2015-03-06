@@ -291,36 +291,27 @@ void Collection::fillIndexesDBServer () const {
   // register indexes
   for (size_t i = 0; i < n; ++i) {
     TRI_json_t const* v = TRI_LookupArrayJson(json, i);
-    if (TRI_IsObjectJson(v)) {
-      // lookup index id
-      TRI_json_t const* id = TRI_LookupObjectJson(v, "id");
-      if (! TRI_IsStringJson(id)) {
-        continue;
-      }
 
-      // use numeric index id
-      uint64_t iid = triagens::basics::StringUtils::uint64(id->_value._string.data, id->_value._string.length - 1);
-      TRI_index_t* data = nullptr;
-
-      // now check if we can find the local index and map it
-      for (auto it : document->_allIndexes) {
-        auto localIndex = it;
-        if (localIndex != nullptr && localIndex->_iid == iid) {
-          // found
-          data = localIndex;
-          break;
-        }
-        else if (localIndex->_type == TRI_IDX_TYPE_PRIMARY_INDEX || 
-                  localIndex->_type == TRI_IDX_TYPE_EDGE_INDEX) {
-        }
-      }
-
-      auto idx = new Index(v);
-      // assign the found local index
-      idx->setInternals(data);
-
-      indexes.push_back(idx);
+    if (! TRI_IsObjectJson(v)) {
+      continue;
     }
+
+    // lookup index id
+    TRI_json_t const* id = TRI_LookupObjectJson(v, "id");
+    if (! TRI_IsStringJson(id)) {
+      continue;
+    }
+    
+    auto idx = new triagens::aql::Index(v);
+
+    // use numeric index id
+    uint64_t iid = triagens::basics::StringUtils::uint64(id->_value._string.data, id->_value._string.length - 1);
+
+    // now check if we can find the local index and map it
+    // assign the found local index
+    idx->setInternals(document->lookupIndex(iid));
+
+    indexes.emplace_back(idx);
   }
 }
 
@@ -332,11 +323,10 @@ void Collection::fillIndexesDBServer () const {
 void Collection::fillIndexesLocal () const {
   // local collection
   auto document = documentCollection();
-  size_t const n = document->_allIndexes.size();
-  indexes.reserve(n);
+  // TODO TODO TODO: check index locking
 
-  for (size_t i = 0; i < n; ++i) {
-    indexes.emplace_back(new Index(document->_allIndexes[i]));
+  for (auto it : document->indexes()) {
+    indexes.emplace_back(new Index(it));
   }
 }
 

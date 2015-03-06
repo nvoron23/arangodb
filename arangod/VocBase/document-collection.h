@@ -550,8 +550,6 @@ public:
   TRI_headers_t*               _headersPtr;
   KeyGenerator*                _keyGenerator;
 
-  std::vector<TRI_index_t*>    _allIndexes;
-
   int64_t                      _uncollectedLogfileEntries;
   int64_t                      _numberDocuments;
   TRI_read_write_lock_t        _compactionLock;

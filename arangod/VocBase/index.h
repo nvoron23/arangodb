@@ -31,22 +31,14 @@
 #define ARANGODB_VOC_BASE_INDEX_H 1
 
 #include "Basics/Common.h"
-#include "Basics/AssocMulti.h"
-#include "Basics/json.h"
-#include "IndexOperators/index-operator.h"
-#include "ShapedJson/shaped-json.h"
 #include "VocBase/voc-types.h"
-#include "VocBase/vocbase.h"
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                              forward declarations
 // -----------------------------------------------------------------------------
 
-struct TRI_collection_t;
-struct TRI_doc_mptr_t;
-struct TRI_shaped_json_s;
+struct TRI_json_t;
 struct TRI_document_collection_t;
-struct TRI_transaction_collection_s;
 
 namespace triagens {
   namespace mvcc {
@@ -77,73 +69,6 @@ typedef enum {
 }
 TRI_idx_type_e;
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief geo index variants
-////////////////////////////////////////////////////////////////////////////////
-
-typedef enum {
-  INDEX_GEO_NONE = 0,
-  INDEX_GEO_INDIVIDUAL_LAT_LON,
-  INDEX_GEO_COMBINED_LAT_LON,
-  INDEX_GEO_COMBINED_LON_LAT
-}
-TRI_index_geo_variant_e;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief index base class
-////////////////////////////////////////////////////////////////////////////////
-
-typedef struct TRI_index_s {
-  TRI_idx_iid_t   _iid;
-  TRI_idx_type_e  _type;
-  struct TRI_document_collection_t* _collection;
-
-  TRI_vector_string_t _fields;
-  bool _unique;
-  bool _sparse;
-  bool _hasSelectivityEstimate;
-
-  double (*selectivityEstimate) (struct TRI_index_s const*);
-  size_t (*memory) (struct TRI_index_s const*);
-  TRI_json_t* (*json) (struct TRI_index_s const*);
-
-  // .........................................................................................
-  // the following functions are called for document/collection administration
-  // .........................................................................................
-
-  int (*insert) (struct TRI_index_s*, struct TRI_doc_mptr_t const*, bool);
-  int (*remove) (struct TRI_index_s*, struct TRI_doc_mptr_t const*, bool);
-
-  // NULL by default. will only be called if non-NULL
-  int (*postInsert) (struct TRI_transaction_collection_s*, struct TRI_index_s*, struct TRI_doc_mptr_t const*);
-
-  // a garbage collection function for the index
-  int (*cleanup) (struct TRI_index_s*);
-
-  // give index a hint about the expected size
-  int (*sizeHint) (struct TRI_index_s*, size_t);
-
-  // .........................................................................................
-  // the following functions are called by the query machinery which attempting to determine an
-  // appropriate index and when using the index to obtain a result set.
-  // .........................................................................................
-}
-TRI_index_t;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief edge index
-////////////////////////////////////////////////////////////////////////////////
-
-typedef triagens::basics::AssocMulti<void, void, uint32_t> TRI_EdgeIndexHash_t;
-
-typedef struct TRI_edge_index_s {
-  TRI_index_t base;
-
-  TRI_EdgeIndexHash_t* _edges_from;
-  TRI_EdgeIndexHash_t* _edges_to;
-}
-TRI_edge_index_t;
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                             INDEX
 // -----------------------------------------------------------------------------
@@ -160,13 +85,6 @@ int TRI_RemoveIndexFile (struct TRI_document_collection_t*,
                          TRI_idx_iid_t);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief removes an index file
-////////////////////////////////////////////////////////////////////////////////
-
-bool TRI_RemoveIndexFile (struct TRI_document_collection_t*,
-                          TRI_index_t*);
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief saves an index
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -175,19 +93,12 @@ int TRI_SaveIndex (struct TRI_document_collection_t*,
                    bool);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief saves an index
-////////////////////////////////////////////////////////////////////////////////
-
-int TRI_SaveIndex (struct TRI_document_collection_t*,
-                   TRI_index_t*,
-                   bool);
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief index comparator, used by the coordinator to detect if two index
 /// contents are the same
 ////////////////////////////////////////////////////////////////////////////////
 
-bool IndexComparator (TRI_json_t const* lhs, TRI_json_t const* rhs);
+bool IndexComparator (struct TRI_json_t const*, 
+                      struct TRI_json_t const*);
 
 #endif
 

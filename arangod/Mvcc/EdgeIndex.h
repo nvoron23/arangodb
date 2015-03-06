@@ -35,9 +35,31 @@
 #include "Basics/JsonHelper.h"
 #include "Basics/ReadWriteLock.h"
 #include "Mvcc/Index.h"
-#include "VocBase/edge-collection.h"
+#include "VocBase/voc-types.h"
 
 struct TRI_document_collection_t;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief edge direction
+////////////////////////////////////////////////////////////////////////////////
+
+typedef enum {
+  TRI_EDGE_ANY    = 0, // can only be used for searching
+  TRI_EDGE_IN     = 1,
+  TRI_EDGE_OUT    = 2
+}
+TRI_edge_direction_e;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief index entry for edges
+////////////////////////////////////////////////////////////////////////////////
+
+typedef struct TRI_edge_header_s {
+  TRI_voc_cid_t _cid; // from or to, depending on the direction
+  TRI_voc_key_t _key;
+}
+TRI_edge_header_t;
+
 
 namespace triagens {
   namespace mvcc {

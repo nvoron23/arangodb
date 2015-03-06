@@ -37,7 +37,6 @@
 #include "Mvcc/TransactionScope.h"
 #include "Rest/HttpRequest.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/edge-collection.h"
 
 using namespace std;
 using namespace triagens::basics;

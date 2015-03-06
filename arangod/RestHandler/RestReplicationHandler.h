@@ -31,15 +31,12 @@
 #define ARANGODB_REST_HANDLER_REST_REPLICATION_HANDLER_H 1
 
 #include "Basics/Common.h"
-
 #include "RestHandler/RestVocbaseBaseHandler.h"
 #include "HttpServer/HttpServer.h"
 #include "Utils/CollectionNameResolver.h"
-#include "VocBase/edge-collection.h"
 #include "VocBase/replication-common.h"
 
 struct TRI_json_t;
-struct TRI_replication_log_state_s;
 struct TRI_transaction_collection_s;
 struct TRI_vocbase_col_s;
 

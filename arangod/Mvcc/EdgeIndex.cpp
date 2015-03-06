@@ -33,7 +33,7 @@
 #include "Basics/WriteLocker.h"
 #include "Mvcc/Transaction.h"
 #include "Utils/Exception.h"
-#include "VocBase/edge-collection.h"
+#include "VocBase/document-collection.h"
 #include "Wal/LogfileManager.h"
 #include "Wal/Marker.h"
 

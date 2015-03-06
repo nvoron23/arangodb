@@ -35,6 +35,7 @@
 #include "Basics/ReadWriteLock.h"
 #include "Basics/SkipList.h"
 #include "Mvcc/Index.h"
+#include "IndexOperators/index-operator.h"
 #include "ShapedJson/shaped-json.h"
 
 struct TRI_document_collection_t;
@@ -46,7 +47,7 @@ namespace triagens {
 // --SECTION--                                               class SkiplistIndex
 // -----------------------------------------------------------------------------
 
-    class SkiplistIndex2 : public Index {
+    class SkiplistIndex : public Index {
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                      public types
@@ -73,14 +74,14 @@ namespace triagens {
       
       public:
 
-        SkiplistIndex2 (TRI_idx_iid_t,
-                        struct TRI_document_collection_t*,
-                        std::vector<std::string> const&,
-                        std::vector<TRI_shape_pid_t> const&,
-                        bool,
-                        bool);
+        SkiplistIndex (TRI_idx_iid_t,
+                       struct TRI_document_collection_t*,
+                       std::vector<std::string> const&,
+                       std::vector<TRI_shape_pid_t> const&,
+                       bool,
+                       bool);
 
-        ~SkiplistIndex2 ();
+        ~SkiplistIndex ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                            public methods, inherited from Index.h
@@ -172,7 +173,7 @@ namespace triagens {
         };
 
         class Iterator {
-            SkiplistIndex2 const* _index;
+            SkiplistIndex const* _index;
             TransactionCollection* _collection;
             Transaction* _transaction;
             bool _reverse;
@@ -191,7 +192,7 @@ namespace triagens {
                      // SkiplistPrevIterationCallback for the exact
                      // condition for the iterator to be exhausted.
           public:
-            Iterator (SkiplistIndex2 const* index, TransactionCollection* coll,
+            Iterator (SkiplistIndex const* index, TransactionCollection* coll,
                       Transaction* trans, TRI_index_operator_t* op,
                       bool reverse)
               : _index(index), _collection(coll), _transaction(trans),

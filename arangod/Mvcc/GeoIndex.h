@@ -47,7 +47,22 @@ namespace triagens {
 // --SECTION--                                                    class GeoIndex
 // -----------------------------------------------------------------------------
 
-    class GeoIndex2 : public Index {
+    class GeoIndex : public Index {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                     private types
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief geo index variants
+////////////////////////////////////////////////////////////////////////////////
+
+      enum IndexVariant {
+        INDEX_GEO_NONE = 0,
+        INDEX_GEO_INDIVIDUAL_LAT_LON,
+        INDEX_GEO_COMBINED_LAT_LON,
+        INDEX_GEO_COMBINED_LON_LAT
+      };
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -55,18 +70,18 @@ namespace triagens {
 
       public:
 
-        GeoIndex2 (TRI_idx_iid_t id,
-                   struct TRI_document_collection_t*,
-                   std::vector<std::string> const&,
-                   std::vector<TRI_shape_pid_t> const&,
-                   bool geoJson);
+        GeoIndex (TRI_idx_iid_t id,
+                  struct TRI_document_collection_t*,
+                  std::vector<std::string> const&,
+                  std::vector<TRI_shape_pid_t> const&,
+                  bool geoJson);
         
-        GeoIndex2 (TRI_idx_iid_t id,
-                   struct TRI_document_collection_t*,
-                   std::vector<std::string> const&,
-                   std::vector<TRI_shape_pid_t> const&);
+        GeoIndex (TRI_idx_iid_t id,
+                  struct TRI_document_collection_t*,
+                  std::vector<std::string> const&,
+                  std::vector<TRI_shape_pid_t> const&);
 
-        ~GeoIndex2 ();
+        ~GeoIndex ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                            public methods, inherited from Index.h
@@ -188,13 +203,13 @@ namespace triagens {
 /// @brief the geo index
 ////////////////////////////////////////////////////////////////////////////////
 
-        GeoIndex* _geoIndex;
+        GeoIndexApiType* _geoIndex;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief the geo index variant (geo1 or geo2)
 ////////////////////////////////////////////////////////////////////////////////
 
-        TRI_index_geo_variant_e const _variant;
+        IndexVariant const _variant;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief attribute paths

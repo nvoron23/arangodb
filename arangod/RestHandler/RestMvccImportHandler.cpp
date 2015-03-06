@@ -35,7 +35,6 @@
 #include "Mvcc/TransactionScope.h"
 #include "Rest/HttpRequest.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/edge-collection.h"
 #include "VocBase/vocbase.h"
 
 using namespace std;

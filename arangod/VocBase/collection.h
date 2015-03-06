@@ -51,7 +51,7 @@
 ///     datafile identifier, see @ref TRI_datafile_t.
 ///
 /// - index-NNN.json: An index description. The number NNN is the index
-///     identifier, see @ref TRI_index_t.
+///     identifier
 ///
 /// The structure @ref TRI_collection_t is abstract. Currently, there is one
 /// concrete sub-class @ref TRI_document_collection_t.

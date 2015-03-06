@@ -31,6 +31,7 @@
 #define ARANGODB_MVCC_HASH_INDEX_H 1
 
 #include "Basics/Common.h"
+#include "Basics/AssocMulti.h"
 #include "Basics/JsonHelper.h"
 #include "Mvcc/Index.h"
 #include "ShapedJson/shaped-json.h"

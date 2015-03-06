@@ -37,6 +37,42 @@
 #include "Mvcc/TransactionId.h"
 #include "VocBase/document-collection.h"
 
+/* first the things that a user might want to change */
+
+/* a GeoString - a signed type of at least 64 bits   */
+typedef long long GeoString;
+
+/* percentage growth of slot or slotslot tables     */
+#define GeoIndexGROW 50
+
+/* maximum number of points in a pot                */
+/*  ***  note - must be even!                       */
+/* smaller takes more space but is a little faster  */
+#define GeoIndexPOTSIZE 6
+
+/* choses the set of fixed points             */
+#define GeoIndexFIXEDSET 6
+/* 1 is just the N pole (doesn't really work) */
+/* 2 is N and S pole - slow but OK            */
+/* 3 is equilateral triangle on 0/180 long    */
+/* 4 is four corners of a tetrahedron         */
+/* 5 is trigonal bipyramid                    */
+/* 6 is the  corners of octahedron (default)  */
+/* 8 is eight corners of a cube               */
+
+/* size of max-dist integer.                           */
+/* 2 is 16-bit - smaller but slow when lots of points  */
+/*     within a few hundred meters of target           */
+/* 4 is 32-bit - larger and fast even when points are  */
+/*     only centimeters apart.  Default                */
+#define GEOFIXLEN 4
+#if GEOFIXLEN == 2
+typedef unsigned short GeoFix;
+#endif
+#if GEOFIXLEN == 4
+typedef unsigned int GeoFix;
+#endif
+
     /* Radius of the earth used for distances  */
 #define EARTHRADIUS 6371000.0
 
@@ -73,12 +109,14 @@
 /* They are computed at GeoIndex_new time and not      */
 /* changed after that                                  */
 /* =================================================== */
-typedef struct
-{
-    double x[GeoIndexFIXEDPOINTS];
-    double y[GeoIndexFIXEDPOINTS];
-    double z[GeoIndexFIXEDPOINTS];
-}       GeoIndexFixed;
+
+typedef struct {
+  double x[GeoIndexFIXEDPOINTS];
+  double y[GeoIndexFIXEDPOINTS];
+  double z[GeoIndexFIXEDPOINTS];
+}
+GeoIndexFixed;
+
 /* =================================================== */
 /*                  GeoPot structure                   */
 /* These only occur in the main index itself, and the  */
@@ -103,6 +141,7 @@ typedef struct
 /* "points" lists the slotid of the points.  This is   */
 /* only used for a leaf pot.                           */
 /* =================================================== */
+
 typedef struct {
   int LorLeaf;
   int RorPoints;
@@ -114,6 +153,7 @@ typedef struct {
   int points[GeoIndexPOTSIZE];
 }
 GeoPot;
+
 /* =================================================== */
 /*                 GeoIx structure                     */
 /* This is the REAL GeoIndex structure - the one in    */
@@ -132,15 +172,17 @@ GeoPot;
 /* There is no provision at present for the index to   */
 /* get smaller when the majority of points are deleted */
 /* =================================================== */
+
 typedef struct {
   GeoIndexFixed fixed;  /* fixed point data          */
   int potct;            /* pots allocated            */
   int slotct;           /* slots allocated           */
-  GeoPot * pots;        /* the pots themselves       */
-  GeoCoordinate * gc;   /* the slots themselves      */
+  GeoPot* pots;         /* the pots themselves       */
+  GeoCoordinate* gc;    /* the slots themselves      */
   size_t _memoryUsed;   /* the amount of memory currently used */
 }
 GeoIx;
+
 /* =================================================== */
 /*              GeoDetailedPoint  structure            */
 /* The routine GeoMkDetail is given a point - really   */
@@ -180,19 +222,20 @@ GeoIx;
 /* The routine GeoPotJunk is used to test this,        */
 /* by comparing the distances in the pot the this array*/
 /* =================================================== */
-typedef struct
-{
-    GeoIx * gix;
-    GeoCoordinate * gc;
-    double x;
-    double y;
-    double z;
-    GeoString gs;
-    GeoFix fixdist[GeoIndexFIXEDPOINTS];
-    double snmd;
-    GeoFix distrej[GeoIndexFIXEDPOINTS];
+
+typedef struct {
+  GeoIx* gix;
+  GeoCoordinate* gc;
+  double x;
+  double y;
+  double z;
+  GeoString gs;
+  GeoFix fixdist[GeoIndexFIXEDPOINTS];
+  double snmd;
+  GeoFix distrej[GeoIndexFIXEDPOINTS];
 }
 GeoDetailedPoint;
+
 /* =================================================== */
 /*                   GeoResults   structure            */
 /* During the searches, this structure is used to      */
@@ -214,14 +257,15 @@ GeoDetailedPoint;
 /* one in the priority queue.  This work is done in the*/
 /* GeoResultsInsertPoint routine (not used by distance)*/
 /* =================================================== */
-typedef struct
-{
-    int pointsct;
-    int allocpoints;
-    int * slot;
-    double * snmd;
+
+typedef struct {
+  int pointsct;
+  int allocpoints;
+  int* slot;
+  double* snmd;
 }
 GeoResults;
+
 /* =================================================== */
 /*                 GeoStack    structure               */
 /* During searches of both kinds, at any time there is */
@@ -238,14 +282,15 @@ GeoResults;
 /* this than suffer the cache miss to determine whether*/
 /* either or both of the children can be rejected)     */
 /* =================================================== */
-typedef struct
-{
-    GeoResults * gr;
-    GeoDetailedPoint * gd;
-    int stacksize;
-    int potid[50];
+
+typedef struct {
+  GeoResults* gr;
+  GeoDetailedPoint* gd;
+  int stacksize;
+  int potid[50];
 }
 GeoStack;
+
 /* =================================================== */
 /*                  GeoPath structure                  */
 /* Similar in many ways to the GeoStack, above, this   */
@@ -261,14 +306,13 @@ GeoStack;
 /* to the current pot being considered is known, and   */
 /* its parent found when needed.                       */
 /* =================================================== */
-typedef struct
-{
-    GeoIx * gix;
-    int pathlength;
-    int path[50];
+
+typedef struct {
+  GeoIx* gix;
+  int pathlength;
+  int path[50];
 }
 GeoPath;
-
 
 /* =================================================== */
 /*                GeoIndex_Distance routine            */
@@ -283,30 +327,34 @@ GeoPath;
 /* points, and finally muliply this angle (in radians) */
 /* by the earth's radius to convert it into meters.    */
 /* =================================================== */
-double GeoIndex_distance(GeoCoordinate * c1, GeoCoordinate * c2)
-{
+
+double GeoIndex_distance (GeoCoordinate* c1, 
+                          GeoCoordinate* c2) {
 /* math.h under MacOS defines y1 and j1 as global variable */
-    double xx1,yy1,z1,x2,y2,z2,mole;
-    z1=sin(c1->latitude*M_PI/180.0);
-    xx1=cos(c1->latitude*M_PI/180.0)*cos(c1->longitude*M_PI/180.0);
-    yy1=cos(c1->latitude*M_PI/180.0)*sin(c1->longitude*M_PI/180.0);
-    z2=sin(c2->latitude*M_PI/180.0);
-    x2=cos(c2->latitude*M_PI/180.0)*cos(c2->longitude*M_PI/180.0);
-    y2=cos(c2->latitude*M_PI/180.0)*sin(c2->longitude*M_PI/180.0);
-    mole=sqrt((xx1-x2)*(xx1-x2) + (yy1-y2)*(yy1-y2) + (z1-z2)*(z1-z2));
-    if(mole >  2.0) mole = 2.0; /* make sure arcsin succeeds! */
-    return 2.0 * EARTHRADIUS * asin(mole/2.0);
+  double xx1,yy1,z1,x2,y2,z2,mole;
+  z1=sin(c1->latitude*M_PI/180.0);
+  xx1=cos(c1->latitude*M_PI/180.0)*cos(c1->longitude*M_PI/180.0);
+  yy1=cos(c1->latitude*M_PI/180.0)*sin(c1->longitude*M_PI/180.0);
+  z2=sin(c2->latitude*M_PI/180.0);
+  x2=cos(c2->latitude*M_PI/180.0)*cos(c2->longitude*M_PI/180.0);
+  y2=cos(c2->latitude*M_PI/180.0)*sin(c2->longitude*M_PI/180.0);
+  mole=sqrt((xx1-x2)*(xx1-x2) + (yy1-y2)*(yy1-y2) + (z1-z2)*(z1-z2));
+  if(mole >  2.0) mole = 2.0; /* make sure arcsin succeeds! */
+  return 2.0 * EARTHRADIUS * asin(mole/2.0);
 }
+
 /* =================================================== */
 /*          GeoIndexFreePot                            */
 /* takes the supplied pot, and puts it back onto the   */
 /* free list.                                          */
 /* =================================================== */
-void GeoIndexFreePot(GeoIx * gix, int pot)
-{
-    gix->pots[pot].LorLeaf=gix->pots[0].LorLeaf;
-    gix->pots[0].LorLeaf = pot;
+
+static void GeoIndexFreePot (GeoIx* gix, 
+                             int pot) {
+  gix->pots[pot].LorLeaf=gix->pots[0].LorLeaf;
+  gix->pots[0].LorLeaf = pot;
 }
+
 /* =================================================== */
 /*            GeoIndexNewPot                           */
 /* During insertion, it may happen that a leaf pot     */
@@ -324,8 +372,8 @@ void GeoIndexFreePot(GeoIx * gix, int pot)
 /* therefore careful to get the new pots (if any are   */
 /* needed) before it gets too far into things.         */
 /* =================================================== */
-int GeoIndexNewPot(GeoIx * gix)
-{
+
+static int GeoIndexNewPot (GeoIx* gix) {
     int newpotct,j;
     long long x,y;
     GeoPot * gp;
@@ -360,6 +408,7 @@ int GeoIndexNewPot(GeoIx * gix)
     gix->pots[0].LorLeaf=gix->pots[j].LorLeaf;
     return j;
 }
+
 /* =================================================== */
 /*         GeoIndex_new routine                        */
 /* User-facing routine to create a whole new GeoIndex. */
@@ -380,15 +429,16 @@ int GeoIndexNewPot(GeoIx * gix)
 /* GeoString values of real (latitude, longitude)      */
 /* points                                              */
 /* =================================================== */
-GeoIndex * GeoIndex_new (void) {
+
+GeoIndexApiType* GeoIndex_new () {
     GeoIx * gix;
     int i,j;
     double lat, lon, x, y, z;
 
     gix = static_cast<GeoIx*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, sizeof(GeoIx), false));
 
-    if (gix == NULL) {
-      return (GeoIndex *) gix;
+    if (gix == nullptr) {
+      return (GeoIndexApiType*) gix;
     }
 
 /* try to allocate all the things we need  */
@@ -581,8 +631,9 @@ GeoIndex * GeoIndex_new (void) {
     gix->pots[j].level = 1;
     for(i=0;i<GeoIndexFIXEDPOINTS;i++)
         gix->pots[j].maxdist[i]=0;
-    return (GeoIndex *) gix;
+    return (GeoIndexApiType*) gix;
 }
+
 /* =================================================== */
 /*               GeoIndex_free routine                 */
 /* Destroys the GeoIndex, and frees all the memory that*/
@@ -590,18 +641,18 @@ GeoIndex * GeoIndex_new (void) {
 /* objects that may have been pointed to by the user's */
 /* data pointers are (of course) not freed by this call*/
 /* =================================================== */
-void GeoIndex_free(GeoIndex * gi) {
-    GeoIx * gix;
 
-    if (gi == NULL) {
-      return;
-    }
+void GeoIndex_free (GeoIndexApiType* gi) {
+  if (gi == nullptr) {
+    return;
+  }
 
-    gix = (GeoIx *) gi;
-    TRI_Free(TRI_UNKNOWN_MEM_ZONE, gix->gc);
-    TRI_Free(TRI_UNKNOWN_MEM_ZONE, gix->pots);
-    TRI_Free(TRI_UNKNOWN_MEM_ZONE, gix);
+  GeoIx* gix = (GeoIx*) gi;
+  TRI_Free(TRI_UNKNOWN_MEM_ZONE, gix->gc);
+  TRI_Free(TRI_UNKNOWN_MEM_ZONE, gix->pots);
+  TRI_Free(TRI_UNKNOWN_MEM_ZONE, gix);
 }
+
 /* =================================================== */
 /*        GeoMkHilbert   routine                       */
 /* Points in this system are indexed by the "GeoString */
@@ -629,8 +680,8 @@ void GeoIndex_free(GeoIndex * gi) {
 #define STRINGPERDEGREE 372827.01
     /* 2^26 - 1 = 0x3ffffff                     */
 #define HILBERTMAX 67108863
-GeoString GeoMkHilbert(GeoCoordinate * c)
-{
+
+static GeoString GeoMkHilbert (GeoCoordinate* c) {
     /* math.h under MacOS defines y1 and j1 as global variable */
     double xx1,yy1;
     GeoString z;
@@ -675,8 +726,8 @@ GeoString GeoMkHilbert(GeoCoordinate * c)
         }
     }
     return z+1ll;
-
 }
+
 /* =================================================== */
 /*          GeoMkDetail  routine                       */
 /* At the beginning of both searches, and also at the  */
@@ -702,8 +753,10 @@ GeoString GeoMkHilbert(GeoCoordinate * c)
 #define ARCSINFIX 1520000000.0
 /*  resolution about 3 cm  */
 #endif
-void GeoMkDetail(GeoIx * gix, GeoDetailedPoint * gd, GeoCoordinate * c)
-{
+
+static void GeoMkDetail (GeoIx* gix, 
+                         GeoDetailedPoint* gd, 
+                         GeoCoordinate* c) {
 /* entire routine takes about 0.94 microseconds  */
 /* math.h under MacOS defines y1 and j1 as global variable */
     double xx1,yy1,z1,snmd;
@@ -727,6 +780,7 @@ void GeoMkDetail(GeoIx * gix, GeoDetailedPoint * gd, GeoCoordinate * c)
         (gd->fixdist)[i] = (GeoFix) (asin(sqrt(snmd)/2.0)*ARCSINFIX);
     }
 }
+
 /* =================================================== */
 /*                GeoMetersToSNMD                      */
 /* When searching for a point "by distance" rather than*/
@@ -740,14 +794,15 @@ void GeoMkDetail(GeoIx * gix, GeoDetailedPoint * gd, GeoCoordinate * c)
 /* calculation needs to be done.  This is, of course   */
 /* considerably faster.                                */
 /* =================================================== */
-double GeoMetersToSNMD(double meters)
-{
+
+static double GeoMetersToSNMD (double meters) {
     double angle,hnmd;
     angle=0.5*meters/EARTHRADIUS;
     hnmd=sin(angle);   /* half normalized mole distance  */
     if(angle>=M_PI/2.0) return 4.0;
     else               return hnmd*hnmd*4.0;
 }
+
 /* =================================================== */
 /*                     GeoSetDistance                  */
 /* During a search (of either type), the target point  */
@@ -759,8 +814,9 @@ double GeoMetersToSNMD(double meters)
 /* so that as much as possible is known to speed up    */
 /* consideration of any new points                     */
 /* =================================================== */
-void GeoSetDistance(GeoDetailedPoint * gd, double snmd)
-{
+
+static void GeoSetDistance (GeoDetailedPoint* gd, 
+                            double snmd) {
     GeoFix gf;
     int i;
     gd->snmd = snmd;
@@ -772,6 +828,7 @@ void GeoSetDistance(GeoDetailedPoint * gd, double snmd)
                else              (gd->distrej)[i]=(gd->fixdist)[i]-gf;
     }
 }
+
 /* =================================================== */
 /*                GeoStackSet  routine                 */
 /* The searches (by count and by distance) both start  */
@@ -787,8 +844,10 @@ void GeoSetDistance(GeoDetailedPoint * gd, double snmd)
 /* points (on the Hilbert curve, anyway) to be on the  */
 /* to of the stack and to contain few points           */
 /* =================================================== */
-void GeoStackSet (GeoStack * gk, GeoDetailedPoint * gd, GeoResults * gr)
-{
+
+static void GeoStackSet (GeoStack* gk, 
+                         GeoDetailedPoint* gd, 
+                         GeoResults* gr) {
     int pot;
     GeoIx * gix;
     GeoPot * gp;
@@ -815,6 +874,7 @@ void GeoStackSet (GeoStack * gk, GeoDetailedPoint * gd, GeoResults * gr)
     }
     gk->potid[gk->stacksize]=pot;
 }
+
 /* =================================================== */
 /*            GeoResultsCons  routine                  */
 /* Constructs (allocates) a new structure suitable for */
@@ -822,7 +882,8 @@ void GeoStackSet (GeoStack * gk, GeoDetailedPoint * gd, GeoResults * gr)
 /* structure just holds the slotid of each point chosen*/
 /* and the (SNMD) distance to the target point         */
 /* =================================================== */
-GeoResults* GeoResultsCons (int alloc) {
+
+static GeoResults* GeoResultsCons (int alloc) {
   if (alloc <= 0) {
     return nullptr;
   }
@@ -855,6 +916,7 @@ GeoResults* GeoResultsCons (int alloc) {
 /* no need to initialize maxsnmd */
   return gres;
 }
+
 /* =================================================== */
 /*                 GeoResultsStartCount                */
 /* The GeoResultsCons routine allocates the memory     */
@@ -864,8 +926,8 @@ GeoResults* GeoResultsCons (int alloc) {
 /* real point will be closer than that and be taken    */
 /* The GeoResultsStartCount routine does just that     */
 /* =================================================== */
-void GeoResultsStartCount(GeoResults * gr)
-{
+
+static void GeoResultsStartCount (GeoResults* gr) {
     int i;
     for(i=0;i<gr->allocpoints;i++)
     {
@@ -873,6 +935,7 @@ void GeoResultsStartCount(GeoResults * gr)
         gr->snmd[i]=10.0;
     }
 }
+
 /* =================================================== */
 /*              GeoResultsInsertPoint                  */
 /* when a point is to be considered as a candidate for */
@@ -887,8 +950,10 @@ void GeoResultsStartCount(GeoResults * gr)
 /* or equal, in SNMD distance, than both its children  */
 /* which are at 2n+1 and 2n+2                          */
 /* =================================================== */
-void GeoResultsInsertPoint(GeoResults * gr, int slot, double snmd)
-{
+
+static void GeoResultsInsertPoint (GeoResults* gr, 
+                                   int slot, 
+                                   double snmd) {
 /* math.h under MacOS defines y1 and j1 as global variable */
     int i,jj1,jj2,temp;
     if(snmd>=gr->snmd[0]) return;
@@ -1000,6 +1065,7 @@ static void GeoResultsInsertPoint (triagens::mvcc::Transaction* transaction,
     return;
   }
 }
+
 /* =================================================== */
 /*                GeoResultsGrow                       */
 /* During a search-by distance (the search-by-count    */
@@ -1009,8 +1075,8 @@ static void GeoResultsInsertPoint (triagens::mvcc::Transaction* transaction,
 /* ensures that another one is available.  If the      */
 /* allocation fails, -1 is returned.                   */
 /* =================================================== */
-int GeoResultsGrow(GeoResults * gr)
-{
+
+static int GeoResultsGrow (GeoResults* gr) {
     int newsiz;
     int * sa;
     double * dd;
@@ -1049,8 +1115,9 @@ int GeoResultsGrow(GeoResults * gr)
 /* distances that could be calculated by a separate    */
 /* call to GeoIndex_distance because of rounding errors*/
 /* =================================================== */
-GeoCoordinates * GeoAnswers (GeoIx * gix, GeoResults * gr)
-{
+
+static GeoCoordinates* GeoAnswers (GeoIx* gix, 
+                                   GeoResults* gr) {
     GeoCoordinates * ans;
     GeoCoordinate  * gc;
     int i,j,slot;
@@ -1105,6 +1172,7 @@ GeoCoordinates * GeoAnswers (GeoIx * gix, GeoResults * gr)
 
     return ans;
 }
+
 /* =================================================== */
 /*                 GeoPotJunk                          */
 /* A detailed point containing the target point set    */
@@ -1115,8 +1183,9 @@ GeoCoordinates * GeoAnswers (GeoIx * gix, GeoResults * gr)
 /* entirety because it contains no points close enough */
 /* to the target.  Otherwise 0 is returned.            */
 /* =================================================== */
-int GeoPotJunk(GeoDetailedPoint * gd, int pot)
-{
+
+static int GeoPotJunk (GeoDetailedPoint* gd, 
+                       int pot) {
     int i;
     GeoPot * gp;
     gp=(gd->gix)->pots + pot;
@@ -1124,6 +1193,7 @@ int GeoPotJunk(GeoDetailedPoint * gd, int pot)
         if(gp->maxdist[i]<gd->distrej[i]) return 1;
     return 0;
 }
+
 /* =================================================== */
 /*                   GeoSNMD                           */
 /* Finds the SNMD (Squared NormalizedMole Distance)    */
@@ -1132,8 +1202,9 @@ int GeoPotJunk(GeoDetailedPoint * gd, int pot)
 /* The cartesian coordinates of the ordinary point are */
 /* found, and then the differences squared returned.   */
 /* =================================================== */
-double GeoSNMD(GeoDetailedPoint * gd, GeoCoordinate * c)
-{
+
+static double GeoSNMD (GeoDetailedPoint* gd, 
+                       GeoCoordinate* c) {
     double x,y,z;
     z=sin(c->latitude*M_PI/180.0);
     x=cos(c->latitude*M_PI/180.0)*cos(c->longitude*M_PI/180.0);
@@ -1141,6 +1212,7 @@ double GeoSNMD(GeoDetailedPoint * gd, GeoCoordinate * c)
     return (x-gd->x)*(x-gd->x) + (y-gd->y)*(y-gd->y) +
                   (z-gd->z)*(z-gd->z);
 }
+
 /* =================================================== */
 /*           GeoIndex_PointsWithinRadius               */
 /* This is the basic user-visible call to find all the */
@@ -1171,9 +1243,11 @@ double GeoSNMD(GeoDetailedPoint * gd, GeoCoordinate * c)
 /* GeoCoordinate data (lat/longitude and data pointer) */
 /* needed for the return to the caller.                */
 /* =================================================== */
-GeoCoordinates * GeoIndex_PointsWithinRadius(GeoIndex * gi,
-                    GeoCoordinate * c, double d)
-{
+
+// this version is used during tests
+GeoCoordinates* GeoIndex_PointsWithinRadius (GeoIndexApiType* gi,
+                                             GeoCoordinate* c, 
+                                             double d) {
     GeoResults * gres;
     GeoCoordinates * answer;
     GeoDetailedPoint gd;
@@ -1228,7 +1302,7 @@ GeoCoordinates * GeoIndex_PointsWithinRadius(GeoIndex * gi,
 }
 
 GeoCoordinates* GeoIndex_PointsWithinRadius (triagens::mvcc::Transaction* transaction,
-                                             GeoIndex* gi,
+                                             GeoIndexApiType* gi,
                                              GeoCoordinate* c, 
                                              double d) {
   GeoIx* gix = (GeoIx*) gi;
@@ -1293,6 +1367,7 @@ GeoCoordinates* GeoIndex_PointsWithinRadius (triagens::mvcc::Transaction* transa
 
   return GeoAnswers(gix, gres);
 }
+
 /* =================================================== */
 /*            GeoIndex_NearestCountPoints              */
 /* The other user-visible search call, which finds the */
@@ -1307,9 +1382,11 @@ GeoCoordinates* GeoIndex_PointsWithinRadius (triagens::mvcc::Transaction* transa
 /* useful points onto the top of the stack for early   */
 /* processing.                                         */
 /* =================================================== */
-GeoCoordinates * GeoIndex_NearestCountPoints(GeoIndex * gi,
-                    GeoCoordinate * c, int count)
-{
+
+// this version is used during tests
+GeoCoordinates* GeoIndex_NearestCountPoints (GeoIndexApiType* gi,
+                                             GeoCoordinate* c, 
+                                             int count) {
     GeoResults * gr;
     GeoDetailedPoint gd;
     GeoCoordinates * answer;
@@ -1366,7 +1443,7 @@ GeoCoordinates * GeoIndex_NearestCountPoints(GeoIndex * gi,
 }
 
 GeoCoordinates* GeoIndex_NearestCountPoints (triagens::mvcc::Transaction* transaction,
-                                             GeoIndex* gi,
+                                             GeoIndexApiType* gi,
                                              GeoCoordinate* c, 
                                              int count) {
   GeoIx* gix = (GeoIx*) gi;
@@ -1420,15 +1497,18 @@ GeoCoordinates* GeoIndex_NearestCountPoints (triagens::mvcc::Transaction* transa
 
   return GeoAnswers(gix, gr);
 }
+
 /* =================================================== */
 /*             GeoIndexFreeSlot                        */
 /* return the specified slot to the free list          */
 /* =================================================== */
-void GeoIndexFreeSlot(GeoIx * gix, int slot)
-{
+
+static void GeoIndexFreeSlot (GeoIx* gix, 
+                              int slot) {
     gix->gc[slot].latitude=gix->gc[0].latitude;
     gix->gc[0].latitude = slot;
 }
+
 /* =================================================== */
 /*           GeoIndexNewSlot                           */
 /* If there is a fre slot already on the free list,    */
@@ -1444,8 +1524,8 @@ void GeoIndexFreeSlot(GeoIx * gix, int slot)
 /* kept unchanged even though the new point cannot be  */
 /* added to the index.                                 */
 /* =================================================== */
-int GeoIndexNewSlot(GeoIx * gix)
-{
+
+static int GeoIndexNewSlot (GeoIx* gix) {
     int newslotct,j;
     long long x,y;
     GeoCoordinate * gc;
@@ -1478,6 +1558,7 @@ int GeoIndexNewSlot(GeoIx * gix)
     gix->gc[0].latitude=gix->gc[j].latitude;
     return j;
 }
+
 /* =================================================== */
 /*                 GeoFind                             */
 /* This routine is used during insertion and removal,  */
@@ -1508,8 +1589,9 @@ int GeoIndexNewSlot(GeoIx * gix)
 /* the return value is 1 if the point is found and 2   */
 /* if it is not found                                  */
 /* =================================================== */
-int GeoFind(GeoPath * gt, GeoDetailedPoint * gd)
-{
+
+static int GeoFind (GeoPath* gt, 
+                    GeoDetailedPoint* gd) {
     int pot,pot1;
     int i;
     int slot;
@@ -1572,6 +1654,7 @@ int GeoFind(GeoPath * gt, GeoDetailedPoint * gd)
     }
     return 2;
 }
+
 /* =================================================== */
 /*          GeoPopulateMaxdist                         */
 /* During maintencance, when the points in a leaf pot  */
@@ -1579,8 +1662,10 @@ int GeoFind(GeoPath * gt, GeoDetailedPoint * gd)
 /* the points in the pot, details them, and rebuilds   */
 /* the list of maximum distances.                      */
 /* =================================================== */
-void GeoPopulateMaxdist(GeoIx * gix, GeoPot * gp, GeoString * gsa)
-{
+
+static void GeoPopulateMaxdist (GeoIx* gix, 
+                                GeoPot* gp, 
+                                GeoString* gsa) {
     int i,j;
     GeoDetailedPoint gd;
     gsa[0]=0x1FFFFFFFFFFFFFll;
@@ -1597,15 +1682,18 @@ void GeoPopulateMaxdist(GeoIx * gix, GeoPot * gp, GeoString * gsa)
     }
     gp->level=1;
 }
+
 /* =================================================== */
 /*              GeoGetPot                              */
 /* This routine simply converts a path and a height    */
 /* into a pot id.                                      */
 /* =================================================== */
-int GeoGetPot(GeoPath * gt, int height)
-{
-    return gt->path[gt->pathlength-height];
+
+static int GeoGetPot (GeoPath* gt, 
+                      int height) {
+  return gt->path[gt->pathlength-height];
 }
+
 /* =================================================== */
 /*             GeoAdjust                               */
 /* During insertion and deletion, this routine is used */
@@ -1615,8 +1703,9 @@ int GeoGetPot(GeoPath * gt, int height)
 /* start, middle and end GeoStrings, the level, and    */
 /* the maximum distances to the fixed points.          */
 /* =================================================== */
-void GeoAdjust(GeoIx * gix, int potx) /* the kids are alright */
-{
+
+static void GeoAdjust (GeoIx* gix, 
+                       int potx) { /* the kids are alright */
     int poty,potz;    /* x = (yz)  */
     int i;
     GeoPot * gpx;
@@ -1642,6 +1731,7 @@ void GeoAdjust(GeoIx * gix, int potx) /* the kids are alright */
 
     }
 }
+
 /* =================================================== */
 /*             RotateLeft                              */
 /* The operation used during tree balancing to convert */
@@ -1653,8 +1743,9 @@ void GeoAdjust(GeoIx * gix, int potx) /* the kids are alright */
 /* the fixed points, taking the data from the children */
 /* in both cases                                       */
 /* =================================================== */
-void RotateLeft(GeoIx * gix, int pote)
-{
+
+static void RotateLeft (GeoIx* gix, 
+                        int pote) {
     int pota,potb,potc,potd;
     GeoPot * gpd;
     GeoPot * gpe;
@@ -1671,6 +1762,7 @@ void RotateLeft(GeoIx * gix, int pote)
     gpe->RorPoints=potc;
     GeoAdjust(gix,pote);
 }
+
 /* =================================================== */
 /*                 RotateRight                         */
 /* The mirror-image or inverse of RotateLeft.          */
@@ -1679,8 +1771,9 @@ void RotateLeft(GeoIx * gix, int pote)
 /* and GeoAdjusted, and then E set to be AD = A(BC) and*/
 /* also GeoAdjusted                                    */
 /* =================================================== */
-void RotateRight(GeoIx * gix, int pote)
-{
+
+static void RotateRight (GeoIx* gix, 
+                         int pote) {
     int pota,potb,potc,potd;
     GeoPot * gpd;
     GeoPot * gpe;
@@ -1697,6 +1790,7 @@ void RotateRight(GeoIx * gix, int pote)
     gpe->RorPoints=potd;
     GeoAdjust(gix,pote);
 }
+
 /* =================================================== */
 /*        GeoIndex_insert                              */
 /* The user-facing routine to insert a new point into  */
@@ -1712,8 +1806,9 @@ void RotateRight(GeoIx * gix, int pote)
 /* balancing operation) which starts by obtaining the  */
 /* two new pots. . . continued below                   */
 /* =================================================== */
-int GeoIndex_insert(GeoIndex * gi, GeoCoordinate * c)
-{
+
+int GeoIndex_insert (GeoIndexApiType* gi, 
+                     GeoCoordinate * c) {
     int i,j,js,slot,pot,pot1,pot2;
     int potx,pota,poty,potz;
     int lvx,lv1,lva,lvy,lvz;
@@ -1930,6 +2025,7 @@ int GeoIndex_insert(GeoIndex * gi, GeoCoordinate * c)
     }
     return 0;
 }
+
 /* =================================================== */
 /*            GeoIndex_remove                          */
 /* As a user-facing routine, this starts by casting the*/
@@ -1951,8 +2047,9 @@ int GeoIndex_insert(GeoIndex * gi, GeoCoordinate * c)
 /* releasing of two pots (which are put back into the  */
 /* free chain using GeoIndexFreePot) Continued . . . . */
 /* =================================================== */
-int GeoIndex_remove(GeoIndex * gi, GeoCoordinate * c)
-{
+
+int GeoIndex_remove (GeoIndexApiType* gi, 
+                     GeoCoordinate* c) {
     GeoDetailedPoint gd;
     int rebalance;
     int lev,levp,levb,levn,levc;
@@ -2296,24 +2393,17 @@ int GeoIndex_remove(GeoIndex * gi, GeoCoordinate * c)
     }
     return 0;
 }
+
 /* =================================================== */
 /*                GeoIndex_CoordinatesFree             */
 /* The user-facing routine that must be called by the  */
 /* user when the results of a search are finished with */
 /* =================================================== */
-void GeoIndex_CoordinatesFree(GeoCoordinates * clist)
-{
-    TRI_Free(TRI_UNKNOWN_MEM_ZONE, clist->coordinates);
-    TRI_Free(TRI_UNKNOWN_MEM_ZONE, clist->distances);
-    TRI_Free(TRI_UNKNOWN_MEM_ZONE, clist);
-}
-/* =================================================== */
-/*            GeoIndex_hint does nothing!              */
-/* it is here for possible future compatibilty         */
-/* =================================================== */
-int GeoIndex_hint(GeoIndex * gi, int hint)
-{
-    return 0;
+
+void GeoIndex_CoordinatesFree (GeoCoordinates* clist) {
+  TRI_Free(TRI_UNKNOWN_MEM_ZONE, clist->coordinates);
+  TRI_Free(TRI_UNKNOWN_MEM_ZONE, clist->distances);
+  TRI_Free(TRI_UNKNOWN_MEM_ZONE, clist);
 }
 
 /* =================================================== */
@@ -2325,8 +2415,9 @@ int GeoIndex_hint(GeoIndex * gi, int hint)
 /* =================================================== */
 #ifdef TRI_GEO_DEBUG
 
-void RecursivePotDump (GeoIx * gix, FILE * f, int pot)
-{
+static void RecursivePotDump (GeoIx* gix, 
+                              FILE* f, 
+                              int pot) {
     int i;
     GeoPot * gp;
     GeoCoordinate * gc;
@@ -2364,8 +2455,8 @@ void RecursivePotDump (GeoIx * gix, FILE * f, int pot)
     }
 }
 
-void GeoIndex_INDEXDUMP (GeoIndex * gi, FILE * f)
-{
+void GeoIndex_INDEXDUMP (GeoIndexApiType* gi, 
+                         FILE* f) {
     GeoIx * gix;
     gix = (GeoIx *) gi;
     fprintf(f,"Dump of entire index.  %d pots and %d slots allocated\n",
@@ -2373,8 +2464,9 @@ void GeoIndex_INDEXDUMP (GeoIndex * gi, FILE * f)
     RecursivePotDump(gix,f,1);
 }
 
-int RecursivePotValidate (GeoIx * gix, int pot, int * usage)
-{
+static int RecursivePotValidate (GeoIx* gix, 
+                                 int pot, 
+                                 int* usage) {
     int i,j;
     GeoPot * gp;
     GeoDetailedPoint gd;
@@ -2436,8 +2528,7 @@ int RecursivePotValidate (GeoIx * gix, int pot, int * usage)
     }
 }
 
-int GeoIndex_INDEXVALID(GeoIndex * gi)
-{
+int GeoIndex_INDEXVALID (GeoIndexApiType* gi) {
     int usage[2];  // pots and slots
     int j,pot,slot;
     GeoIx * gix;
@@ -2474,10 +2565,9 @@ int GeoIndex_INDEXVALID(GeoIndex * gi)
 
 #endif
 
-
-size_t GeoIndex_MemoryUsage (void* theIndex) {
+size_t GeoIndex_MemoryUsage (GeoIndexApiType* theIndex) {
   GeoIx* geoIndex = (GeoIx*) theIndex;
-  if (geoIndex != NULL) {
+  if (geoIndex != nullptr) {
     return geoIndex->_memoryUsed;
   }
   return 0;

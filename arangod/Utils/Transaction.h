@@ -38,7 +38,6 @@
 #include "VocBase/barrier.h"
 #include "VocBase/collection.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/edge-collection.h"
 #include "VocBase/transaction.h"
 #include "VocBase/update-policy.h"
 #include "VocBase/vocbase.h"

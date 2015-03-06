@@ -70,7 +70,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/CollectionOperations.cpp \
 	arangod/Mvcc/EdgeIndex.cpp \
 	arangod/Mvcc/FulltextIndex.cpp \
-	arangod/Mvcc/GeoIndex2.cpp \
+	arangod/Mvcc/GeoIndex.cpp \
 	arangod/Mvcc/HashIndex.cpp \
 	arangod/Mvcc/Index.cpp \
 	arangod/Mvcc/IndexesReadLocker.cpp \
@@ -81,7 +81,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Mvcc/OpenIterator.cpp \
 	arangod/Mvcc/PrimaryIndex.cpp \
 	arangod/Mvcc/ScopedResolver.cpp \
-	arangod/Mvcc/SkiplistIndex2.cpp \
+	arangod/Mvcc/SkiplistIndex.cpp \
 	arangod/Mvcc/SubTransaction.cpp \
 	arangod/Mvcc/TopLevelTransaction.cpp \
 	arangod/Mvcc/Transaction.cpp \
@@ -136,7 +136,6 @@ arangod_libarangod_a_SOURCES = \
 	arangod/VocBase/compactor.cpp \
 	arangod/VocBase/datafile.cpp \
 	arangod/VocBase/document-collection.cpp \
-	arangod/VocBase/edge-collection.cpp \
 	arangod/VocBase/general-cursor.cpp \
 	arangod/VocBase/headers.cpp \
 	arangod/VocBase/index.cpp \

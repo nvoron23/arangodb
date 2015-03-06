@@ -28,7 +28,7 @@
 /// @author Copyright 2011-2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "SkiplistIndex2.h"
+#include "SkiplistIndex.h"
 #include "Basics/ReadLocker.h"
 #include "Basics/WriteLocker.h"
 #include "Mvcc/Transaction.h"
@@ -72,7 +72,7 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 static int CompareKeyElement (TRI_shaped_json_t const* left,
-                              SkiplistIndex2::Element const* right,
+                              SkiplistIndex::Element const* right,
                               size_t rightPosition,
                               TRI_shaper_t* shaper) {
   TRI_ASSERT(nullptr != left);
@@ -108,9 +108,9 @@ static int CompareKeyElement (TRI_shaped_json_t const* left,
 /// @brief compares elements, version with proper types
 ////////////////////////////////////////////////////////////////////////////////
 
-static int CompareElementElement (SkiplistIndex2::Element const* left,
+static int CompareElementElement (SkiplistIndex::Element const* left,
                                   size_t leftPosition,
-                                  SkiplistIndex2::Element const* right,
+                                  SkiplistIndex::Element const* right,
                                   size_t rightPosition,
                                   TRI_shaper_t* shaper) {
   TRI_ASSERT(nullptr != left);
@@ -156,9 +156,9 @@ class CmpElmElm {
     }
     ~CmpElmElm () {
     }
-    int operator() (SkiplistIndex2::Element const* leftElement, 
-                    SkiplistIndex2::Element const* rightElement, 
-                    SkiplistIndex2::SkipList_t::CmpType cmptype) {
+    int operator() (SkiplistIndex::Element const* leftElement, 
+                    SkiplistIndex::Element const* rightElement, 
+                    SkiplistIndex::SkipList_t::CmpType cmptype) {
       TRI_ASSERT(nullptr != leftElement);
       TRI_ASSERT(nullptr != rightElement);
 
@@ -191,7 +191,7 @@ class CmpElmElm {
       // otherwise.
       // .......................................................................
 
-      if (SkiplistIndex2::SkipList_t::CMP_PREORDER == cmptype) {
+      if (SkiplistIndex::SkipList_t::CMP_PREORDER == cmptype) {
         return 0;
       }
 
@@ -229,8 +229,8 @@ class CmpKeyElm {
     }
     ~CmpKeyElm () {
     }
-    int operator() (SkiplistIndex2::Key const*     leftKey, 
-                    SkiplistIndex2::Element const* rightElement) {
+    int operator() (SkiplistIndex::Key const*     leftKey, 
+                    SkiplistIndex::Element const* rightElement) {
       TRI_ASSERT(nullptr != leftKey);
       TRI_ASSERT(nullptr != rightElement);
 
@@ -255,14 +255,14 @@ class CmpKeyElm {
 ////////////////////////////////////////////////////////////////////////////////
 
 class FreeElm {
-    SkiplistIndex2* _skipListIndex;
+    SkiplistIndex* _skipListIndex;
   public:
-    FreeElm (SkiplistIndex2* skipListIndex)
+    FreeElm (SkiplistIndex* skipListIndex)
       : _skipListIndex(skipListIndex) {
     }
     ~FreeElm () {
     }
-    void operator() (SkiplistIndex2::Element* elm) {
+    void operator() (SkiplistIndex::Element* elm) {
       _skipListIndex->deleteElement(elm);
     }
 };
@@ -275,12 +275,12 @@ class FreeElm {
 /// @brief create a new skiplist index
 ////////////////////////////////////////////////////////////////////////////////
 
-SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
-                                TRI_document_collection_t* collection,
-                                std::vector<std::string> const& fields,
-                                std::vector<TRI_shape_pid_t> const& paths,
-                                bool unique,
-                                bool sparse)
+SkiplistIndex::SkiplistIndex (TRI_idx_iid_t id,
+                              TRI_document_collection_t* collection,
+                              std::vector<std::string> const& fields,
+                              std::vector<TRI_shape_pid_t> const& paths,
+                              bool unique,
+                              bool sparse)
   : Index(id, fields),
     _collection(collection),
     _lock(),
@@ -310,7 +310,7 @@ SkiplistIndex2::SkiplistIndex2 (TRI_idx_iid_t id,
 /// @brief destroy the skiplist index
 ////////////////////////////////////////////////////////////////////////////////
 
-SkiplistIndex2::~SkiplistIndex2 () {
+SkiplistIndex::~SkiplistIndex () {
   delete _theSkipList;
 }
 
@@ -322,11 +322,10 @@ SkiplistIndex2::~SkiplistIndex2 () {
 /// @brief lookup method, constructing an iterator
 ////////////////////////////////////////////////////////////////////////////////
 
-SkiplistIndex2::Iterator* SkiplistIndex2::lookup (
-                                  TransactionCollection* coll,
-                                  Transaction* trans,
-                                  TRI_index_operator_t* op,
-                                  bool reverse) const {
+SkiplistIndex::Iterator* SkiplistIndex::lookup (TransactionCollection* coll,
+                                                Transaction* trans,
+                                                TRI_index_operator_t* op,
+                                                bool reverse) const {
   return new Iterator(this, coll, trans, op, reverse);
 }
 
@@ -416,7 +415,7 @@ static int FillLookupSLOperator (TRI_index_operator_t* slOperator,
 /// @brief fillMe, this actually builds up the iterator object
 ////////////////////////////////////////////////////////////////////////////////
 
-void SkiplistIndex2::Iterator::fillMe (TRI_index_operator_t* op) {
+void SkiplistIndex::Iterator::fillMe (TRI_index_operator_t* op) {
 
   int errorResult = FillLookupSLOperator(op, _collection->documentCollection());
   if (errorResult != TRI_ERROR_NO_ERROR) {
@@ -448,8 +447,8 @@ void SkiplistIndex2::Iterator::fillMe (TRI_index_operator_t* op) {
 /// calling itself recursively
 ////////////////////////////////////////////////////////////////////////////////
 
-void SkiplistIndex2::Iterator::fillHelper (TRI_index_operator_t* op,
-                                           std::vector<Interval>& result) {
+void SkiplistIndex::Iterator::fillHelper (TRI_index_operator_t* op,
+                                          std::vector<Interval>& result) {
   Key                               values;
   std::vector<Interval>             leftResult;
   std::vector<Interval>             rightResult;
@@ -597,7 +596,7 @@ void SkiplistIndex2::Iterator::fillHelper (TRI_index_operator_t* op,
 // Tests whether the LeftEndPoint is > than RightEndPoint (1)   [undefined]
 // .............................................................................
 
-bool SkiplistIndex2::Iterator::intervalValid ( Interval const& interval) {
+bool SkiplistIndex::Iterator::intervalValid (Interval const& interval) {
   int compareResult;
   SkipList_t::Node* lNode;
   SkipList_t::Node* rNode;
@@ -649,10 +648,9 @@ bool SkiplistIndex2::Iterator::intervalValid ( Interval const& interval) {
 /// @brief intervalIntersectionValid
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SkiplistIndex2::Iterator::intervalIntersectionValid (
-                    Interval const& lInterval,
-                    Interval const& rInterval,
-                    Interval &interval) {
+bool SkiplistIndex::Iterator::intervalIntersectionValid (Interval const& lInterval,
+                                                         Interval const& rInterval,
+                                                         Interval &interval) {
   SkipList_t::Node* lNode;
   SkipList_t::Node* rNode;
 
@@ -720,7 +718,7 @@ bool SkiplistIndex2::Iterator::intervalIntersectionValid (
 /// @brief getInterval
 ////////////////////////////////////////////////////////////////////////////////
 
-SkiplistIndex2::Interval SkiplistIndex2::Iterator::getInterval () const {
+SkiplistIndex::Interval SkiplistIndex::Iterator::getInterval () const {
   return _intervals[_currentInterval];
 }
 
@@ -728,7 +726,7 @@ SkiplistIndex2::Interval SkiplistIndex2::Iterator::getInterval () const {
 /// @brief hasNext - iterator functionality
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SkiplistIndex2::Iterator::hasNext () const {
+bool SkiplistIndex::Iterator::hasNext () const {
   if (_intervals.empty()) {
     return false;
   }
@@ -789,7 +787,7 @@ bool SkiplistIndex2::Iterator::hasNext () const {
 /// @brief next - iterator functionality
 ////////////////////////////////////////////////////////////////////////////////
 
-SkiplistIndex2::Element* SkiplistIndex2::Iterator::next () {
+SkiplistIndex::Element* SkiplistIndex::Iterator::next () {
   // We assume that hasNext() has returned true
   TRI_ASSERT(_currentInterval < _intervals.size());
   Interval interval = getInterval();
@@ -868,7 +866,7 @@ SkiplistIndex2::Element* SkiplistIndex2::Iterator::next () {
 /// @brief skip - iterator functionality
 ////////////////////////////////////////////////////////////////////////////////
 
-void SkiplistIndex2::Iterator::skip (size_t steps) {
+void SkiplistIndex::Iterator::skip (size_t steps) {
   for (size_t i = 0; i < steps; i++) {
     if (! hasNext()) {
       return;
@@ -884,7 +882,7 @@ void SkiplistIndex2::Iterator::skip (size_t steps) {
 /// @brief insert document into index (called when opening a collection)
 ////////////////////////////////////////////////////////////////////////////////
         
-void SkiplistIndex2::insert (TRI_doc_mptr_t* doc) {
+void SkiplistIndex::insert (TRI_doc_mptr_t* doc) {
   bool includeForSparse = true;
   Element* listElement = allocateAndFillElement(doc, includeForSparse);
 
@@ -902,9 +900,9 @@ void SkiplistIndex2::insert (TRI_doc_mptr_t* doc) {
 /// @brief insert document into index
 ////////////////////////////////////////////////////////////////////////////////
         
-void SkiplistIndex2::insert (TransactionCollection* coll,
-                             Transaction* trans,
-                             TRI_doc_mptr_t* doc) {
+void SkiplistIndex::insert (TransactionCollection* coll,
+                            Transaction* trans,
+                            TRI_doc_mptr_t* doc) {
   bool includeForSparse = true;
   Element* listElement = allocateAndFillElement(doc, includeForSparse);
     
@@ -990,10 +988,10 @@ void SkiplistIndex2::insert (TransactionCollection* coll,
 /// @brief remove document from index
 ////////////////////////////////////////////////////////////////////////////////
         
-TRI_doc_mptr_t* SkiplistIndex2::remove (TransactionCollection*,
-                                        Transaction*,
-                                        std::string const&,
-                                        TRI_doc_mptr_t* doc) {
+TRI_doc_mptr_t* SkiplistIndex::remove (TransactionCollection*,
+                                       Transaction*,
+                                       std::string const&,
+                                       TRI_doc_mptr_t* doc) {
   return nullptr;   // this is a no-operation
 }
 
@@ -1001,9 +999,9 @@ TRI_doc_mptr_t* SkiplistIndex2::remove (TransactionCollection*,
 /// @brief forget document in the index
 ////////////////////////////////////////////////////////////////////////////////
         
-void SkiplistIndex2::forget (TransactionCollection* coll,
-                             Transaction* trans,
-                             TRI_doc_mptr_t* doc) {
+void SkiplistIndex::forget (TransactionCollection* coll,
+                            Transaction* trans,
+                            TRI_doc_mptr_t* doc) {
   bool includeForSparse = false;
   Element* listElement = allocateAndFillElement(doc, includeForSparse);
 
@@ -1031,7 +1029,7 @@ void SkiplistIndex2::forget (TransactionCollection* coll,
 /// @brief post-insert (does nothing)
 ////////////////////////////////////////////////////////////////////////////////
 
-void SkiplistIndex2::preCommit (TransactionCollection*, Transaction*) {
+void SkiplistIndex::preCommit (TransactionCollection*, Transaction*) {
   // this is intentionally a no-operation
 }
 
@@ -1039,7 +1037,7 @@ void SkiplistIndex2::preCommit (TransactionCollection*, Transaction*) {
 /// @brief determine the amount of memory used by the index
 ////////////////////////////////////////////////////////////////////////////////
 
-size_t SkiplistIndex2::memory () {
+size_t SkiplistIndex::memory () {
   READ_LOCKER(_lock);
   return _theSkipList->memoryUsage() + elementSize() * _theSkipList->getNrUsed();
 }
@@ -1048,7 +1046,7 @@ size_t SkiplistIndex2::memory () {
 /// @brief return a JSON representation of the index
 ////////////////////////////////////////////////////////////////////////////////
         
-Json SkiplistIndex2::toJson (TRI_memory_zone_t* zone) const {
+Json SkiplistIndex::toJson (TRI_memory_zone_t* zone) const {
   Json json = Index::toJson(zone);
   Json fields(zone, Json::Array, _fields.size());
   for (auto& field : _fields) {
@@ -1065,7 +1063,7 @@ Json SkiplistIndex2::toJson (TRI_memory_zone_t* zone) const {
 ////////////////////////////////////////////////////////////////////////////////
         
 // a garbage collection function for the index
-void SkiplistIndex2::cleanup () {
+void SkiplistIndex::cleanup () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1073,7 +1071,7 @@ void SkiplistIndex2::cleanup () {
 ////////////////////////////////////////////////////////////////////////////////
         
 // give index a hint about the expected size
-void SkiplistIndex2::sizeHint (size_t) {
+void SkiplistIndex::sizeHint (size_t) {
 }
 
 // -----------------------------------------------------------------------------
@@ -1084,7 +1082,7 @@ void SkiplistIndex2::sizeHint (size_t) {
 /// @brief returns the memory needed for an index key entry
 ////////////////////////////////////////////////////////////////////////////////
 
-size_t SkiplistIndex2::elementSize () const {
+size_t SkiplistIndex::elementSize () const {
   return sizeof(TRI_doc_mptr_t*) + _paths.size() * sizeof(TRI_shaped_sub_t);
 }
 
@@ -1092,13 +1090,12 @@ size_t SkiplistIndex2::elementSize () const {
 /// @brief allocateAndFillElement
 ////////////////////////////////////////////////////////////////////////////////
 
-SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
-                                 TRI_doc_mptr_t* doc,
-                                 bool& includeForSparse) {
+SkiplistIndex::Element* SkiplistIndex::allocateAndFillElement (TRI_doc_mptr_t* doc,
+                                                               bool& includeForSparse) {
   auto elm 
-    = static_cast<SkiplistIndex2::Element*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, 
-                                                         elementSize(),
-                                                         false));
+    = static_cast<SkiplistIndex::Element*>(TRI_Allocate(TRI_UNKNOWN_MEM_ZONE, 
+                                                        elementSize(),
+                                                        false));
 
   if (elm == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
@@ -1160,7 +1157,7 @@ SkiplistIndex2::Element* SkiplistIndex2::allocateAndFillElement (
 /// @brief deleteElement
 ////////////////////////////////////////////////////////////////////////////////
 
-void SkiplistIndex2::deleteElement (Element* elm) {
+void SkiplistIndex::deleteElement (Element* elm) {
   TRI_Free(TRI_UNKNOWN_MEM_ZONE, static_cast<void*>(elm));
 }
 

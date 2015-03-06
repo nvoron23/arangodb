@@ -1948,20 +1948,20 @@ int RestReplicationHandler::processRestoreIndexes (TRI_json_t const* collection,
 
     for (size_t i = 0; i < n; ++i) {
       TRI_json_t const* idxDef = static_cast<TRI_json_t const*>(TRI_AtVector(&indexes->_value._objects, i));
-      triagens::mvcc::Index* idx = nullptr;
+      triagens::mvcc::Index* index = nullptr;
 
       // {"id":"229907440927234","type":"hash","unique":false,"fields":["x","Y"]}
 
-      res = TRI_FromJsonIndexDocumentCollection(document, idxDef, idx);
+      res = TRI_FromJsonIndexDocumentCollection(document, idxDef, index);
 
       if (res != TRI_ERROR_NO_ERROR) {
         errorMsg = "could not create index: " + string(TRI_errno_string(res));
         break;
       }
       else {
-        TRI_ASSERT(idx != nullptr);
+        TRI_ASSERT(index != nullptr);
 
-        res = TRI_SaveIndex(document, idx, true);
+        res = TRI_SaveIndex(document, index, true);
 
         if (res != TRI_ERROR_NO_ERROR) {
           errorMsg = "could not save index: " + string(TRI_errno_string(res));

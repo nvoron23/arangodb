@@ -37,13 +37,13 @@
 #include "Mvcc/CapConstraint.h"
 #include "Mvcc/EdgeIndex.h"
 #include "Mvcc/FulltextIndex.h"
-#include "Mvcc/GeoIndex2.h"
+#include "Mvcc/GeoIndex.h"
 #include "Mvcc/HashIndex.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/OpenIterator.h"
 #include "Mvcc/PrimaryIndex.h"
-#include "Mvcc/SkiplistIndex2.h"
+#include "Mvcc/SkiplistIndex.h"
 #include "Mvcc/Transaction.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Mvcc/TransactionScope.h"
@@ -53,7 +53,6 @@
 #include "Utils/CollectionReadLocker.h"
 #include "Utils/CollectionWriteLocker.h"
 #include "Utils/Exception.h"
-#include "VocBase/edge-collection.h"
 #include "VocBase/index.h"
 #include "VocBase/key-generator.h"
 #include "VocBase/primary-index.h"
@@ -447,7 +446,7 @@ void TRI_document_collection_t::fillIndex (triagens::mvcc::Index* index) {
     return;
   }
   
- static_cast<triagens::mvcc::PrimaryIndex*>(primaryIndex)->iterate([&index](TRI_doc_mptr_t* document) -> void {
+  static_cast<triagens::mvcc::PrimaryIndex*>(primaryIndex)->iterate([&index](TRI_doc_mptr_t* document) -> void {
     index->insert(document);
   });
 }
@@ -461,9 +460,6 @@ int TRI_AddOperationTransaction (triagens::wal::DocumentOperation&, bool&);
 // -----------------------------------------------------------------------------
 // --SECTION--                                              forward declarations
 // -----------------------------------------------------------------------------
-
-static int FillIndex (TRI_document_collection_t*,
-                      TRI_index_t*);
 
 static int CapConstraintFromJson (TRI_document_collection_t*,
                                   TRI_json_t const*,
@@ -619,36 +615,9 @@ static int InsertPrimaryIndex (TRI_document_collection_t* document,
 static int InsertSecondaryIndexes (TRI_document_collection_t* document,
                                    TRI_doc_mptr_t const* header,
                                    bool isRollback) {
-  TRI_IF_FAILURE("InsertSecondaryIndexes") {
-    return TRI_ERROR_DEBUG;
-  }
-
-  if (! document->useSecondaryIndexes()) {
-    return TRI_ERROR_NO_ERROR;
-  }
-
-  int result = TRI_ERROR_NO_ERROR;
-  size_t const n = document->_allIndexes.size();
-
-  // we can start at index #1 here (index #0 is the primary index)
-  for (size_t i = 1;  i < n;  ++i) {
-    TRI_index_t* idx = document->_allIndexes[i];
-    int res = idx->insert(idx, header, isRollback);
-
-    // in case of no-memory, return immediately
-    if (res == TRI_ERROR_OUT_OF_MEMORY) {
-      return res;
-    }
-    else if (res != TRI_ERROR_NO_ERROR) {
-      if (res == TRI_ERROR_ARANGO_UNIQUE_CONSTRAINT_VIOLATED ||
-          result == TRI_ERROR_NO_ERROR) {
-        // "prefer" unique constraint violated
-        result = res;
-      }
-    }
-  }
-
-  return result;
+  // TODO TODO TODO: remove this
+  TRI_ASSERT(false);
+  return TRI_ERROR_INTERNAL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -678,29 +647,9 @@ static int DeletePrimaryIndex (TRI_document_collection_t* document,
 static int DeleteSecondaryIndexes (TRI_document_collection_t* document,
                                    TRI_doc_mptr_t const* header,
                                    bool isRollback) {
-  if (! document->useSecondaryIndexes()) {
-    return TRI_ERROR_NO_ERROR;
-  }
-
-  TRI_IF_FAILURE("DeleteSecondaryIndexes") {
-    return TRI_ERROR_DEBUG;
-  }
-
-  int result = TRI_ERROR_NO_ERROR;
-  size_t const n = document->_allIndexes.size();
-
-  // we can start at index #1 here (index #0 is the primary index)
-  for (size_t i = 1;  i < n;  ++i) {
-    TRI_index_t* idx = document->_allIndexes[i];
-    int res = idx->remove(idx, header, isRollback);
-
-    if (res != TRI_ERROR_NO_ERROR) {
-      // an error occurred
-      result = res;
-    }
-  }
-
-  return result;
+  // TODO TODO TODO: delete this method
+  TRI_ASSERT(false);
+  return TRI_ERROR_INTERNAL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -775,24 +724,9 @@ static void UpdateHeader (TRI_voc_fid_t fid,
 static int PostInsertIndexes (TRI_transaction_collection_t* trxCollection,
                               TRI_doc_mptr_t* header) {
 
-  TRI_document_collection_t* document = trxCollection->_collection->_collection;
-  if (! document->useSecondaryIndexes()) {
-    return TRI_ERROR_NO_ERROR;
-  }
-
-  size_t const n = document->_allIndexes.size();
-
-  // we can start at index #1 here (index #0 is the primary index)
-  for (size_t i = 1;  i < n;  ++i) {
-    TRI_index_t* idx = document->_allIndexes[i];
-
-    if (idx->postInsert != nullptr) {
-      idx->postInsert(trxCollection, idx, header);
-    }
-  }
-
-  // post-insert will never return an error
-  return TRI_ERROR_NO_ERROR;
+  // TODO TODO TODO: remove this method
+  TRI_ASSERT(false);
+  return TRI_ERROR_INTERNAL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2614,21 +2548,25 @@ bool TRI_CloseDatafileDocumentCollection (TRI_document_collection_t* document,
 class IndexFiller {
   public:
     IndexFiller (TRI_document_collection_t* document,
-                 TRI_index_t* idx,
+                 triagens::mvcc::Index* index,
                  std::function<void(int)> callback) 
       : _document(document),
-        _idx(idx),
+        _index(index),
         _callback(callback) {
     }
 
     void operator() () {
       TransactionBase trx(true);
-      int res = TRI_ERROR_INTERNAL;
+      int res = TRI_ERROR_NO_ERROR;
 
       try {
-        res = FillIndex(_document, _idx);
+        _document->fillIndex(_index);
+      }
+      catch (triagens::arango::Exception const& ex) {
+        res = ex.code();
       }
       catch (...) {
+        res = TRI_ERROR_INTERNAL;
       }
         
       _callback(res);
@@ -2637,7 +2575,7 @@ class IndexFiller {
   private:
 
     TRI_document_collection_t* _document;
-    TRI_index_t*               _idx;
+    triagens::mvcc::Index*     _index;
     std::function<void(int)>   _callback;
 };
 
@@ -2663,13 +2601,14 @@ int TRI_FillIndexesDocumentCollection (TRI_vocbase_col_t* collection,
     return TRI_ERROR_INTERNAL;
   }
  
-  // distribute the work to index threads plus this thread
-  size_t const n = document->_allIndexes.size();
-  
+  // TODO TODO TODO: locking!
+  auto const indexes = document->indexes();
+  size_t const n = indexes.size();
   TRI_ASSERT(n >= 1);
   
   std::atomic<int> result(TRI_ERROR_NO_ERROR);
 
+  // distribute the work to index threads plus this thread
   { 
     triagens::basics::Barrier barrier(n - 1);
 
@@ -2687,13 +2626,13 @@ int TRI_FillIndexesDocumentCollection (TRI_vocbase_col_t* collection,
 
     // now actually fill the secondary indexes
     for (size_t i = 1;  i < n;  ++i) {
-      TRI_index_t* idx = document->_allIndexes[i];
+      auto index = indexes[i];
 
       // index threads must come first, otherwise this thread will block the loop and
       // prevent distribution to threads
       if (indexPool != nullptr && i != (n - 1)) {
         // move task into thread pool
-        IndexFiller indexTask(document, idx, callback);
+        IndexFiller indexTask(document, index, callback);
 
         try {
           static_cast<triagens::basics::ThreadPool*>(indexPool)->enqueue(indexTask);
@@ -2708,10 +2647,13 @@ int TRI_FillIndexesDocumentCollection (TRI_vocbase_col_t* collection,
       }
       else { 
         // fill index in this thread
-        int res;
+        int res = TRI_ERROR_NO_ERROR;
         
         try {
-          res = FillIndex(document, idx);
+          document->fillIndex(index);
+        }
+        catch (triagens::arango::Exception const& ex) {
+          res = ex.code();
         }
         catch (...) {
           res = TRI_ERROR_INTERNAL;
@@ -2896,58 +2838,6 @@ static std::vector<std::string> ExtractAttributes (TRI_json_t const* json) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief initialises an index with all existing documents
-////////////////////////////////////////////////////////////////////////////////
-
-static int FillIndex (TRI_document_collection_t* document,
-                      TRI_index_t* idx) {
-
-  if (! document->useSecondaryIndexes()) {
-    return TRI_ERROR_NO_ERROR;
-  }
-
-  void** ptr = document->_primaryIndex._table;
-  void** end = ptr + document->_primaryIndex._nrAlloc;
-
-  if (idx->sizeHint != nullptr) {
-    // give the index a size hint
-    idx->sizeHint(idx, (size_t) document->_primaryIndex._nrUsed);
-  }
-
-#ifdef TRI_ENABLE_MAINTAINER_MODE
-  static const int LoopSize = 10000;
-  int counter = 0;
-  int loops = 0;
-#endif
-
-  for (;  ptr < end;  ++ptr) {
-    TRI_doc_mptr_t const* mptr = static_cast<TRI_doc_mptr_t const*>(*ptr);
-
-    if (mptr != nullptr) {
-      int res = idx->insert(idx, mptr, false);
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        return res;
-      }
-
-#ifdef TRI_ENABLE_MAINTAINER_MODE
-      if (++counter == LoopSize) {
-        counter = 0;
-        ++loops;
-
-        LOG_TRACE("indexed %llu documents of collection %llu",
-                  (unsigned long long) (LoopSize * loops),
-                  (unsigned long long) document->_info._cid);
-      }
-#endif
-
-    }
-  }
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief finds a path based, unique or non-unique index
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2985,7 +2875,7 @@ static triagens::mvcc::Index* LookupPathIndexDocumentCollection (TRI_document_co
     
     }
     else if (type == TRI_IDX_TYPE_SKIPLIST_INDEX) {
-      auto found = static_cast<triagens::mvcc::SkiplistIndex2*>(index);
+      auto found = static_cast<triagens::mvcc::SkiplistIndex*>(index);
       
       int indexSparsity = found->sparse() ? 1 : 0;
       
@@ -3403,7 +3293,7 @@ static triagens::mvcc::Index* CreateGeoIndexDocumentCollection (TRI_document_col
       iid = triagens::mvcc::Index::generateId();
     }
 
-    index = new triagens::mvcc::GeoIndex2(iid, document, fields, paths, geoJson);
+    index = new triagens::mvcc::GeoIndex(iid, document, fields, paths, geoJson);
 
     try {
       document->addIndex(index);
@@ -3458,7 +3348,7 @@ static triagens::mvcc::Index* CreateGeoIndexDocumentCollection (TRI_document_col
       iid = triagens::mvcc::Index::generateId();
     }
 
-    index = new triagens::mvcc::GeoIndex2(iid, document, fields, paths);
+    index = new triagens::mvcc::GeoIndex(iid, document, fields, paths);
   
     try {
       document->addIndex(index);
@@ -3836,7 +3726,7 @@ static triagens::mvcc::Index* CreateSkiplistIndexDocumentCollection (TRI_documen
       iid = triagens::mvcc::Index::generateId();
     }
 
-    index = new triagens::mvcc::SkiplistIndex2(iid, document, fields, paths, unique, sparse);
+    index = new triagens::mvcc::SkiplistIndex(iid, document, fields, paths, unique, sparse);
   
     try {
       document->addIndex(index);
