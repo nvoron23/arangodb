@@ -576,10 +576,6 @@ public:
   int (*beginReadTimed) (struct TRI_document_collection_t*, uint64_t, uint64_t);
   int (*beginWriteTimed) (struct TRI_document_collection_t*, uint64_t, uint64_t);
 
-#ifdef TRI_ENABLE_MAINTAINER_MODE
-  void (*dump) (struct TRI_document_collection_t*);
-#endif
-
   TRI_doc_collection_info_t* (*figures) (struct TRI_document_collection_t* collection);
   TRI_voc_size_t (*size) (struct TRI_document_collection_t* collection);
 
@@ -1167,24 +1163,6 @@ triagens::mvcc::Index* TRI_EnsureFulltextIndexDocumentCollection (TRI_document_c
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  public functions
 // -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief executes a select-by-example query
-////////////////////////////////////////////////////////////////////////////////
-
-std::vector<TRI_doc_mptr_copy_t> TRI_SelectByExample (
-                          struct TRI_transaction_collection_s*,
-                          size_t,
-                          TRI_shape_pid_t*,
-                          TRI_shaped_json_t**);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief deletes a documet given by a master pointer
-////////////////////////////////////////////////////////////////////////////////
-
-int TRI_DeleteDocumentDocumentCollection (struct TRI_transaction_collection_s*,
-                                          TRI_doc_update_policy_t const*,
-                                          TRI_doc_mptr_t*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief rotate the current journal of the collection
