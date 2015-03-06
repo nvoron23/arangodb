@@ -45,6 +45,23 @@
 
 struct TRI_hash_index_element_multi_s;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief index query parameter
+////////////////////////////////////////////////////////////////////////////////
+
+// TODO: delete this struct after index cleanup!
+typedef struct TRI_index_search_value_s {
+  size_t _length;
+  TRI_shaped_json_t* _values;
+}
+TRI_index_search_value_t;
+
+typedef struct TRI_skiplist_iterator_t {
+  void* _fixme;  
+}
+TRI_skiplist_iterator_t;
+
+
 namespace triagens {
   namespace aql {
 

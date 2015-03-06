@@ -31,17 +31,12 @@
 #define ARANGODB_VOC_BASE_INDEX_H 1
 
 #include "Basics/Common.h"
-
-#include "VocBase/vocbase.h"
-
 #include "Basics/AssocMulti.h"
 #include "Basics/json.h"
-#include "FulltextIndex/fulltext-index.h"
-#include "GeoIndex/GeoIndex.h"
 #include "IndexOperators/index-operator.h"
 #include "ShapedJson/shaped-json.h"
-#include "SkipLists/skiplistIndex.h"
 #include "VocBase/voc-types.h"
+#include "VocBase/vocbase.h"
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                              forward declarations
@@ -136,25 +131,6 @@ typedef struct TRI_index_s {
 TRI_index_t;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief geo index
-////////////////////////////////////////////////////////////////////////////////
-
-typedef struct TRI_geo_index_s {
-  TRI_index_t base;
-  TRI_index_geo_variant_e _variant;
-
-  GeoIndex* _geoIndex;
-
-  TRI_shape_pid_t _location;
-  TRI_shape_pid_t _latitude;
-  TRI_shape_pid_t _longitude;
-
-  bool _geoJson;
-  bool _constraint;
-}
-TRI_geo_index_t;
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief edge index
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -168,108 +144,13 @@ typedef struct TRI_edge_index_s {
 }
 TRI_edge_index_t;
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief skiplist index
-////////////////////////////////////////////////////////////////////////////////
-
-typedef struct TRI_skiplist_index_s {
-  TRI_index_t base;
-
-  SkiplistIndex* _skiplistIndex;  // effectively the skiplist
-  TRI_vector_t _paths;            // a list of shape pid which identifies the fields of the index
-}
-TRI_skiplist_index_t;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief fulltext index
-////////////////////////////////////////////////////////////////////////////////
-
-typedef struct TRI_fulltext_index_s {
-  TRI_index_t base;
-
-  TRI_fts_index_t* _fulltextIndex;
-  TRI_shape_pid_t _attribute;
-  int _minWordLength;
-
-  bool _indexSubstrings;
-}
-TRI_fulltext_index_t;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief cap constraint
-////////////////////////////////////////////////////////////////////////////////
-
-typedef struct TRI_cap_constraint_s {
-  TRI_index_t base;
-
-  size_t _count;
-  int64_t _size;
-}
-TRI_cap_constraint_t;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief index query parameter
-////////////////////////////////////////////////////////////////////////////////
-
-typedef struct TRI_index_search_value_s {
-  size_t _length;
-  TRI_shaped_json_t* _values;
-}
-TRI_index_search_value_t;
-
 // -----------------------------------------------------------------------------
 // --SECTION--                                                             INDEX
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                      constructors and destructors
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief initialise basic index properties
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_InitIndex (TRI_index_t*,
-                    TRI_idx_iid_t,
-                    TRI_idx_type_e,
-                    struct TRI_document_collection_t*,
-                    bool,   // sparse
-                    bool);  // unique
-
-// -----------------------------------------------------------------------------
 // --SECTION--                                                  public functions
 // -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return the name of an index type
-////////////////////////////////////////////////////////////////////////////////
-
-TRI_idx_type_e TRI_TypeIndex (char const*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief return the name of an index type
-////////////////////////////////////////////////////////////////////////////////
-
-char const* TRI_TypeNameIndex (TRI_idx_type_e);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief validate index id string
-////////////////////////////////////////////////////////////////////////////////
-
-bool TRI_ValidateIdIndex (char const*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief validate an index id (collection name + / + index id)
-////////////////////////////////////////////////////////////////////////////////
-
-bool TRI_ValidateIndexIdIndex (char const*,
-                               size_t*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief free an index
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_FreeIndex (TRI_index_t*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief removes an index file
@@ -290,138 +171,16 @@ bool TRI_RemoveIndexFile (struct TRI_document_collection_t*,
 ////////////////////////////////////////////////////////////////////////////////
 
 int TRI_SaveIndex (struct TRI_document_collection_t*,
-                   TRI_index_t*,
+                   triagens::mvcc::Index const*,
                    bool);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief looks up an index identifier
+/// @brief saves an index
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupIndex (struct TRI_document_collection_t const*,
-                              TRI_idx_iid_t);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief creates a basic index description as JSON
-/// this only contains the common index fields and needs to be extended by the
-/// specialised index
-////////////////////////////////////////////////////////////////////////////////
-
-TRI_json_t* TRI_JsonIndex (TRI_memory_zone_t*,
-                           TRI_index_t const*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief copies a path vector
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_CopyPathVector (TRI_vector_t*,
-                         TRI_vector_t*);
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                     PRIMARY INDEX
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief create the primary index
-////////////////////////////////////////////////////////////////////////////////
-
-TRI_index_t* TRI_CreatePrimaryIndex (struct TRI_document_collection_t*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief free a primary index
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_FreePrimaryIndex (TRI_index_t*);
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                        EDGE INDEX
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief create the edge index
-////////////////////////////////////////////////////////////////////////////////
-
-TRI_index_t* TRI_CreateEdgeIndex (struct TRI_document_collection_t*,
-                                  TRI_idx_iid_t);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief destroys an edge index, but does not free the pointer
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_DestroyEdgeIndex (TRI_index_t*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief free an edge index
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_FreeEdgeIndex (TRI_index_t*);
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                    SKIPLIST INDEX
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                      constructors and destructors
-// -----------------------------------------------------------------------------
-
-TRI_skiplist_iterator_t* TRI_LookupSkiplistIndex (TRI_index_t*,
-                                                  TRI_index_operator_t*,
-                                                  bool);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief creates a skiplist index
-////////////////////////////////////////////////////////////////////////////////
-
-TRI_index_t* TRI_CreateSkiplistIndex (struct TRI_document_collection_t*,
-                                      TRI_idx_iid_t,
-                                      TRI_vector_pointer_t*,
-                                      TRI_vector_t*,
-                                      bool,
-                                      bool);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief frees the memory allocated, but does not free the pointer
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_DestroySkiplistIndex (TRI_index_t* idx);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief frees the memory allocated and frees the pointer
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_FreeSkiplistIndex (TRI_index_t* idx);
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                    FULLTEXT INDEX
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                      constructors and destructors
-// -----------------------------------------------------------------------------
-
-struct TRI_doc_mptr_t** TRI_LookupFulltextIndex (TRI_index_t*,
-                                                 const char*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief creates a fulltext index
-////////////////////////////////////////////////////////////////////////////////
-
-TRI_index_t* TRI_CreateFulltextIndex (struct TRI_document_collection_t*,
-                                      TRI_idx_iid_t,
-                                      const char*,
-                                      const bool,
-                                      int);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief frees the memory allocated, but does not free the pointer
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_DestroyFulltextIndex (TRI_index_t*);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief frees the memory allocated and frees the pointer
-////////////////////////////////////////////////////////////////////////////////
-
-void TRI_FreeFulltextIndex (TRI_index_t*);
+int TRI_SaveIndex (struct TRI_document_collection_t*,
+                   TRI_index_t*,
+                   bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief index comparator, used by the coordinator to detect if two index

@@ -26,16 +26,16 @@
 /// @author Copyright 2014, triagens GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "Cluster/ClusterMethods.h"
-#include "Cluster/ClusterInfo.h"
-#include "Cluster/ClusterComm.h"
-
+#include "ClusterMethods.h"
 #include "Basics/conversions.h"
 #include "Basics/json.h"
 #include "Basics/tri-strings.h"
 #include "Basics/vector.h"
 #include "Basics/json-utilities.h"
 #include "Basics/StringUtils.h"
+#include "Cluster/ClusterInfo.h"
+#include "Cluster/ClusterComm.h"
+#include "Mvcc/Index.h"
 #include "VocBase/index.h"
 #include "VocBase/server.h"
 
@@ -1354,7 +1354,7 @@ TRI_vector_pointer_t* getIndexesCoordinator (string const& databaseName,
           continue;
         }
 
-        TRI_idx_type_e type = TRI_TypeIndex(value->_value._string.data);
+        TRI_idx_type_e type = triagens::mvcc::Index::type(value->_value._string.data);
 
         bool unique = false;
         value = TRI_LookupObjectJson(v, "unique");

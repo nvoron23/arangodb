@@ -37,6 +37,8 @@
 #include "Mvcc/Index.h"
 #include "VocBase/edge-collection.h"
 
+struct TRI_document_collection_t;
+
 namespace triagens {
   namespace mvcc {
 
@@ -74,6 +76,8 @@ namespace triagens {
 // -----------------------------------------------------------------------------
       
       public:
+        
+        EdgeIndex (TRI_idx_iid_t);
 
         EdgeIndex (TRI_idx_iid_t,
                   struct TRI_document_collection_t*);
@@ -171,6 +175,12 @@ namespace triagens {
 // -----------------------------------------------------------------------------
       
       private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the underlying collection
+////////////////////////////////////////////////////////////////////////////////
+  
+        struct TRI_document_collection_t* _collection;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief the index R/W lock

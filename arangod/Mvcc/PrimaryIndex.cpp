@@ -29,6 +29,7 @@
 
 #include "PrimaryIndex.h"
 #include "Basics/gcd.h"
+#include "Basics/random.h"
 #include "Basics/WriteLocker.h"
 #include "Basics/ReadLocker.h"
 #include "Mvcc/TransactionCollection.h"
@@ -117,13 +118,26 @@ static bool compareElementElement (TRI_doc_mptr_t const* left,
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create a new primary index (not fully functional - use only to
+/// retrieve the JSON representation of the index)
+////////////////////////////////////////////////////////////////////////////////
+
+PrimaryIndex::PrimaryIndex () 
+  : Index(0, std::vector<std::string>( { TRI_VOC_ATTRIBUTE_KEY } )),
+    _collection(nullptr),
+    _lock(),
+    _theHash(nullptr) {
+  
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create a new primary index
 ////////////////////////////////////////////////////////////////////////////////
 
 PrimaryIndex::PrimaryIndex (TRI_idx_iid_t id,
                             TRI_document_collection_t* collection)
-  : Index(id, collection, 
-          std::vector<std::string>( { TRI_VOC_ATTRIBUTE_KEY } )),
+  : Index(id, std::vector<std::string>( { TRI_VOC_ATTRIBUTE_KEY } )),
+    _collection(collection),
     _lock(),
     _theHash(nullptr) {
   

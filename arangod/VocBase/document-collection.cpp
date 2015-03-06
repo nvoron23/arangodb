@@ -28,17 +28,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "document-collection.h"
-
 #include "Basics/Barrier.h"
 #include "Basics/conversions.h"
 #include "Basics/files.h"
 #include "Basics/logging.h"
 #include "Basics/tri-strings.h"
 #include "Basics/ThreadPool.h"
-#include "CapConstraint/cap-constraint.h"
-#include "FulltextIndex/fulltext-index.h"
-#include "GeoIndex/geo-index.h"
-#include "HashIndex/hash-index.h"
 #include "Mvcc/CapConstraint.h"
 #include "Mvcc/EdgeIndex.h"
 #include "Mvcc/FulltextIndex.h"
@@ -240,8 +235,6 @@ bool TRI_document_collection_t::unlinkIndex (triagens::mvcc::Index* index) {
     // invalid index id or primary index
     return false;
   }
-
-  // TODO: re-add inventoryLock
 
   size_t i = 0;
   for (auto it : _indexes) {
@@ -475,27 +468,27 @@ static int FillIndex (TRI_document_collection_t*,
 static int CapConstraintFromJson (TRI_document_collection_t*,
                                   TRI_json_t const*,
                                   TRI_idx_iid_t,
-                                  TRI_index_t**);
+                                  triagens::mvcc::Index*&);
 
 static int GeoIndexFromJson (TRI_document_collection_t*,
                              TRI_json_t const*,
                              TRI_idx_iid_t,
-                             TRI_index_t**);
+                             triagens::mvcc::Index*&);
 
 static int HashIndexFromJson (TRI_document_collection_t*,
                               TRI_json_t const*,
                               TRI_idx_iid_t,
-                              TRI_index_t**);
+                              triagens::mvcc::Index*&);
 
 static int SkiplistIndexFromJson (TRI_document_collection_t*,
                                   TRI_json_t const*,
                                   TRI_idx_iid_t,
-                                  TRI_index_t**);
+                                  triagens::mvcc::Index*&);
 
 static int FulltextIndexFromJson (TRI_document_collection_t*,
                                   TRI_json_t const*,
                                   TRI_idx_iid_t,
-                                  TRI_index_t**);
+                                  triagens::mvcc::Index*&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  HELPER FUNCTIONS
@@ -774,30 +767,6 @@ static void UpdateHeader (TRI_voc_fid_t fid,
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief adds an index to the collection
-///
-/// The caller must hold the index lock for the collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int AddIndex (TRI_document_collection_t* document,
-                     TRI_index_t* idx) {
-  TRI_ASSERT(idx != nullptr);
-
-  LOG_DEBUG("adding index of type %s for collection '%s'",
-            TRI_TypeNameIndex(idx->_type),
-            document->_info._name);
-
-  try {
-    document->_allIndexes.push_back(idx);
-  }
-  catch (...) {
-    return TRI_ERROR_OUT_OF_MEMORY;
-  }
-
-  return TRI_ERROR_NO_ERROR;
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief post-insert operation
@@ -1332,22 +1301,6 @@ open_iterator_operation_t;
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief mark a transaction as failed during opening of a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorNoteFailedTransaction (open_iterator_state_t const* state) {
-  TRI_ASSERT(state->_tid > 0);
-
-  if (state->_document->_failedTransactions == nullptr) {
-    state->_document->_failedTransactions = new std::set<TRI_voc_tid_t>;
-  }
-
-  state->_document->_failedTransactions->insert(state->_tid);
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief apply an insert/update operation when opening a collection
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1649,131 +1602,6 @@ static int OpenIteratorAddOperation (open_iterator_state_t* state,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief reset the list of operations during opening
-////////////////////////////////////////////////////////////////////////////////
-
-static void OpenIteratorResetOperations (open_iterator_state_t* state) {
-  size_t n = state->_operations._length;
-
-  if (n > OpenIteratorBufferSize * 2) {
-    // free some memory
-    TRI_DestroyVector(&state->_operations);
-    TRI_InitVector2(&state->_operations, TRI_UNKNOWN_MEM_ZONE, sizeof(open_iterator_operation_t), OpenIteratorBufferSize);
-  }
-  else {
-    TRI_ClearVector(&state->_operations);
-  }
-
-  state->_tid            = 0;
-  state->_trxPrepared    = false;
-  state->_trxCollections = 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief start a transaction when opening a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorStartTransaction (open_iterator_state_t* state,
-                                         TRI_voc_tid_t tid,
-                                         uint32_t numCollections) {
-  state->_tid = tid;
-  state->_trxCollections = numCollections;
-
-  TRI_ASSERT(state->_operations._length == 0);
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief prepare an ongoing transaction when opening a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorPrepareTransaction (open_iterator_state_t* state) {
-  if (state->_tid != 0) {
-    state->_trxPrepared = true;
-  }
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief abort an ongoing transaction when opening a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorAbortTransaction (open_iterator_state_t* state) {
-  if (state->_tid != 0) {
-    if (state->_trxCollections > 1 && state->_trxPrepared) {
-      // multi-collection transaction...
-      // check if we have a coordinator entry in _trx
-      // if yes, then we'll recover the transaction, otherwise we'll abort it
-
-      if (state->_vocbase->_oldTransactions != nullptr &&
-          state->_vocbase->_oldTransactions->find(state->_tid) != state->_vocbase->_oldTransactions->end()) {
-        // we have found a coordinator entry
-        // otherwise we would have got TRI_ERROR_ARANGO_DOCUMENT_NOT_FOUND etc.
-        int res = TRI_ERROR_NO_ERROR;
-
-        LOG_INFO("recovering transaction %llu", (unsigned long long) state->_tid);
-        size_t const n = state->_operations._length;
-
-        for (size_t i = 0; i < n; ++i) {
-          open_iterator_operation_t* operation = static_cast<open_iterator_operation_t*>(TRI_AtVector(&state->_operations, i));
-
-          int r = OpenIteratorApplyOperation(state, operation);
-
-          if (r != TRI_ERROR_NO_ERROR) {
-            res = r;
-          }
-        }
-
-        OpenIteratorResetOperations(state);
-        return res;
-      }
-
-      // fall-through
-    }
-
-    OpenIteratorNoteFailedTransaction(state);
-
-    LOG_INFO("rolling back uncommitted transaction %llu", (unsigned long long) state->_tid);
-    OpenIteratorResetOperations(state);
-  }
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief commit a transaction when opening a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorCommitTransaction (open_iterator_state_t* state) {
-  int res = TRI_ERROR_NO_ERROR;
-
-  if (state->_trxCollections <= 1 || state->_trxPrepared) {
-    size_t i, n;
-
-    n = state->_operations._length;
-
-    for (i = 0; i < n; ++i) {
-      open_iterator_operation_t* operation = static_cast<open_iterator_operation_t*>(TRI_AtVector(&state->_operations, i));
-
-      int r = OpenIteratorApplyOperation(state, operation);
-      if (r != TRI_ERROR_NO_ERROR) {
-        res = r;
-      }
-    }
-  }
-  else if (state->_trxCollections > 1 && ! state->_trxPrepared) {
-    OpenIteratorAbortTransaction(state);
-  }
-
-  // clean up
-  OpenIteratorResetOperations(state);
-
-  return res;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief process a document (or edge) marker when opening a collection
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1793,8 +1621,6 @@ static int OpenIteratorHandleDocumentMarker (TRI_df_marker_t const* marker,
                   (unsigned long long) datafile->_fid,
                   (unsigned long long) d->_tid,
                   (unsigned long long) state->_tid);
-
-      OpenIteratorAbortTransaction(state);
 
       return TRI_ERROR_INTERNAL;
     }
@@ -1825,8 +1651,6 @@ static int OpenIteratorHandleDeletionMarker (TRI_df_marker_t const* marker,
                   (unsigned long long) datafile->_fid,
                   (unsigned long long) d->_tid,
                   (unsigned long long) state->_tid);
-
-      OpenIteratorAbortTransaction(state);
 
       return TRI_ERROR_INTERNAL;
     }
@@ -1890,114 +1714,6 @@ static int OpenIteratorHandleAttributeMarker (TRI_df_marker_t const* marker,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief process a "begin transaction" marker when opening a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorHandleBeginMarker (TRI_df_marker_t const* marker,
-                                          TRI_datafile_t* datafile,
-                                          open_iterator_state_t* state) {
-
-  TRI_doc_begin_transaction_marker_t const* m = (TRI_doc_begin_transaction_marker_t const*) marker;
-
-  if (m->_tid != state->_tid && state->_tid != 0) {
-    // some incomplete transaction was going on before us...
-    LOG_WARNING("logic error in %s, fid %llu. found tid: %llu, expected tid: %llu. "
-                "this may also be the result of an aborted transaction",
-                __FUNCTION__,
-                (unsigned long long) datafile->_fid,
-                (unsigned long long) m->_tid,
-                (unsigned long long) state->_tid);
-
-    OpenIteratorAbortTransaction(state);
-  }
-
-  OpenIteratorStartTransaction(state, m->_tid, (uint32_t) m->_numCollections);
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief process a "commit transaction" marker when opening a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorHandleCommitMarker (TRI_df_marker_t const* marker,
-                                           TRI_datafile_t* datafile,
-                                           open_iterator_state_t* state) {
-
-  TRI_doc_commit_transaction_marker_t const* m = (TRI_doc_commit_transaction_marker_t const*) marker;
-
-  if (m->_tid != state->_tid) {
-    // we found a commit marker, but we did not find any begin marker beforehand. strange
-    LOG_WARNING("logic error in %s, fid %llu. found tid: %llu, expected tid: %llu",
-                __FUNCTION__,
-                (unsigned long long) datafile->_fid,
-                (unsigned long long) m->_tid,
-                (unsigned long long) state->_tid);
-
-    OpenIteratorAbortTransaction(state);
-  }
-  else {
-    OpenIteratorCommitTransaction(state);
-  }
-
-  // reset transaction id
-  state->_tid = 0;
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief process a "prepare transaction" marker when opening a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorHandlePrepareMarker (TRI_df_marker_t const* marker,
-                                            TRI_datafile_t* datafile,
-                                            open_iterator_state_t* state) {
-
-  TRI_doc_prepare_transaction_marker_t const* m = (TRI_doc_prepare_transaction_marker_t const*) marker;
-
-  if (m->_tid != state->_tid) {
-    // we found a commit marker, but we did not find any begin marker beforehand. strange
-    LOG_WARNING("logic error in %s, fid %llu. found tid: %llu, expected tid: %llu",
-                __FUNCTION__,
-                (unsigned long long) datafile->_fid,
-                (unsigned long long) m->_tid,
-                (unsigned long long) state->_tid);
-
-    OpenIteratorAbortTransaction(state);
-  }
-  else {
-    OpenIteratorPrepareTransaction(state);
-  }
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief process an "abort transaction" marker when opening a collection
-////////////////////////////////////////////////////////////////////////////////
-
-static int OpenIteratorHandleAbortMarker (TRI_df_marker_t const* marker,
-                                          TRI_datafile_t* datafile,
-                                          open_iterator_state_t* state) {
-
-  TRI_doc_abort_transaction_marker_t const* m = (TRI_doc_abort_transaction_marker_t const*) marker;
-
-  if (m->_tid != state->_tid) {
-    // we found an abort marker, but we did not find any begin marker beforehand. strange
-    LOG_WARNING("logic error in %s, fid %llu. found tid: %llu, expected tid: %llu",
-                __FUNCTION__,
-                (unsigned long long) datafile->_fid,
-                (unsigned long long) m->_tid,
-                (unsigned long long) state->_tid);
-  }
-
-  OpenIteratorAbortTransaction(state);
-
-  return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief iterator for open
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2029,18 +1745,6 @@ static bool OpenIterator (TRI_df_marker_t const* marker,
   }
   else if (marker->_type == TRI_DF_MARKER_ATTRIBUTE) {
     res = OpenIteratorHandleAttributeMarker(marker, datafile, (open_iterator_state_t*) data);
-  }
-  else if (marker->_type == TRI_DOC_MARKER_BEGIN_TRANSACTION) {
-    res = OpenIteratorHandleBeginMarker(marker, datafile, (open_iterator_state_t*) data);
-  }
-  else if (marker->_type == TRI_DOC_MARKER_COMMIT_TRANSACTION) {
-    res = OpenIteratorHandleCommitMarker(marker, datafile, (open_iterator_state_t*) data);
-  }
-  else if (marker->_type == TRI_DOC_MARKER_PREPARE_TRANSACTION) {
-    res = OpenIteratorHandlePrepareMarker(marker, datafile, (open_iterator_state_t*) data);
-  }
-  else if (marker->_type == TRI_DOC_MARKER_ABORT_TRANSACTION) {
-    res = OpenIteratorHandleAbortMarker(marker, datafile, (open_iterator_state_t*) data);
   }
   else {
     LOG_TRACE("skipping marker type %lu", (unsigned long) marker->_type);
@@ -2077,21 +1781,17 @@ static bool OpenIterator (TRI_df_marker_t const* marker,
 static bool OpenIndexIterator (char const* filename,
                                void* data) {
   // load json description of the index
-  TRI_json_t* json = TRI_JsonFile(TRI_CORE_MEM_ZONE, filename, nullptr);
+  std::unique_ptr<TRI_json_t> json(TRI_JsonFile(TRI_UNKNOWN_MEM_ZONE, filename, nullptr));
 
   // json must be a index description
-  if (! TRI_IsObjectJson(json)) {
+  if (! TRI_IsObjectJson(json.get())) {
     LOG_ERROR("cannot read index definition from '%s'", filename);
-
-    if (json != nullptr) {
-      TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
-    }
 
     return false;
   }
 
-  int res = TRI_FromJsonIndexDocumentCollection(static_cast<TRI_document_collection_t*>(data), json, nullptr);
-  TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
+  triagens::mvcc::Index* index;
+  int res = TRI_FromJsonIndexDocumentCollection(static_cast<TRI_document_collection_t*>(data), json.get(), index);
 
   if (res != TRI_ERROR_NO_ERROR) {
     // error was already printed if we get here
@@ -2258,8 +1958,6 @@ static void DestroyBaseDocumentCollection (TRI_document_collection_t* document) 
 
 static bool InitDocumentCollection (TRI_document_collection_t* document,
                                     TRI_shaper_t* shaper) {
-  document->_failedTransactions = nullptr;
-
   document->_uncollectedLogfileEntries = 0;
 
   int res = InitBaseDocumentCollection(document, shaper);
@@ -2279,30 +1977,13 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
     return false;
   }
 
-  // create primary index
-  TRI_index_t* primaryIndex = TRI_CreatePrimaryIndex(document);
-
-  if (primaryIndex == nullptr) {
-    DestroyBaseDocumentCollection(document);
-    TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-
-    return false;
-  }
-
   // add an MVCC primary index to the collection
-  auto mvccPrimaryIndex = new triagens::mvcc::PrimaryIndex(0, document);
+  auto primaryIndex = new triagens::mvcc::PrimaryIndex(0, document);
   try {
-    document->addIndex(mvccPrimaryIndex);
+    document->addIndex(primaryIndex);
   }
   catch (...) {
-    delete mvccPrimaryIndex;
-    return false;
-  }
-
-  res = AddIndex(document, primaryIndex);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeIndex(primaryIndex);
+    delete primaryIndex;
     DestroyBaseDocumentCollection(document);
     TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
 
@@ -2311,34 +1992,16 @@ static bool InitDocumentCollection (TRI_document_collection_t* document,
 
   // create edges index
   if (document->_info._type == TRI_COL_TYPE_EDGE) {
-    TRI_index_t* edgesIndex = TRI_CreateEdgeIndex(document, document->_info._cid);
-
-    if (edgesIndex == nullptr) {
-      TRI_FreeIndex(primaryIndex);
-      DestroyBaseDocumentCollection(document);
-      TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-
-      return false;
-    }
-
-    res = AddIndex(document, edgesIndex);
-
-    if (res != TRI_ERROR_NO_ERROR) {
-      TRI_FreeIndex(edgesIndex);
-      TRI_FreeIndex(primaryIndex);
-      DestroyBaseDocumentCollection(document);
-      TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-
-      return false;
-    }
-    
     // add an MVCC edge index to the collection
-    auto mvccEdgeIndex = new triagens::mvcc::EdgeIndex(document->_info._cid, document);
+    auto edgeIndex = new triagens::mvcc::EdgeIndex(document->_info._cid, document);
     try {
-      document->addIndex(mvccEdgeIndex);
+      document->addIndex(edgeIndex);
     }
     catch (...) {
-      delete mvccEdgeIndex;
+      delete edgeIndex;
+      DestroyBaseDocumentCollection(document);
+      TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
+
       return false;
     }
   }
@@ -2403,9 +2066,6 @@ static int IterateMarkersCollection (TRI_collection_t* collection) {
             (unsigned long long) openState._documents,
             (unsigned long long) openState._deletions,
             collection->_info._name);
-
-  // abort any transaction that's unfinished after iterating over all markers
-  OpenIteratorAbortTransaction(&openState);
 
   TRI_DestroyVector(&openState._operations);
   
@@ -2531,16 +2191,6 @@ TRI_document_collection_t* TRI_CreateDocumentCollection (TRI_vocbase_t* vocbase,
 
 void TRI_DestroyDocumentCollection (TRI_document_collection_t* document) {
   TRI_DestroyCondition(&document->_journalsCondition);
-
-  // free memory allocated for indexes
-  for (auto idx : document->_allIndexes) {
-    TRI_FreeIndex(idx);
-  }
-
-  if (document->_failedTransactions != nullptr) {
-    delete document->_failedTransactions;
-  }
-
   DestroyBaseDocumentCollection(document);
 }
 
@@ -2768,57 +2418,15 @@ TRI_datafile_t* TRI_CreateDatafileDocumentCollection (TRI_document_collection_t*
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief iterate over all documents in the collection, using a user-defined
-/// callback function. Returns the total number of documents in the collection
-///
-/// The user can abort the iteration by return "false" from the callback
-/// function.
-///
-/// Note: the function will not acquire any locks. It is the task of the caller
-/// to ensure the collection is properly locked
-////////////////////////////////////////////////////////////////////////////////
-
-size_t TRI_DocumentIteratorDocumentCollection (TransactionBase const*,
-                                              TRI_document_collection_t* document,
-                                              void* data,
-                                              bool (*callback)(TRI_doc_mptr_t const*, TRI_document_collection_t*, void*)) {
-  // The first argument is only used to make the compiler prove that a
-  // transaction is ongoing. We need this to prove that accesses to
-  // master pointers and their data pointers in the callback are
-  // protected.
-
-  size_t const nrUsed = (size_t) document->_primaryIndex._nrUsed;
-
-  if (nrUsed > 0) {
-    void** ptr = document->_primaryIndex._table;
-    void** end = ptr + document->_primaryIndex._nrAlloc;
-
-    for (;  ptr < end;  ++ptr) {
-      if (*ptr) {
-        TRI_doc_mptr_t const* d = (TRI_doc_mptr_t const*) *ptr;
-
-        if (! callback(d, document, data)) {
-          break;
-        }
-      }
-    }
-  }
-
-  return nrUsed;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief create an index, based on a JSON description
 ////////////////////////////////////////////////////////////////////////////////
 
 int TRI_FromJsonIndexDocumentCollection (TRI_document_collection_t* document,
                                          TRI_json_t const* json,
-                                         TRI_index_t** idx) {
+                                         triagens::mvcc::Index*& index) {
   TRI_ASSERT(TRI_IsObjectJson(json));
 
-  if (idx != nullptr) {
-    *idx = nullptr;
-  }
+  index = nullptr;
 
   // extract the type
   TRI_json_t const* type = TRI_LookupObjectJson(json, "type");
@@ -2827,18 +2435,18 @@ int TRI_FromJsonIndexDocumentCollection (TRI_document_collection_t* document,
     return TRI_ERROR_INTERNAL;
   }
 
-  char const* typeStr = type->_value._string.data;
+  std::string typeString = std::string(type->_value._string.data, type->_value._string.length - 1);
 
   // extract the index identifier
   TRI_json_t const* iis = TRI_LookupObjectJson(json, "id");
 
   TRI_idx_iid_t iid;
   if (TRI_IsNumberJson(iis)) {
-    iid = (TRI_idx_iid_t) iis->_value._number;
+    iid = static_cast<TRI_idx_iid_t>(iis->_value._number);
   }
   else if (TRI_IsStringJson(iis)) {
-    iid = (TRI_idx_iid_t) TRI_UInt64String2(iis->_value._string.data,
-                                            iis->_value._string.length - 1);
+    iid = static_cast<TRI_idx_iid_t>(TRI_UInt64String2(iis->_value._string.data,
+                                                       iis->_value._string.length - 1));
   }
   else {
     LOG_ERROR("ignoring index, index identifier could not be located");
@@ -2848,57 +2456,29 @@ int TRI_FromJsonIndexDocumentCollection (TRI_document_collection_t* document,
 
   TRI_UpdateTickServer(iid);
 
-  // ...........................................................................
-  // CAP CONSTRAINT
-  // ...........................................................................
-
-  if (TRI_EqualString(typeStr, "cap")) {
-    return CapConstraintFromJson(document, json, iid, idx);
+  if (typeString == "cap") {
+    return CapConstraintFromJson(document, json, iid, index);
   }
 
-  // ...........................................................................
-  // GEO INDEX (list or attribute)
-  // ...........................................................................
-
-  else if (TRI_EqualString(typeStr, "geo1") || TRI_EqualString(typeStr, "geo2")) {
-    return GeoIndexFromJson(document, json, iid, idx);
+  if (typeString == "geo1" || typeString == "geo2") {
+    return GeoIndexFromJson(document, json, iid, index);
   }
 
-  // ...........................................................................
-  // HASH INDEX
-  // ...........................................................................
-
-  else if (TRI_EqualString(typeStr, "hash")) {
-    return HashIndexFromJson(document, json, iid, idx);
+  if (typeString == "hash") {
+    return HashIndexFromJson(document, json, iid, index);
   }
 
-  // ...........................................................................
-  // SKIPLIST INDEX
-  // ...........................................................................
-
-  else if (TRI_EqualString(typeStr, "skiplist")) {
-    return SkiplistIndexFromJson(document, json, iid, idx);
+  if (typeString == "skiplist") {
+    return SkiplistIndexFromJson(document, json, iid, index);
   }
 
-  // ...........................................................................
-  // FULLTEXT INDEX
-  // ...........................................................................
-
-  else if (TRI_EqualString(typeStr, "fulltext")) {
-    return FulltextIndexFromJson(document, json, iid, idx);
+  if (typeString == "fulltext") {
+    return FulltextIndexFromJson(document, json, iid, index);
   }
 
-  // ...........................................................................
-  // EDGES INDEX
-  // ...........................................................................
+  LOG_WARNING("index type '%s' is not supported in this version of ArangoDB and is ignored", 
+              typeString.c_str());
 
-  else if (TRI_EqualString(typeStr, "edge")) {
-    // we should never get here, as users cannot create their own edge indexes
-    LOG_ERROR("logic error. there should never be a JSON file describing an edges index");
-    return TRI_ERROR_INTERNAL;
-  }
-
-  LOG_WARNING("index type '%s' is not supported in this version of ArangoDB and is ignored", typeStr);
   return TRI_ERROR_NO_ERROR;
 }
 
@@ -3223,9 +2803,6 @@ TRI_document_collection_t* TRI_OpenDocumentCollection (TRI_vocbase_t* vocbase,
   int res = IterateMarkersCollection(collection);
 
   if (res != TRI_ERROR_NO_ERROR) {
-    if (document->_failedTransactions != nullptr) {
-      delete document->_failedTransactions;
-    }
     TRI_CloseCollection(collection);
     TRI_FreeCollection(collection);
 
@@ -3295,35 +2872,27 @@ pid_name_t;
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief converts extracts a field list from a json object
+/// @brief extracts a field list from a json object
 ////////////////////////////////////////////////////////////////////////////////
 
-static TRI_json_t* ExtractFields (TRI_json_t const* json,
-                                  size_t* fieldCount,
-                                  TRI_idx_iid_t iid) {
-  TRI_json_t* fld = TRI_LookupObjectJson(json, "fields");
+static std::vector<std::string> ExtractAttributes (TRI_json_t const* json) {
+  std::vector<std::string> result;
 
-  if (! TRI_IsArrayJson(fld)) {
-    LOG_ERROR("ignoring index %llu, 'fields' must be a list", (unsigned long long) iid);
+  TRI_json_t const* fields = TRI_LookupObjectJson(json, "fields");
 
-    TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
-    return nullptr;
+  if (! TRI_IsArrayJson(fields)) {
+    return result;
   }
 
-  *fieldCount = fld->_value._objects._length;
+  for (size_t i = 0; i < fields->_value._objects._length;  ++i) {
+    auto sub = static_cast<TRI_json_t const*>(TRI_AtVector(&fields->_value._objects, i));
 
-  for (size_t j = 0;  j < *fieldCount;  ++j) {
-    TRI_json_t* sub = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, j));
-
-    if (! TRI_IsStringJson(sub)) {
-      LOG_ERROR("ignoring index %llu, 'fields' must be a list of attribute paths", (unsigned long long) iid);
-
-      TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
-      return nullptr;
+    if (TRI_IsStringJson(sub)) {
+      result.emplace_back(std::string(sub->_value._string.data, sub->_value._string.length - 1));
     }
   }
 
-  return fld;
+  return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3382,112 +2951,93 @@ static int FillIndex (TRI_document_collection_t* document,
 /// @brief finds a path based, unique or non-unique index
 ////////////////////////////////////////////////////////////////////////////////
 
-static TRI_index_t* LookupPathIndexDocumentCollection (TRI_document_collection_t* collection,
-                                                       TRI_vector_t const* paths,
-                                                       TRI_idx_type_e type,
-                                                       int sparsity,
-                                                       bool unique,
-                                                       bool allowAnyAttributeOrder) {
-  TRI_vector_t* indexPaths = nullptr;
+static triagens::mvcc::Index* LookupPathIndexDocumentCollection (TRI_document_collection_t* collection,
+                                                                 std::vector<TRI_shape_pid_t> const& paths,
+                                                                 TRI_idx_type_e type,
+                                                                 int sparsity,
+                                                                 bool unique,
+                                                                 bool allowAnyAttributeOrder) {
+  TRI_ASSERT(type == TRI_IDX_TYPE_HASH_INDEX ||
+             type == TRI_IDX_TYPE_SKIPLIST_INDEX);
 
-  // ...........................................................................
-  // go through every index and see if we have a match
-  // ...........................................................................
+  // TODO: check locking for indexes
 
-  for (auto idx : collection->_allIndexes) {
-    int indexSparsity = idx->_sparse ? 1 : 0;
+  for (auto index : collection->indexes()) {
+    if (index->type() != type) {
+      // wrong index type
+      continue;
+    }
+
+    std::vector<TRI_shape_pid_t> indexPaths;
+
+    if (type == TRI_IDX_TYPE_HASH_INDEX) {
+      auto found = static_cast<triagens::mvcc::HashIndex*>(index);
+      
+      int indexSparsity = found->sparse() ? 1 : 0;
+
+      if (found->unique() != unique ||
+          (sparsity != -1 && sparsity != indexSparsity)) {
+        // different uniqueness
+        continue;
+      }
+
+      indexPaths = found->paths();
     
-    // .........................................................................
-    // check if the type, uniqueness and sparsity of the indexes match
-    // .........................................................................
-
-    if (idx->_type != type || 
-        idx->_unique != unique ||
-        (sparsity != -1 && sparsity != indexSparsity)) {
-      continue;
     }
-
-    // .........................................................................
-    // Now perform checks which are specific to the type of index
-    // .........................................................................
-
-    switch (type) {
-      case TRI_IDX_TYPE_HASH_INDEX: {
-        TRI_hash_index_t* hashIndex = (TRI_hash_index_t*) idx;
-        indexPaths = &(hashIndex->_paths);
-        break;
+    else if (type == TRI_IDX_TYPE_SKIPLIST_INDEX) {
+      auto found = static_cast<triagens::mvcc::SkiplistIndex2*>(index);
+      
+      int indexSparsity = found->sparse() ? 1 : 0;
+      
+      if (found->unique() != unique ||
+          (sparsity != -1 && sparsity != indexSparsity)) {
+        // different uniqueness
+        continue;
       }
-
-      case TRI_IDX_TYPE_SKIPLIST_INDEX: {
-        TRI_skiplist_index_t* slIndex = (TRI_skiplist_index_t*) idx;
-        indexPaths = &(slIndex->_paths);
-        break;
-      }
-
-      default: {
-        TRI_ASSERT(false);
-        break;
-      }
-
+      
+      indexPaths = found->paths();
+    }
+    else {
+      TRI_ASSERT(false);
     }
 
-    if (indexPaths == nullptr) {
-      // this may actually happen if compiled with -DNDEBUG
-      return nullptr;
-    }
-
-    // .........................................................................
-    // check that the number of paths (fields) in the index matches that
-    // of the number of attributes
-    // .........................................................................
-
-    if (paths->_length != indexPaths->_length) {
-      continue;
-    }
-
-    // .........................................................................
     // go through all the attributes and see if they match
-    // .........................................................................
+    if (paths.size() != indexPaths.size()) {
+      // different number of attributes
+      continue;
+    }
 
-    bool found = true;
+
+    bool isMatch = true;
 
     if (allowAnyAttributeOrder) {
       // any permutation of attributes is allowed
-      for (size_t k = 0;  k < paths->_length;  ++k) {
-        TRI_shape_pid_t indexShape = *((TRI_shape_pid_t*) TRI_AtVector(indexPaths, k));
-
-        found = false;
-
-        for (size_t l = 0;  l < paths->_length;  ++l) {
-          TRI_shape_pid_t givenShape = *((TRI_shape_pid_t*) TRI_AtVector(paths, l));
-
-          if (indexShape == givenShape) {
+      for (auto it : paths) {
+        bool found = false;
+        for (auto it2 : indexPaths) {
+          if (it == it2) {
             found = true;
             break;
           }
         }
 
         if (! found) {
+          isMatch = false;
           break;
         }
       }
     }
     else {
-      // attributes need to present in a given order
-      for (size_t k = 0;  k < paths->_length;  ++k) {
-        TRI_shape_pid_t indexShape = *((TRI_shape_pid_t*) TRI_AtVector(indexPaths, k));
-        TRI_shape_pid_t givenShape = *((TRI_shape_pid_t*) TRI_AtVector(paths, k));
-
-        if (indexShape != givenShape) {
-          found = false;
+      for (size_t i = 0; i < paths.size(); ++i) {
+        if (paths[i] != indexPaths[i]) {
+          isMatch = false;
           break;
         }
       }
     }
 
-    // stop if we found a match
-    if (found) {
-      return idx;
+    if (isMatch) {
+      return index;
     }
   }
 
@@ -3501,58 +3051,51 @@ static TRI_index_t* LookupPathIndexDocumentCollection (TRI_document_collection_t
 static int PathBasedIndexFromJson (TRI_document_collection_t* document,
                                    TRI_json_t const* definition,
                                    TRI_idx_iid_t iid,
-                                   TRI_index_t* (*creator)(TRI_document_collection_t*,
-                                                           TRI_vector_pointer_t const*,
-                                                           TRI_idx_iid_t,
-                                                           bool,
-                                                           bool,
-                                                           bool*),
-                                   TRI_index_t** dst) {
-  TRI_json_t* bv;
-  TRI_vector_pointer_t attributes;
-  size_t fieldCount;
-
-  if (dst != nullptr) {
-    *dst = nullptr;
-  }
+                                   triagens::mvcc::Index* (*creator)(TRI_document_collection_t*,
+                                                                     std::vector<std::string> const&,
+                                                                     TRI_idx_iid_t,
+                                                                     bool,
+                                                                     bool,
+                                                                     bool&),
+                                   triagens::mvcc::Index*& dst) {
+  dst = nullptr;
 
   // extract fields
-  TRI_json_t* fld = ExtractFields(definition, &fieldCount, iid);
-
-  if (fld == nullptr) {
-    return TRI_errno();
-  }
+  std::vector<std::string> attributes = ExtractAttributes(definition);
 
   // extract the list of fields
-  if (fieldCount < 1) {
-    LOG_ERROR("ignoring index %llu, need at least one attribute path", (unsigned long long) iid);
+  if (attributes.size() < 1) {
+    LOG_ERROR("ignoring index %llu, need at least one attribute path", 
+              (unsigned long long) iid);
 
     return TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
   }
 
   // determine if the index is unique or non-unique
-  bv = TRI_LookupObjectJson(definition, "unique");
+  TRI_json_t const* value = TRI_LookupObjectJson(definition, "unique");
 
-  if (! TRI_IsBooleanJson(bv)) {
-    LOG_ERROR("ignoring index %llu, could not determine if unique or non-unique", (unsigned long long) iid);
+  if (! TRI_IsBooleanJson(value)) {
+    LOG_ERROR("ignoring index %llu, could not determine if unique or non-unique", 
+              (unsigned long long) iid);
     return TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
   }
 
-  bool unique = bv->_value._boolean;
+  bool unique = value->_value._boolean;
 
   // determine sparsity
   bool sparse = false;
 
-  bv = TRI_LookupObjectJson(definition, "sparse"); 
+  value = TRI_LookupObjectJson(definition, "sparse"); 
 
-  if (TRI_IsBooleanJson(bv)) {
-    sparse = bv->_value._boolean;
+  if (TRI_IsBooleanJson(value)) {
+    sparse = value->_value._boolean;
   }
   else {
     // no sparsity information given for index
     // now use pre-2.5 defaults: unique hash indexes were sparse, all other indexes were non-sparse
     bool isHashIndex = false;
     TRI_json_t const* typeJson = TRI_LookupObjectJson(definition, "type");
+
     if (TRI_IsStringJson(typeJson)) {
       isHashIndex = (strcmp(typeJson->_value._string.data, "hash") == 0);
     }
@@ -3562,44 +3105,19 @@ static int PathBasedIndexFromJson (TRI_document_collection_t* document,
     } 
   }
 
-  // Initialise the vector in which we store the fields on which the hashing
-  // will be based.
-  TRI_InitVectorPointer(&attributes, TRI_CORE_MEM_ZONE);
-
-  // find fields
-  for (size_t j = 0;  j < fieldCount;  ++j) {
-    TRI_json_t* fieldStr = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, j));
-
-    TRI_PushBackVectorPointer(&attributes, fieldStr->_value._string.data);
-  }
-
   // create the index
-  TRI_index_t* idx = creator(document, &attributes, iid, sparse, unique, nullptr);
+  bool created;
+  triagens::mvcc::Index* index = creator(document, attributes, iid, sparse, unique, created);
 
-  if (dst != nullptr) {
-    *dst = idx;
-  }
+  dst = index;
 
-  // cleanup
-  TRI_DestroyVectorPointer(&attributes);
-
-  if (idx == nullptr) {
-    LOG_ERROR("cannot create index %llu in collection '%s'", (unsigned long long) iid, document->_info._name);
+  if (index == nullptr) {
+    LOG_ERROR("cannot create index %llu in collection '%s'", (unsigned long long) iid, 
+              document->_info._name);
     return TRI_errno();
   }
 
   return TRI_ERROR_NO_ERROR;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief compares pid and name
-////////////////////////////////////////////////////////////////////////////////
-
-static int ComparePidName (void const* left, void const* right) {
-  pid_name_t const* l = static_cast<pid_name_t const*>(left);
-  pid_name_t const* r = static_cast<pid_name_t const*>(right);
-
-  return (int) (l->_pid - r->_pid);
 }
 
 // -----------------------------------------------------------------------------
@@ -3640,82 +3158,20 @@ bool TRI_IsFullyCollectedDocumentCollection (TRI_document_collection_t* document
 bool TRI_DropIndexDocumentCollection (TRI_document_collection_t* document,
                                       TRI_idx_iid_t iid,
                                       bool writeMarker) {
-  if (iid == 0) {
-    // invalid index id or primary index
-    return true;
+  // TODO TODO: check if we need to acquire a lock here!
+  triagens::mvcc::Index* index = document->lookupIndex(iid);
+
+  if (index == nullptr ||
+      index->type() == TRI_IDX_TYPE_PRIMARY_INDEX ||
+      index->type() == TRI_IDX_TYPE_EDGE_INDEX) {
+    return false;
   }
 
-  TRI_index_t* found = nullptr;
-  TRI_vocbase_t* vocbase = document->_vocbase;
-
-  TRI_ReadLockReadWriteLock(&vocbase->_inventoryLock);
-
-  // .............................................................................
-  // inside write-lock
-  // .............................................................................
-
-  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-  size_t const n = document->_allIndexes.size();
-
-  for (size_t i = 0;  i < n;  ++i) {
-    TRI_index_t* idx = document->_allIndexes[i];
-
-    if (idx->_iid == iid) {
-      if (idx->_type == TRI_IDX_TYPE_PRIMARY_INDEX ||
-          idx->_type == TRI_IDX_TYPE_EDGE_INDEX) {
-        // cannot remove these index types
-        break;
-      }
-
-      // remove the element
-      found = idx;
-      document->_allIndexes.erase(document->_allIndexes.begin() + i);
-      break;
-    }
+  if (! document->unlinkIndex(index)) {
+    return false;
   }
 
-  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-  TRI_ReadUnlockReadWriteLock(&vocbase->_inventoryLock);
-
-  // .............................................................................
-  // outside write-lock
-  // .............................................................................
-
-  if (found != nullptr) {
-    bool result = TRI_RemoveIndexFile(document, found);
-
-    TRI_FreeIndex(found);
-
-    if (writeMarker) {
-      int res = TRI_ERROR_NO_ERROR;
-
-      try {
-        triagens::wal::DropIndexMarker marker(vocbase->_id, document->_info._cid, iid);
-        triagens::wal::SlotInfoCopy slotInfo = triagens::wal::LogfileManager::instance()->allocateAndWrite(marker, false);
-
-        if (slotInfo.errorCode != TRI_ERROR_NO_ERROR) {
-          THROW_ARANGO_EXCEPTION(slotInfo.errorCode);
-        }
-
-        return true;
-      }
-      catch (triagens::arango::Exception const& ex) {
-        res = ex.code();
-      }
-      catch (...) {
-        res = TRI_ERROR_INTERNAL;
-      }
-
-      LOG_WARNING("could not save index drop marker in log: %s", TRI_errno_string(res));
-    }
-
-    // TODO: what to do here?
-    return result;
-  }
-
-  return false;
+  return document->dropIndex(index, writeMarker);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3725,89 +3181,47 @@ bool TRI_DropIndexDocumentCollection (TRI_document_collection_t* document,
 /// freed.
 ////////////////////////////////////////////////////////////////////////////////
 
-static int PidNamesByAttributeNames (TRI_vector_pointer_t const* attributes,
-                                     TRI_shaper_t* shaper,
-                                     TRI_vector_t* pids,
-                                     TRI_vector_pointer_t* names,
-                                     bool sorted,
-                                     bool create) {
-  // .............................................................................
-  // sorted case
-  // .............................................................................
+static void PidNamesByAttributeNames (std::vector<std::string> const& attributes,
+                                      TRI_shaper_t* shaper,
+                                      std::vector<TRI_shape_pid_t>& pids,
+                                      std::vector<std::string>& names,
+                                      bool sorted,
+                                      bool create) {
+  pids.reserve(attributes.size());
+  names.reserve(attributes.size());
+
+  std::vector<std::pair<TRI_shape_pid_t, std::string>> pidNames;
+  pidNames.reserve(attributes.size());
+
+  for (auto it : attributes) {
+    TRI_shape_pid_t pid;
+    if (create) {
+      pid = shaper->findOrCreateAttributePathByName(shaper, it.c_str());
+    }
+    else {
+      pid = shaper->lookupAttributePathByName(shaper, it.c_str());
+    }
+
+    if (pid == 0) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_ILLEGAL_NAME);
+    }
+      
+    pidNames.emplace_back(std::make_pair(pid, it));
+  }
 
   if (sorted) {
-    // combine name and pid
-    pid_name_t* pidnames = static_cast<pid_name_t*>(TRI_Allocate(TRI_CORE_MEM_ZONE, sizeof(pid_name_t) * attributes->_length, false));
-
-    if (pidnames == nullptr) {
-      LOG_ERROR("out of memory in PidNamesByAttributeNames");
-      return TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-    }
-
-    for (size_t j = 0;  j < attributes->_length;  ++j) {
-      pidnames[j]._name = static_cast<char*>(attributes->_buffer[j]);
-
-      if (create) {
-        pidnames[j]._pid = shaper->findOrCreateAttributePathByName(shaper, pidnames[j]._name);
-      }
-      else {
-        pidnames[j]._pid = shaper->lookupAttributePathByName(shaper, pidnames[j]._name);
-      }
-
-      if (pidnames[j]._pid == 0) {
-        TRI_Free(TRI_CORE_MEM_ZONE, pidnames);
-
-        return TRI_set_errno(TRI_ERROR_ARANGO_ILLEGAL_NAME);
-      }
-    }
-
     // sort according to pid
-    qsort(pidnames, attributes->_length, sizeof(pid_name_t), ComparePidName);
-
-    // split again
-    TRI_InitVector(pids, TRI_CORE_MEM_ZONE, sizeof(TRI_shape_pid_t));
-    TRI_InitVectorPointer(names, TRI_CORE_MEM_ZONE);
-
-    for (size_t j = 0;  j < attributes->_length;  ++j) {
-      TRI_PushBackVector(pids, &pidnames[j]._pid);
-      TRI_PushBackVectorPointer(names, pidnames[j]._name);
-    }
-
-    TRI_Free(TRI_CORE_MEM_ZONE, pidnames);
+    std::sort(pidNames.begin(), pidNames.end(), [](std::pair<TRI_shape_pid_t, std::string> const& lhs, 
+                                                   std::pair<TRI_shape_pid_t, std::string> const& rhs) {
+      return (lhs.first < rhs.first);
+    });
   }
 
-  // .............................................................................
-  // unsorted case
-  // .............................................................................
-
-  else {
-    TRI_InitVector(pids, TRI_CORE_MEM_ZONE, sizeof(TRI_shape_pid_t));
-    TRI_InitVectorPointer(names, TRI_CORE_MEM_ZONE);
-
-    for (size_t j = 0;  j < attributes->_length;  ++j) {
-      char* name = static_cast<char*>(attributes->_buffer[j]);
-
-      TRI_shape_pid_t pid;
-      if (create) {
-        pid = shaper->findOrCreateAttributePathByName(shaper, name);
-      }
-      else {
-        pid = shaper->lookupAttributePathByName(shaper, name);
-      }
-
-      if (pid == 0) {
-        TRI_DestroyVector(pids);
-        TRI_DestroyVectorPointer(names);
-
-        return TRI_set_errno(TRI_ERROR_ARANGO_ILLEGAL_NAME);
-      }
-
-      TRI_PushBackVector(pids, &pid);
-      TRI_PushBackVectorPointer(names, name);
-    }
+  // split again
+  for (auto const& it : pidNames) {
+    pids.emplace_back(it.first);
+    names.emplace_back(it.second);
   }
-
-  return TRI_ERROR_NO_ERROR;
 }
 
 // -----------------------------------------------------------------------------
@@ -3822,49 +3236,25 @@ static int PidNamesByAttributeNames (TRI_vector_pointer_t const* attributes,
 /// @brief adds a cap constraint to a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-static TRI_index_t* CreateCapConstraintDocumentCollection (TRI_document_collection_t* document,
-                                                           size_t count,
-                                                           int64_t size,
-                                                           TRI_idx_iid_t iid,
-                                                           bool* created) {
-  if (created != nullptr) {
-    *created = false;
-  }
+static triagens::mvcc::Index* CreateCapConstraintDocumentCollection (TRI_document_collection_t* document,
+                                                                     size_t count,
+                                                                     int64_t size,
+                                                                     TRI_idx_iid_t iid,
+                                                                     bool& created) {
+  created = false;
 
   // create a new index
-  TRI_index_t* idx = TRI_CreateCapConstraint(document, iid, count, size);
-
-  if (idx == nullptr) {
-    TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-
-    return nullptr;
+  if (iid == 0) {
+    iid = triagens::mvcc::Index::generateId();
   }
 
-  // initialises the index with all existing documents
-  int res = FillIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeCapConstraint(idx);
-
-    return nullptr;
-  }
-
-  // and store index
-  res = AddIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeCapConstraint(idx);
-
-    return nullptr;
-  }
-
-  auto mvccIndex = new triagens::mvcc::CapConstraint(idx->_iid, document, count, size);
+  auto index = new triagens::mvcc::CapConstraint(iid, document, count, size);
   
   try {
-    document->addIndex(mvccIndex);
+    document->addIndex(index);
   }
   catch (...) {
-    delete mvccIndex;
+    delete index;
     throw;
   }
 
@@ -3874,14 +3264,12 @@ static TRI_index_t* CreateCapConstraintDocumentCollection (TRI_document_collecti
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(document->_info._cid);
 
-    mvccIndex->apply(transactionCollection, transaction, false);
+    index->apply(transactionCollection, transaction, false);
   }
 
-  if (created != nullptr) {
-    *created = true;
-  }
+  created = true;
 
-  return idx;
+  return index;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3891,10 +3279,8 @@ static TRI_index_t* CreateCapConstraintDocumentCollection (TRI_document_collecti
 static int CapConstraintFromJson (TRI_document_collection_t* document,
                                   TRI_json_t const* definition,
                                   TRI_idx_iid_t iid,
-                                  TRI_index_t** dst) {
-  if (dst != nullptr) {
-    *dst = nullptr;
-  }
+                                  triagens::mvcc::Index*& dst) {
+  dst = nullptr;
 
   TRI_json_t const* val1 = TRI_LookupObjectJson(definition, "size");
   TRI_json_t const* val2 = TRI_LookupObjectJson(definition, "byteSize");
@@ -3908,29 +3294,29 @@ static int CapConstraintFromJson (TRI_document_collection_t* document,
 
   size_t count = 0;
   if (TRI_IsNumberJson(val1) && val1->_value._number > 0.0) {
-    count = (size_t) val1->_value._number;
+    count = static_cast<size_t>(val1->_value._number);
   }
 
   int64_t size = 0;
-  if (TRI_IsNumberJson(val2) && val2->_value._number > (double) TRI_CAP_CONSTRAINT_MIN_SIZE) {
-    size = (int64_t) val2->_value._number;
+  if (TRI_IsNumberJson(val2) && val2->_value._number > static_cast<double>(triagens::mvcc::CapConstraint::MinSize)) {
+    size = static_cast<int64_t>(val2->_value._number);
   }
 
   if (count == 0 && size == 0) {
     LOG_ERROR("ignoring cap constraint %llu, 'size' must be at least 1, "
-              "or 'byteSize' must be at least "
-              TRI_CAP_CONSTRAINT_MIN_SIZE_STR,
-              (unsigned long long) iid);
+              "or 'byteSize' must be at least %llu",
+              (unsigned long long) iid,
+              (unsigned long long) triagens::mvcc::CapConstraint::MinSize);
 
     return TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
   }
 
-  TRI_index_t* idx = CreateCapConstraintDocumentCollection(document, count, size, iid, nullptr);
-  if (dst != nullptr) {
-    *dst = idx;
-  }
+  bool created;
+  auto index = CreateCapConstraintDocumentCollection(document, count, size, iid, created);
 
-  return idx == nullptr ? TRI_errno() : TRI_ERROR_NO_ERROR;
+  dst = index;
+
+  return index == nullptr ? TRI_errno() : TRI_ERROR_NO_ERROR;
 }
 
 // -----------------------------------------------------------------------------
@@ -3941,7 +3327,7 @@ static int CapConstraintFromJson (TRI_document_collection_t* document,
 /// @brief looks up a cap constraint
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupCapConstraintDocumentCollection (TRI_document_collection_t* document) {
+triagens::mvcc::Index* TRI_LookupCapConstraintDocumentCollection (TRI_document_collection_t* document) {
   // check if we already know a cap constraint
 #if 0
   // TODO
@@ -3957,40 +3343,26 @@ TRI_index_t* TRI_LookupCapConstraintDocumentCollection (TRI_document_collection_
 /// @brief ensures that a cap constraint exists
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_EnsureCapConstraintDocumentCollection (TRI_document_collection_t* document,
-                                                        TRI_idx_iid_t iid,
-                                                        size_t count,
-                                                        int64_t size,
-                                                        bool* created) {
-  // .............................................................................
-  // inside write-lock
-  // .............................................................................
+triagens::mvcc::Index* TRI_EnsureCapConstraintDocumentCollection (TRI_document_collection_t* document,
+                                                                  TRI_idx_iid_t iid,
+                                                                  size_t count,
+                                                                  int64_t size,
+                                                                  bool& created) {
 
-  TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
+  triagens::mvcc::Index* index = CreateCapConstraintDocumentCollection(document, count, size, iid, created);
 
-  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+  if (created) {
+    TRI_ASSERT(index != nullptr);
+      
+    int res = TRI_SaveIndex(document, index, true);
 
-  TRI_index_t* idx = CreateCapConstraintDocumentCollection(document, count, size, iid, created);
-
-  if (idx != nullptr) {
-    if (created) {
-      int res = TRI_SaveIndex(document, idx, true);
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        idx = nullptr;
-      }
+    if (res != TRI_ERROR_NO_ERROR) {
+      // TODO: handle failure
+      index = nullptr;
     }
   }
 
-  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-  // .............................................................................
-  // outside write-lock
-  // .............................................................................
-
-  TRI_ReadUnlockReadWriteLock(&document->_vocbase->_inventoryLock);
-
-  return idx;
+  return index;
 }
 
 // -----------------------------------------------------------------------------
@@ -4002,151 +3374,104 @@ TRI_index_t* TRI_EnsureCapConstraintDocumentCollection (TRI_document_collection_
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief adds a geo index to a collection
+/// @brief adds a geo index to a collection (location)
 ////////////////////////////////////////////////////////////////////////////////
 
-static TRI_index_t* CreateGeoIndexDocumentCollection (TRI_document_collection_t* document,
-                                                      char const* location,
-                                                      char const* latitude,
-                                                      char const* longitude,
-                                                      bool geoJson,
-                                                      TRI_idx_iid_t iid,
-                                                      bool* created) {
-  TRI_index_t* idx;
-  TRI_shape_pid_t lat;
-  TRI_shape_pid_t loc;
-  TRI_shape_pid_t lon;
-  TRI_shaper_t* shaper;
-  int res;
+static triagens::mvcc::Index* CreateGeoIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                std::string const& location,
+                                                                bool geoJson,
+                                                                TRI_idx_iid_t iid,
+                                                                bool& created) {
+  created = false;
 
-  lat = 0;
-  lon = 0;
-  loc = 0;
-  idx = nullptr;
+  triagens::mvcc::Index* index = TRI_LookupGeoIndex1DocumentCollection(document, location, geoJson);
 
-  shaper = document->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
+  if (index == nullptr) {
+    TRI_shaper_t* shaper = document->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
-  if (location != nullptr) {
-    loc = shaper->findOrCreateAttributePathByName(shaper, location);
+    TRI_shape_pid_t loc = shaper->findOrCreateAttributePathByName(shaper, location.c_str());
 
     if (loc == 0) {
       TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
       return nullptr;
     }
+
+    std::vector<TRI_shape_pid_t> paths{ loc };
+    std::vector<std::string> fields{ location };
+
+    if (iid == 0) {
+      iid = triagens::mvcc::Index::generateId();
+    }
+
+    index = new triagens::mvcc::GeoIndex2(iid, document, fields, paths, geoJson);
+
+    try {
+      document->addIndex(index);
+    }
+    catch (...) {
+      delete index;
+      throw;
+    }
+    
+    // TODO: fill index, store index
+
+    created = true;
   }
 
-  if (latitude != nullptr) {
-    lat = shaper->findOrCreateAttributePathByName(shaper, latitude);
+  return index;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief adds a geo index to a collection (latitude, longitude)
+////////////////////////////////////////////////////////////////////////////////
+
+static triagens::mvcc::Index* CreateGeoIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                std::string const& latitude,
+                                                                std::string const& longitude,
+                                                                TRI_idx_iid_t iid,
+                                                                bool& created) {
+  created = false;
+
+  triagens::mvcc::Index* index = TRI_LookupGeoIndex2DocumentCollection(document, latitude, longitude);
+
+  if (index == nullptr) {
+    TRI_shaper_t* shaper = document->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
+
+    TRI_shape_pid_t lat = shaper->findOrCreateAttributePathByName(shaper, latitude.c_str());
 
     if (lat == 0) {
       TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
       return nullptr;
     }
-  }
 
-  if (longitude != nullptr) {
-    lon = shaper->findOrCreateAttributePathByName(shaper, longitude);
+    TRI_shape_pid_t lon = shaper->findOrCreateAttributePathByName(shaper, longitude.c_str());
 
     if (lon == 0) {
       TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
       return nullptr;
     }
-  }
 
-  // check, if we know the index
-  if (location != nullptr) {
-    idx = TRI_LookupGeoIndex1DocumentCollection(document, location, geoJson);
-  }
-  else if (longitude != nullptr && latitude != nullptr) {
-    idx = TRI_LookupGeoIndex2DocumentCollection(document, latitude, longitude);
-  }
-  else {
-    TRI_set_errno(TRI_ERROR_INTERNAL);
-    LOG_TRACE("expecting either 'location' or 'latitude' and 'longitude'");
-    return nullptr;
-  }
+    std::vector<TRI_shape_pid_t> paths{ lat, lon };
+    std::vector<std::string> fields{ latitude, longitude }; 
 
-  if (idx != nullptr) {
-    LOG_TRACE("geo-index already created for location '%s'", location);
-
-    if (created != nullptr) {
-      *created = false;
+    if (iid == 0) {
+      iid = triagens::mvcc::Index::generateId();
     }
 
-    return idx;
-  }
-
-  // create a new index
-  if (location != nullptr) {
-    idx = TRI_CreateGeo1Index(document, iid, location, loc, geoJson);
-
-    LOG_TRACE("created geo-index for location '%s': %ld",
-              location,
-              (unsigned long) loc);
-  }
-  else if (longitude != nullptr && latitude != nullptr) {
-    idx = TRI_CreateGeo2Index(document, iid, latitude, lat, longitude, lon);
-
-    LOG_TRACE("created geo-index for location '%s': %ld, %ld",
-              location,
-              (unsigned long) lat,
-              (unsigned long) lon);
-  }
-
-  if (idx == nullptr) {
-    TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-    return nullptr;
-  }
-
-  // initialises the index with all existing documents
-  res = FillIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeGeoIndex(idx);
-
-    return nullptr;
-  }
-
-  // and store index
-  res = AddIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeGeoIndex(idx);
-
-    return nullptr;
-  }
-
-  triagens::mvcc::Index* mvccIndex;
-
-  if (location != nullptr) {
-    std::vector<std::string> fieldsVector{ 
-      std::string(location)
-    };
-    std::vector<TRI_shape_pid_t> pathsVector{ loc };
-    mvccIndex = new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector, geoJson);
-  }
-  else {
-    std::vector<std::string> fieldsVector{ 
-      std::string(latitude), 
-      std::string(longitude) 
-    };
-    std::vector<TRI_shape_pid_t> pathsVector{ lat, lon };
-    mvccIndex = new triagens::mvcc::GeoIndex2(idx->_iid, document, fieldsVector, pathsVector);
-  }
+    index = new triagens::mvcc::GeoIndex2(iid, document, fields, paths);
   
-  try {
-    document->addIndex(mvccIndex);
-  }
-  catch (...) {
-    delete mvccIndex;
-    throw;
+    try {
+      document->addIndex(index);
+    }
+    catch (...) {
+      delete index;
+      throw;
+    }
+
+    created = true;
   }
 
-  if (created != nullptr) {
-    *created = true;
-  }
-
-  return idx;
+  return index;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4156,102 +3481,69 @@ static TRI_index_t* CreateGeoIndexDocumentCollection (TRI_document_collection_t*
 static int GeoIndexFromJson (TRI_document_collection_t* document,
                              TRI_json_t const* definition,
                              TRI_idx_iid_t iid,
-                             TRI_index_t** dst) {
-  TRI_index_t* idx;
-  TRI_json_t* type;
-  TRI_json_t* bv;
-  TRI_json_t* fld;
-  char const* typeStr;
-  size_t fieldCount;
+                             triagens::mvcc::Index*& dst) {
+  dst = nullptr;
 
-  if (dst != nullptr) {
-    *dst = nullptr;
-  }
-
-  type = TRI_LookupObjectJson(definition, "type");
+  TRI_json_t const* type = TRI_LookupObjectJson(definition, "type");
 
   if (! TRI_IsStringJson(type)) {
     return TRI_ERROR_INTERNAL;
   }
 
-  typeStr = type->_value._string.data;
+  std::string typeString(type->_value._string.data, type->_value._string.length - 1);
 
   // extract fields
-  fld = ExtractFields(definition, &fieldCount, iid);
-
-  if (fld == nullptr) {
-    return TRI_errno();
-  }
+  auto attributes = ExtractAttributes(definition);
 
   // list style
-  if (TRI_EqualString(typeStr, "geo1")) {
+  if (typeString == "geo1") {
     // extract geo json
     bool geoJson = false;
-    bv = TRI_LookupObjectJson(definition, "geoJson");
+    auto const value = TRI_LookupObjectJson(definition, "geoJson");
 
-    if (TRI_IsBooleanJson(bv)) {
-      geoJson = bv->_value._boolean;
+    if (TRI_IsBooleanJson(value)) {
+      geoJson = value->_value._boolean;
     }
 
     // need just one field
-    if (fieldCount == 1) {
-      TRI_json_t const* loc = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 0));
+    if (attributes.size() == 1) {
+      bool created;
+      auto index = CreateGeoIndexDocumentCollection(document,
+                                                    attributes[0],
+                                                    geoJson,
+                                                    iid,
+                                                    created);
 
-      idx = CreateGeoIndexDocumentCollection(document,
-                                        loc->_value._string.data,
-                                        nullptr,
-                                        nullptr,
-                                        geoJson,
-                                        iid,
-                                        nullptr);
+      dst = index;
 
-      if (dst != nullptr) {
-        *dst = idx;
-      }
-
-      return idx == nullptr ? TRI_errno() : TRI_ERROR_NO_ERROR;
+      return index == nullptr ? TRI_errno() : TRI_ERROR_NO_ERROR;
     }
     else {
-      LOG_ERROR("ignoring %s-index %llu, 'fields' must be a list with 1 entries",
-                typeStr, (unsigned long long) iid);
+      LOG_ERROR("ignoring %s-index %llu, 'fields' must be an array with 1 attribute",
+                typeString.c_str(), 
+                (unsigned long long) iid);
 
       return TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
     }
   }
 
   // attribute style
-  else if (TRI_EqualString(typeStr, "geo2")) {
-    if (fieldCount == 2) {
-      TRI_json_t const* lat = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 0));
-      TRI_json_t const* lon = static_cast<TRI_json_t*>(TRI_AtVector(&fld->_value._objects, 1));
+  else if (typeString == "geo2") {
+    if (attributes.size() == 2) {
+      bool created;
+      auto index = CreateGeoIndexDocumentCollection(document,
+                                                    attributes[0],
+                                                    attributes[1],
+                                                    iid,
+                                                    created);
 
-      idx = CreateGeoIndexDocumentCollection(document,
-                                             nullptr,
-                                             lat->_value._string.data,
-                                             lon->_value._string.data,
-                                             false,
-                                             iid,
-                                             nullptr);
+      dst = index;
 
-      if (dst != nullptr) {
-        *dst = idx;
-      }
-
-      return idx == nullptr ? TRI_errno() : TRI_ERROR_NO_ERROR;
-    }
-    else {
-      LOG_ERROR("ignoring %s-index %llu, 'fields' must be a list with 2 entries",
-                typeStr, (unsigned long long) iid);
-
-      return TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
+      return index == nullptr ? TRI_errno() : TRI_ERROR_NO_ERROR;
     }
   }
 
-  else {
-    TRI_ASSERT(false);
-  }
-
-  return TRI_ERROR_NO_ERROR; // shut the vc++ up
+  return TRI_ERROR_BAD_PARAMETER;
 }
 
 // -----------------------------------------------------------------------------
@@ -4262,16 +3554,19 @@ static int GeoIndexFromJson (TRI_document_collection_t* document,
 /// @brief finds a geo index, list style
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupGeoIndex1DocumentCollection (TRI_document_collection_t* document,
-                                                    char const* location,
-                                                    bool geoJson) {
+triagens::mvcc::Index* TRI_LookupGeoIndex1DocumentCollection (TRI_document_collection_t* document,
+                                                              std::string const& location,
+                                                              bool geoJson) {
   TRI_shaper_t* shaper = document->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
-  TRI_shape_pid_t loc = shaper->lookupAttributePathByName(shaper, location);
+  TRI_shape_pid_t loc = shaper->lookupAttributePathByName(shaper, location.c_str());
 
   if (loc == 0) {
     return nullptr;
   }
+
+// TODO TODO TODO
+#if 0
 
   for (auto idx : document->_allIndexes) {
     if (idx->_type == TRI_IDX_TYPE_GEO1_INDEX) {
@@ -4283,6 +3578,7 @@ TRI_index_t* TRI_LookupGeoIndex1DocumentCollection (TRI_document_collection_t* d
       }
     }
   }
+#endif
 
   return nullptr;
 }
@@ -4291,18 +3587,20 @@ TRI_index_t* TRI_LookupGeoIndex1DocumentCollection (TRI_document_collection_t* d
 /// @brief finds a geo index, attribute style
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupGeoIndex2DocumentCollection (TRI_document_collection_t* document,
-                                                    char const* latitude,
-                                                    char const* longitude) {
+triagens::mvcc::Index* TRI_LookupGeoIndex2DocumentCollection (TRI_document_collection_t* document,
+                                                              std::string const& latitude,
+                                                              std::string const& longitude) {
   TRI_shaper_t* shaper = document->getShaper();  // ONLY IN INDEX, PROTECTED by RUNTIME
 
-  TRI_shape_pid_t lat = shaper->lookupAttributePathByName(shaper, latitude);
-  TRI_shape_pid_t lon = shaper->lookupAttributePathByName(shaper, longitude);
+  TRI_shape_pid_t lat = shaper->lookupAttributePathByName(shaper, latitude.c_str());
+  TRI_shape_pid_t lon = shaper->lookupAttributePathByName(shaper, longitude.c_str());
 
   if (lat == 0 || lon == 0) {
     return nullptr;
   }
 
+// TODO TODO TODO
+#if 0
   for (auto idx : document->_allIndexes) {
     if (idx->_type == TRI_IDX_TYPE_GEO2_INDEX) {
       TRI_geo_index_t* geo = (TRI_geo_index_t*) idx;
@@ -4315,6 +3613,7 @@ TRI_index_t* TRI_LookupGeoIndex2DocumentCollection (TRI_document_collection_t* d
       }
     }
   }
+#endif
 
   return nullptr;
 }
@@ -4323,80 +3622,52 @@ TRI_index_t* TRI_LookupGeoIndex2DocumentCollection (TRI_document_collection_t* d
 /// @brief ensures that a geo index exists, list style
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_EnsureGeoIndex1DocumentCollection (TRI_document_collection_t* document,
-                                                    TRI_idx_iid_t iid,
-                                                    char const* location,
-                                                    bool geoJson,
-                                                    bool* created) {
-  TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
+triagens::mvcc::Index* TRI_EnsureGeoIndex1DocumentCollection (TRI_document_collection_t* document,
+                                                              TRI_idx_iid_t iid,
+                                                              std::string const& location,
+                                                              bool geoJson,
+                                                              bool& created) {
 
-  // .............................................................................
-  // inside write-lock
-  // .............................................................................
+  triagens::mvcc::Index* index = CreateGeoIndexDocumentCollection(document, location, geoJson, iid, created);
 
-  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+  if (created) {
+    TRI_ASSERT(index != nullptr);
+      
+    int res = TRI_SaveIndex(document, index, true);
 
-  TRI_index_t* idx = CreateGeoIndexDocumentCollection(document, location, nullptr, nullptr, geoJson, iid, created);
-
-  if (idx != nullptr) {
-    if (created) {
-      int res = TRI_SaveIndex(document, idx, true);
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        idx = nullptr;
-      }
+    if (res != TRI_ERROR_NO_ERROR) {
+      // TODO: handle failure
+      index = nullptr;
     }
   }
 
-  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-  // .............................................................................
-  // outside write-lock
-  // .............................................................................
-
-  TRI_ReadUnlockReadWriteLock(&document->_vocbase->_inventoryLock);
-
-  return idx;
+  return index;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a geo index exists, attribute style
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_EnsureGeoIndex2DocumentCollection (TRI_document_collection_t* document,
-                                                    TRI_idx_iid_t iid,
-                                                    char const* latitude,
-                                                    char const* longitude,
-                                                    bool* created) {
-  TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
+triagens::mvcc::Index* TRI_EnsureGeoIndex2DocumentCollection (TRI_document_collection_t* document,
+                                                              TRI_idx_iid_t iid,
+                                                              std::string const& latitude,
+                                                              std::string const& longitude,
+                                                              bool& created) {
 
-  // .............................................................................
-  // inside write-lock
-  // .............................................................................
+  triagens::mvcc::Index* index = CreateGeoIndexDocumentCollection(document, latitude, longitude, iid, created);
 
-  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+  if (created) {
+    TRI_ASSERT(index != nullptr);
+      
+    int res = TRI_SaveIndex(document, index, true);
 
-  TRI_index_t* idx = CreateGeoIndexDocumentCollection(document, nullptr, latitude, longitude, false, iid, created);
-
-  if (idx != nullptr) {
-    if (created) {
-      int res = TRI_SaveIndex(document, idx, true);
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        idx = nullptr;
-      }
+    if (res != TRI_ERROR_NO_ERROR) {
+      // TODO: handle failure
+      index = nullptr;
     }
   }
 
-  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-  // .............................................................................
-  // outside write-lock
-  // .............................................................................
-
-  TRI_ReadUnlockReadWriteLock(&document->_vocbase->_inventoryLock);
-
-  return idx;
+  return index;
 }
 
 // -----------------------------------------------------------------------------
@@ -4411,121 +3682,50 @@ TRI_index_t* TRI_EnsureGeoIndex2DocumentCollection (TRI_document_collection_t* d
 /// @brief adds a hash index to the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-static TRI_index_t* CreateHashIndexDocumentCollection (TRI_document_collection_t* document,
-                                                       TRI_vector_pointer_t const* attributes,
-                                                       TRI_idx_iid_t iid,
-                                                       bool sparse,
-                                                       bool unique,
-                                                       bool* created) {
-  TRI_vector_pointer_t fields;
-  TRI_vector_t paths;
-
+static triagens::mvcc::Index* CreateHashIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                 std::vector<std::string> const& attributes,
+                                                                 TRI_idx_iid_t iid,
+                                                                 bool sparse,
+                                                                 bool unique,
+                                                                 bool& created) {
+  std::vector<TRI_shape_pid_t> paths;
+  std::vector<std::string> fields;
+    
   // determine the sorted shape ids for the attributes
-  int res = PidNamesByAttributeNames(attributes,
-                                     document->getShaper(),  // ONLY IN INDEX, PROTECTED by RUNTIME
-                                     &paths,
-                                     &fields,
-                                     true,
-                                     true);
+  PidNamesByAttributeNames(attributes,
+                           document->getShaper(),  // ONLY IN INDEX, PROTECTED by RUNTIME
+                           paths,
+                           fields,
+                           true,
+                           true);
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    if (created != nullptr) {
-      *created = false;
-    }
-
-    return nullptr;
-  }
-
-  // ...........................................................................
-  // Attempt to find an existing index which matches the attributes above.
-  // If a suitable index is found, return that one otherwise we need to create
-  // a new one.
-  // ...........................................................................
+  created = false;
 
   int sparsity = sparse ? 1 : 0;
-  TRI_index_t* idx = LookupPathIndexDocumentCollection(document, &paths, TRI_IDX_TYPE_HASH_INDEX, sparsity, unique, false);
+  triagens::mvcc::Index* index = LookupPathIndexDocumentCollection(document, paths, TRI_IDX_TYPE_HASH_INDEX, sparsity, unique, false);
 
-  if (idx != nullptr) {
-    TRI_DestroyVector(&paths);
-    TRI_DestroyVectorPointer(&fields);
-    LOG_TRACE("hash-index already created");
-
-    if (created != nullptr) {
-      *created = false;
+  if (index == nullptr) {
+    if (iid == 0) {
+      iid = triagens::mvcc::Index::generateId();
     }
 
-    return idx;
-  }
-
-  std::vector<std::string> fieldsVector;
-  fieldsVector.reserve(fields._length);
-  for (size_t i = 0; i < fields._length; ++i) {
-    fieldsVector.push_back(std::string(static_cast<char const*>(fields._buffer[i])));
-  }
-
-  std::vector<TRI_shape_pid_t> pathsVector;
-  pathsVector.reserve(paths._length);
-  for (size_t i = 0; i < paths._length; ++i) {
-    TRI_shape_pid_t* p = reinterpret_cast<TRI_shape_pid_t*>(TRI_AtVector(&paths, i));
-    pathsVector.push_back(*p);
-  }
-
-  // create the hash index. we'll provide it with the current number of documents
-  // in the collection so the index can do a sensible memory preallocation
-  idx = TRI_CreateHashIndex(document,
-                            iid,
-                            &fields,
-                            &paths,
-                            sparse,
-                            unique);
-
-  if (idx == nullptr) {
-    TRI_DestroyVector(&paths);
-    TRI_DestroyVectorPointer(&fields);
-    TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-    return nullptr;
-  }
-
-  // release memory allocated to vector
-  TRI_DestroyVector(&paths);
-  TRI_DestroyVectorPointer(&fields);
-
-  // initialises the index with all existing documents
-  res = FillIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeHashIndex(idx);
-    TRI_set_errno(res);
-
-    return nullptr;
-  }
-    
-    
-  // store index and return
-  res = AddIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeHashIndex(idx);
-
-    return nullptr;
-  }
+    index = new triagens::mvcc::HashIndex(iid, document, fields, paths, unique, sparse);
   
+    try {
+      document->addIndex(index);
+    }
+    catch (...) {
+      delete index;
+      throw;
+    }
   
-  auto mvccIndex = new triagens::mvcc::HashIndex(idx->_iid, document, fieldsVector, pathsVector, unique, sparse);
-  
-  try {
-    document->addIndex(mvccIndex);
+    created = true;
+    // TODO: fill index, store index
   }
-  catch (...) {
-    delete mvccIndex;
-    throw;
+  else {
   }
 
-  if (created != nullptr) {
-    *created = true;
-  }
-
-  return idx;
+  return index;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4535,7 +3735,7 @@ static TRI_index_t* CreateHashIndexDocumentCollection (TRI_document_collection_t
 static int HashIndexFromJson (TRI_document_collection_t* document,
                               TRI_json_t const* definition,
                               TRI_idx_iid_t iid,
-                              TRI_index_t** dst) {
+                              triagens::mvcc::Index*& dst) {
   return PathBasedIndexFromJson(document, definition, iid, CreateHashIndexDocumentCollection, dst);
 }
 
@@ -4548,74 +3748,54 @@ static int HashIndexFromJson (TRI_document_collection_t* document,
 /// the index lock must be held when calling this function
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupHashIndexDocumentCollection (TRI_document_collection_t* document,
-                                                    TRI_vector_pointer_t const* attributes,
-                                                    int sparsity,
-                                                    bool unique) {
-  TRI_vector_pointer_t fields;
-  TRI_vector_t paths;
+triagens::mvcc::Index* TRI_LookupHashIndexDocumentCollection (TRI_document_collection_t* document,
+                                                              std::vector<std::string> const& attributes,
+                                                              int sparsity,
+                                                              bool unique) {
+  std::vector<TRI_shape_pid_t> paths;
+  std::vector<std::string> fields;
 
-  // determine the sorted shape ids for the attributes
-  int res = PidNamesByAttributeNames(attributes,
-                                     document->getShaper(),  // ONLY IN INDEX, PROTECTED by RUNTIME
-                                     &paths,
-                                     &fields,
-                                     true,
-                                     false);
-
-  if (res != TRI_ERROR_NO_ERROR) {
+  try {
+    PidNamesByAttributeNames(attributes,
+                             document->getShaper(),  // ONLY IN INDEX, PROTECTED by RUNTIME
+                             paths,
+                             fields,
+                             true,
+                             false);
+  }
+  catch (...) {
+    // TRI_ERROR_ILLEGAL_NAME here means the index is not there
     return nullptr;
   }
 
-  TRI_index_t* idx = LookupPathIndexDocumentCollection(document, &paths, TRI_IDX_TYPE_HASH_INDEX, sparsity, unique, true);
-
-  // release memory allocated to vector
-  TRI_DestroyVector(&paths);
-  TRI_DestroyVectorPointer(&fields);
-
-  return idx;
+  return LookupPathIndexDocumentCollection(document, paths, TRI_IDX_TYPE_HASH_INDEX, sparsity, unique, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a hash index exists
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_EnsureHashIndexDocumentCollection (TRI_document_collection_t* document,
-                                                    TRI_idx_iid_t iid,
-                                                    TRI_vector_pointer_t const* attributes,
-                                                    bool sparse,
-                                                    bool unique,
-                                                    bool* created) {
-  TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
+triagens::mvcc::Index* TRI_EnsureHashIndexDocumentCollection (TRI_document_collection_t* document,
+                                                              TRI_idx_iid_t iid,
+                                                              std::vector<std::string> const& attributes,
+                                                              bool sparse,
+                                                              bool unique,
+                                                              bool& created) {
 
-  // .............................................................................
-  // inside write-lock
-  // .............................................................................
+  triagens::mvcc::Index* index = CreateHashIndexDocumentCollection(document, attributes, iid, sparse, unique, created);
 
-  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+  if (created) {
+    TRI_ASSERT(index != nullptr);
 
-  // given the list of attributes (as strings)
-  TRI_index_t* idx = CreateHashIndexDocumentCollection(document, attributes, iid, sparse, unique, created);
+    int res = TRI_SaveIndex(document, index, true);
 
-  if (idx != nullptr) {
-    if (created) {
-      int res = TRI_SaveIndex(document, idx, true);
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        idx = nullptr;
-      }
+    if (res != TRI_ERROR_NO_ERROR) {
+      // TODO: handle failure here?
+      index = nullptr;
     }
   }
 
-  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-  // .............................................................................
-  // outside write-lock
-  // .............................................................................
-
-  TRI_ReadUnlockReadWriteLock(&document->_vocbase->_inventoryLock);
-
-  return idx;
+  return index;
 }
 
 // -----------------------------------------------------------------------------
@@ -4630,111 +3810,47 @@ TRI_index_t* TRI_EnsureHashIndexDocumentCollection (TRI_document_collection_t* d
 /// @brief adds a skiplist index to the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-static TRI_index_t* CreateSkiplistIndexDocumentCollection (TRI_document_collection_t* document,
-                                                           TRI_vector_pointer_t const* attributes,
-                                                           TRI_idx_iid_t iid,
-                                                           bool sparse,
-                                                           bool unique,
-                                                           bool* created) {
-  TRI_vector_pointer_t fields;
-  TRI_vector_t paths;
+static triagens::mvcc::Index* CreateSkiplistIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                     std::vector<std::string> const& attributes,
+                                                                     TRI_idx_iid_t iid,
+                                                                     bool sparse,
+                                                                     bool unique,
+                                                                     bool& created) {
+  std::vector<TRI_shape_pid_t> paths;
+  std::vector<std::string> fields;
   
-  int res = PidNamesByAttributeNames(attributes,
-                                     document->getShaper(),  // ONLY IN INDEX, PROTECTED by RUNTIME
-                                     &paths,
-                                     &fields,
-                                     false,
-                                     true);
+  PidNamesByAttributeNames(attributes,
+                           document->getShaper(),  // ONLY IN INDEX, PROTECTED by RUNTIME
+                           paths,
+                           fields,
+                           false,
+                           true);
 
-  if (res != TRI_ERROR_NO_ERROR) {
-    if (created != nullptr) {
-      *created = false;
-    }
-
-    return nullptr;
-  }
-
-  // ...........................................................................
-  // Attempt to find an existing index which matches the attributes above.
-  // If a suitable index is found, return that one otherwise we need to create
-  // a new one.
-  // ...........................................................................
+  created = false;
 
   int sparsity = sparse ? 1 : 0;
-  TRI_index_t* idx = LookupPathIndexDocumentCollection(document, &paths, TRI_IDX_TYPE_SKIPLIST_INDEX, sparsity, unique, false);
+  triagens::mvcc::Index* index = LookupPathIndexDocumentCollection(document, paths, TRI_IDX_TYPE_SKIPLIST_INDEX, sparsity, unique, false);
 
-  if (idx != nullptr) {
-    TRI_DestroyVector(&paths);
-    TRI_DestroyVectorPointer(&fields);
-    LOG_TRACE("skiplist-index already created");
-
-    if (created != nullptr) {
-      *created = false;
+  if (index == nullptr) {
+    if (iid == 0) {
+      iid = triagens::mvcc::Index::generateId();
     }
 
-    return idx;
-  }
+    index = new triagens::mvcc::SkiplistIndex2(iid, document, fields, paths, unique, sparse);
   
-  std::vector<std::string> fieldsVector;
-  fieldsVector.reserve(fields._length);
-  for (size_t i = 0; i < fields._length; ++i) {
-    fieldsVector.push_back(std::string(static_cast<char const*>(fields._buffer[i])));
-  }
-
-  std::vector<TRI_shape_pid_t> pathsVector;
-  pathsVector.reserve(paths._length);
-  for (size_t i = 0; i < paths._length; ++i) {
-    TRI_shape_pid_t* p = reinterpret_cast<TRI_shape_pid_t*>(TRI_AtVector(&paths, i));
-    pathsVector.push_back(*p);
-  }
-
-
-  // Create the skiplist index
-  idx = TRI_CreateSkiplistIndex(document, iid, &fields, &paths, sparse, unique);
-
-  if (idx == nullptr) {
-    TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-    return nullptr;
-  }
-
-  // release memory allocated to vector
-  TRI_DestroyVector(&paths);
-  TRI_DestroyVectorPointer(&fields);
-
-  // initialises the index with all existing documents
-  res = FillIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeSkiplistIndex(idx);
-
-    TRI_set_errno(res);
-    return nullptr;
-  }
-
-  // store index and return
-  res = AddIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeSkiplistIndex(idx);
-
-    return nullptr;
-  }
-
-  auto mvccIndex = new triagens::mvcc::SkiplistIndex2(idx->_iid, document, fieldsVector, pathsVector, unique, sparse);
+    try {
+      document->addIndex(index);
+    }
+    catch (...) {
+      delete index;
+      throw;
+    }
   
-  try {
-    document->addIndex(mvccIndex);
-  }
-  catch (...) {
-    delete mvccIndex;
-    throw;
+    created = true;
+    // TODO: fill index, store index
   }
 
-  if (created != nullptr) {
-    *created = true;
-  }
-
-  return idx;
+  return index;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4744,7 +3860,7 @@ static TRI_index_t* CreateSkiplistIndexDocumentCollection (TRI_document_collecti
 static int SkiplistIndexFromJson (TRI_document_collection_t* document,
                                   TRI_json_t const* definition,
                                   TRI_idx_iid_t iid,
-                                  TRI_index_t** dst) {
+                                  triagens::mvcc::Index*& dst) {
   return PathBasedIndexFromJson(document, definition, iid, CreateSkiplistIndexDocumentCollection, dst);
 }
 
@@ -4757,73 +3873,54 @@ static int SkiplistIndexFromJson (TRI_document_collection_t* document,
 /// the index lock must be held when calling this function
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupSkiplistIndexDocumentCollection (TRI_document_collection_t* document,
-                                                        TRI_vector_pointer_t const* attributes,
-                                                        int sparsity,
-                                                        bool unique) {
-  TRI_vector_pointer_t fields;
-  TRI_vector_t paths;
+triagens::mvcc::Index* TRI_LookupSkiplistIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                  std::vector<std::string> const& attributes,
+                                                                  int sparsity,
+                                                                  bool unique) {
+  std::vector<TRI_shape_pid_t> paths;
+  std::vector<std::string> fields;
 
-  // determine the unsorted shape ids for the attributes
-  int res = PidNamesByAttributeNames(attributes,
-                                     document->getShaper(),  // ONLY IN INDEX, PROTECTED by RUNTIME
-                                     &paths,
-                                     &fields,
-                                     false,
-                                     false);
-
-  if (res != TRI_ERROR_NO_ERROR) {
+  try {
+    PidNamesByAttributeNames(attributes,
+                             document->getShaper(),  // ONLY IN INDEX, PROTECTED by RUNTIME
+                             paths,
+                             fields,
+                             false,
+                             false);
+  }
+  catch (...) {
+    // TRI_ERROR_ILLEGAL_NAME here means the index is not there
     return nullptr;
   }
 
-  TRI_index_t* idx = LookupPathIndexDocumentCollection(document, &paths, TRI_IDX_TYPE_SKIPLIST_INDEX, sparsity, unique, true);
-
-  // release memory allocated to vector
-  TRI_DestroyVector(&paths);
-  TRI_DestroyVectorPointer(&fields);
-
-  return idx;
+  return LookupPathIndexDocumentCollection(document, paths, TRI_IDX_TYPE_SKIPLIST_INDEX, sparsity, unique, true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a skiplist index exists
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_collection_t* document,
-                                                        TRI_idx_iid_t iid,
-                                                        TRI_vector_pointer_t const* attributes,
-                                                        bool sparse,
-                                                        bool unique,
-                                                        bool* created) {
-  TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
+triagens::mvcc::Index* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                  TRI_idx_iid_t iid,
+                                                                  std::vector<std::string> const& attributes,
+                                                                  bool sparse,
+                                                                  bool unique,
+                                                                  bool& created) {
 
-  // .............................................................................
-  // inside write-lock the collection
-  // .............................................................................
+  triagens::mvcc::Index* index = CreateSkiplistIndexDocumentCollection(document, attributes, iid, sparse, unique, created);
 
-  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+  if (created) {
+    TRI_ASSERT(index != nullptr);
+    
+    int res = TRI_SaveIndex(document, index, true);
 
-  TRI_index_t* idx = CreateSkiplistIndexDocumentCollection(document, attributes, iid, sparse, unique, created);
-
-  if (idx != nullptr) {
-    if (created) {
-      int res = TRI_SaveIndex(document, idx, true);
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        idx = nullptr;
-      }
+    if (res != TRI_ERROR_NO_ERROR) {
+      // TODO: handle failure
+      index = nullptr;
     }
   }
 
-  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-  // .............................................................................
-  // outside write-lock
-  // .............................................................................
-
-  TRI_ReadUnlockReadWriteLock(&document->_vocbase->_inventoryLock);
-
-  return idx;
+  return index;
 }
 
 // -----------------------------------------------------------------------------
@@ -4834,21 +3931,14 @@ TRI_index_t* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_collection_
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
 
-static TRI_index_t* LookupFulltextIndexDocumentCollection (TRI_document_collection_t* document,
-                                                           char const* attributeName,
-                                                           bool indexSubstrings,
-                                                           int minWordLength) {
-  TRI_ASSERT(attributeName != nullptr);
+triagens::mvcc::Index* LookupFulltextIndexDocumentCollection (TRI_document_collection_t* document,
+                                                              std::vector<std::string> const& attributes,
+                                                              int minWordLength) {
 
+// TODO: fix fulltext index lookup
+#if 0
   for (auto idx : document->_allIndexes) {
     if (idx->_type == TRI_IDX_TYPE_FULLTEXT_INDEX) {
-      TRI_fulltext_index_t* fulltext = (TRI_fulltext_index_t*) idx;
-
-      // 2013-01-17: deactivated substring indexing
-      // if (fulltext->_indexSubstrings != indexSubstrings) {
-      //   continue;
-      // }
-
       if (fulltext->_minWordLength != minWordLength) {
         continue;
       }
@@ -4864,6 +3954,7 @@ static TRI_index_t* LookupFulltextIndexDocumentCollection (TRI_document_collecti
       }
     }
   }
+#endif
 
   return nullptr;
 }
@@ -4872,72 +3963,34 @@ static TRI_index_t* LookupFulltextIndexDocumentCollection (TRI_document_collecti
 /// @brief adds a fulltext index to the collection
 ////////////////////////////////////////////////////////////////////////////////
 
-static TRI_index_t* CreateFulltextIndexDocumentCollection (TRI_document_collection_t* document,
-                                                           char const* attributeName,
-                                                           bool indexSubstrings,
-                                                           int minWordLength,
-                                                           TRI_idx_iid_t iid,
-                                                           bool* created) {
-  // ...........................................................................
-  // Attempt to find an existing index with the same attribute
-  // If a suitable index is found, return that one otherwise we need to create
-  // a new one.
-  // ...........................................................................
+static triagens::mvcc::Index* CreateFulltextIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                     std::vector<std::string> const& attributes,
+                                                                     int minWordLength,
+                                                                     TRI_idx_iid_t iid,
+                                                                     bool& created) {
+  created = false;
 
-  TRI_index_t* idx = LookupFulltextIndexDocumentCollection(document, attributeName, indexSubstrings, minWordLength);
+  triagens::mvcc::Index* index = LookupFulltextIndexDocumentCollection(document, attributes, minWordLength);
 
-  if (idx != nullptr) {
-    LOG_TRACE("fulltext-index already created");
-
-    if (created != nullptr) {
-      *created = false;
+  if (index == nullptr) {
+    if (iid == 0) {
+      iid = triagens::mvcc::Index::generateId();
     }
-    return idx;
-  }
 
-  // Create the fulltext index
-  idx = TRI_CreateFulltextIndex(document, iid, attributeName, indexSubstrings, minWordLength);
-
-  if (idx == nullptr) {
-    TRI_set_errno(TRI_ERROR_OUT_OF_MEMORY);
-    return nullptr;
-  }
-
-  // initialises the index with all existing documents
-  int res = FillIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeFulltextIndex(idx);
-
-    return nullptr;
-  }
-
-  // store index and return
-  res = AddIndex(document, idx);
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    TRI_FreeFulltextIndex(idx);
-
-    return nullptr;
-  }
-
-
-  std::vector<std::string> fieldsVector{ std::string(attributeName) };
-  auto mvccIndex = new triagens::mvcc::FulltextIndex(idx->_iid, document, fieldsVector, minWordLength);
+    index = new triagens::mvcc::FulltextIndex(iid, document, attributes, minWordLength);
   
-  try {
-    document->addIndex(mvccIndex);
-  }
-  catch (...) {
-    delete mvccIndex;
-    throw;
+    try {
+      document->addIndex(index);
+    }
+    catch (...) {
+      delete index;
+      throw;
+    }
+
+    created = true;
   }
 
-  if (created != nullptr) {
-    *created = true;
-  }
-
-  return idx;
+  return index;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4947,59 +4000,36 @@ static TRI_index_t* CreateFulltextIndexDocumentCollection (TRI_document_collecti
 static int FulltextIndexFromJson (TRI_document_collection_t* document,
                                   TRI_json_t const* definition,
                                   TRI_idx_iid_t iid,
-                                  TRI_index_t** dst) {
-  if (dst != nullptr) {
-    *dst = nullptr;
-  }
+                                  triagens::mvcc::Index*& dst) {
+  dst = nullptr;
 
   // extract fields
-  size_t fieldCount;
-  TRI_json_t* fld = ExtractFields(definition, &fieldCount, iid);
+  std::vector<std::string> attributes = ExtractAttributes(definition);
 
-  if (fld == nullptr) {
-    return TRI_errno();
+  if (attributes.size() != 1) {
+    return TRI_ERROR_BAD_PARAMETER;
   }
-
-  // extract the list of fields
-  if (fieldCount != 1) {
-    LOG_ERROR("ignoring index %llu, has an invalid number of attributes", (unsigned long long) iid);
-
-    return TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
-  }
-
-  TRI_json_t const* attribute = static_cast<TRI_json_t const*>(TRI_AtVector(&fld->_value._objects, 0));
-
-  if (! TRI_IsStringJson(attribute)) {
-    return TRI_set_errno(TRI_ERROR_BAD_PARAMETER);
-  }
-
-  char* attributeName = attribute->_value._string.data;
-
-  // 2013-01-17: deactivated substring indexing
-  // indexSubstrings = TRI_LookupObjectJson(definition, "indexSubstrings");
 
   int minWordLengthValue = TRI_FULLTEXT_MIN_WORD_LENGTH_DEFAULT;
   TRI_json_t const* minWordLength = TRI_LookupObjectJson(definition, "minLength");
 
-  if (minWordLength != nullptr && minWordLength->_type == TRI_JSON_NUMBER) {
-    minWordLengthValue = (int) minWordLength->_value._number;
+  if (TRI_IsNumberJson(minWordLength)) {
+    minWordLengthValue = static_cast<int>(minWordLength->_value._number);
   }
 
   // create the index
-  TRI_index_t* idx = LookupFulltextIndexDocumentCollection(document, attributeName, false, minWordLengthValue);
+  triagens::mvcc::Index* index = LookupFulltextIndexDocumentCollection(document, attributes, minWordLengthValue);
 
-  if (idx == nullptr) {
+  if (index == nullptr) {
     bool created;
-    idx = CreateFulltextIndexDocumentCollection(document, attributeName, false, minWordLengthValue, iid, &created);
+    index = CreateFulltextIndexDocumentCollection(document, attributes, minWordLengthValue, iid, created);
   }
 
-  if (dst != nullptr) {
-    *dst = idx;
-  }
+  dst = index;
 
-  if (idx == nullptr) {
+  if (index == nullptr) {
     LOG_ERROR("cannot create fulltext index %llu", (unsigned long long) iid);
-    return TRI_errno();
+    return TRI_ERROR_INTERNAL;
   }
 
   return TRI_ERROR_NO_ERROR;
@@ -5014,52 +4044,36 @@ static int FulltextIndexFromJson (TRI_document_collection_t* document,
 /// the index lock must be held when calling this function
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupFulltextIndexDocumentCollection (TRI_document_collection_t* document,
-                                                        char const* attributeName,
-                                                        bool indexSubstrings,
-                                                        int minWordLength) {
-  return LookupFulltextIndexDocumentCollection(document, attributeName, indexSubstrings, minWordLength);
+triagens::mvcc::Index* TRI_LookupFulltextIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                  std::vector<std::string> const& attributes,
+                                                                  int minWordLength) {
+  return LookupFulltextIndexDocumentCollection(document, attributes, minWordLength);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a fulltext index exists
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_EnsureFulltextIndexDocumentCollection (TRI_document_collection_t* document,
-                                                        TRI_idx_iid_t iid,
-                                                        char const* attributeName,
-                                                        bool indexSubstrings,
-                                                        int minWordLength,
-                                                        bool* created) {
-  TRI_ReadLockReadWriteLock(&document->_vocbase->_inventoryLock);
+triagens::mvcc::Index* TRI_EnsureFulltextIndexDocumentCollection (TRI_document_collection_t* document,
+                                                                  TRI_idx_iid_t iid,
+                                                                  std::vector<std::string> const& attributes,
+                                                                  int minWordLength,
+                                                                  bool& created) {
 
-  // .............................................................................
-  // inside write-lock the collection
-  // .............................................................................
+  triagens::mvcc::Index* index = CreateFulltextIndexDocumentCollection(document, attributes, minWordLength, iid, created);
 
-  TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
+  if (created) {
+    TRI_ASSERT(index != nullptr);
+      
+    int res = TRI_SaveIndex(document, index, true);
 
-  TRI_index_t* idx = CreateFulltextIndexDocumentCollection(document, attributeName, indexSubstrings, minWordLength, iid, created);
-
-  if (idx != nullptr) {
-    if (created) {
-      int res = TRI_SaveIndex(document, idx, true);
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        idx = nullptr;
-      }
+    if (res != TRI_ERROR_NO_ERROR) {
+      // TODO: handle failure
+      index = nullptr;
     }
   }
 
-  TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
-
-  // .............................................................................
-  // outside write-lock
-  // .............................................................................
-
-  TRI_ReadUnlockReadWriteLock(&document->_vocbase->_inventoryLock);
-
-  return idx;
+  return index;
 }
 
 // -----------------------------------------------------------------------------

@@ -34,7 +34,6 @@
 #include "Basics/Common.h"
 
 #include "Mvcc/TransactionId.h"
-
 #include "VocBase/barrier.h"
 #include "VocBase/collection.h"
 #include "VocBase/headers.h"
@@ -552,7 +551,6 @@ public:
   KeyGenerator*                _keyGenerator;
 
   std::vector<TRI_index_t*>    _allIndexes;
-  std::set<TRI_voc_tid_t>*     _failedTransactions;
 
   int64_t                      _uncollectedLogfileEntries;
   int64_t                      _numberDocuments;
@@ -610,25 +608,6 @@ void TRI_RemoveDatafileInfoDocumentCollection (TRI_document_collection_t*,
 TRI_doc_datafile_info_t* TRI_FindDatafileInfoDocumentCollection (TRI_document_collection_t*,
                                                                 TRI_voc_fid_t,
                                                                 bool);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief iterate over all documents in the collection, using a user-defined
-/// callback function. Returns the total number of documents in the collection
-///
-/// The user can abort the iteration by return "false" from the callback
-/// function.
-///
-/// Note: the function will not acquire any locks. It is the task of the caller
-/// to ensure the collection is properly locked
-////////////////////////////////////////////////////////////////////////////////
-
-size_t TRI_DocumentIteratorDocumentCollection (triagens::arango::TransactionBase const*,
-                                              TRI_document_collection_t*,
-                                              void*,
-                                              bool (*callback)(TRI_doc_mptr_t const*,
-                                              TRI_document_collection_t*, void*));
-
-
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                               DOCUMENT COLLECTION
@@ -971,7 +950,7 @@ bool TRI_IsFullyCollectedDocumentCollection (TRI_document_collection_t*);
 
 int TRI_FromJsonIndexDocumentCollection (TRI_document_collection_t*,
                                          struct TRI_json_t const*,
-                                         struct TRI_index_s**);
+                                         triagens::mvcc::Index*&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief rolls back a document operation
@@ -1048,17 +1027,17 @@ bool TRI_DropIndexDocumentCollection (TRI_document_collection_t*,
 /// @brief looks up a cap constraint
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupCapConstraintDocumentCollection (TRI_document_collection_t*);
+triagens::mvcc::Index* TRI_LookupCapConstraintDocumentCollection (TRI_document_collection_t*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a cap constraint exists
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_EnsureCapConstraintDocumentCollection (TRI_document_collection_t*,
-                                                        TRI_idx_iid_t,
-                                                        size_t,
-                                                        int64_t,
-                                                        bool*);
+triagens::mvcc::Index* TRI_EnsureCapConstraintDocumentCollection (TRI_document_collection_t*,
+                                                                  TRI_idx_iid_t,
+                                                                  size_t,
+                                                                  int64_t,
+                                                                  bool&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                         GEO INDEX
@@ -1070,43 +1049,39 @@ TRI_index_t* TRI_EnsureCapConstraintDocumentCollection (TRI_document_collection_
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief finds a geo index, list style
-///
-/// Note that the caller must hold at least a read-lock.
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_LookupGeoIndex1DocumentCollection (TRI_document_collection_t*,
-                                                           char const*,
-                                                           bool);
+triagens::mvcc::Index* TRI_LookupGeoIndex1DocumentCollection (TRI_document_collection_t*,
+                                                              std::string const&,
+                                                              bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief finds a geo index, attribute style
-///
-/// Note that the caller must hold at least a read-lock.
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_LookupGeoIndex2DocumentCollection (TRI_document_collection_t*,
-                                                           char const*,
-                                                           char const*);
+triagens::mvcc::Index* TRI_LookupGeoIndex2DocumentCollection (TRI_document_collection_t*,
+                                                              std::string const&,
+                                                              std::string const&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a geo index exists, list style
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_EnsureGeoIndex1DocumentCollection (TRI_document_collection_t*,
-                                                           TRI_idx_iid_t,
-                                                           char const*,
-                                                           bool,
-                                                           bool*);
+triagens::mvcc::Index* TRI_EnsureGeoIndex1DocumentCollection (TRI_document_collection_t*,
+                                                              TRI_idx_iid_t,
+                                                              std::string const&,
+                                                              bool,
+                                                              bool&);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a geo index exists, attribute style
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_EnsureGeoIndex2DocumentCollection (TRI_document_collection_t*,
-                                                           TRI_idx_iid_t,
-                                                           char const*,
-                                                           char const*,
-                                                           bool*);
+triagens::mvcc::Index* TRI_EnsureGeoIndex2DocumentCollection (TRI_document_collection_t*,
+                                                              TRI_idx_iid_t,
+                                                              std::string const&,
+                                                              std::string const&,
+                                                              bool&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                        HASH INDEX
@@ -1118,27 +1093,24 @@ struct TRI_index_s* TRI_EnsureGeoIndex2DocumentCollection (TRI_document_collecti
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief finds a hash index
-///
-/// @note The caller must hold at least a read-lock.
-///
 /// @note The @FA{paths} must be sorted.
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_LookupHashIndexDocumentCollection (TRI_document_collection_t*,
-                                                           TRI_vector_pointer_t const*,
-                                                           int,
-                                                           bool);
+triagens::mvcc::Index* TRI_LookupHashIndexDocumentCollection (TRI_document_collection_t*,
+                                                              std::vector<std::string> const&,
+                                                              int,
+                                                              bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a hash index exists
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_EnsureHashIndexDocumentCollection (TRI_document_collection_t*,
-                                                           TRI_idx_iid_t,
-                                                           TRI_vector_pointer_t const*,
-                                                           bool,
-                                                           bool,
-                                                           bool*);
+triagens::mvcc::Index* TRI_EnsureHashIndexDocumentCollection (TRI_document_collection_t*,
+                                                              TRI_idx_iid_t,
+                                                              std::vector<std::string> const&,
+                                                              bool,
+                                                              bool,
+                                                              bool&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    SKIPLIST INDEX
@@ -1150,25 +1122,23 @@ struct TRI_index_s* TRI_EnsureHashIndexDocumentCollection (TRI_document_collecti
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief finds a skiplist index
-///
-/// Note that the caller must hold at least a read-lock.
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_LookupSkiplistIndexDocumentCollection (TRI_document_collection_t*,
-                                                               TRI_vector_pointer_t const*,
-                                                               int,
-                                                               bool);
+triagens::mvcc::Index* TRI_LookupSkiplistIndexDocumentCollection (TRI_document_collection_t*,
+                                                                  std::vector<std::string> const&,
+                                                                  int,
+                                                                  bool);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a skiplist index exists
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_collection_t*,
-                                                               TRI_idx_iid_t,
-                                                               TRI_vector_pointer_t const*,
-                                                               bool,
-                                                               bool,
-                                                               bool*);
+triagens::mvcc::Index* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_collection_t*,
+                                                                  TRI_idx_iid_t,
+                                                                  std::vector<std::string> const&,
+                                                                  bool,
+                                                                  bool,
+                                                                  bool&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    FULLTEXT INDEX
@@ -1180,25 +1150,21 @@ struct TRI_index_s* TRI_EnsureSkiplistIndexDocumentCollection (TRI_document_coll
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief finds a fulltext index
-///
-/// Note that the caller must hold at least a read-lock.
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_LookupFulltextIndexDocumentCollection (TRI_document_collection_t*,
-                                                               char const*,
-                                                               bool,
-                                                               int);
+triagens::mvcc::Index* TRI_LookupFulltextIndexDocumentCollection (TRI_document_collection_t*,
+                                                                  std::vector<std::string> const&,
+                                                                  int);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief ensures that a fulltext index exists
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TRI_index_s* TRI_EnsureFulltextIndexDocumentCollection (TRI_document_collection_t*,
-                                                               TRI_idx_iid_t,
-                                                               char const*,
-                                                               bool,
-                                                               int,
-                                                               bool*);
+triagens::mvcc::Index* TRI_EnsureFulltextIndexDocumentCollection (TRI_document_collection_t*,
+                                                                  TRI_idx_iid_t,
+                                                                  std::vector<std::string> const&,
+                                                                  int,
+                                                                  bool&);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  public functions

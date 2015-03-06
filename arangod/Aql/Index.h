@@ -33,7 +33,7 @@
 #include "Basics/Common.h"
 #include "Basics/json.h"
 #include "Basics/JsonHelper.h"
-#include "HashIndex/hash-index.h"
+#include "Mvcc/Index.h"
 #include "Utils/Exception.h"
 #include "VocBase/index.h"
 
@@ -74,7 +74,7 @@ namespace triagens {
       
       Index (TRI_json_t const* json)
         : id(triagens::basics::StringUtils::uint64(triagens::basics::JsonHelper::checkAndGetStringValue(json, "id"))),
-          type(TRI_TypeIndex(triagens::basics::JsonHelper::checkAndGetStringValue(json, "type").c_str())),
+          type(triagens::mvcc::Index::type(triagens::basics::JsonHelper::checkAndGetStringValue(json, "type").c_str())),
           unique(triagens::basics::JsonHelper::checkAndGetBooleanValue(json, "unique")),
           sparse(triagens::basics::JsonHelper::getBooleanValue(json, "sparse", false)),
           fields(),
@@ -104,7 +104,7 @@ namespace triagens {
       triagens::basics::Json toJson () const {
         triagens::basics::Json json(triagens::basics::Json::Object);
 
-        json("type", triagens::basics::Json(TRI_TypeNameIndex(type)))
+        json("type", triagens::basics::Json(triagens::mvcc::Index::type(type)))
             ("id", triagens::basics::Json(triagens::basics::StringUtils::itoa(id))) 
             ("unique", triagens::basics::Json(unique))
             ("sparse", triagens::basics::Json(sparse));

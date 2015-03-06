@@ -47,16 +47,6 @@ namespace triagens {
 /// @brief looks up a index identifier
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_index_t* TRI_LookupIndexByHandle (v8::Isolate*,
-                                      triagens::arango::CollectionNameResolver const*,
-                                      TRI_vocbase_col_t const*,
-                                      v8::Handle<v8::Value> const,
-                                      bool ignoreNotFound);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief looks up a index identifier
-////////////////////////////////////////////////////////////////////////////////
-
 triagens::mvcc::Index* TRI_LookupMvccIndexByHandle (v8::Isolate*,
                                                     triagens::arango::CollectionNameResolver const*,
                                                     TRI_vocbase_col_t const*,

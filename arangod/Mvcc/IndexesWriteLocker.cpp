@@ -49,7 +49,10 @@ using namespace triagens::mvcc;
 IndexesWriteLocker::IndexesWriteLocker (TransactionCollection* collection)
   : _collection(collection) {
 
-  _collection->documentCollection()->writeLockIndexes();
+  auto documentCollection = _collection->documentCollection();
+
+  TRI_ReadLockReadWriteLock(&(documentCollection->_vocbase->_inventoryLock));
+  documentCollection->writeLockIndexes();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +60,10 @@ IndexesWriteLocker::IndexesWriteLocker (TransactionCollection* collection)
 ////////////////////////////////////////////////////////////////////////////////
 
 IndexesWriteLocker::~IndexesWriteLocker () {
-  _collection->documentCollection()->writeUnlockIndexes();
+  auto documentCollection = _collection->documentCollection();
+
+  documentCollection->writeUnlockIndexes();
+  TRI_ReadUnlockReadWriteLock(&(documentCollection->_vocbase->_inventoryLock));
 }
 
 // -----------------------------------------------------------------------------

@@ -33,6 +33,7 @@
 #include "Basics/json.h"
 #include "Basics/tri-strings.h"
 #include "Basics/JsonHelper.h"
+#include "Mvcc/Index.h"
 #include "Rest/HttpRequest.h"
 #include "SimpleHttpClient/GeneralClientConnection.h"
 #include "SimpleHttpClient/SimpleHttpClient.h"
@@ -482,22 +483,12 @@ int Syncer::createIndex (TRI_json_t const* json) {
 
     TRI_document_collection_t* document = guard.collection()->_collection;
   
-    SingleCollectionWriteTransaction<UINT64_MAX> trx(new StandaloneTransactionContext(), _vocbase, cid);
-
-    int res = trx.begin();
-
-    if (res != TRI_ERROR_NO_ERROR) {
-      return res;
-    }
-
-    TRI_index_t* idx;
-    res = TRI_FromJsonIndexDocumentCollection(document, indexJson, &idx);
+    triagens::mvcc::Index* idx;
+    int res = TRI_FromJsonIndexDocumentCollection(document, indexJson, idx);
 
     if (res == TRI_ERROR_NO_ERROR) {
       res = TRI_SaveIndex(document, idx, true);
     }
-
-    res = trx.finish(res);
 
     return res;
   }

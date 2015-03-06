@@ -39,6 +39,8 @@
 #include "Mvcc/TransactionId.h"
 #include "Mvcc/Transaction.h"
 
+struct TRI_document_collection_t;
+
 namespace triagens {
   namespace mvcc {
 
@@ -53,6 +55,8 @@ namespace triagens {
 // -----------------------------------------------------------------------------
       
       public:
+        
+        PrimaryIndex ();
 
         PrimaryIndex (TRI_idx_iid_t id,
                       struct TRI_document_collection_t*);
@@ -199,6 +203,12 @@ namespace triagens {
 // -----------------------------------------------------------------------------
       
       private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the underlying collection
+////////////////////////////////////////////////////////////////////////////////
+  
+        struct TRI_document_collection_t* _collection;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief typedef for the hash table

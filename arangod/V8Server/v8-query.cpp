@@ -1089,13 +1089,13 @@ struct CollectionChecksumHelper {
   }
 
   void update (TRI_doc_mptr_t const* mptr) {
-    TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());  // PROTECTED by trx in calling function TRI_DocumentIteratorDocumentCollection
+    TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());  
     uint32_t localCrc;
 
     if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
         marker->_type == TRI_WAL_MARKER_DOCUMENT ||
         marker->_type == TRI_WAL_MARKER_MVCC_DOCUMENT) {
-      localCrc = TRI_Crc32HashString(TRI_EXTRACT_MARKER_KEY(mptr));  // PROTECTED by trx in calling function TRI_DocumentIteratorDocumentCollection
+      localCrc = TRI_Crc32HashString(TRI_EXTRACT_MARKER_KEY(mptr));  
       if (withRevisions) {
         localCrc += TRI_Crc32HashPointer(&mptr->_rid, sizeof(TRI_voc_rid_t));
       }
@@ -1109,7 +1109,7 @@ struct CollectionChecksumHelper {
       uint32_t offsetToKey;
 
       // must convert _rid, _fromCid, _toCid into strings for portability
-      localCrc = TRI_Crc32HashString(TRI_EXTRACT_MARKER_KEY(mptr));  // PROTECTED by trx in calling function TRI_DocumentIteratorDocumentCollection
+      localCrc = TRI_Crc32HashString(TRI_EXTRACT_MARKER_KEY(mptr)); 
       if (withRevisions) {
         localCrc += TRI_Crc32HashPointer(&mptr->_rid, sizeof(TRI_voc_rid_t));
       }
@@ -1156,7 +1156,7 @@ struct CollectionChecksumHelper {
       TRI_shaped_json_t shaped;
       TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, d);
 
-      TRI_StringifyArrayShapedJson(shaper, &buffer, &shaped, false);  // PROTECTED by trx in calling function TRI_DocumentIteratorDocumentCollection
+      TRI_StringifyArrayShapedJson(shaper, &buffer, &shaped, false);  
       localCrc += TRI_Crc32HashPointer(TRI_BeginStringBuffer(&buffer), TRI_LengthStringBuffer(&buffer));
       TRI_ResetStringBuffer(&buffer);
     }

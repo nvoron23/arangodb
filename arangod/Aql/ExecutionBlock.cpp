@@ -32,9 +32,8 @@
 #include "Basics/StringUtils.h"
 #include "Basics/StringBuffer.h"
 #include "Basics/json-utilities.h"
-#include "V8/v8-globals.h"
-#include "HashIndex/hash-index.h"
 #include "Utils/Exception.h"
+#include "V8/v8-globals.h"
 #include "VocBase/edge-collection.h"
 #include "VocBase/index.h"
 #include "VocBase/vocbase.h"
@@ -932,7 +931,10 @@ IndexRangeBlock::~IndexRangeBlock () {
   }
     
   if (_skiplistIterator != nullptr) {
+    // TODO TODO TODO: free skiplist iterator
+#if 0    
     TRI_FreeSkiplistIterator(_skiplistIterator);
+#endif
   }
 }
 
@@ -1802,7 +1804,10 @@ void IndexRangeBlock::destroyHashIndexSearchValues () {
 }
 
 bool IndexRangeBlock::setupHashIndexSearchValue (IndexAndCondition const& range) { 
+// TODO TODO TODO: re-add hash index functionality
+#if 0
   auto en = static_cast<IndexRangeNode const*>(getPlanNode());
+
   TRI_index_t* idx = en->_index->getInternals();
   TRI_ASSERT(idx != nullptr);
   TRI_hash_index_t* hashIndex = (TRI_hash_index_t*) idx;
@@ -1831,7 +1836,7 @@ bool IndexRangeBlock::setupHashIndexSearchValue (IndexAndCondition const& range)
     std::string const lookFor = std::string(name);
 
     for (auto x : range) {
-      if (x._attr == lookFor) {    //found attribute
+      if (x._attr == lookFor) {    // found attribute
         if (x._lowConst.bound().json() == nullptr) {
           // attribute is empty. this may be case if a function expression is used as a 
           // comparison value, and the function returns an empty list, e.g. x.a IN PASSTHRU([])
@@ -1850,6 +1855,7 @@ bool IndexRangeBlock::setupHashIndexSearchValue (IndexAndCondition const& range)
       }
     }
   }
+#endif
 
   return true;
 }
@@ -1878,6 +1884,8 @@ void IndexRangeBlock::readHashIndex (size_t atMost) {
     return;
   }
 
+  // TODO TODO TODO: re-add hash index functionality
+#if 0
   auto en = static_cast<IndexRangeNode const*>(getPlanNode());
   TRI_index_t* idx = en->_index->getInternals();
   TRI_ASSERT(idx != nullptr);
@@ -1904,6 +1912,8 @@ void IndexRangeBlock::readHashIndex (size_t atMost) {
       }
     }
   }
+#endif
+
   LEAVE_BLOCK;
 }
 
@@ -1946,7 +1956,10 @@ void IndexRangeBlock::readHashIndex (size_t atMost) {
 void IndexRangeBlock::getSkiplistIterator (IndexAndCondition const& ranges) {
   ENTER_BLOCK;
   TRI_ASSERT(_skiplistIterator == nullptr);
-  
+ 
+  // TODO TODO TODO: re-add skiplist index functionality
+
+#if 0 
   auto en = static_cast<IndexRangeNode const*>(getPlanNode());
   TRI_index_t* idx = en->_index->getInternals();
   TRI_ASSERT(idx != nullptr);
@@ -2022,6 +2035,8 @@ void IndexRangeBlock::getSkiplistIterator (IndexAndCondition const& ranges) {
 
     THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
   }
+#endif
+
   LEAVE_BLOCK;
 }
 
@@ -2030,7 +2045,10 @@ void IndexRangeBlock::readSkiplistIndex (size_t atMost) {
   if (_skiplistIterator == nullptr) {
     return;
   }
-  
+
+  // TODO TODO TODO: re-add skiplist index functionality
+ 
+#if 0 
   try {
     size_t nrSent = 0;
     while (nrSent < atMost && _skiplistIterator !=nullptr) { 
@@ -2057,6 +2075,7 @@ void IndexRangeBlock::readSkiplistIndex (size_t atMost) {
     }
     throw;
   }
+#endif  
   LEAVE_BLOCK;
 }
 

@@ -34,6 +34,7 @@
 #include "Basics/tri-strings.h"
 #include "Basics/JsonHelper.h"
 #include "Basics/StringUtils.h"
+#include "Mvcc/Index.h"
 #include "SimpleHttpClient/SimpleHttpClient.h"
 #include "SimpleHttpClient/SimpleHttpResult.h"
 #include "Utils/CollectionGuard.h"
@@ -829,15 +830,14 @@ int InitialSyncer::handleCollection (TRI_json_t const* parameters,
 
             // create a fake transaction object to avoid assertions
             TransactionBase trx(true);
-            TRI_WRITE_LOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
 
             for (size_t i = 0; i < n; ++i) {
               TRI_json_t const* idxDef = static_cast<TRI_json_t const*>(TRI_AtVector(&indexes->_value._objects, i));
-              TRI_index_t* idx = nullptr;
+              triagens::mvcc::Index* idx = nullptr;
  
               // {"id":"229907440927234","type":"hash","unique":false,"fields":["x","Y"]}
     
-              res = TRI_FromJsonIndexDocumentCollection(document, idxDef, &idx);
+              res = TRI_FromJsonIndexDocumentCollection(document, idxDef, idx);
 
               if (res != TRI_ERROR_NO_ERROR) {
                 errorMsg = "could not create index: " + string(TRI_errno_string(res));
@@ -854,8 +854,6 @@ int InitialSyncer::handleCollection (TRI_json_t const* parameters,
                 }
               }
             }
-
-            TRI_WRITE_UNLOCK_DOCUMENTS_INDEXES_PRIMARY_COLLECTION(document);
           }
         }
         catch (triagens::arango::Exception const& ex) {

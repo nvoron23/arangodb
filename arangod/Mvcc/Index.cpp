@@ -28,7 +28,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Index.h"
-#include "Basics/json.h"
+#include "VocBase/server.h"
+#include "VocBase/vocbase.h"
 
 using namespace triagens::basics;
 using namespace triagens::mvcc;
@@ -46,10 +47,8 @@ using namespace triagens::mvcc;
 ////////////////////////////////////////////////////////////////////////////////
 
 Index::Index (TRI_idx_iid_t id,
-              TRI_document_collection_t* collection,
               std::vector<std::string> const& fields)
   : _id(id),
-    _collection(collection),
     _fields(fields) {
 
 }
@@ -99,6 +98,144 @@ triagens::basics::Json Index::toJson (TRI_memory_zone_t* zone) const {
   json("id", triagens::basics::Json(zone, static_cast<double>(_id)))
       ("type", triagens::basics::Json(zone, typeName()));
   return json;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the index type based on a type name
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_idx_type_e Index::type (char const* type) {
+  if (::strcmp(type, "primary") == 0) {
+    return TRI_IDX_TYPE_PRIMARY_INDEX;
+  }
+  if (::strcmp(type, "edge") == 0) {
+    return TRI_IDX_TYPE_EDGE_INDEX;
+  }
+  if (::strcmp(type, "hash") == 0) {
+    return TRI_IDX_TYPE_HASH_INDEX;
+  }
+  if (::strcmp(type, "skiplist") == 0) {
+    return TRI_IDX_TYPE_SKIPLIST_INDEX;
+  }
+  if (::strcmp(type, "fulltext") == 0) {
+    return TRI_IDX_TYPE_FULLTEXT_INDEX;
+  }
+  if (::strcmp(type, "cap") == 0) {
+    return TRI_IDX_TYPE_CAP_CONSTRAINT;
+  }
+  if (::strcmp(type, "geo1") == 0) {
+    return TRI_IDX_TYPE_GEO1_INDEX;
+  }
+  if (::strcmp(type, "geo2") == 0) {
+    return TRI_IDX_TYPE_GEO2_INDEX;
+  }
+
+  return TRI_IDX_TYPE_UNKNOWN;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the name of an index type
+////////////////////////////////////////////////////////////////////////////////
+
+char const* Index::type (TRI_idx_type_e type) {
+  switch (type) {
+    case TRI_IDX_TYPE_PRIMARY_INDEX:
+      return "primary";
+    case TRI_IDX_TYPE_GEO1_INDEX:
+      return "geo1";
+    case TRI_IDX_TYPE_GEO2_INDEX:
+      return "geo2";
+    case TRI_IDX_TYPE_HASH_INDEX:
+      return "hash";
+    case TRI_IDX_TYPE_EDGE_INDEX:
+      return "edge";
+    case TRI_IDX_TYPE_FULLTEXT_INDEX:
+      return "fulltext";
+    case TRI_IDX_TYPE_SKIPLIST_INDEX:
+      return "skiplist";
+    case TRI_IDX_TYPE_CAP_CONSTRAINT:
+      return "cap";
+    case TRI_IDX_TYPE_PRIORITY_QUEUE_INDEX:
+    case TRI_IDX_TYPE_BITARRAY_INDEX:
+    case TRI_IDX_TYPE_UNKNOWN: {
+    }
+  }
+
+  return "";
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief generate a new index id
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_idx_iid_t Index::generateId () {
+  return TRI_NewTickServer();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief validate an index id
+////////////////////////////////////////////////////////////////////////////////
+
+bool Index::validateId (char const* key) {
+  char const* p = key;
+
+  while (true) {
+    char const c = *p;
+
+    if (c == '\0') {
+      return (p - key) > 0;
+    }
+    if (c >= '0' && c <= '9') {
+      ++p;
+      continue;
+    }
+
+    return false;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief validate an index id (collection name + / + index id)
+////////////////////////////////////////////////////////////////////////////////
+
+bool Index::validateId (char const* key,
+                        size_t* split) {
+  char const* p = key;
+  char c = *p;
+
+  // extract collection name
+
+  if (! (c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) {
+    return false;
+  }
+
+  ++p;
+
+  while (true) {
+    c = *p;
+
+    if ((c == '_') || (c == '-') || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+      ++p;
+      continue;
+    }
+
+    if (c == '/') {
+      break;
+    }
+
+    return false;
+  }
+
+  if (p - key > TRI_COL_NAME_LENGTH) {
+    return false;
+  }
+
+  // store split position
+  *split = p - key;
+  ++p;
+
+  // validate index id
+  return validateId(p);
 }
 
 // -----------------------------------------------------------------------------

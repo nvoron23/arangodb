@@ -1108,12 +1108,10 @@ static int DumpCollection (TRI_replication_dump_t* dump,
   TRI_vector_t datafiles;
   TRI_string_buffer_t* buffer;
   TRI_voc_tick_t lastFoundTick;
-  TRI_voc_tid_t lastTid;
   size_t i, n;
   int res;
   bool hasMore;
   bool bufferFull;
-  bool ignoreMarkers;
 
   // The following fake transaction allows us to access data pointers
   // and shapers, essentially disabling the runtime checks. This is OK,
@@ -1133,11 +1131,9 @@ static int DumpCollection (TRI_replication_dump_t* dump,
 
   // setup some iteration state
   lastFoundTick  = 0;
-  lastTid        = 0;
   res            = TRI_ERROR_NO_ERROR;
   hasMore        = true;
   bufferFull     = false;
-  ignoreMarkers  = false;
 
   n = datafiles._length;
 
@@ -1170,7 +1166,6 @@ static int DumpCollection (TRI_replication_dump_t* dump,
     while (ptr < end) {
       TRI_df_marker_t* marker = (TRI_df_marker_t*) ptr;
       TRI_voc_tick_t foundTick;
-      TRI_voc_tid_t tid;
 
       if (marker->_size == 0 || marker->_type <= TRI_MARKER_MIN) {
         // end of datafile
@@ -1219,37 +1214,6 @@ static int DumpCollection (TRI_replication_dump_t* dump,
 
       // note the last tick we processed
       lastFoundTick = foundTick;
-
-
-      // handle aborted/unfinished transactions
-
-      if (document->_failedTransactions == nullptr) {
-        // there are no failed transactions
-        ignoreMarkers = false;
-      }
-      else {
-        // get transaction id of marker
-        if (marker->_type == TRI_DOC_MARKER_KEY_DELETION) {
-          tid = ((TRI_doc_deletion_key_marker_t const*) marker)->_tid;
-        }
-        else {
-          tid = ((TRI_doc_document_key_marker_t const*) marker)->_tid;
-        }
-
-        // check if marker is from an aborted transaction
-        if (tid > 0) {
-          if (tid != lastTid) {
-            ignoreMarkers = (document->_failedTransactions->find(tid) != document->_failedTransactions->end());
-          }
-
-          lastTid = tid;
-        }
-
-        if (ignoreMarkers) {
-          continue;
-        }
-      }
-
 
       res = StringifyMarkerDump(dump, document, marker, withTicks, translateCollectionIds, resolver);
 

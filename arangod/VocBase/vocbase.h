@@ -319,8 +319,6 @@ typedef struct TRI_vocbase_s {
   bool                       _hasCompactor;
   bool                       _isOwnAppsDirectory;
 
-  std::set<TRI_voc_tid_t>*   _oldTransactions;
-
   struct TRI_replication_applier_t* _replicationApplier;
 
   // state of the database

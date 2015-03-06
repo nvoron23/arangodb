@@ -33,7 +33,12 @@
 #include "Basics/conversions.h"
 #include "Basics/files.h"
 #include "Basics/logging.h"
+#include "Cluster/ClusterMethods.h"
+#include "Cluster/ClusterComm.h"
 #include "HttpServer/HttpServer.h"
+#include "Mvcc/EdgeIndex.h"
+#include "Mvcc/Index.h"
+#include "Mvcc/PrimaryIndex.h"
 #include "Replication/InitialSyncer.h"
 #include "Rest/HttpRequest.h"
 #include "Utils/CollectionGuard.h"
@@ -45,8 +50,6 @@
 #include "VocBase/update-policy.h"
 #include "VocBase/index.h"
 #include "Wal/LogfileManager.h"
-#include "Cluster/ClusterMethods.h"
-#include "Cluster/ClusterComm.h"
 
 using namespace std;
 using namespace triagens::basics;
@@ -1823,44 +1826,31 @@ int RestReplicationHandler::processRestoreCollectionCoordinator (
   // dig out number of shards:
   uint64_t numberOfShards = 1;
   TRI_json_t const* shards = JsonHelper::getObjectElement(parameters, "shards");
-  if (nullptr != shards && TRI_IsObjectJson(shards)) {
-    numberOfShards = TRI_LengthVector(&shards->_value._objects)/2;
+  if (TRI_IsObjectJson(shards)) {
+    numberOfShards = TRI_LengthVector(&shards->_value._objects) / 2;
   }
   // We take one shard if "shards" was not given
 
-  TRI_voc_tick_t new_id_tick = ci->uniqid(1);
-  string new_id = StringUtils::itoa(new_id_tick);
+  TRI_voc_tick_t newIdTick = ci->uniqid(1);
+  std::string newId = std::to_string(newIdTick);
+
   TRI_ReplaceObjectJson(TRI_UNKNOWN_MEM_ZONE, parameters, "id",
                        TRI_CreateStringCopyJson(TRI_UNKNOWN_MEM_ZONE,
-                                                new_id.c_str(), new_id.size()));
+                                                newId.c_str(), newId.size()));
 
   // Now put in the primary and an edge index if needed:
-  TRI_json_t* indexes = TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE);
+  triagens::basics::Json indexes(triagens::basics::Json::Array);
 
-  if (indexes == nullptr) {
-    errorMsg = "out of memory";
-    return TRI_ERROR_OUT_OF_MEMORY;
+  {
+    // create a dummy primary index
+    triagens::mvcc::PrimaryIndex index;
+    indexes.add(index.toJson(TRI_UNKNOWN_MEM_ZONE));
   }
 
-  // create a dummy primary index
-  TRI_index_t* idx = TRI_CreatePrimaryIndex(0);
-
-  if (idx == nullptr) {
-    TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, indexes);
-    errorMsg = "out of memory";
-    return TRI_ERROR_OUT_OF_MEMORY;
-  }
-
-  TRI_json_t* idxJson = idx->json(idx);
-  TRI_FreeIndex(idx);
-
-  TRI_PushBack3ArrayJson(TRI_UNKNOWN_MEM_ZONE, indexes, TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, idxJson));
-  TRI_FreeJson(TRI_CORE_MEM_ZONE, idxJson);
-
-  TRI_json_t* type = TRI_LookupObjectJson(parameters, "type");
+  TRI_json_t const* type = TRI_LookupObjectJson(parameters, "type");
   TRI_col_type_e collectionType;
   if (TRI_IsNumberJson(type)) {
-    collectionType = (TRI_col_type_e) ((int) type->_value._number);
+    collectionType = static_cast<TRI_col_type_e>(static_cast<int>(type->_value._number));
   }
   else {
     errorMsg = "collection type not given or wrong";
@@ -1869,25 +1859,18 @@ int RestReplicationHandler::processRestoreCollectionCoordinator (
 
   if (collectionType == TRI_COL_TYPE_EDGE) {
     // create a dummy edge index
-    idx = TRI_CreateEdgeIndex(0, new_id_tick);
-
-    if (idx == nullptr) {
-      TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, indexes);
-      errorMsg = "cannot create edge index";
-      return TRI_ERROR_INTERNAL;
-    }
-
-    idxJson = idx->json(idx);
-    TRI_FreeIndex(idx);
-
-    TRI_PushBack3ArrayJson(TRI_UNKNOWN_MEM_ZONE, indexes, TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, idxJson));
-    TRI_FreeJson(TRI_CORE_MEM_ZONE, idxJson);
+    triagens::mvcc::EdgeIndex index(newIdTick);
+    indexes.add(index.toJson(TRI_UNKNOWN_MEM_ZONE));
   }
 
-  TRI_Insert3ObjectJson(TRI_UNKNOWN_MEM_ZONE, parameters, "indexes", indexes);
+  TRI_Insert3ObjectJson(TRI_UNKNOWN_MEM_ZONE, parameters, "indexes", indexes.steal());
 
-  int res = ci->createCollectionCoordinator(dbName, new_id, numberOfShards,
-                                            parameters, errorMsg, 0.0);
+  int res = ci->createCollectionCoordinator(dbName, 
+                                            newId, 
+                                            numberOfShards,
+                                            parameters, 
+                                            errorMsg, 
+                                            0.0);
 
   if (res != TRI_ERROR_NO_ERROR) {
     errorMsg = "unable to create collection: " + string(TRI_errno_string(res));
@@ -1965,11 +1948,11 @@ int RestReplicationHandler::processRestoreIndexes (TRI_json_t const* collection,
 
     for (size_t i = 0; i < n; ++i) {
       TRI_json_t const* idxDef = static_cast<TRI_json_t const*>(TRI_AtVector(&indexes->_value._objects, i));
-      TRI_index_t* idx = nullptr;
+      triagens::mvcc::Index* idx = nullptr;
 
       // {"id":"229907440927234","type":"hash","unique":false,"fields":["x","Y"]}
 
-      res = TRI_FromJsonIndexDocumentCollection(document, idxDef, &idx);
+      res = TRI_FromJsonIndexDocumentCollection(document, idxDef, idx);
 
       if (res != TRI_ERROR_NO_ERROR) {
         errorMsg = "could not create index: " + string(TRI_errno_string(res));

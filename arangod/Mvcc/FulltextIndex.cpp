@@ -49,6 +49,12 @@ using namespace triagens::mvcc;
 // --SECTION--                                               class FulltextIndex
 // -----------------------------------------------------------------------------
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief default minimum word length
+////////////////////////////////////////////////////////////////////////////////
+  
+int const FulltextIndex::DefaultMinWordLength = 2;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -61,7 +67,8 @@ FulltextIndex::FulltextIndex (TRI_idx_iid_t id,
                               TRI_document_collection_t* collection,
                               std::vector<std::string> const& fields,
                               int minWordLength) 
-  : Index(id, collection, fields),
+  : Index(id, fields),
+    _collection(collection),
     _lock(),
     _fulltextIndex(nullptr),
     _attribute(0),

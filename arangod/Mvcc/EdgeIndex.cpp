@@ -394,12 +394,27 @@ static bool IsEqualElementEdgeTo (TRI_doc_mptr_t const* left,
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create a new edge index (not fully functional - use only to 
+/// retrieve the JSON representation of the index)
+////////////////////////////////////////////////////////////////////////////////
+
+EdgeIndex::EdgeIndex (TRI_idx_iid_t id)
+  : Index(id, std::vector<std::string>({ TRI_VOC_ATTRIBUTE_FROM, TRI_VOC_ATTRIBUTE_TO })),
+    _collection(nullptr),
+    _lock(),
+    _from(nullptr),
+    _to(nullptr) {
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create a new edge index
 ////////////////////////////////////////////////////////////////////////////////
 
 EdgeIndex::EdgeIndex (TRI_idx_iid_t id,
                       TRI_document_collection_t* collection) 
-  : Index(id, collection, std::vector<std::string>({ TRI_VOC_ATTRIBUTE_FROM, TRI_VOC_ATTRIBUTE_TO })),
+  : Index(id, std::vector<std::string>({ TRI_VOC_ATTRIBUTE_FROM, TRI_VOC_ATTRIBUTE_TO })),
+    _collection(collection),
     _lock(),
     _from(nullptr),
     _to(nullptr) {

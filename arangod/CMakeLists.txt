@@ -66,7 +66,6 @@ add_executable(
     Aql/Variable.cpp
     Aql/VariableGenerator.cpp
     Aql/ModificationOptions.cpp
-    CapConstraint/cap-constraint.cpp
     Cluster/AgencyComm.cpp
     Cluster/ApplicationCluster.cpp
     Cluster/ClusterComm.cpp
@@ -84,10 +83,6 @@ add_executable(
     FulltextIndex/fulltext-result.cpp
     FulltextIndex/fulltext-wordlist.cpp
     GeoIndex/GeoIndex.cpp
-    GeoIndex/geo-index.cpp
-    HashIndex/hash-array.cpp
-    HashIndex/hash-array-multi.cpp
-    HashIndex/hash-index.cpp
     IndexOperators/index-operator.cpp
     Mvcc/CapConstraint.cpp
     Mvcc/CollectionReadLock.cpp
@@ -128,7 +123,6 @@ add_executable(
     RestServer/ConsoleThread.cpp
     RestServer/VocbaseContext.cpp
     RestServer/arangod.cpp
-    SkipLists/skiplistIndex.cpp
     Utils/DocumentHelper.cpp
     Utils/Exception.cpp
     Utils/StandaloneTransactionContext.cpp

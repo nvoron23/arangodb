@@ -43,6 +43,12 @@ using namespace triagens::mvcc;
 // --SECTION--                                               class CapConstraint
 // -----------------------------------------------------------------------------
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief minimum bytesize value for cap constraint
+////////////////////////////////////////////////////////////////////////////////
+
+int64_t const CapConstraint::MinSize = 16384;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
 // -----------------------------------------------------------------------------
@@ -55,7 +61,8 @@ CapConstraint::CapConstraint (TRI_idx_iid_t id,
                               TRI_document_collection_t* collection,
                               size_t count,
                               int64_t size)
-  : Index(id, collection, std::vector<std::string>()),
+  : Index(id, std::vector<std::string>()),
+    _collection(collection),
     _count(count),
     _size(static_cast<int64_t>(size)) {
 

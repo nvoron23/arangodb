@@ -47,7 +47,6 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Aql/Variable.cpp \
 	arangod/Aql/VariableGenerator.cpp \
 	arangod/Aql/ModificationOptions.cpp \
-	arangod/CapConstraint/cap-constraint.cpp \
 	arangod/Cluster/AgencyComm.cpp \
 	arangod/Cluster/ApplicationCluster.cpp \
 	arangod/Cluster/ClusterComm.cpp \
@@ -65,10 +64,6 @@ arangod_libarangod_a_SOURCES = \
 	arangod/FulltextIndex/fulltext-result.cpp \
 	arangod/FulltextIndex/fulltext-wordlist.cpp \
 	arangod/GeoIndex/GeoIndex.cpp \
-	arangod/GeoIndex/geo-index.cpp \
-	arangod/HashIndex/hash-array.cpp \
-	arangod/HashIndex/hash-array-multi.cpp \
-	arangod/HashIndex/hash-index.cpp \
 	arangod/IndexOperators/index-operator.cpp \
 	arangod/Mvcc/CapConstraint.cpp \
 	arangod/Mvcc/CollectionReadLock.cpp \
@@ -110,7 +105,6 @@ arangod_libarangod_a_SOURCES = \
 	arangod/RestServer/ConsoleThread.cpp \
 	arangod/RestServer/VocbaseContext.cpp \
 	arangod/RestServer/arangod.cpp \
-	arangod/SkipLists/skiplistIndex.cpp \
 	arangod/Utils/DocumentHelper.cpp \
 	arangod/Utils/Exception.cpp \
 	arangod/Utils/StandaloneTransactionContext.cpp \

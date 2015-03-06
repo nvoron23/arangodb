@@ -1657,14 +1657,12 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
       }
             
       TRI_document_collection_t* document = state->getCollection(databaseId, collectionId);
+
       if (document == nullptr) {
         // if the underlying collection gone, we can go on
         return true;
       }
       
-      // fake transaction to satisfy assertions
-      triagens::arango::TransactionBase trx(true); 
-
       // ignore any potential error returned by this call
       TRI_DropIndexDocumentCollection(document, indexId, false);
       TRI_RemoveFileIndexCollection(document, indexId);

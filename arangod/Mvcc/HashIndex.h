@@ -35,6 +35,8 @@
 #include "Mvcc/Index.h"
 #include "ShapedJson/shaped-json.h"
 
+struct TRI_document_collection_t;
+
 namespace triagens {
   namespace mvcc {
 
@@ -131,6 +133,14 @@ namespace triagens {
 
       public:
         
+        bool unique () const {
+          return _unique;
+        }
+        
+        bool sparse () const {
+          return _sparse;
+        }
+        
         size_t nrIndexedFields () const {
           return _paths.size();
         }
@@ -173,6 +183,12 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
       private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the underlying collection
+////////////////////////////////////////////////////////////////////////////////
+  
+        struct TRI_document_collection_t* _collection;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief typedef for the hash table
