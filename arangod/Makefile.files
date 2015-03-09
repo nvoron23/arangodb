@@ -137,10 +137,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/VocBase/datafile.cpp \
 	arangod/VocBase/document-collection.cpp \
 	arangod/VocBase/general-cursor.cpp \
-	arangod/VocBase/headers.cpp \
-	arangod/VocBase/index.cpp \
 	arangod/VocBase/key-generator.cpp \
-	arangod/VocBase/primary-index.cpp \
 	arangod/VocBase/replication-applier.cpp \
 	arangod/VocBase/replication-common.cpp \
 	arangod/VocBase/replication-dump.cpp \

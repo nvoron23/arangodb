@@ -34,6 +34,7 @@
 #include "Basics/fasthash.h"
 #include "Basics/AssocMulti.h"
 #include "Basics/JsonHelper.h"
+#include "Basics/ReadLocker.h"
 #include "Basics/ReadWriteLock.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/TransactionId.h"
@@ -49,6 +50,8 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     class PrimaryIndex : public Index {
+    
+      friend class PrimaryIndexReadAccessor;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -68,7 +71,7 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
       public:
- 
+
         void insert (struct TRI_doc_mptr_t*) override final;
         
         void insert (TransactionCollection*, 
@@ -103,7 +106,7 @@ namespace triagens {
 
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
-        TRI_idx_type_e type () const override final {
+        Index::IndexType type () const override final {
           return TRI_IDX_TYPE_PRIMARY_INDEX;
         }
         
@@ -119,6 +122,20 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    public methods
 // -----------------------------------------------------------------------------
+
+      public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the number of documents in the index
+////////////////////////////////////////////////////////////////////////////////
+
+        size_t size ();
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief resizes the primary index to the specified target size
+////////////////////////////////////////////////////////////////////////////////
+    
+        void resize (uint32_t);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return a hash value for a key
@@ -222,7 +239,7 @@ namespace triagens {
 /// @brief the index R/W lock
 ////////////////////////////////////////////////////////////////////////////////
         
-        triagens::basics::ReadWriteLock   _lock;
+        triagens::basics::ReadWriteLock _lock;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief the underlying hash table
@@ -230,6 +247,61 @@ namespace triagens {
 
         PrimaryIndexHash_t* _theHash;
 
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                    class PrimaryIndexReadAccessor
+// -----------------------------------------------------------------------------
+
+    class PrimaryIndexReadAccessor {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                        constructors / destructors
+// -----------------------------------------------------------------------------
+
+      public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief creates a read accessor. the accessor will hold the read-lock on
+/// the index during the accessor's lifetime
+////////////////////////////////////////////////////////////////////////////////
+       
+        PrimaryIndexReadAccessor (PrimaryIndex*);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroys read accessor. this will also release the read-lock on the 
+/// index
+////////////////////////////////////////////////////////////////////////////////
+
+        ~PrimaryIndexReadAccessor ();
+
+      public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up a key in the primary index while holding the read-lock
+////////////////////////////////////////////////////////////////////////////////
+        
+        struct TRI_doc_mptr_t* lookup (TransactionCollection*,
+                                       Transaction*,
+                                       std::string const& key);
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+
+      private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the primary index
+////////////////////////////////////////////////////////////////////////////////
+
+        PrimaryIndex* _index;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief a read-locker for the index lock
+////////////////////////////////////////////////////////////////////////////////
+
+        triagens::basics::ReadLocker const _readLocker;
     };
 
   }

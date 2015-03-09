@@ -99,7 +99,7 @@ namespace triagens {
 
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
-        TRI_idx_type_e type () const override final {
+        triagens::mvcc::Index::IndexType type () const override final {
           return TRI_IDX_TYPE_FULLTEXT_INDEX;
         }
         

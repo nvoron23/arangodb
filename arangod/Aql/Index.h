@@ -37,7 +37,6 @@
 #include "Mvcc/Index.h"
 #include "Mvcc/SkiplistIndex.h"
 #include "Utils/Exception.h"
-#include "VocBase/index.h"
 
 namespace triagens {
   namespace aql {
@@ -65,12 +64,12 @@ namespace triagens {
 
         TRI_ASSERT(internals != nullptr);
 
-        if (index->type() == TRI_IDX_TYPE_HASH_INDEX) {
+        if (index->type() == triagens::mvcc::Index::TRI_IDX_TYPE_HASH_INDEX) {
           auto idx = static_cast<triagens::mvcc::HashIndex const*>(index);
           unique = idx->unique();
           sparse = idx->sparse();
         }
-        else if (index->type() == TRI_IDX_TYPE_SKIPLIST_INDEX) {
+        else if (index->type() == triagens::mvcc::Index::TRI_IDX_TYPE_SKIPLIST_INDEX) {
           auto idx = static_cast<triagens::mvcc::SkiplistIndex const*>(index);
           unique = idx->unique();
           sparse = idx->sparse();
@@ -165,11 +164,11 @@ namespace triagens {
 
       public:
 
-        TRI_idx_iid_t const        id;
-        TRI_idx_type_e const       type;
-        bool                       unique;
-        bool                       sparse;
-        std::vector<std::string>   fields;
+        TRI_idx_iid_t const                       id;
+        triagens::mvcc::Index::IndexType const    type;
+        bool                                      unique;
+        bool                                      sparse;
+        std::vector<std::string>                  fields;
 
       private:
 

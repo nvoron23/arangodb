@@ -49,14 +49,11 @@ struct TRI_server_s;
 
 #define RemoteTransactionType triagens::arango::ReplicationTransaction
 
-////////////////////////////////////////////////////////////////////////////////
-/// @brief shortcut for single-operation write transaction
-////////////////////////////////////////////////////////////////////////////////
-
-#define SingleWriteTransactionType triagens::arango::SingleCollectionWriteTransaction<1>
-
-
 namespace triagens {
+  namespace mvcc {
+    class TransactionCollection;
+  }
+
   namespace wal {
 
 // -----------------------------------------------------------------------------
@@ -247,7 +244,7 @@ namespace triagens {
                                   TRI_voc_cid_t,
                                   TRI_df_marker_t const*,
                                   TRI_voc_fid_t,
-                                  std::function<int(SingleWriteTransactionType*, Marker*)>);
+                                  std::function<int(triagens::mvcc::TransactionCollection*, Marker*)>);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief callback to handle one marker during recovery

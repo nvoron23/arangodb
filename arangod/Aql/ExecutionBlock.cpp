@@ -33,9 +33,13 @@
 #include "Basics/StringBuffer.h"
 #include "Basics/json-utilities.h"
 #include "Mvcc/EdgeIndex.h"
+#include "Mvcc/Index.h"
+#include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "Utils/Exception.h"
 #include "V8/v8-globals.h"
-#include "VocBase/index.h"
 #include "VocBase/vocbase.h"
 
 using namespace std;
@@ -694,7 +698,7 @@ bool EnumerateCollectionBlock::moreDocuments (size_t hint) {
     hint = DefaultBatchSize;
   }
 
-  std::vector<TRI_doc_mptr_copy_t> newDocs;
+  std::vector<TRI_doc_mptr_t*> newDocs;
 
   newDocs.reserve(hint);
 
@@ -800,7 +804,7 @@ AqlItemBlock* EnumerateCollectionBlock::getSome (size_t, // atLeast,
     // but can just take cur->getNrRegs() as registerId:
     res->setValue(j, static_cast<triagens::aql::RegisterId>(curRegs),
                   AqlValue(reinterpret_cast<TRI_df_marker_t
-                           const*>(_documents[_posInDocuments++].getDataPtr())));
+                           const*>(_documents[_posInDocuments++]->getDataPtr())));
     // No harm done, if the setValue throws!
   }
 
@@ -1227,12 +1231,12 @@ bool IndexRangeBlock::initRanges () {
     removeOverlapsIndexOr(*_condition);
   }
    
-  if (en->_index->type == TRI_IDX_TYPE_PRIMARY_INDEX ||
-      en->_index->type == TRI_IDX_TYPE_EDGE_INDEX) {
+  if (en->_index->type == triagens::mvcc::Index::TRI_IDX_TYPE_PRIMARY_INDEX ||
+      en->_index->type == triagens::mvcc::Index::TRI_IDX_TYPE_EDGE_INDEX) {
     return true; //no initialization here!
   }
       
-  if (en->_index->type == TRI_IDX_TYPE_HASH_INDEX) {
+  if (en->_index->type == triagens::mvcc::Index::TRI_IDX_TYPE_HASH_INDEX) {
     if (_condition->empty()) {
       return false;
     }
@@ -1242,7 +1246,7 @@ bool IndexRangeBlock::initRanges () {
     return (_hashIndexSearchValue._values != nullptr); 
   }
   
-  if (en->_index->type == TRI_IDX_TYPE_SKIPLIST_INDEX) {
+  if (en->_index->type == triagens::mvcc::Index::TRI_IDX_TYPE_SKIPLIST_INDEX) {
     if (_condition->empty()) {
       return false;
     }
@@ -1445,18 +1449,18 @@ bool IndexRangeBlock::readIndex (size_t atMost) {
   
   auto en = static_cast<IndexRangeNode const*>(getPlanNode());
   
-  if (en->_index->type == TRI_IDX_TYPE_PRIMARY_INDEX) {
+  if (en->_index->type == triagens::mvcc::Index::TRI_IDX_TYPE_PRIMARY_INDEX) {
     if (_flag) {
       readPrimaryIndex(*_condition);
     }
   }
-  else if (en->_index->type == TRI_IDX_TYPE_HASH_INDEX) {
+  else if (en->_index->type == triagens::mvcc::Index::TRI_IDX_TYPE_HASH_INDEX) {
     readHashIndex(atMost);
   }
-  else if (en->_index->type == TRI_IDX_TYPE_SKIPLIST_INDEX) {
+  else if (en->_index->type == triagens::mvcc::Index::TRI_IDX_TYPE_SKIPLIST_INDEX) {
     readSkiplistIndex(atMost);
   }
-  else if (en->_index->type == TRI_IDX_TYPE_EDGE_INDEX) {
+  else if (en->_index->type == triagens::mvcc::Index::TRI_IDX_TYPE_EDGE_INDEX) {
     if (_flag) {
       readEdgeIndex(*_condition); 
     }
@@ -1580,7 +1584,7 @@ AqlItemBlock* IndexRangeBlock::getSome (size_t atLeast,
         // but can just take cur->getNrRegs() as registerId:
         res->setValue(j, static_cast<triagens::aql::RegisterId>(curRegs),
                       AqlValue(reinterpret_cast<TRI_df_marker_t
-                               const*>(_documents[_posInDocs++].getDataPtr())));
+                               const*>(_documents[_posInDocs++]->getDataPtr())));
         // No harm done, if the setValue throws!
       }
     }
@@ -1665,7 +1669,14 @@ size_t IndexRangeBlock::skipSome (size_t atLeast,
 
 void IndexRangeBlock::readPrimaryIndex (IndexOrCondition const& ranges) {
   ENTER_BLOCK;
-  TRI_primary_index_t* primaryIndex = &(_collection->documentCollection()->_primaryIndex);
+
+  // TODO TODO TODO: replace with transaction from query!
+  triagens::mvcc::TransactionScope transactionScope(static_cast<IndexRangeNode const*>(_exeNode)->_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+
+  auto transaction = transactionScope.transaction();
+  auto transactionCollection = transaction->collection(_collection->documentCollection()->_info._cid); 
+  
+  triagens::mvcc::PrimaryIndexReadAccessor primaryIndexAccessor(transactionCollection->documentCollection()->primaryIndex());
   
   for (size_t i = 0; i < ranges.size(); i++) {
     std::string key;
@@ -1723,10 +1734,10 @@ void IndexRangeBlock::readPrimaryIndex (IndexOrCondition const& ranges) {
     if (! key.empty()) {
       ++_engine->_stats.scannedIndex;
 
-      auto found = static_cast<TRI_doc_mptr_t
-        const*>(TRI_LookupByKeyPrimaryIndex(primaryIndex, key.c_str()));
+      auto found = primaryIndexAccessor.lookup(transactionCollection, transaction, key);
+
       if (found != nullptr) {
-        _documents.emplace_back(*found);
+        _documents.emplace_back(found);
       }
     }
   }

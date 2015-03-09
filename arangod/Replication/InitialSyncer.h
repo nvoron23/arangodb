@@ -31,7 +31,6 @@
 #define ARANGODB_REPLICATION_INITIAL_SYNCER_H 1
 
 #include "Basics/Common.h"
-
 #include "Replication/Syncer.h"
 
 // -----------------------------------------------------------------------------
@@ -47,6 +46,11 @@ namespace triagens {
 
   namespace httpclient {
     class SimpleHttpResult;
+  }
+
+  namespace mvcc {
+    class Transaction;
+    class TransactionCollection;
   }
 
   namespace arango {
@@ -167,7 +171,8 @@ namespace triagens {
 /// @brief apply the data from a collection dump
 ////////////////////////////////////////////////////////////////////////////////
 
-        int applyCollectionDump (struct TRI_transaction_collection_s*,
+        int applyCollectionDump (triagens::mvcc::Transaction*,
+                                 triagens::mvcc::TransactionCollection*,
                                  httpclient::SimpleHttpResult*,
                                  std::string&);
 
@@ -177,7 +182,8 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         int handleCollectionDump (std::string const&, 
-                                  struct TRI_transaction_collection_s*,
+                                  triagens::mvcc::Transaction*,
+                                  triagens::mvcc::TransactionCollection*,
                                   std::string const&,
                                   TRI_voc_tick_t,
                                   std::string&);

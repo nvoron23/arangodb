@@ -28,6 +28,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Index.h"
+#include "Basics/json-utilities.h"
 #include "VocBase/server.h"
 #include "VocBase/vocbase.h"
 
@@ -104,7 +105,7 @@ triagens::basics::Json Index::toJson (TRI_memory_zone_t* zone) const {
 /// @brief return the index type based on a type name
 ////////////////////////////////////////////////////////////////////////////////
 
-TRI_idx_type_e Index::type (char const* type) {
+Index::IndexType Index::type (char const* type) {
   if (::strcmp(type, "primary") == 0) {
     return TRI_IDX_TYPE_PRIMARY_INDEX;
   }
@@ -137,7 +138,7 @@ TRI_idx_type_e Index::type (char const* type) {
 /// @brief return the name of an index type
 ////////////////////////////////////////////////////////////////////////////////
 
-char const* Index::type (TRI_idx_type_e type) {
+char const* Index::type (Index::IndexType type) {
   switch (type) {
     case TRI_IDX_TYPE_PRIMARY_INDEX:
       return "primary";
@@ -236,6 +237,123 @@ bool Index::validateId (char const* key,
 
   // validate index id
   return validateId(p);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief index comparator, used by the coordinator to detect if two index
+/// contents are the same
+////////////////////////////////////////////////////////////////////////////////
+
+bool Index::IndexComparator (TRI_json_t const* lhs,
+                             TRI_json_t const* rhs) {
+  TRI_json_t const* typeJson = TRI_LookupObjectJson(lhs, "type");
+  TRI_ASSERT(TRI_IsStringJson(typeJson));
+
+  // type must be identical
+  if (! TRI_CheckSameValueJson(typeJson, TRI_LookupObjectJson(rhs, "type"))) {
+    return false;
+  }
+
+  triagens::mvcc::Index::IndexType type = triagens::mvcc::Index::type(typeJson->_value._string.data);
+
+
+  // unique must be identical if present
+  TRI_json_t const* value = TRI_LookupObjectJson(lhs, "unique");
+
+  if (TRI_IsBooleanJson(value)) {
+    if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "unique"))) {
+      return false;
+    }
+  }
+
+  // sparse must be identical if present
+  value = TRI_LookupObjectJson(lhs, "sparse");
+
+  if (TRI_IsBooleanJson(value)) {
+    if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "sparse"))) {
+      return false;
+    }
+  }
+
+
+  if (type == triagens::mvcc::Index::TRI_IDX_TYPE_GEO1_INDEX) {
+    // geoJson must be identical if present
+    value = TRI_LookupObjectJson(lhs, "geoJson");
+
+    if (TRI_IsBooleanJson(value)) {
+      if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "geoJson"))) {
+        return false;
+      }
+    }
+  }
+  else if (type == triagens::mvcc::Index::TRI_IDX_TYPE_FULLTEXT_INDEX) {
+    // minLength
+    value = TRI_LookupObjectJson(lhs, "minLength");
+
+    if (TRI_IsNumberJson(value)) {
+      if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "minLength"))) {
+        return false;
+      }
+    }
+  }
+  else if (type == triagens::mvcc::Index::TRI_IDX_TYPE_CAP_CONSTRAINT) {
+    // size, byteSize
+    value = TRI_LookupObjectJson(lhs, "size");
+
+    if (TRI_IsNumberJson(value)) {
+      if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "size"))) {
+        return false;
+      }
+    }
+
+    value = TRI_LookupObjectJson(lhs, "byteSize");
+
+    if (TRI_IsNumberJson(value)) {
+      if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "byteSize"))) {
+        return false;
+      }
+    }
+  }
+
+  // other index types: fields must be identical if present
+  value = TRI_LookupObjectJson(lhs, "fields");
+
+  if (TRI_IsArrayJson(value)) {
+    if (type == triagens::mvcc::Index::TRI_IDX_TYPE_HASH_INDEX) {
+      // compare fields in arbitrary order
+      TRI_json_t const* r = TRI_LookupObjectJson(rhs, "fields");
+
+      if (! TRI_IsArrayJson(r) ||
+          value->_value._objects._length != r->_value._objects._length) {
+        return false;
+      }
+
+      for (size_t i = 0; i < value->_value._objects._length; ++i) {
+        TRI_json_t const* v = TRI_LookupArrayJson(value, i);
+
+        bool found = false;
+
+        for (size_t j = 0; j < r->_value._objects._length; ++j) {
+          if (TRI_CheckSameValueJson(v, TRI_LookupArrayJson(r, j))) {
+            found = true;
+            break;
+          }
+        }
+
+        if (! found) {
+          return false;
+        }
+      }
+    }
+    else {
+      if (! TRI_CheckSameValueJson(value, TRI_LookupObjectJson(rhs, "fields"))) {
+        return false;
+      }
+    }
+
+  }
+
+  return true;
 }
 
 // -----------------------------------------------------------------------------

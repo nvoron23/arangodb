@@ -566,7 +566,7 @@ static void JS_MvccByExampleHash (const v8::FunctionCallbackInfo<v8::Value>& arg
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
 
     if (index == nullptr ||
-        index->type() != TRI_IDX_TYPE_HASH_INDEX) {
+        index->type() != triagens::mvcc::Index::TRI_IDX_TYPE_HASH_INDEX) {
       TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
     }
 
@@ -975,7 +975,7 @@ static void MvccSkiplistQuery (QueryType type,
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
 
     if (index == nullptr ||
-        index->type() != TRI_IDX_TYPE_SKIPLIST_INDEX) {
+        index->type() != triagens::mvcc::Index::TRI_IDX_TYPE_SKIPLIST_INDEX) {
       TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
     }
 
@@ -1361,7 +1361,7 @@ static void MvccEdgesQuery (TRI_edge_direction_e direction,
     auto* transaction = transactionScope.transaction();
     auto* transactionCollection = transaction->collection(collection->_cid);
   
-    auto edgeIndex = static_cast<triagens::mvcc::EdgeIndex*>(transactionCollection->documentCollection()->lookupIndex(TRI_IDX_TYPE_EDGE_INDEX));
+    auto edgeIndex = static_cast<triagens::mvcc::EdgeIndex*>(transactionCollection->documentCollection()->lookupIndex(triagens::mvcc::Index::TRI_IDX_TYPE_EDGE_INDEX));
 
     if (edgeIndex == nullptr) {
       // collection must have an edge index
@@ -1655,8 +1655,8 @@ static void JS_MvccNear (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
   
     if (index == nullptr ||
-        (index->type() != TRI_IDX_TYPE_GEO1_INDEX &&
-         index->type() != TRI_IDX_TYPE_GEO2_INDEX)) {
+        (index->type() != triagens::mvcc::Index::TRI_IDX_TYPE_GEO1_INDEX &&
+         index->type() != triagens::mvcc::Index::TRI_IDX_TYPE_GEO2_INDEX)) {
       TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
     }
   
@@ -1737,8 +1737,8 @@ static void JS_MvccWithin (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
   
     if (index == nullptr ||
-        (index->type() != TRI_IDX_TYPE_GEO1_INDEX &&
-         index->type() != TRI_IDX_TYPE_GEO2_INDEX)) {
+        (index->type() != triagens::mvcc::Index::TRI_IDX_TYPE_GEO1_INDEX &&
+         index->type() != triagens::mvcc::Index::TRI_IDX_TYPE_GEO2_INDEX)) {
       TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
     }
   
@@ -1839,7 +1839,7 @@ static void JS_MvccFulltext (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto index = TRI_LookupMvccIndexByHandle(isolate, resolver, collection, args[0]);
  
     if (index == nullptr ||
-        index->type() != TRI_IDX_TYPE_FULLTEXT_INDEX) {
+        index->type() != triagens::mvcc::Index::TRI_IDX_TYPE_FULLTEXT_INDEX) {
       TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_NO_INDEX);
     }
   

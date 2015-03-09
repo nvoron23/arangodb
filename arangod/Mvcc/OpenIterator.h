@@ -78,6 +78,8 @@ namespace triagens {
         int64_t documentSize;
         struct TRI_doc_datafile_info_s* dfi;
         triagens::mvcc::PrimaryIndex* primaryIndex;
+        int64_t insertions; 
+        int64_t deletions; 
     };
 
 // -----------------------------------------------------------------------------

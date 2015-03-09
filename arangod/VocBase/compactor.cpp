@@ -37,9 +37,11 @@
 #include "Basics/files.h"
 #include "Basics/logging.h"
 #include "Basics/tri-strings.h"
-#include "Utils/transactions.h"
+#include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/primary-index.h"
 #include "VocBase/server.h"
 #include "VocBase/vocbase.h"
 #include "VocBase/voc-shaper.h"
@@ -126,11 +128,13 @@ compaction_blocker_t;
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef struct compaction_intial_context_s {
-  TRI_document_collection_t* _document;
-  int64_t                    _targetSize;
-  TRI_voc_fid_t              _fid;
-  bool                       _keepDeletions;
-  bool                       _failed;
+  TRI_document_collection_t*              _document;
+  int64_t                                 _targetSize;
+  TRI_voc_fid_t                           _fid;
+  bool                                    _keepDeletions;
+  bool                                    _failed;
+  triagens::mvcc::Transaction*            _transaction;
+  triagens::mvcc::TransactionCollection*  _transactionCollection;
 }
 compaction_initial_context_t;
 
@@ -139,10 +143,12 @@ compaction_initial_context_t;
 ////////////////////////////////////////////////////////////////////////////////
 
 typedef struct compaction_context_s {
-  TRI_document_collection_t* _document;
-  TRI_datafile_t*            _compactor;
-  TRI_doc_datafile_info_t    _dfi;
-  bool                       _keepDeletions;
+  TRI_document_collection_t*              _document;
+  TRI_datafile_t*                         _compactor;
+  TRI_doc_datafile_info_t                 _dfi;
+  bool                                    _keepDeletions;
+  triagens::mvcc::Transaction*            _transaction;
+  triagens::mvcc::TransactionCollection*  _transactionCollection;
 }
 compaction_context_t;
 
@@ -449,19 +455,20 @@ static bool Compactifier (TRI_df_marker_t const* marker,
 
   compaction_context_t* context = static_cast<compaction_context_t*>(data);
   TRI_document_collection_t* document = context->_document;
+  auto transaction = context->_transaction;
+  auto transactionCollection = context->_transactionCollection;
+  auto primaryIndex = document->primaryIndex();
 
   // new or updated document
   if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
       marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
 
-    bool deleted;
-
     TRI_doc_document_key_marker_t const* d = reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker);
     TRI_voc_key_t key = (char*) d + d->_offsetKey;
 
     // check if the document is still active
-    TRI_doc_mptr_t const* found = static_cast<TRI_doc_mptr_t const*>(TRI_LookupByKeyPrimaryIndex(&document->_primaryIndex, key));
-    deleted = (found == nullptr || found->_rid > d->_rid);
+    TRI_doc_mptr_t const* found = primaryIndex->lookup(transactionCollection, transaction, std::string(key));
+    bool deleted = (found == nullptr || found->_rid > d->_rid);
 
     if (deleted) {
       LOG_TRACE("found a stale document: %s", key);
@@ -479,7 +486,7 @@ static bool Compactifier (TRI_df_marker_t const* marker,
     }
 
     // check if the document is still active
-    found = static_cast<TRI_doc_mptr_t const*>(TRI_LookupByKeyPrimaryIndex(&document->_primaryIndex, key));
+    found = primaryIndex->lookup(transactionCollection, transaction, std::string(key));
     deleted = (found == nullptr);
 
     if (deleted) {
@@ -665,19 +672,20 @@ static bool CalculateSize (TRI_df_marker_t const* marker,
                            TRI_datafile_t* datafile) {
   compaction_initial_context_t* context = static_cast<compaction_initial_context_t*>(data);
   TRI_document_collection_t* document = context->_document;
+  auto transaction = context->_transaction;
+  auto transactionCollection = context->_transactionCollection;
+  auto primaryIndex = document->primaryIndex();
 
   // new or updated document
   if (marker->_type == TRI_DOC_MARKER_KEY_DOCUMENT ||
       marker->_type == TRI_DOC_MARKER_KEY_EDGE) {
 
-    bool deleted;
-
     TRI_doc_document_key_marker_t const* d = reinterpret_cast<TRI_doc_document_key_marker_t const*>(marker);
     TRI_voc_key_t key = (char*) d + d->_offsetKey;
 
     // check if the document is still active
-    TRI_doc_mptr_t const* found = static_cast<TRI_doc_mptr_t const*>(TRI_LookupByKeyPrimaryIndex(&document->_primaryIndex, key));
-    deleted = (found == nullptr || found->_rid > d->_rid);
+    TRI_doc_mptr_t const* found = primaryIndex->lookup(transactionCollection, transaction, std::string(key));
+    bool deleted = (found == nullptr || found->_rid > d->_rid);
 
     if (deleted) {
       return true;
@@ -706,13 +714,16 @@ static bool CalculateSize (TRI_df_marker_t const* marker,
 /// @brief calculate the target size for the compactor to be created
 ////////////////////////////////////////////////////////////////////////////////
 
-static compaction_initial_context_t InitCompaction (TRI_document_collection_t* document,
+static compaction_initial_context_t InitCompaction (triagens::mvcc::Transaction* transaction,
+                                                    TRI_document_collection_t* document,
                                                     TRI_vector_t const* compactions) {
   compaction_initial_context_t context;
 
   memset(&context, 0, sizeof(compaction_initial_context_t));
   context._failed = false;
   context._document = document;
+  context._transaction = transaction; 
+  context._transactionCollection = transaction->collection(document->_info._cid);
 
   // this is the minimum required size
   context._targetSize = sizeof(TRI_df_header_marker_t) +
@@ -760,8 +771,9 @@ static void CompactifyDatafiles (TRI_document_collection_t* document,
   // create a fake transaction
   triagens::arango::TransactionBase trx(true);
 
+  triagens::mvcc::TransactionScope transactionScope(document->_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true, false);
 
-  initial = InitCompaction(document, compactions);
+  initial = InitCompaction(transactionScope.transaction(), document, compactions);
 
   if (initial._failed) {
     LOG_ERROR("could not create initialise compaction");
@@ -792,6 +804,8 @@ static void CompactifyDatafiles (TRI_document_collection_t* document,
   context._document  = document;
   context._compactor = compactor;
   context._dfi._fid  = compactor->_fid;
+  context._transaction = transactionScope.transaction(); 
+  context._transactionCollection = context._transaction->collection(document->_info._cid);
 
   // now compact all datafiles
   for (i = 0; i < n; ++i) {

@@ -34,6 +34,9 @@
 #include "Basics/tri-strings.h"
 #include "Basics/JsonHelper.h"
 #include "Mvcc/Index.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "Rest/HttpRequest.h"
 #include "SimpleHttpClient/GeneralClientConnection.h"
 #include "SimpleHttpClient/SimpleHttpClient.h"
@@ -211,7 +214,8 @@ TRI_voc_cid_t Syncer::getCid (TRI_json_t const* json) const {
 /// @brief apply the data from a collection dump or the continuous log
 ////////////////////////////////////////////////////////////////////////////////
 
-int Syncer::applyCollectionDumpMarker (TRI_transaction_collection_t* trxCollection,
+int Syncer::applyCollectionDumpMarker (triagens::mvcc::Transaction* transaction,
+                                       triagens::mvcc::TransactionCollection* transactionCollection,
                                        TRI_replication_operation_e type,
                                        const TRI_voc_key_t key,
                                        const TRI_voc_rid_t rid,
@@ -224,8 +228,7 @@ int Syncer::applyCollectionDumpMarker (TRI_transaction_collection_t* trxCollecti
 
     TRI_ASSERT(json != nullptr);
 
-    TRI_document_collection_t* document = trxCollection->_collection->_collection;
-    TRI_memory_zone_t* zone = document->getShaper()->_memoryZone;  // PROTECTED by trx in trxCollection
+    TRI_document_collection_t* document = transactionCollection->documentCollection();
     TRI_shaped_json_t* shaped = TRI_ShapedJsonJson(document->getShaper(), json, true);  // PROTECTED by trx in trxCollection
     
     if (shaped == nullptr) {
@@ -234,7 +237,10 @@ int Syncer::applyCollectionDumpMarker (TRI_transaction_collection_t* trxCollecti
       return TRI_ERROR_OUT_OF_MEMORY;
     }
 
+    // TODO TODO TODO: re-add replication with primary index
+#if 0
     try {
+      TRI_memory_zone_t* zone = document->getShaper()->_memoryZone;  // PROTECTED by trx in trxCollection
       TRI_doc_mptr_copy_t mptr;
 
       bool const isLocked = TRI_IsLockedCollectionTransaction(trxCollection);
@@ -297,12 +303,16 @@ int Syncer::applyCollectionDumpMarker (TRI_transaction_collection_t* trxCollecti
     catch (...) {
       return TRI_ERROR_INTERNAL;
     }
+#endif    
+    return TRI_ERROR_INTERNAL;
   }
 
   else if (type == REPLICATION_MARKER_REMOVE) {
     // {"type":2402,"key":"592063"}
 
     int res = TRI_ERROR_INTERNAL;
+    // TODO TODO TODO: re-add replication with primary index
+#if 0
     bool const isLocked = TRI_IsLockedCollectionTransaction(trxCollection);
 
     try {
@@ -319,6 +329,7 @@ int Syncer::applyCollectionDumpMarker (TRI_transaction_collection_t* trxCollecti
     catch (...) {
       res = TRI_ERROR_INTERNAL;
     }
+#endif    
         
     if (res != TRI_ERROR_NO_ERROR) {
       errorMsg = "document removal operation failed: " + string(TRI_errno_string(res));
@@ -328,7 +339,7 @@ int Syncer::applyCollectionDumpMarker (TRI_transaction_collection_t* trxCollecti
   }
 
   else {
-    errorMsg = "unexpected marker type " + StringUtils::itoa(type);
+    errorMsg = "unexpected marker type " + std::to_string(type);
 
     return TRI_ERROR_REPLICATION_UNEXPECTED_MARKER;
   }
@@ -486,7 +497,7 @@ int Syncer::createIndex (TRI_json_t const* json) {
     int res = TRI_FromJsonIndexDocumentCollection(document, indexJson, index);
 
     if (res == TRI_ERROR_NO_ERROR) {
-      res = TRI_SaveIndex(document, index, true);
+      res = document->saveIndexFile(index, true);
     }
 
     return res;

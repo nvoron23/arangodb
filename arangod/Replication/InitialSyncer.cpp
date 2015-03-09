@@ -34,13 +34,16 @@
 #include "Basics/tri-strings.h"
 #include "Basics/JsonHelper.h"
 #include "Basics/StringUtils.h"
+#include "Mvcc/CollectionOperations.h"
 #include "Mvcc/Index.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "SimpleHttpClient/SimpleHttpClient.h"
 #include "SimpleHttpClient/SimpleHttpResult.h"
 #include "Utils/CollectionGuard.h"
 #include "Utils/Exception.h"
 #include "Utils/transactions.h"
-#include "VocBase/index.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/vocbase.h"
 #include "VocBase/voc-types.h"
@@ -385,12 +388,13 @@ int InitialSyncer::sendFinishBatch () {
 /// @brief apply the data from a collection dump
 ////////////////////////////////////////////////////////////////////////////////
 
-int InitialSyncer::applyCollectionDump (TRI_transaction_collection_t* trxCollection,
+int InitialSyncer::applyCollectionDump (triagens::mvcc::Transaction* transaction,
+                                        triagens::mvcc::TransactionCollection* transactionCollection,
                                         SimpleHttpResult* response,
-                                        string& errorMsg) {
+                                        std::string& errorMsg) {
 
-  const string invalidMsg = "received invalid JSON data for collection " +
-                            StringUtils::itoa(trxCollection->_cid);
+  std::string const invalidMsg = "received invalid JSON data for collection " +
+                                 std::to_string(transactionCollection->id());
 
   StringBuffer& data = response->getBody();
   char const* p = data.c_str();
@@ -470,7 +474,7 @@ int InitialSyncer::applyCollectionDump (TRI_transaction_collection_t* trxCollect
       return TRI_ERROR_REPLICATION_INVALID_RESPONSE;
     }
 
-    int res = applyCollectionDumpMarker(trxCollection, type, (const TRI_voc_key_t) key, rid, doc, errorMsg);
+    int res = applyCollectionDumpMarker(transaction, transactionCollection, type, (const TRI_voc_key_t) key, rid, doc, errorMsg);
 
     TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
 
@@ -484,11 +488,12 @@ int InitialSyncer::applyCollectionDump (TRI_transaction_collection_t* trxCollect
 /// @brief incrementally fetch data from a collection
 ////////////////////////////////////////////////////////////////////////////////
 
-int InitialSyncer::handleCollectionDump (string const& cid,
-                                         TRI_transaction_collection_t* trxCollection,
-                                         string const& collectionName,
+int InitialSyncer::handleCollectionDump (std::string const& cid,
+                                         triagens::mvcc::Transaction* transaction,
+                                         triagens::mvcc::TransactionCollection* transactionCollection,
+                                         std::string const& collectionName,
                                          TRI_voc_tick_t maxTick,
-                                         string& errorMsg) {
+                                         std::string& errorMsg) {
 
   std::string appendix;
 
@@ -506,7 +511,7 @@ int InitialSyncer::handleCollectionDump (string const& cid,
                          "&chunkSize=" + _chunkSize + 
                          appendix;
 
-  map<string, string> headers;
+  std::map<std::string, std::string> headers;
 
   TRI_voc_tick_t fromTick = 0;
   int batch = 1;
@@ -514,17 +519,17 @@ int InitialSyncer::handleCollectionDump (string const& cid,
   while (1) {
     sendExtendBatch();
 
-    string url = baseUrl + "&from=" + StringUtils::itoa(fromTick);
+    string url = baseUrl + "&from=" + std::to_string(fromTick);
 
     if (maxTick > 0) {
-      url += "&to=" + StringUtils::itoa(maxTick);
+      url += "&to=" + std::to_string(maxTick);
     }
 
     url += "&serverId=" + _localServerIdString;
 
     // send request
     string const progress = "fetching master collection dump for collection '" + collectionName +
-                            "', id " + cid + ", batch " + StringUtils::itoa(batch);
+                            "', id " + cid + ", batch " + std::to_string(batch);
 
     setProgress(progress.c_str());
 
@@ -588,7 +593,7 @@ int InitialSyncer::handleCollectionDump (string const& cid,
     }
 
     if (res == TRI_ERROR_NO_ERROR) {
-      res = applyCollectionDump(trxCollection, response, errorMsg);
+      res = applyCollectionDump(transaction, transactionCollection, response, errorMsg);
     }
 
     delete response;
@@ -697,27 +702,17 @@ int InitialSyncer::handleCollection (TRI_json_t const* parameters,
       if (truncate) {
         // system collection
         setProgress("truncating " + collectionMsg);
-     
-        SingleCollectionWriteTransaction<UINT64_MAX> trx(new StandaloneTransactionContext(), _vocbase, col->_cid);
+      
+        triagens::mvcc::OperationOptions options;
 
-        int res = trx.begin();
+        triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true);
+        auto* transaction = transactionScope.transaction();
+        auto* transactionCollection = transaction->collection(col->_cid);
 
-        if (res != TRI_ERROR_NO_ERROR) {
-          errorMsg = "unable to truncate " + collectionMsg + ": " + TRI_errno_string(res);
+        auto truncateResult = triagens::mvcc::CollectionOperations::Truncate(&transactionScope, transactionCollection, options);
+    
+        int res = truncateResult.code;
  
-          return res;
-        }
-
-        res = trx.truncate(false);
- 
-        if (res != TRI_ERROR_NO_ERROR) {
-          errorMsg = "unable to truncate " + collectionMsg + ": " + TRI_errno_string(res);
- 
-          return res;
-        }
-
-        res = trx.commit();
-        
         if (res != TRI_ERROR_NO_ERROR) {
           errorMsg = "unable to truncate " + collectionMsg + ": " + TRI_errno_string(res);
  
@@ -784,27 +779,11 @@ int InitialSyncer::handleCollection (TRI_json_t const* parameters,
     int res = TRI_ERROR_INTERNAL;
 
     {
-      SingleCollectionWriteTransaction<UINT64_MAX> trx(new StandaloneTransactionContext(), _vocbase, col->_cid);
+      triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections());
+      auto* transaction = transactionScope.transaction();
+      auto* transactionCollection = transaction->collection(cid);
 
-      res = trx.begin();
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        errorMsg = "unable to start transaction: " + string(TRI_errno_string(res));
-
-        return res;
-      }
-
-      TRI_transaction_collection_t* trxCollection = trx.trxCollection();
-
-      if (trxCollection == nullptr) {
-        res = TRI_ERROR_INTERNAL;
-        errorMsg = "unable to start transaction: " + string(TRI_errno_string(res));
-      }
-      else {
-        res = handleCollectionDump(StringUtils::itoa(cid), trxCollection, masterName, _masterInfo._lastLogTick, errorMsg);
-      }
-
-      res = trx.finish(res);
+      res = handleCollectionDump(std::to_string(cid), transaction, transactionCollection, masterName, _masterInfo._lastLogTick, errorMsg);
     }
 
     if (res == TRI_ERROR_NO_ERROR) {
@@ -846,7 +825,7 @@ int InitialSyncer::handleCollection (TRI_json_t const* parameters,
               else {
                 TRI_ASSERT(index != nullptr);
 
-                res = TRI_SaveIndex(document, index, true);
+                res = document->saveIndexFile(index, true);
 
                 if (res != TRI_ERROR_NO_ERROR) {
                   errorMsg = "could not save index: " + string(TRI_errno_string(res));

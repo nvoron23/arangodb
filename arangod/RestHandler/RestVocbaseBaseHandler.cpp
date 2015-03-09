@@ -35,7 +35,7 @@
 #include "RestServer/VocbaseContext.h"
 #include "ShapedJson/shaped-json.h"
 #include "Utils/DocumentHelper.h"
-#include "Utils/transactions.h"
+#include "Utils/Transaction.h"
 #include "VocBase/document-collection.h"
 
 using namespace std;
@@ -55,43 +55,43 @@ using namespace triagens::arango;
 /// @brief batch path
 ////////////////////////////////////////////////////////////////////////////////
 
-const string RestVocbaseBaseHandler::BATCH_PATH = "/_api/batch";
+std::string const RestVocbaseBaseHandler::BATCH_PATH = "/_api/batch";
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief document path
 ////////////////////////////////////////////////////////////////////////////////
 
-const string RestVocbaseBaseHandler::DOCUMENT_PATH = "/_api/document";
+std::string const RestVocbaseBaseHandler::DOCUMENT_PATH = "/_api/document";
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief documents import path
 ////////////////////////////////////////////////////////////////////////////////
 
-const string RestVocbaseBaseHandler::IMPORT_PATH = "/_api/import";
+std::string const RestVocbaseBaseHandler::IMPORT_PATH = "/_api/import";
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief document path
 ////////////////////////////////////////////////////////////////////////////////
 
-const string RestVocbaseBaseHandler::EDGE_PATH = "/_api/edge";
+std::string const RestVocbaseBaseHandler::EDGE_PATH = "/_api/edge";
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief replication path
 ////////////////////////////////////////////////////////////////////////////////
 
-const string RestVocbaseBaseHandler::REPLICATION_PATH = "/_api/replication";
+std::string const RestVocbaseBaseHandler::REPLICATION_PATH = "/_api/replication";
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief upload path
 ////////////////////////////////////////////////////////////////////////////////
 
-const string RestVocbaseBaseHandler::UPLOAD_PATH = "/_api/upload";
+std::string const RestVocbaseBaseHandler::UPLOAD_PATH = "/_api/upload";
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief name of the queue
 ////////////////////////////////////////////////////////////////////////////////
 
-const string RestVocbaseBaseHandler::QUEUE_NAME = "STANDARD";
+std::string const RestVocbaseBaseHandler::QUEUE_NAME = "STANDARD";
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                      constructors and destructors
@@ -383,6 +383,7 @@ void RestVocbaseBaseHandler::prepareExecute () {
   //}
   //std::cout << std::endl;
   char const* shardId = _request->header("x-arango-nolock", found);
+
   if (found) {
     _nolockHeaderSet = new std::unordered_set<std::string>();
     _nolockHeaderSet->insert(std::string(shardId));

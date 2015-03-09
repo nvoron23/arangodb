@@ -32,7 +32,6 @@
 
 #include "Basics/Common.h"
 #include "Utils/CollectionNameResolver.h"
-#include "VocBase/index.h"
 #include "VocBase/server.h"
 #include "V8/v8-globals.h"
 #include "V8Server/v8-vocbase.h"

@@ -31,6 +31,9 @@
 #include "Basics/FileUtils.h"
 #include "Basics/conversions.h"
 #include "Basics/files.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "VocBase/collection.h"
 #include "VocBase/replication-applier.h"
 #include "VocBase/voc-shaper.h"
@@ -461,7 +464,7 @@ int RecoverState::executeSingleOperation (TRI_voc_tick_t databaseId,
                                           TRI_voc_cid_t collectionId,
                                           TRI_df_marker_t const* marker,
                                           TRI_voc_fid_t fid,
-                                          std::function<int(SingleWriteTransactionType*, Marker*)> func) {
+                                          std::function<int(triagens::mvcc::TransactionCollection*, Marker*)> func) {
 
   // first find the correct database
   TRI_vocbase_t* vocbase = useDatabase(databaseId);
@@ -482,41 +485,29 @@ int RecoverState::executeSingleOperation (TRI_voc_tick_t databaseId,
     // already transferred this marker
     return TRI_ERROR_NO_ERROR;
   }
-
-
-  SingleWriteTransactionType* trx = nullptr;
+    
   EnvelopeMarker* envelope = nullptr;
   int res = TRI_ERROR_INTERNAL;
 
   try {
-    trx = new SingleWriteTransactionType(new triagens::arango::StandaloneTransactionContext(), vocbase, collectionId);
+    triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections());
+    auto* transaction = transactionScope.transaction();
+    auto* transactionCollection = transaction->collection(collectionId);
 
-    if (trx == nullptr) {
-      THROW_ARANGO_EXCEPTION(res);
-    }
+// TODO TODO TODO: re-add hints??
+//    trx->addHint(TRI_TRANSACTION_HINT_NO_BEGIN_MARKER, false);
+//    trx->addHint(TRI_TRANSACTION_HINT_NO_ABORT_MARKER, false);
+//    trx->addHint(TRI_TRANSACTION_HINT_NO_THROTTLING, false);
+//    trx->addHint(TRI_TRANSACTION_HINT_LOCK_NEVER, false);
 
-    trx->addHint(TRI_TRANSACTION_HINT_NO_BEGIN_MARKER, false);
-    trx->addHint(TRI_TRANSACTION_HINT_NO_ABORT_MARKER, false);
-    trx->addHint(TRI_TRANSACTION_HINT_NO_THROTTLING, false);
-    trx->addHint(TRI_TRANSACTION_HINT_LOCK_NEVER, false);
-
-    res = trx->begin();
-
-    if (res != TRI_ERROR_NO_ERROR) {
-      THROW_ARANGO_EXCEPTION(res);
-    }
-    
     envelope = new EnvelopeMarker(marker, fid);
 
     // execute the operation
-    res = func(trx, envelope);
+    res = func(transactionCollection, envelope);
 
     if (res != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(res);
     }
-
-    // commit the operation
-    res = trx->commit();
   }
   catch (triagens::arango::Exception const& ex) {
     res = ex.code();
@@ -527,10 +518,6 @@ int RecoverState::executeSingleOperation (TRI_voc_tick_t databaseId,
     
   if (envelope != nullptr) {
     delete envelope;
-  }
-
-  if (trx != nullptr) {
-    delete trx;
   }
 
   return res;
@@ -704,8 +691,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
         return true;
       }
 
-      int res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int { 
-        TRI_document_collection_t* document = trx->documentCollection();
+      int res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](triagens::mvcc::TransactionCollection* collection, Marker* envelope) -> int { 
+        TRI_document_collection_t* document = collection->documentCollection();
 
         // re-insert the attribute
         int res = TRI_InsertAttributeVocShaper(document->getShaper(), marker, false);
@@ -732,8 +719,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
         return true;
       }
       
-      int res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int { 
-        TRI_document_collection_t* document = trx->documentCollection();
+      int res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](triagens::mvcc::TransactionCollection* collection, Marker* envelope) -> int { 
+        TRI_document_collection_t* document = collection->documentCollection();
      
         // re-insert the shape
         int res = TRI_InsertShapeVocShaper(document->getShaper(), marker, false);
@@ -770,8 +757,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
         return true;
       }
         
-      char const* base = reinterpret_cast<char const*>(m); 
-      char const* key = base + m->_offsetKey;
+//      char const* base = reinterpret_cast<char const*>(m); 
+//      char const* key = base + m->_offsetKey;
       TRI_shaped_json_t shaped;
       TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, m);
 
@@ -784,6 +771,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
             return TRI_ERROR_NO_ERROR;
           } 
 
+          // TODO TODO TODO: re-add recovery
+#if 0
           TRI_doc_mptr_copy_t mptr;
           int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, nullptr, false, false, true);
 
@@ -793,15 +782,19 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           }
 
           return res;
+#endif
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else if (! state->isUsedByRemoteTransaction(collectionId)) {
         // local operation
-        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int { 
-          if (IsVolatile(trx->trxCollection())) {
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](triagens::mvcc::TransactionCollection* collection, Marker* envelope) -> int { 
+          if (collection->isVolatile()) {
             return TRI_ERROR_NO_ERROR;
           } 
 
+          // TODO TODO TODO: re-add recovery
+#if 0
           TRI_doc_mptr_copy_t mptr;
           int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, nullptr, false, false, true);
 
@@ -811,6 +804,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           }
 
           return res;
+#endif           
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else {
@@ -847,13 +842,13 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
         return true;
       }
 
-      char const* base = reinterpret_cast<char const*>(m); 
-      char const* key = base + m->_offsetKey;
-      TRI_document_edge_t edge;
-      edge._fromCid = m->_fromCid;
-      edge._toCid   = m->_toCid;
-      edge._fromKey = const_cast<char*>(base) + m->_offsetFromKey;
-      edge._toKey   = const_cast<char*>(base) + m->_offsetToKey;
+//      char const* base = reinterpret_cast<char const*>(m); 
+//      char const* key = base + m->_offsetKey;
+//      TRI_document_edge_t edge;
+//      edge._fromCid = m->_fromCid;
+//      edge._toCid   = m->_toCid;
+//      edge._fromKey = const_cast<char*>(base) + m->_offsetFromKey;
+//      edge._toKey   = const_cast<char*>(base) + m->_offsetToKey;
 
       TRI_shaped_json_t shaped;
       TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, m);
@@ -867,6 +862,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
             return TRI_ERROR_NO_ERROR;
           } 
 
+          // TODO TODO TODO: re-add recovery
+#if 0
           TRI_doc_mptr_copy_t mptr;
           int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &edge, false, false, true);
 
@@ -876,15 +873,19 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           }
 
           return res;
+#endif
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else if (! state->isUsedByRemoteTransaction(collectionId)) {
         // local operation
-        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int {
-          if (IsVolatile(trx->trxCollection())) {
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](triagens::mvcc::TransactionCollection* collection, Marker* envelope) -> int {
+          if (collection->isVolatile()) {
             return TRI_ERROR_NO_ERROR;
           } 
  
+          // TODO TODO TODO: re-add recovery
+#if 0
           TRI_doc_mptr_copy_t mptr;
           int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &edge, false, false, true);
 
@@ -894,6 +895,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           }
 
           return res;
+#endif
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else {
@@ -931,8 +934,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
         return true;
       }
      
-      char const* base = reinterpret_cast<char const*>(m); 
-      char const* key = base + sizeof(remove_marker_t);
+//      char const* base = reinterpret_cast<char const*>(m); 
+//      char const* key = base + sizeof(remove_marker_t);
       int res = TRI_ERROR_NO_ERROR;
        
       if (state->isRemoteTransaction(transactionId)) {
@@ -942,25 +945,33 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
             return TRI_ERROR_NO_ERROR;
           } 
 
+          // TODO TODO TODO: re-add recovery
+#if 0
           // remove the document and ignore any potential errors
           state->policy.setExpectedRevision(m->_revisionId);
           TRI_RemoveShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &state->policy, false, false);
 
           return TRI_ERROR_NO_ERROR;
+#endif
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else if (! state->isUsedByRemoteTransaction(collectionId)) {
         // local operation
-        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int { 
-          if (IsVolatile(trx->trxCollection())) {
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](triagens::mvcc::TransactionCollection* collection, Marker* envelope) -> int { 
+          if (collection->isVolatile()) {
             return TRI_ERROR_NO_ERROR;
           } 
 
+          // TODO TODO TODO: re-add recovery
+#if 0
           // remove the document and ignore any potential errors
           state->policy.setExpectedRevision(m->_revisionId);
           TRI_RemoveShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &state->policy, false, false);
 
           return TRI_ERROR_NO_ERROR;
+#endif
+          return TRI_ERROR_INTERNAL;
         });
       }
       else {
@@ -998,8 +1009,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
         return true;
       }
         
-      char const* base = reinterpret_cast<char const*>(m); 
-      char const* key = base + m->_offsetKey;
+//      char const* base = reinterpret_cast<char const*>(m); 
+//      char const* key = base + m->_offsetKey;
       TRI_shaped_json_t shaped;
       TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, m);
 
@@ -1011,6 +1022,9 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           if (IsVolatile(trx->trxCollection(collectionId))) {
             return TRI_ERROR_NO_ERROR;
           } 
+          
+          // TODO TODO TODO: re-add recovery
+#if 0
 
           TRI_doc_mptr_copy_t mptr;
           int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, nullptr, false, false, true);
@@ -1021,15 +1035,19 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           }
 
           return res;
+#endif
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else if (! state->isUsedByRemoteTransaction(collectionId)) {
         // local operation
-        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int { 
-          if (IsVolatile(trx->trxCollection())) {
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](triagens::mvcc::TransactionCollection* collection, Marker* envelope) -> int { 
+          if (collection->isVolatile()) {
             return TRI_ERROR_NO_ERROR;
           } 
 
+          // TODO TODO TODO: re-add recovery
+#if 0
           TRI_doc_mptr_copy_t mptr;
           int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, nullptr, false, false, true);
 
@@ -1039,6 +1057,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           }
 
           return res;
+#endif
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else {
@@ -1075,13 +1095,13 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
         return true;
       }
 
-      char const* base = reinterpret_cast<char const*>(m); 
-      char const* key = base + m->_offsetKey;
-      TRI_document_edge_t edge;
-      edge._fromCid = m->_fromCid;
-      edge._toCid   = m->_toCid;
-      edge._fromKey = const_cast<char*>(base) + m->_offsetFromKey;
-      edge._toKey   = const_cast<char*>(base) + m->_offsetToKey;
+//      char const* base = reinterpret_cast<char const*>(m); 
+//      char const* key = base + m->_offsetKey;
+//      TRI_document_edge_t edge;
+//      edge._fromCid = m->_fromCid;
+//      edge._toCid   = m->_toCid;
+//      edge._fromKey = const_cast<char*>(base) + m->_offsetFromKey;
+//      edge._toKey   = const_cast<char*>(base) + m->_offsetToKey;
 
       TRI_shaped_json_t shaped;
       TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, m);
@@ -1094,6 +1114,9 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           if (IsVolatile(trx->trxCollection(collectionId))) {
             return TRI_ERROR_NO_ERROR;
           } 
+          
+          // TODO TODO TODO: re-add recovery
+#if 0
 
           TRI_doc_mptr_copy_t mptr;
           int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &edge, false, false, true);
@@ -1104,15 +1127,19 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           }
 
           return res;
+#endif
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else if (! state->isUsedByRemoteTransaction(collectionId)) {
         // local operation
-        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int {
-          if (IsVolatile(trx->trxCollection())) {
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](triagens::mvcc::TransactionCollection* collection, Marker* envelope) -> int {
+          if (collection->isVolatile()) {
             return TRI_ERROR_NO_ERROR;
           } 
  
+          // TODO TODO TODO: re-add recovery
+#if 0
           TRI_doc_mptr_copy_t mptr;
           int res = TRI_InsertShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &mptr, &shaped, &edge, false, false, true);
 
@@ -1122,6 +1149,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
           }
 
           return res;
+#endif
+          return TRI_ERROR_INTERNAL;          
         });
       }
       else {
@@ -1159,8 +1188,8 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
         return true;
       }
      
-      char const* base = reinterpret_cast<char const*>(m); 
-      char const* key = base + sizeof(remove_marker_t);
+//      char const* base = reinterpret_cast<char const*>(m); 
+//      char const* key = base + sizeof(remove_marker_t);
       int res = TRI_ERROR_NO_ERROR;
        
       if (state->isRemoteTransaction(transactionId)) {
@@ -1170,23 +1199,29 @@ bool RecoverState::ReplayMarker (TRI_df_marker_t const* marker,
             return TRI_ERROR_NO_ERROR;
           } 
 
+          // TODO TODO TODO: re-add recovery
+#if 0
           // remove the document and ignore any potential errors
           state->policy.setExpectedRevision(m->_revisionId);
           TRI_RemoveShapedJsonDocumentCollection(trx->trxCollection(collectionId), (TRI_voc_key_t) key, m->_revisionId, envelope, &state->policy, false, false);
+#endif
 
           return TRI_ERROR_NO_ERROR;
         });
       }
       else if (! state->isUsedByRemoteTransaction(collectionId)) {
         // local operation
-        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](SingleWriteTransactionType* trx, Marker* envelope) -> int { 
-          if (IsVolatile(trx->trxCollection())) {
+        res = state->executeSingleOperation(databaseId, collectionId, marker, datafile->_fid, [&](triagens::mvcc::TransactionCollection* collection, Marker* envelope) -> int { 
+          if (collection->isVolatile()) {
             return TRI_ERROR_NO_ERROR;
           } 
 
+          // TODO TODO TODO: re-add recovery
+#if 0
           // remove the document and ignore any potential errors
           state->policy.setExpectedRevision(m->_revisionId);
           TRI_RemoveShapedJsonDocumentCollection(trx->trxCollection(), (TRI_voc_key_t) key, m->_revisionId, envelope, &state->policy, false, false);
+#endif
 
           return TRI_ERROR_NO_ERROR;
         });

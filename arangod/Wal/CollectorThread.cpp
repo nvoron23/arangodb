@@ -32,10 +32,13 @@
 #include "Basics/hashes.h"
 #include "Basics/logging.h"
 #include "Basics/ConditionLocker.h"
+#include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "Utils/CollectionGuard.h"
 #include "Utils/DatabaseGuard.h"
 #include "Utils/Exception.h"
-#include "Utils/transactions.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/server.h"
 #include "VocBase/voc-shaper.h"
@@ -573,15 +576,16 @@ int CollectorThread::processCollectionOperations (CollectorCache* cache) {
   TRI_vocbase_t* vocbase = dbGuard.database();
   TRI_ASSERT(vocbase != nullptr);
 
-  triagens::arango::CollectionGuard collectionGuard(vocbase, cache->collectionId, true);
-  TRI_vocbase_col_t* collection = collectionGuard.collection();
-
-  TRI_ASSERT(collection != nullptr);
-
   // create a fake transaction while accessing the collection
   triagens::arango::TransactionBase trx(true);
+  
+  triagens::mvcc::TransactionScope transactionScope(vocbase, triagens::mvcc::TransactionScope::NoCollections(), true, false);
+  
+  auto transaction = transactionScope.transaction();
+  auto transactionCollection = transaction->collection(cache->collectionId);
 
-  TRI_document_collection_t* document = collection->_collection;
+  TRI_document_collection_t* document = transactionCollection->documentCollection();
+  auto primaryIndex = document->primaryIndex();
 
   // first try to read-lock the compactor-lock, afterwards try to write-lock the collection
   // if any locking attempt fails, release and try again next time
@@ -606,9 +610,7 @@ int CollectorThread::processCollectionOperations (CollectorCache* cache) {
 
     TRI_ASSERT(! cache->operations->empty());
 
-    for (auto it = cache->operations->begin(); it != cache->operations->end(); ++it) {
-      auto operation = (*it);
-
+    for (auto const& operation : *(cache->operations)) {
       TRI_df_marker_t const* walMarker = reinterpret_cast<TRI_df_marker_t const*>(operation.walPosition);
       TRI_df_marker_t const* marker = reinterpret_cast<TRI_df_marker_t const*>(operation.datafilePosition);
       TRI_voc_size_t const datafileMarkerSize = operation.datafileMarkerSize;
@@ -621,7 +623,7 @@ int CollectorThread::processCollectionOperations (CollectorCache* cache) {
         wal::document_marker_t const* m = reinterpret_cast<wal::document_marker_t const*>(walMarker);
         char const* key = reinterpret_cast<char const*>(m) + m->_offsetKey;
 
-        TRI_doc_mptr_t* found = static_cast<TRI_doc_mptr_t*>(TRI_LookupByKeyPrimaryIndex(&document->_primaryIndex, key));
+        TRI_doc_mptr_t* found = primaryIndex->lookup(transactionCollection, transaction, std::string(key));
 
         if (found == nullptr || found->_rid != m->_revisionId || found->getDataPtr() != walMarker) {
           // somebody inserted a new revision of the document or the revision was already moved by the compactor
@@ -633,8 +635,12 @@ int CollectorThread::processCollectionOperations (CollectorCache* cache) {
         }
         else {
           // update cap constraint info
+          // TODO TODO TODO: adjust cap constraint size info!
+#if 0
+                    
           document->_headersPtr->adjustTotalSize(TRI_DF_ALIGN_BLOCK(walMarker->_size),
                                                   TRI_DF_ALIGN_BLOCK(datafileMarkerSize));
+#endif        
 
           // we can safely update the master pointer's dataptr value
           found->setDataPtr(static_cast<void*>(const_cast<char*>(operation.datafilePosition)));
@@ -645,7 +651,7 @@ int CollectorThread::processCollectionOperations (CollectorCache* cache) {
         wal::edge_marker_t const* m = reinterpret_cast<wal::edge_marker_t const*>(walMarker);
         char const* key = reinterpret_cast<char const*>(m) + m->_offsetKey;
 
-        TRI_doc_mptr_t* found = static_cast<TRI_doc_mptr_t*>(TRI_LookupByKeyPrimaryIndex(&document->_primaryIndex, key));
+        TRI_doc_mptr_t* found = primaryIndex->lookup(transactionCollection, transaction, std::string(key));
 
         if (found == nullptr || found->_rid != m->_revisionId || found->getDataPtr() != walMarker) {
           // somebody inserted a new revision of the document or the revision was already moved by the compactor
@@ -657,9 +663,11 @@ int CollectorThread::processCollectionOperations (CollectorCache* cache) {
         }
         else {
           // update cap constraint info
+          // TODO TODO TODO: adjust cap constraint size info!
+#if 0
           document->_headersPtr->adjustTotalSize(TRI_DF_ALIGN_BLOCK(walMarker->_size),
                                                   TRI_DF_ALIGN_BLOCK(datafileMarkerSize));
-
+#endif
           // we can safely update the master pointer's dataptr value
           found->setDataPtr(static_cast<void*>(const_cast<char*>(operation.datafilePosition)));
           found->_fid = fid;
@@ -669,7 +677,7 @@ int CollectorThread::processCollectionOperations (CollectorCache* cache) {
         wal::remove_marker_t const* m = reinterpret_cast<wal::remove_marker_t const*>(walMarker);
         char const* key = reinterpret_cast<char const*>(m) + sizeof(wal::remove_marker_t);
 
-        TRI_doc_mptr_t* found = static_cast<TRI_doc_mptr_t*>(TRI_LookupByKeyPrimaryIndex(&document->_primaryIndex, key));
+        TRI_doc_mptr_t const* found = primaryIndex->lookup(transactionCollection, transaction, std::string(key));
 
         if (found != nullptr && found->_rid > m->_revisionId) {
           // somebody re-created the document with a newer revision

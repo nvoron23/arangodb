@@ -39,7 +39,6 @@
 #include "SimpleHttpClient/SimpleHttpResult.h"
 #include "Utils/CollectionGuard.h"
 #include "Utils/Exception.h"
-#include "Utils/transactions.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/transaction.h"
 #include "VocBase/vocbase.h"
@@ -384,6 +383,8 @@ int ContinuousSyncer::processDocument (TRI_replication_operation_e type,
     return TRI_ERROR_REPLICATION_INVALID_RESPONSE;
   }
 
+    // TODO TODO TODO: re-add replication
+#if 0
   // extract "rev"
   TRI_voc_rid_t rid;
 
@@ -397,6 +398,7 @@ int ContinuousSyncer::processDocument (TRI_replication_operation_e type,
 
   // extract "data"
   TRI_json_t const* doc = JsonHelper::getObjectElement(json, "data");
+#endif
 
   // extract "tid"
   string const id = JsonHelper::getStringValue(json, "tid", "");
@@ -412,6 +414,8 @@ int ContinuousSyncer::processDocument (TRI_replication_operation_e type,
   }
 
   if (tid > 0) {
+    // TODO TODO TODO: re-add replication
+#if 0    
     auto it = _applier->_runningRemoteTransactions.find(tid);
 
     if (it == _applier->_runningRemoteTransactions.end()) {
@@ -427,7 +431,8 @@ int ContinuousSyncer::processDocument (TRI_replication_operation_e type,
       return TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND;
     }
 
-    int res = applyCollectionDumpMarker(trxCollection,
+    int res = applyCollectionDumpMarker(transaction,
+                                        transactionCollection,
                                         type,
                                         (const TRI_voc_key_t) keyJson->_value._string.data,
                                         rid,
@@ -435,11 +440,15 @@ int ContinuousSyncer::processDocument (TRI_replication_operation_e type,
                                         errorMsg);
 
     return res;
+#endif
+    return TRI_ERROR_INTERNAL;    
   }
 
   else {
     // standalone operation
     // update the apply tick for all standalone operations
+    // TODO TODO TODO: re-add replication
+#if 0    
     SingleCollectionWriteTransaction<1> trx(new StandaloneTransactionContext(), _vocbase, cid);
 
     int res = trx.begin();
@@ -466,6 +475,8 @@ int ContinuousSyncer::processDocument (TRI_replication_operation_e type,
     res = trx.finish(res);
 
     return res;
+#endif
+    return TRI_ERROR_INTERNAL;    
   }
 }
 

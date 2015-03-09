@@ -36,7 +36,6 @@
 #include "GeoIndex/GeoIndex.h"
 #include "Mvcc/Index.h"
 #include "ShapedJson/shaped-json.h"
-#include "VocBase/index.h"
 
 struct TRI_document_collection_t;
 
@@ -119,7 +118,7 @@ namespace triagens {
 
         triagens::basics::Json toJson (TRI_memory_zone_t*) const override final;
 
-        TRI_idx_type_e type () const override final {
+        Index::IndexType type () const override final {
           if (_variant == INDEX_GEO_COMBINED_LAT_LON || 
               _variant == INDEX_GEO_COMBINED_LON_LAT) {
             return TRI_IDX_TYPE_GEO1_INDEX;

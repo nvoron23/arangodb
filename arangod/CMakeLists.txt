@@ -155,10 +155,7 @@ add_executable(
     VocBase/datafile.cpp
     VocBase/document-collection.cpp
     VocBase/general-cursor.cpp
-    VocBase/headers.cpp
-    VocBase/index.cpp
     VocBase/key-generator.cpp
-    VocBase/primary-index.cpp
     VocBase/replication-applier.cpp
     VocBase/replication-common.cpp
     VocBase/replication-dump.cpp

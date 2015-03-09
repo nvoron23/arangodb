@@ -32,7 +32,6 @@
 
 #include "Basics/Common.h"
 #include "Basics/JsonHelper.h"
-#include "VocBase/index.h"
 #include "VocBase/voc-types.h"
 
 struct TRI_doc_mptr_t;
@@ -49,6 +48,26 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
     class Index {
+
+      public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief index type
+////////////////////////////////////////////////////////////////////////////////
+
+        enum IndexType {
+          TRI_IDX_TYPE_UNKNOWN = 0,
+          TRI_IDX_TYPE_PRIMARY_INDEX,
+          TRI_IDX_TYPE_GEO1_INDEX,
+          TRI_IDX_TYPE_GEO2_INDEX,
+          TRI_IDX_TYPE_HASH_INDEX,
+          TRI_IDX_TYPE_EDGE_INDEX,
+          TRI_IDX_TYPE_FULLTEXT_INDEX,
+          TRI_IDX_TYPE_PRIORITY_QUEUE_INDEX, // DEPRECATED and not functional anymore
+          TRI_IDX_TYPE_SKIPLIST_INDEX,
+          TRI_IDX_TYPE_BITARRAY_INDEX,       // DEPRECATED and not functional anymore
+          TRI_IDX_TYPE_CAP_CONSTRAINT
+        };
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                        constructors / destructors
@@ -171,7 +190,7 @@ namespace triagens {
 /// @brief return the index type
 ////////////////////////////////////////////////////////////////////////////////
 
-        virtual TRI_idx_type_e type () const = 0;
+        virtual IndexType type () const = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the index type name (e.g. "primary", "hash")
@@ -217,13 +236,13 @@ namespace triagens {
 /// @brief return the index type based on a type name
 ////////////////////////////////////////////////////////////////////////////////
 
-        static TRI_idx_type_e type (char const*);
+        static IndexType type (char const*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the name of an index type
 ////////////////////////////////////////////////////////////////////////////////
 
-        static char const* type (TRI_idx_type_e);
+        static char const* type (IndexType);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief generate a new index id
@@ -243,6 +262,14 @@ namespace triagens {
 
         static bool validateId (char const*,
                                 size_t*);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief index comparator, used by the coordinator to detect if two index
+/// contents are the same
+////////////////////////////////////////////////////////////////////////////////
+
+        static bool IndexComparator (struct TRI_json_t const*, 
+                                     struct TRI_json_t const*);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                               protected variables

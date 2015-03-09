@@ -36,9 +36,13 @@
 #include "Cluster/ClusterMethods.h"
 #include "Cluster/ClusterComm.h"
 #include "HttpServer/HttpServer.h"
+#include "Mvcc/CollectionOperations.h"
 #include "Mvcc/EdgeIndex.h"
 #include "Mvcc/Index.h"
 #include "Mvcc/PrimaryIndex.h"
+#include "Mvcc/Transaction.h"
+#include "Mvcc/TransactionCollection.h"
+#include "Mvcc/TransactionScope.h"
 #include "Replication/InitialSyncer.h"
 #include "Rest/HttpRequest.h"
 #include "Utils/CollectionGuard.h"
@@ -48,7 +52,6 @@
 #include "VocBase/replication-dump.h"
 #include "VocBase/server.h"
 #include "VocBase/update-policy.h"
-#include "VocBase/index.h"
 #include "Wal/LogfileManager.h"
 
 using namespace std;
@@ -1706,23 +1709,21 @@ int RestReplicationHandler::processRestoreCollection (TRI_json_t const* collecti
 
       if (res == TRI_ERROR_FORBIDDEN) {
         // some collections must not be dropped
+        
+        triagens::mvcc::OperationOptions options;
+
+        triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true);
+        auto* transaction = transactionScope.transaction();
+        auto* transactionCollection = transaction->collection(col->_cid);
 
         // instead, truncate them
-        SingleCollectionWriteTransaction<UINT64_MAX> trx(new StandaloneTransactionContext(), _vocbase, col->_cid);
-
-        res = trx.begin();
-        if (res != TRI_ERROR_NO_ERROR) {
-          return res;
-        }
-
-        res = trx.truncate(false);
-        res = trx.finish(res);
-
-        return res;
+        auto truncateResult = triagens::mvcc::CollectionOperations::Truncate(&transactionScope, transactionCollection, options);
+    
+        res = truncateResult.code;
       }
 
       if (res != TRI_ERROR_NO_ERROR) {
-        errorMsg = "unable to drop collection '" + name + "': " + string(TRI_errno_string(res));
+        errorMsg = "unable to drop/truncate collection '" + name + "': " + string(TRI_errno_string(res));
 
         return res;
       }
@@ -1937,14 +1938,9 @@ int RestReplicationHandler::processRestoreIndexes (TRI_json_t const* collection,
 
     TRI_document_collection_t* document = guard.collection()->_collection;
 
-    SingleCollectionWriteTransaction<UINT64_MAX> trx(new StandaloneTransactionContext(), _vocbase, document->_info._cid);
-
-    int res = trx.begin();
-
-    if (res != TRI_ERROR_NO_ERROR) {
-      errorMsg = "unable to start transaction: " + string(TRI_errno_string(res));
-      THROW_ARANGO_EXCEPTION(res);
-    }
+    triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true);
+    //auto* transaction = transactionScope.transaction();
+    // auto* transactionCollection = transaction->collection(document->_info._cid);
 
     for (size_t i = 0; i < n; ++i) {
       TRI_json_t const* idxDef = static_cast<TRI_json_t const*>(TRI_AtVector(&indexes->_value._objects, i));
@@ -1952,21 +1948,20 @@ int RestReplicationHandler::processRestoreIndexes (TRI_json_t const* collection,
 
       // {"id":"229907440927234","type":"hash","unique":false,"fields":["x","Y"]}
 
-      res = TRI_FromJsonIndexDocumentCollection(document, idxDef, index);
+      int res = TRI_FromJsonIndexDocumentCollection(document, idxDef, index);
 
       if (res != TRI_ERROR_NO_ERROR) {
         errorMsg = "could not create index: " + string(TRI_errno_string(res));
         break;
       }
-      else {
-        TRI_ASSERT(index != nullptr);
 
-        res = TRI_SaveIndex(document, index, true);
+      TRI_ASSERT(index != nullptr);
 
-        if (res != TRI_ERROR_NO_ERROR) {
-          errorMsg = "could not save index: " + string(TRI_errno_string(res));
-          break;
-        }
+      res = document->saveIndexFile(index, true);
+
+      if (res != TRI_ERROR_NO_ERROR) {
+        errorMsg = "could not save index: " + string(TRI_errno_string(res));
+        break;
       }
     }
   }
@@ -2048,7 +2043,7 @@ int RestReplicationHandler::processRestoreIndexesCoordinator (
     TRI_json_t const* idxDef = static_cast<TRI_json_t const*>(TRI_AtVector(&indexes->_value._objects, i));
     TRI_json_t* res_json = nullptr;
     res = ci->ensureIndexCoordinator(dbName, col->id_as_string(), idxDef,
-                     true, IndexComparator, res_json, errorMsg, 3600.0);
+                     true, &triagens::mvcc::Index::IndexComparator, res_json, errorMsg, 3600.0);
     if (res != TRI_ERROR_NO_ERROR) {
       errorMsg = "could not create index: " + string(TRI_errno_string(res));
       break;
@@ -2062,8 +2057,8 @@ int RestReplicationHandler::processRestoreIndexesCoordinator (
 /// @brief apply the data from a collection dump or the continuous log
 ////////////////////////////////////////////////////////////////////////////////
 
-int RestReplicationHandler::applyCollectionDumpMarker (CollectionNameResolver const& resolver,
-                                                       TRI_transaction_collection_t* trxCollection,
+int RestReplicationHandler::applyCollectionDumpMarker (triagens::mvcc::Transaction* transaction,
+                                                       triagens::mvcc::TransactionCollection* transactionCollection,
                                                        TRI_replication_operation_e type,
                                                        const TRI_voc_key_t key,
                                                        const TRI_voc_rid_t rid,
@@ -2076,8 +2071,7 @@ int RestReplicationHandler::applyCollectionDumpMarker (CollectionNameResolver co
 
     TRI_ASSERT(json != nullptr);
 
-    TRI_document_collection_t* document = trxCollection->_collection->_collection;
-    TRI_memory_zone_t* zone = document->getShaper()->_memoryZone;  // PROTECTED by trx in trxCollection
+    TRI_document_collection_t* document = transactionCollection->documentCollection();
     TRI_shaped_json_t* shaped = TRI_ShapedJsonJson(document->getShaper(), json, true);  // PROTECTED by trx in trxCollection
 
     if (shaped == nullptr) {
@@ -2086,7 +2080,10 @@ int RestReplicationHandler::applyCollectionDumpMarker (CollectionNameResolver co
       return TRI_ERROR_OUT_OF_MEMORY;
     }
 
+    // TODO TODO TODO: re-add replication with primary index
+#if 0
     try {
+      TRI_memory_zone_t* zone = document->getShaper()->_memoryZone;  // PROTECTED by trx in trxCollection
       TRI_doc_mptr_copy_t mptr;
 
       int res = TRI_ReadShapedJsonDocumentCollection(trxCollection, key, &mptr, false);
@@ -2152,6 +2149,8 @@ int RestReplicationHandler::applyCollectionDumpMarker (CollectionNameResolver co
       TRI_FreeShapedJson(zone, shaped);
       return TRI_ERROR_INTERNAL;
     }
+#endif 
+    return TRI_ERROR_INTERNAL;    
   }
 
   else if (type == REPLICATION_MARKER_REMOVE) {
@@ -2161,6 +2160,8 @@ int RestReplicationHandler::applyCollectionDumpMarker (CollectionNameResolver co
 
     int res = TRI_ERROR_INTERNAL;
 
+    // TODO TODO TODO: re-add replication with primary index
+#if 0
     try {
       res = TRI_RemoveShapedJsonDocumentCollection(trxCollection, key, rid, nullptr, &policy, false, false);
 
@@ -2175,6 +2176,7 @@ int RestReplicationHandler::applyCollectionDumpMarker (CollectionNameResolver co
     catch (...) {
       res = TRI_ERROR_INTERNAL;
     }
+#endif    
 
     if (res != TRI_ERROR_NO_ERROR) {
       errorMsg = "document removal operation failed: " + string(TRI_errno_string(res));
@@ -2194,13 +2196,13 @@ int RestReplicationHandler::applyCollectionDumpMarker (CollectionNameResolver co
 /// @brief restores the data of a collection TODO MOVE
 ////////////////////////////////////////////////////////////////////////////////
 
-int RestReplicationHandler::processRestoreDataBatch (CollectionNameResolver const& resolver,
-                                                     TRI_transaction_collection_t* trxCollection,
+int RestReplicationHandler::processRestoreDataBatch (triagens::mvcc::Transaction* transaction,
+                                                     triagens::mvcc::TransactionCollection* transactionCollection,
                                                      bool useRevision,
                                                      bool force,
                                                      std::string& errorMsg) {
-  string const invalidMsg = "received invalid JSON data for collection " +
-                            StringUtils::itoa(trxCollection->_cid);
+  std::string const invalidMsg = "received invalid JSON data for collection " +
+                                 std::to_string(transactionCollection->id());
 
   char const* ptr = _request->body();
   char const* end = ptr + _request->bodySize();
@@ -2230,7 +2232,7 @@ int RestReplicationHandler::processRestoreDataBatch (CollectionNameResolver cons
       }
 
       TRI_replication_operation_e type = REPLICATION_INVALID;
-      const char* key       = nullptr;
+      char const* key       = nullptr;
       TRI_voc_rid_t rid     = 0;
       TRI_json_t const* doc = nullptr;
 
@@ -2246,7 +2248,7 @@ int RestReplicationHandler::processRestoreDataBatch (CollectionNameResolver cons
           return TRI_ERROR_HTTP_CORRUPTED_JSON;
         }
 
-        const char* attributeName = element->_value._string.data;
+        char const* attributeName = element->_value._string.data;
         TRI_json_t const* value = static_cast<TRI_json_t const*>(TRI_AtVector(&json->_value._objects, i + 1));
 
         if (TRI_EqualString(attributeName, "type")) {
@@ -2282,7 +2284,7 @@ int RestReplicationHandler::processRestoreDataBatch (CollectionNameResolver cons
         return TRI_ERROR_HTTP_BAD_PARAMETER;
       }
 
-      int res = applyCollectionDumpMarker(resolver, trxCollection, type, (const TRI_voc_key_t) key, rid, doc, errorMsg);
+      int res = applyCollectionDumpMarker(transaction, transactionCollection, type, (const TRI_voc_key_t) key, rid, doc, errorMsg);
 
       TRI_FreeJson(TRI_CORE_MEM_ZONE, json);
 
@@ -2301,40 +2303,17 @@ int RestReplicationHandler::processRestoreDataBatch (CollectionNameResolver cons
 /// @brief restores the data of a collection TODO
 ////////////////////////////////////////////////////////////////////////////////
 
-int RestReplicationHandler::processRestoreData (CollectionNameResolver const& resolver,
-                                                TRI_voc_cid_t cid,
+int RestReplicationHandler::processRestoreData (TRI_voc_cid_t cid,
                                                 bool useRevision,
                                                 bool force,
                                                 string& errorMsg) {
 
-  SingleCollectionWriteTransaction<UINT64_MAX> trx(new StandaloneTransactionContext(), _vocbase, cid);
+  triagens::mvcc::TransactionScope transactionScope(_vocbase, triagens::mvcc::TransactionScope::NoCollections(), true);
+  auto* transaction = transactionScope.transaction();
+  auto* transactionCollection = transaction->collection(cid);
 
-  int res = trx.begin();
-
-  if (res != TRI_ERROR_NO_ERROR) {
-    errorMsg = "unable to start transaction: " + string(TRI_errno_string(res));
-
-    return res;
-  }
-
-  TRI_transaction_collection_t* trxCollection = trx.trxCollection();
-
-  if (trxCollection == nullptr) {
-    res = TRI_ERROR_INTERNAL;
-    errorMsg = "unable to start transaction: " + string(TRI_errno_string(res));
-  }
-  else {
-    // TODO: waitForSync disabled here. use for initial replication, too
-    // sync at end of trx
-    trxCollection->_waitForSync = false;
-
-    // create a fake transaction to avoid assertion failures. TODO: use proper transaction here
-    res = processRestoreDataBatch(resolver, trxCollection, useRevision, force, errorMsg);
-  }
-
-  res = trx.finish(res);
-
-  return res;
+  // create a fake transaction to avoid assertion failures. TODO: use proper transaction here
+  return processRestoreDataBatch(transaction, transactionCollection, useRevision, force, errorMsg);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2376,7 +2355,7 @@ void RestReplicationHandler::handleCommandRestoreData () {
 
   string errorMsg;
 
-  int res = processRestoreData(resolver, cid, recycleIds, force, errorMsg);
+  int res = processRestoreData(cid, recycleIds, force, errorMsg);
 
   if (res != TRI_ERROR_NO_ERROR) {
     generateError(HttpResponse::SERVER_ERROR, res);

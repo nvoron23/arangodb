@@ -155,7 +155,7 @@ PrimaryIndex::~PrimaryIndex () {
 }
 
 // -----------------------------------------------------------------------------
-// --SECTION--                                                  public functions
+// --SECTION--                            public methods, inherited from Index.h
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -529,6 +529,61 @@ TRI_doc_mptr_t* PrimaryIndex::findVisibleRevision (
     }
   }
   return nullptr;
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                    class PrimaryIndexReadAccessor
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief creates a read accessor. the accessor will hold the read-lock on
+/// the index during the accessor's lifetime
+////////////////////////////////////////////////////////////////////////////////
+
+PrimaryIndexReadAccessor::PrimaryIndexReadAccessor (PrimaryIndex* index) 
+  : _index(index),
+    _readLocker(&index->_lock) {
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief destroys read accessor. this will also release the read-lock on the 
+/// index
+////////////////////////////////////////////////////////////////////////////////
+
+PrimaryIndexReadAccessor::~PrimaryIndexReadAccessor () {
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                  public functions
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the number of documents in the index
+////////////////////////////////////////////////////////////////////////////////
+
+size_t PrimaryIndex::size () {
+  READ_LOCKER(_lock);
+  return static_cast<size_t>(_theHash->size());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief resizes the primary index to the specified target size
+////////////////////////////////////////////////////////////////////////////////
+    
+void PrimaryIndex::resize (uint32_t size) {
+  WRITE_LOCKER(_lock);
+  _theHash->resize(size);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief looks up a key in the primary index while holding the read-lock
+////////////////////////////////////////////////////////////////////////////////
+
+TRI_doc_mptr_t* PrimaryIndexReadAccessor::lookup (TransactionCollection* transColl,
+                                                  Transaction* trans,
+                                                  std::string const& key) {
+  return _index->findVisibleRevision(transColl, trans, key);
 }
 
 // -----------------------------------------------------------------------------

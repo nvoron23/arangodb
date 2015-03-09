@@ -36,15 +36,8 @@
 #include "Basics/hashes.h"
 #include "Basics/locks.h"
 #include "Basics/vector.h"
-
 #include "VocBase/datafile.h"
 #include "VocBase/voc-types.h"
-
-namespace triagens {
-  namespace wal {
-    struct DocumentOperation;
-  }
-}
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                              forward declarations
@@ -168,7 +161,6 @@ typedef struct TRI_transaction_collection_s {
   int                                  _nestingLevel;      // the transaction level that added this collection
   struct TRI_vocbase_col_s*            _collection;        // vocbase collection pointer
   struct TRI_barrier_s*                _barrier;
-  std::vector<triagens::wal::DocumentOperation*>* _operations;
   TRI_voc_rid_t                        _originalRevision;  // collection revision at trx start
   TRI_transaction_type_e               _lockType;          // collection lock type
   bool                                 _compactionLocked;  // was the compaction lock grabbed for the collection?

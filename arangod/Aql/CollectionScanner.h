@@ -58,7 +58,8 @@ namespace triagens {
 // --SECTION--                                                  public functions
 // -----------------------------------------------------------------------------
 
-      virtual int scan (std::vector<TRI_doc_mptr_copy_t>&, size_t) = 0;
+      virtual int scan (std::vector<TRI_doc_mptr_t*>&, 
+                        size_t) = 0;
 
       virtual void reset () = 0;
  
@@ -81,10 +82,10 @@ namespace triagens {
       RandomCollectionScanner (triagens::arango::AqlTransaction*,
                                TRI_transaction_collection_t*);
 
-      int scan (std::vector<TRI_doc_mptr_copy_t>&,
-                size_t);
+      int scan (std::vector<TRI_doc_mptr_t*>&,
+                size_t) override final;
 
-      void reset ();
+      void reset () override final;
 
       uint32_t initialPosition;
       uint32_t step;
@@ -103,10 +104,10 @@ namespace triagens {
       LinearCollectionScanner (triagens::arango::AqlTransaction*,
                                TRI_transaction_collection_t*); 
 
-      int scan (std::vector<TRI_doc_mptr_copy_t>&,
-                size_t);
+      int scan (std::vector<TRI_doc_mptr_t*>&,
+                size_t) override final;
       
-      void reset ();
+      void reset () override final;
     };
 
   }

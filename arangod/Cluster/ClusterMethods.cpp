@@ -36,7 +36,6 @@
 #include "Cluster/ClusterInfo.h"
 #include "Cluster/ClusterComm.h"
 #include "Mvcc/Index.h"
-#include "VocBase/index.h"
 #include "VocBase/server.h"
 
 using namespace std;

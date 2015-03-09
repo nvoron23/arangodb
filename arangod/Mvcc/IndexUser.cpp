@@ -80,7 +80,7 @@ IndexUser::~IndexUser () {
 bool IndexUser::hasCapConstraint () const {
   size_t const n = _indexes.size();
   for (size_t i = 1; i < n; ++i) {
-    if (_indexes[i]->type() == TRI_IDX_TYPE_CAP_CONSTRAINT) {
+    if (_indexes[i]->type() == triagens::mvcc::Index::TRI_IDX_TYPE_CAP_CONSTRAINT) {
       return true;
     }
   }

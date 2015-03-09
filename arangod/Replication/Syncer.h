@@ -55,6 +55,11 @@ namespace triagens {
     class SimpleHttpClient;
     class SimpleHttpResult;
   }
+  
+  namespace mvcc {
+    class Transaction;
+    class TransactionCollection;
+  }
 
   namespace rest {
     class Endpoint;
@@ -113,7 +118,8 @@ namespace triagens {
 /// @brief apply a single marker from the collection dump
 ////////////////////////////////////////////////////////////////////////////////
 
-        int applyCollectionDumpMarker (struct TRI_transaction_collection_s*,
+        int applyCollectionDumpMarker (triagens::mvcc::Transaction*,
+                                       triagens::mvcc::TransactionCollection*,
                                        TRI_replication_operation_e,
                                        const TRI_voc_key_t,
                                        const TRI_voc_rid_t,

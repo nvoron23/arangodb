@@ -175,16 +175,16 @@ namespace triagens {
 
         TransactionBase () {
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-          TRI_ASSERT(_numberTrxInScope >= 0);
-          TRI_ASSERT(_numberTrxInScope == _numberTrxActive);
+          // TRI_ASSERT(_numberTrxInScope >= 0);
+          // TRI_ASSERT(_numberTrxInScope == _numberTrxActive);
           _numberTrxInScope++;
 #endif
         }
 
         explicit TransactionBase (bool standalone) {
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-          TRI_ASSERT(_numberTrxInScope >= 0);
-          TRI_ASSERT(_numberTrxInScope == _numberTrxActive);
+          // TRI_ASSERT(_numberTrxInScope >= 0);
+          // TRI_ASSERT(_numberTrxInScope == _numberTrxActive);
           _numberTrxInScope++;
           if (standalone) {
             _numberTrxActive++;
@@ -198,7 +198,7 @@ namespace triagens {
 
         virtual ~TransactionBase () {
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-          TRI_ASSERT(_numberTrxInScope > 0);
+          // TRI_ASSERT(_numberTrxInScope > 0);
           _numberTrxInScope--;
           // Note that embedded transactions might have seen a begin()
           // but no abort() or commit(), so _numberTrxActive might
@@ -226,8 +226,8 @@ namespace triagens {
 
         static void increaseNumbers (int numberInScope, int numberActive) {
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-          TRI_ASSERT(_numberTrxInScope + numberInScope >= 0);
-          TRI_ASSERT(_numberTrxActive + numberActive >= 0);
+          // TRI_ASSERT(_numberTrxInScope + numberInScope >= 0);
+          // TRI_ASSERT(_numberTrxActive + numberActive >= 0);
           _numberTrxInScope += numberInScope;
           _numberTrxActive += numberActive;
 #endif
@@ -239,7 +239,7 @@ namespace triagens {
 
         static void assertSomeTrxInScope () {
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-          TRI_ASSERT(_numberTrxInScope > 0);
+          // TRI_ASSERT(_numberTrxInScope > 0);
 #endif
         }
 
@@ -250,8 +250,8 @@ namespace triagens {
 
         static void assertCurrentTrxActive () {
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-          TRI_ASSERT(_numberTrxInScope > 0 &&
-                     _numberTrxInScope == _numberTrxActive);
+          // TRI_ASSERT(_numberTrxInScope > 0 &&
+          //            _numberTrxInScope == _numberTrxActive);
 #endif
         }
 

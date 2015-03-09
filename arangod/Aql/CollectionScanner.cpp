@@ -66,15 +66,10 @@ RandomCollectionScanner::RandomCollectionScanner (triagens::arango::AqlTransacti
 
 }
 
-int RandomCollectionScanner::scan (std::vector<TRI_doc_mptr_copy_t>& docs,
+int RandomCollectionScanner::scan (std::vector<TRI_doc_mptr_t*>& docs,
                                    size_t batchSize) {
-  return trx->readRandom(trxCollection,
-                         docs,
-                         initialPosition,
-                         position,
-                         static_cast<TRI_voc_size_t>(batchSize),
-                         &step,
-                         &totalCount);
+  // TODO TODO TODO: re-implement
+  return TRI_ERROR_NO_ERROR;
 }
 
 // -----------------------------------------------------------------------------
@@ -101,15 +96,10 @@ LinearCollectionScanner::LinearCollectionScanner (triagens::arango::AqlTransacti
 
 }
 
-int LinearCollectionScanner::scan (std::vector<TRI_doc_mptr_copy_t>& docs,
+int LinearCollectionScanner::scan (std::vector<TRI_doc_mptr_t*>& docs,
                                    size_t batchSize) {
-  return trx->readIncremental(trxCollection,
-                              docs,
-                              position,
-                              static_cast<TRI_voc_size_t>(batchSize),
-                              0,
-                              TRI_QRY_NO_LIMIT,
-                              &totalCount);
+  // TODO TODO TODO: re-implement
+  return TRI_ERROR_NO_ERROR;
 }
 
 // -----------------------------------------------------------------------------

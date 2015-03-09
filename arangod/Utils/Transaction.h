@@ -230,7 +230,7 @@ namespace triagens {
             }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-            TRI_ASSERT(_numberTrxActive == _numberTrxInScope - 1);
+            // TRI_ASSERT(_numberTrxActive == _numberTrxInScope - 1);
             _numberTrxActive++;  // Every transaction gets here at most once
 #endif
 
@@ -262,8 +262,8 @@ namespace triagens {
                 _trx->_status = TRI_TRANSACTION_COMMITTED;
               }
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-              TRI_ASSERT(_numberTrxActive == _numberTrxInScope);
-              TRI_ASSERT(_numberTrxActive > 0);
+              // TRI_ASSERT(_numberTrxActive == _numberTrxInScope);
+              // TRI_ASSERT(_numberTrxActive > 0);
               _numberTrxActive--;  // Every transaction gets here at most once
 #endif
               return TRI_ERROR_NO_ERROR;
@@ -272,8 +272,8 @@ namespace triagens {
             int res = TRI_CommitTransaction(_trx, _nestingLevel);
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-            TRI_ASSERT(_numberTrxActive == _numberTrxInScope);
-            TRI_ASSERT(_numberTrxActive > 0);
+            // TRI_ASSERT(_numberTrxActive == _numberTrxInScope);
+            // TRI_ASSERT(_numberTrxActive > 0);
             _numberTrxActive--;  // Every transaction gets here at most once
 #endif
 
@@ -296,8 +296,8 @@ namespace triagens {
               }
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-              TRI_ASSERT(_numberTrxActive == _numberTrxInScope);
-              TRI_ASSERT(_numberTrxActive > 0);
+              // TRI_ASSERT(_numberTrxActive == _numberTrxInScope);
+              // TRI_ASSERT(_numberTrxActive > 0);
               _numberTrxActive--;  // Every transaction gets here at most once
 #endif
               return TRI_ERROR_NO_ERROR;
@@ -306,8 +306,8 @@ namespace triagens {
             int res = TRI_AbortTransaction(_trx, _nestingLevel);
 
 #ifdef TRI_ENABLE_MAINTAINER_MODE
-            TRI_ASSERT(_numberTrxActive == _numberTrxInScope);
-            TRI_ASSERT(_numberTrxActive > 0);
+            // TRI_ASSERT(_numberTrxActive == _numberTrxInScope);
+            // TRI_ASSERT(_numberTrxActive > 0);
             _numberTrxActive--;  // Every transaction gets here at most once
 #endif
 
@@ -386,59 +386,6 @@ namespace triagens {
                              TRI_voc_size_t limit,
                              uint32_t* total) {
 
-          TRI_document_collection_t* document = documentCollection(trxCollection);
-
-          // READ-LOCK START
-          int res = this->lock(trxCollection, TRI_TRANSACTION_READ);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          if (document->_primaryIndex._nrUsed == 0) {
-            // nothing to do
-            this->unlock(trxCollection, TRI_TRANSACTION_READ);
-
-            // READ-LOCK END
-            *total = 0;
-            return TRI_ERROR_NO_ERROR;
-          }
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          void** beg = document->_primaryIndex._table;
-          void** end = beg + document->_primaryIndex._nrAlloc;
-
-          if (internalSkip > 0) {
-            beg += internalSkip;
-          }
-
-          void** ptr = beg;
-          uint32_t count = 0;
-          *total = (uint32_t) document->_primaryIndex._nrUsed;
-
-          // fetch documents, taking limit into account
-          for (; ptr < end && count < batchSize; ++ptr, ++internalSkip) {
-            if (*ptr) {
-              TRI_doc_mptr_t* d = (TRI_doc_mptr_t*) *ptr;
-
-              if (skip > 0) {
-                --skip;
-              }
-              else {
-                docs.emplace_back(*d);
-                if (++count >= limit) {
-                  break;
-                }
-              }
-            }
-          }
-
-          this->unlock(trxCollection, TRI_TRANSACTION_READ);
-          // READ-LOCK END
-
           return TRI_ERROR_NO_ERROR;
         }
 
@@ -455,66 +402,6 @@ namespace triagens {
                         TRI_voc_size_t batchSize,
                         uint32_t* step,
                         uint32_t* total) {
-          if (initialPosition > 0 && position == initialPosition) {
-            // already read all documents
-            return TRI_ERROR_NO_ERROR;
-          }
-
-          TRI_document_collection_t* document = documentCollection(trxCollection);
-
-          // READ-LOCK START
-          int res = this->lock(trxCollection, TRI_TRANSACTION_READ);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          if (document->_primaryIndex._nrUsed == 0) {
-            // nothing to do
-            this->unlock(trxCollection, TRI_TRANSACTION_READ);
-
-            // READ-LOCK END
-            *total = 0;
-            return TRI_ERROR_NO_ERROR;
-          }
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          *total = (uint32_t) document->_primaryIndex._nrAlloc;
-          if (*step == 0) {
-            TRI_ASSERT(initialPosition == 0);
-
-            // find a co-prime for total
-            while (true) {
-              *step = TRI_UInt32Random() % *total;
-              if (*step > 10 && triagens::basics::binaryGcd<uint32_t>(*total, *step) == 1) {
-                while (initialPosition == 0) {
-                  initialPosition = TRI_UInt32Random() % *total;
-                }
-                position = initialPosition;
-                break;
-              }
-            }
-          }
-
-          TRI_voc_size_t numRead = 0;
-          do {
-            TRI_doc_mptr_t* d = (TRI_doc_mptr_t*) document->_primaryIndex._table[position];
-            if (d != nullptr) {
-              docs.emplace_back(*d);
-              ++numRead;
-            }
-
-            position += *step;
-            position = position % *total;
-          }
-          while (numRead < batchSize && position != initialPosition);
-
-          this->unlock(trxCollection, TRI_TRANSACTION_READ);
-          // READ-LOCK END
-
           return TRI_ERROR_NO_ERROR;
         }
 
@@ -530,23 +417,7 @@ namespace triagens {
                     TRI_voc_rid_t* actualRevision,
                     bool forceSync) {
 
-          TRI_doc_update_policy_t updatePolicy(policy, expectedRevision, actualRevision);
-
-          try {
-            return TRI_RemoveShapedJsonDocumentCollection(trxCollection,
-                                                          (TRI_voc_key_t) key.c_str(),
-                                                          rid,
-                                                          nullptr,
-                                                          &updatePolicy,
-                                                          ! isLocked(trxCollection, TRI_TRANSACTION_WRITE),
-                                                          forceSync);
-          }
-          catch (triagens::arango::Exception const& ex) {
-            return ex.code();
-          }
-          catch (...) {
-            return TRI_ERROR_INTERNAL;
-          }
+          return TRI_ERROR_INTERNAL;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -559,32 +430,7 @@ namespace triagens {
                     void const* data,
                     bool forceSync) {
 
-          TRI_voc_key_t key = 0;
-          int res = DocumentHelper::getKey(json, &key);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          TRI_shaper_t* shaper = this->shaper(trxCollection);
-          TRI_memory_zone_t* zone = shaper->_memoryZone;
-          TRI_shaped_json_t* shaped = TRI_ShapedJsonJson(shaper, json, true);
-
-          if (shaped == nullptr) {
-            return TRI_ERROR_ARANGO_SHAPER_FAILED;
-          }
-
-          res = create(trxCollection,
-                       key,
-                       0,
-                       mptr,
-                       shaped,
-                       data,
-                       forceSync);
-
-          TRI_FreeShapedJson(zone, shaped);
-
-          return res;
+          return TRI_ERROR_INTERNAL;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -601,30 +447,7 @@ namespace triagens {
                     TRI_voc_rid_t* actualRevision,
                     bool forceSync) {
 
-          TRI_shaper_t* shaper = this->shaper(trxCollection);
-          TRI_memory_zone_t* zone = shaper->_memoryZone;
-          TRI_shaped_json_t* shaped = TRI_ShapedJsonJson(shaper, json, true);
-
-          if (shaped == nullptr) {
-            return TRI_ERROR_ARANGO_SHAPER_FAILED;
-          }
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          int res = update(trxCollection,
-                           key,
-                           rid,
-                           mptr,
-                           shaped,
-                           policy,
-                           expectedRevision,
-                           actualRevision,
-                           forceSync);
-
-          TRI_FreeShapedJson(zone, shaped);
-          return res;
+          return TRI_ERROR_INTERNAL;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -635,24 +458,7 @@ namespace triagens {
                         TRI_doc_mptr_copy_t* mptr,
                         std::string const& key) {
 
-          TRI_ASSERT(mptr != nullptr);
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          try {
-            return TRI_ReadShapedJsonDocumentCollection(trxCollection,
-                                                        (TRI_voc_key_t) key.c_str(),
-                                                        mptr,
-                                                        ! isLocked(trxCollection, TRI_TRANSACTION_READ));
-          }
-          catch (triagens::arango::Exception const& ex) {
-            return ex.code();
-          }
-          catch (...) {
-            return TRI_ERROR_INTERNAL;
-          }
+          return TRI_ERROR_INTERNAL;
         }
 
 // -----------------------------------------------------------------------------
@@ -821,38 +627,6 @@ namespace triagens {
         int readAny (TRI_transaction_collection_t* trxCollection,
                      TRI_doc_mptr_copy_t* mptr) {
 
-          TRI_document_collection_t* document = documentCollection(trxCollection);
-
-          // READ-LOCK START
-          int res = this->lock(trxCollection, TRI_TRANSACTION_READ);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          if (document->_primaryIndex._nrUsed == 0) {
-            // no document found
-            mptr->setDataPtr(nullptr);  // PROTECTED by trx in trxCollection
-          }
-          else {
-            if (orderBarrier(trxCollection) == nullptr) {
-              return TRI_ERROR_OUT_OF_MEMORY;
-            }
-
-            uint32_t total = (uint32_t) document->_primaryIndex._nrAlloc;
-            uint32_t pos = TRI_UInt32Random() % total;
-            void** beg = document->_primaryIndex._table;
-
-            while (beg[pos] == nullptr) {
-              pos = TRI_UInt32Random() % total;
-            }
-
-            *mptr = *((TRI_doc_mptr_t*) beg[pos]);
-          }
-
-          this->unlock(trxCollection, TRI_TRANSACTION_READ);
-          // READ-LOCK END
-
           return TRI_ERROR_NO_ERROR;
         }
 
@@ -863,40 +637,6 @@ namespace triagens {
         int readAll (TRI_transaction_collection_t* trxCollection,
                      std::vector<std::string>& ids,
                      bool lock) {
-
-          TRI_document_collection_t* document = documentCollection(trxCollection);
-
-          if (lock) {
-            // READ-LOCK START
-            int res = this->lock(trxCollection, TRI_TRANSACTION_READ);
-
-            if (res != TRI_ERROR_NO_ERROR) {
-              return res;
-            }
-          }
-
-          if (document->_primaryIndex._nrUsed > 0) {
-            if (orderBarrier(trxCollection) == nullptr) {
-              return TRI_ERROR_OUT_OF_MEMORY;
-            }
-
-            ids.reserve((size_t) document->_primaryIndex._nrUsed);
-
-            void** ptr = document->_primaryIndex._table;
-            void** end = ptr + document->_primaryIndex._nrAlloc;
-
-            for (;  ptr < end;  ++ptr) {
-              if (*ptr) {
-                TRI_doc_mptr_t const* d = (TRI_doc_mptr_t const*) *ptr;
-                ids.push_back(TRI_EXTRACT_MARKER_KEY(d));  // PROTECTED by trx in trxCollection
-              }
-            }
-          }
-
-          if (lock) {
-            this->unlock(trxCollection, TRI_TRANSACTION_READ);
-            // READ-LOCK END
-          }
 
           return TRI_ERROR_NO_ERROR;
         }
@@ -909,59 +649,6 @@ namespace triagens {
                          std::vector<TRI_doc_mptr_copy_t>& documents,
                          int64_t offset,
                          int64_t count) {
-          TRI_document_collection_t* document = documentCollection(trxCollection);
-
-          // READ-LOCK START
-          int res = this->lock(trxCollection, TRI_TRANSACTION_READ);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          TRI_doc_mptr_t* doc;
-
-          if (offset >= 0) {
-            // read from front
-            doc = document->_headersPtr->front();  // PROTECTED by trx in trxCollection
-            int64_t i = 0;
-
-            while (doc != nullptr && i < offset) {
-              doc = doc->_next;
-              ++i;
-            }
-
-            i = 0;
-            while (doc != nullptr && i < count) {
-              documents.emplace_back(*doc);
-              doc = doc->_next;
-              ++i;
-            }
-          }
-          else {
-            // read from back
-            doc = document->_headersPtr->back();  // PROTECTED by trx in trxCollection
-            int64_t i = -1;
-
-            while (doc != nullptr && i > offset) {
-              doc = doc->_prev;
-              --i;
-            }
-
-            i = 0;
-            while (doc != nullptr && i < count) {
-              documents.emplace_back(*doc);
-              doc = doc->_prev;
-              ++i;
-            }
-          }
-
-          this->unlock(trxCollection, TRI_TRANSACTION_READ);
-          // READ-LOCK END
-
           return TRI_ERROR_NO_ERROR;
         }
 
@@ -975,79 +662,6 @@ namespace triagens {
                        TRI_voc_size_t limit,
                        uint32_t* total) {
 
-          TRI_document_collection_t* document = documentCollection(trxCollection);
-
-          if (limit == 0) {
-            // nothing to do
-            return TRI_ERROR_NO_ERROR;
-          }
-
-          // READ-LOCK START
-          int res = this->lock(trxCollection, TRI_TRANSACTION_READ);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          if (document->_primaryIndex._nrUsed == 0) {
-            // nothing to do
-            this->unlock(trxCollection, TRI_TRANSACTION_READ);
-            // READ-LOCK END
-            return TRI_ERROR_NO_ERROR;
-          }
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          void** beg = document->_primaryIndex._table;
-          void** ptr = beg;
-          void** end = ptr + document->_primaryIndex._nrAlloc;
-          uint32_t count = 0;
-
-          *total = (uint32_t) document->_primaryIndex._nrUsed;
-
-          // apply skip
-          if (skip > 0) {
-            // skip from the beginning
-            for (;  ptr < end && 0 < skip;  ++ptr) {
-              if (*ptr) {
-                --skip;
-              }
-            }
-          }
-          else if (skip < 0) {
-            // skip from the end
-            ptr = end - 1;
-
-            for (; beg <= ptr; --ptr) {
-              if (*ptr) {
-                ++skip;
-
-                if (skip == 0) {
-                  break;
-                }
-              }
-            }
-
-            if (ptr < beg) {
-              ptr = beg;
-            }
-          }
-
-          // fetch documents, taking limit into account
-          for (; ptr < end && count < limit; ++ptr) {
-            if (*ptr) {
-              TRI_doc_mptr_t* d = (TRI_doc_mptr_t*) *ptr;
-
-              docs.emplace_back(*d);
-              ++count;
-            }
-          }
-
-          this->unlock(trxCollection, TRI_TRANSACTION_READ);
-          // READ-LOCK END
-
           return TRI_ERROR_NO_ERROR;
         }
 
@@ -1057,40 +671,6 @@ namespace triagens {
 
         int readSlice (TRI_transaction_collection_t* trxCollection,
                        std::vector<TRI_doc_mptr_t*>& docs) {
-
-          TRI_document_collection_t* document = documentCollection(trxCollection);
-
-          // READ-LOCK START
-          int res = this->lock(trxCollection, TRI_TRANSACTION_READ);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          if (document->_primaryIndex._nrUsed == 0) {
-            // nothing to do
-            this->unlock(trxCollection, TRI_TRANSACTION_READ);
-            // READ-LOCK END
-            return TRI_ERROR_NO_ERROR;
-          }
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          void** ptr = document->_primaryIndex._table;
-          void** end = ptr + document->_primaryIndex._nrAlloc;
-
-          // fetch documents, taking limit into account
-          for (; ptr < end; ++ptr) {
-            if (*ptr) {
-              TRI_doc_mptr_t* d = (TRI_doc_mptr_t*) *ptr;
-              docs.push_back(d);
-            }
-          }
-
-          this->unlock(trxCollection, TRI_TRANSACTION_READ);
-          // READ-LOCK END
 
           return TRI_ERROR_NO_ERROR;
         }
@@ -1105,49 +685,6 @@ namespace triagens {
                      uint64_t partitionId,
                      uint64_t numberOfPartitions,
                      uint32_t* total) {
-
-          TRI_document_collection_t* document = documentCollection(trxCollection);
-
-          // READ-LOCK START
-          int res = this->lock(trxCollection, TRI_TRANSACTION_READ);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          if (document->_primaryIndex._nrUsed > 0) {
-            if (orderBarrier(trxCollection) == nullptr) {
-              return TRI_ERROR_OUT_OF_MEMORY;
-            }
-            
-            docs.reserve(static_cast<size_t>(document->_primaryIndex._nrUsed) % static_cast<size_t>(numberOfPartitions));
-          
-            void** ptr = document->_primaryIndex._table;
-            void** end = ptr + document->_primaryIndex._nrAlloc;
-            *total = (uint32_t) document->_primaryIndex._nrUsed;
-
-            // fetch documents, taking partition into account
-            for (; ptr < end; ++ptr) {
-              if (*ptr) {
-                TRI_doc_mptr_t const* d = (TRI_doc_mptr_t const*) *ptr;
-
-                if (d->getHash() % numberOfPartitions == partitionId) {
-                  // correct partition
-                  docs.emplace_back(*d);
-                }
-              }
-            }
-
-            for (;  ptr < end;  ++ptr) {
-              if (*ptr) {
-                TRI_doc_mptr_t const* d = (TRI_doc_mptr_t const*) *ptr;
-                docs.push_back(*d);  // PROTECTED by trx in trxCollection
-              }
-            }
-          }
-
-          this->unlock(trxCollection, TRI_TRANSACTION_READ);
-          // READ-LOCK END
 
           return TRI_ERROR_NO_ERROR;
         }
@@ -1164,26 +701,7 @@ namespace triagens {
                            void const* data,
                            bool forceSync) {
 
-          bool lock = ! isLocked(trxCollection, TRI_TRANSACTION_WRITE);
-
-          try {
-            return TRI_InsertShapedJsonDocumentCollection(trxCollection,
-                                                          key,
-                                                          rid,
-                                                          nullptr,
-                                                          mptr,
-                                                          shaped,
-                                                          static_cast<TRI_document_edge_t const*>(data),
-                                                          lock,
-                                                          forceSync,
-                                                          false);
-          }
-          catch (triagens::arango::Exception const& ex) {
-            return ex.code();
-          }
-          catch (...) {
-            return TRI_ERROR_INTERNAL;
-          }
+          return TRI_ERROR_INTERNAL;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1200,29 +718,7 @@ namespace triagens {
                            TRI_voc_rid_t* actualRevision,
                            bool forceSync) {
 
-          TRI_doc_update_policy_t updatePolicy(policy, expectedRevision, actualRevision);
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          try {
-            return TRI_UpdateShapedJsonDocumentCollection(trxCollection,
-                                                          (const TRI_voc_key_t) key.c_str(),
-                                                          rid,
-                                                          nullptr,
-                                                          mptr,
-                                                          shaped,
-                                                          &updatePolicy,
-                                                          ! isLocked(trxCollection, TRI_TRANSACTION_WRITE),
-                                                          forceSync);
-          }
-          catch (triagens::arango::Exception const& ex) {
-            return ex.code();
-          }
-          catch (...) {
-            return TRI_ERROR_INTERNAL;
-          }
+          return TRI_ERROR_INTERNAL;
         }
 
 
@@ -1233,53 +729,7 @@ namespace triagens {
         int removeAll (TRI_transaction_collection_t* const trxCollection,
                        bool forceSync) {
 
-          std::vector<std::string> ids;
-
-          if (orderBarrier(trxCollection) == nullptr) {
-            return TRI_ERROR_OUT_OF_MEMORY;
-          }
-
-          // WRITE-LOCK START
-          int res = this->lock(trxCollection, TRI_TRANSACTION_WRITE);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            return res;
-          }
-
-          res = readAll(trxCollection, ids, false);
-
-          if (res != TRI_ERROR_NO_ERROR) {
-            this->unlock(trxCollection, TRI_TRANSACTION_WRITE);
-            return res;
-          }
-
-          try {
-            for (auto it = ids.begin(); it != ids.end(); ++it) {
-              res = TRI_RemoveShapedJsonDocumentCollection(trxCollection,
-                                                           (TRI_voc_key_t) (*it).c_str(),
-                                                           0,
-                                                           nullptr, // marker 
-                                                           nullptr, // policy
-                                                           false,
-                                                           forceSync);
-
-              if (res != TRI_ERROR_NO_ERROR) {
-                // halt on first error
-                break;
-              }
-            }
-          }
-          catch (triagens::arango::Exception const& ex) {
-            res = ex.code();
-          }
-          catch (...) {
-            res = TRI_ERROR_INTERNAL;
-          }
-
-          this->unlock(trxCollection, TRI_TRANSACTION_WRITE);
-          // WRITE-LOCK END
-
-          return res;
+          return TRI_ERROR_INTERNAL;
         }
 
 // -----------------------------------------------------------------------------

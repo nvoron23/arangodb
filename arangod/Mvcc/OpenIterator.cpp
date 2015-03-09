@@ -55,15 +55,22 @@ OpenIteratorState::OpenIteratorState (TRI_document_collection_t* collection)
     documentCount(0),
     documentSize(0),
     dfi(nullptr),
-    primaryIndex(nullptr) {
+    primaryIndex(nullptr),
+    insertions(0),
+    deletions(0) {
 
-  auto index = collection->lookupIndex(TRI_IDX_TYPE_PRIMARY_INDEX);
+  auto index = collection->primaryIndex();
 
   if (index == nullptr) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "no primary index found for collection");
   }
 
   primaryIndex = static_cast<triagens::mvcc::PrimaryIndex*>(index);
+
+  if (collection->_info._initialCount != -1) {
+    // give the index an appropriate initial size so we can avoid resizes during insert
+    primaryIndex->resize(static_cast<uint32_t>(collection->_info._initialCount * 1.1)); 
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -92,6 +99,7 @@ TRI_doc_mptr_t* OpenIteratorState::lookupDocument (char const* key) {
 ////////////////////////////////////////////////////////////////////////////////
     
 void OpenIteratorState::insertDocument (TRI_df_marker_t const* marker) {
+  ++insertions;
   auto transactionId = triagens::mvcc::TransactionId();
 
   MasterpointerContainer mptr = collection->masterpointerManager()->create(marker, transactionId);
@@ -110,6 +118,8 @@ void OpenIteratorState::insertDocument (TRI_df_marker_t const* marker) {
 ////////////////////////////////////////////////////////////////////////////////
     
 TRI_doc_mptr_t* OpenIteratorState::removeDocument (char const* key) {
+  ++deletions;
+
   auto found = primaryIndex->remove(std::string(key));
 
   if (found != nullptr) {

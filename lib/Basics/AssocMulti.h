@@ -574,16 +574,17 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         int resize (IndexType size) throw() {
-          if (2*size+1 < _nrUsed) {
+          if (2 * size + 1 < _nrUsed) {
             return TRI_ERROR_BAD_PARAMETER;
           }
 
           try {
-            resizeInternal(2*size+1);
+            resizeInternal(2 * size + 1);
           }
           catch (...) {
             return TRI_ERROR_OUT_OF_MEMORY;
           }
+
           return TRI_ERROR_NO_ERROR;
         }
 

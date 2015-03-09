@@ -377,7 +377,7 @@ static int EnhanceIndexJson (const v8::FunctionCallbackInfo<v8::Value>& args,
   v8::Handle<v8::Object> obj = args[0].As<v8::Object>();
 
   // extract index type
-  TRI_idx_type_e type = TRI_IDX_TYPE_UNKNOWN;
+  triagens::mvcc::Index::IndexType type = triagens::mvcc::Index::TRI_IDX_TYPE_UNKNOWN;
 
   if (obj->Has(TRI_V8_ASCII_STRING("type")) && obj->Get(TRI_V8_ASCII_STRING("type"))->IsString()) {
     TRI_Utf8ValueNFC typeString(TRI_UNKNOWN_MEM_ZONE, obj->Get(TRI_V8_ASCII_STRING("type")));
@@ -402,13 +402,13 @@ static int EnhanceIndexJson (const v8::FunctionCallbackInfo<v8::Value>& args,
     type = triagens::mvcc::Index::type(t.c_str());
   }
 
-  if (type == TRI_IDX_TYPE_UNKNOWN) {
+  if (type == triagens::mvcc::Index::TRI_IDX_TYPE_UNKNOWN) {
     return TRI_ERROR_BAD_PARAMETER;
   }
 
   if (create) {
-    if (type == TRI_IDX_TYPE_PRIMARY_INDEX ||
-        type == TRI_IDX_TYPE_EDGE_INDEX) {
+    if (type == triagens::mvcc::Index::TRI_IDX_TYPE_PRIMARY_INDEX ||
+        type == triagens::mvcc::Index::TRI_IDX_TYPE_EDGE_INDEX) {
       // creating these indexes yourself is forbidden
       return TRI_ERROR_FORBIDDEN;
     }
@@ -439,34 +439,34 @@ static int EnhanceIndexJson (const v8::FunctionCallbackInfo<v8::Value>& args,
   int res = TRI_ERROR_INTERNAL;
 
   switch (type) {
-    case TRI_IDX_TYPE_UNKNOWN:
-    case TRI_IDX_TYPE_PRIORITY_QUEUE_INDEX: {
+    case triagens::mvcc::Index::TRI_IDX_TYPE_UNKNOWN:
+    case triagens::mvcc::Index::TRI_IDX_TYPE_PRIORITY_QUEUE_INDEX: {
       res = TRI_ERROR_BAD_PARAMETER;
       break;
     }
 
-    case TRI_IDX_TYPE_PRIMARY_INDEX:
-    case TRI_IDX_TYPE_EDGE_INDEX: 
-    case TRI_IDX_TYPE_BITARRAY_INDEX: {
+    case triagens::mvcc::Index::TRI_IDX_TYPE_PRIMARY_INDEX:
+    case triagens::mvcc::Index::TRI_IDX_TYPE_EDGE_INDEX: 
+    case triagens::mvcc::Index::TRI_IDX_TYPE_BITARRAY_INDEX: {
       break;
     }
 
-    case TRI_IDX_TYPE_GEO1_INDEX:
+    case triagens::mvcc::Index::TRI_IDX_TYPE_GEO1_INDEX:
       res = EnhanceJsonIndexGeo1(isolate, obj, json, create);
       break;
-    case TRI_IDX_TYPE_GEO2_INDEX:
+    case triagens::mvcc::Index::TRI_IDX_TYPE_GEO2_INDEX:
       res = EnhanceJsonIndexGeo2(isolate, obj, json, create);
       break;
-    case TRI_IDX_TYPE_HASH_INDEX:
+    case triagens::mvcc::Index::TRI_IDX_TYPE_HASH_INDEX:
       res = EnhanceJsonIndexHash(isolate, obj, json, create);
       break;
-    case TRI_IDX_TYPE_SKIPLIST_INDEX:
+    case triagens::mvcc::Index::TRI_IDX_TYPE_SKIPLIST_INDEX:
       res = EnhanceJsonIndexSkiplist(isolate, obj, json, create);
       break;
-    case TRI_IDX_TYPE_FULLTEXT_INDEX:
+    case triagens::mvcc::Index::TRI_IDX_TYPE_FULLTEXT_INDEX:
       res = EnhanceJsonIndexFulltext(isolate, obj, json, create);
       break;
-    case TRI_IDX_TYPE_CAP_CONSTRAINT:
+    case triagens::mvcc::Index::TRI_IDX_TYPE_CAP_CONSTRAINT:
       res = EnhanceJsonIndexCap(isolate, obj, json);
       break;
   }
@@ -499,7 +499,7 @@ static void EnsureIndexCoordinator (const v8::FunctionCallbackInfo<v8::Value>& a
                                                             cid,
                                                             json,
                                                             create,
-                                                            &IndexComparator,
+                                                            &triagens::mvcc::Index::IndexComparator,
                                                             resultJson,
                                                             errorMsg,
                                                             360.0);
@@ -543,7 +543,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     TRI_V8_THROW_EXCEPTION_MEMORY();
   }
 
-  TRI_idx_type_e type = triagens::mvcc::Index::type(value->_value._string.data);
+  triagens::mvcc::Index::IndexType type = triagens::mvcc::Index::type(value->_value._string.data);
 
   // extract unique flag
   bool unique = false;
@@ -607,16 +607,16 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
     triagens::mvcc::IndexesWriteLocker indexesWriteLocker(transactionCollection);
 
     switch (type) {
-      case TRI_IDX_TYPE_UNKNOWN:
-      case TRI_IDX_TYPE_PRIMARY_INDEX:
-      case TRI_IDX_TYPE_EDGE_INDEX:
-      case TRI_IDX_TYPE_PRIORITY_QUEUE_INDEX: 
-      case TRI_IDX_TYPE_BITARRAY_INDEX: {
+      case triagens::mvcc::Index::TRI_IDX_TYPE_UNKNOWN:
+      case triagens::mvcc::Index::TRI_IDX_TYPE_PRIMARY_INDEX:
+      case triagens::mvcc::Index::TRI_IDX_TYPE_EDGE_INDEX:
+      case triagens::mvcc::Index::TRI_IDX_TYPE_PRIORITY_QUEUE_INDEX: 
+      case triagens::mvcc::Index::TRI_IDX_TYPE_BITARRAY_INDEX: {
         // these indexes cannot be created directly
         TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
       }
 
-      case TRI_IDX_TYPE_GEO1_INDEX: {
+      case triagens::mvcc::Index::TRI_IDX_TYPE_GEO1_INDEX: {
         if (attributes.size() != 1) {
           TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
         }
@@ -642,7 +642,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
         break;
       }
 
-      case TRI_IDX_TYPE_GEO2_INDEX: {
+      case triagens::mvcc::Index::TRI_IDX_TYPE_GEO2_INDEX: {
         if (attributes.size() != 2) {
           TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
         }
@@ -662,7 +662,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
         break;
       }
 
-      case TRI_IDX_TYPE_HASH_INDEX: {
+      case triagens::mvcc::Index::TRI_IDX_TYPE_HASH_INDEX: {
         if (attributes.empty()) {
           TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
         }
@@ -685,7 +685,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
         break;
       }
 
-      case TRI_IDX_TYPE_SKIPLIST_INDEX: {
+      case triagens::mvcc::Index::TRI_IDX_TYPE_SKIPLIST_INDEX: {
         if (attributes.empty()) {
           TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
         }
@@ -707,7 +707,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
         break;
       }
 
-      case TRI_IDX_TYPE_FULLTEXT_INDEX: {
+      case triagens::mvcc::Index::TRI_IDX_TYPE_FULLTEXT_INDEX: {
         if (attributes.size() != 1) {
           TRI_V8_THROW_EXCEPTION(TRI_ERROR_INTERNAL);
         }
@@ -738,7 +738,7 @@ static void EnsureIndexLocal (const v8::FunctionCallbackInfo<v8::Value>& args,
         break;
       }
 
-      case TRI_IDX_TYPE_CAP_CONSTRAINT: {
+      case triagens::mvcc::Index::TRI_IDX_TYPE_CAP_CONSTRAINT: {
         size_t size = 0;
         TRI_json_t const* value = TRI_LookupObjectJson(json, "size");
 
@@ -1285,8 +1285,8 @@ static void JS_DropIndex (const v8::FunctionCallbackInfo<v8::Value>& args) {
         THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_INDEX_NOT_FOUND);
       }
   
-      if (index->type() == TRI_IDX_TYPE_PRIMARY_INDEX ||
-          index->type() == TRI_IDX_TYPE_EDGE_INDEX) {
+      if (index->type() == triagens::mvcc::Index::TRI_IDX_TYPE_PRIMARY_INDEX ||
+          index->type() == triagens::mvcc::Index::TRI_IDX_TYPE_EDGE_INDEX) {
         TRI_V8_THROW_EXCEPTION(TRI_ERROR_FORBIDDEN);
       }
 

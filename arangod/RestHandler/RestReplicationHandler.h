@@ -45,6 +45,12 @@ struct TRI_vocbase_col_s;
 // -----------------------------------------------------------------------------
 
 namespace triagens {
+
+  namespace mvcc {
+    class Transaction;
+    class TransactionCollection;
+  }
+
   namespace arango {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -230,8 +236,8 @@ namespace triagens {
 /// @brief apply a single marker from the collection dump
 ////////////////////////////////////////////////////////////////////////////////
 
-        int applyCollectionDumpMarker (CollectionNameResolver const&,
-                                       struct TRI_transaction_collection_s*,
+        int applyCollectionDumpMarker (triagens::mvcc::Transaction*,
+                                       triagens::mvcc::TransactionCollection*,
                                        TRI_replication_operation_e,
                                        const TRI_voc_key_t,
                                        const TRI_voc_rid_t,
@@ -242,8 +248,8 @@ namespace triagens {
 /// @brief restores the data of a collection TODO MOVE
 ////////////////////////////////////////////////////////////////////////////////
 
-        int processRestoreDataBatch (CollectionNameResolver const&,
-                                     struct TRI_transaction_collection_s*,
+        int processRestoreDataBatch (triagens::mvcc::Transaction*,
+                                     triagens::mvcc::TransactionCollection*,
                                      bool,
                                      bool,
                                      std::string&);
@@ -252,8 +258,7 @@ namespace triagens {
 /// @brief restores the data of a collection TODO
 ////////////////////////////////////////////////////////////////////////////////
 
-        int processRestoreData (CollectionNameResolver const&,
-                                TRI_voc_cid_t,
+        int processRestoreData (TRI_voc_cid_t,
                                 bool,
                                 bool,
                                 std::string&);

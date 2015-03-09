@@ -32,7 +32,6 @@
 #include "Mvcc/MasterpointerManager.h"
 #include "Mvcc/TransactionCollection.h"
 #include "Utils/Exception.h"
-#include "Utils/transactions.h"
 #include "VocBase/datafile.h"
 #include "VocBase/document-collection.h"
 

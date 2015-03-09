@@ -32,13 +32,10 @@
 #define ARANGODB_VOC_BASE_DOCUMENT__COLLECTION_H 1
 
 #include "Basics/Common.h"
-
+#include "Mvcc/Index.h"
 #include "Mvcc/TransactionId.h"
 #include "VocBase/barrier.h"
 #include "VocBase/collection.h"
-#include "VocBase/headers.h"
-#include "VocBase/index.h"
-#include "VocBase/primary-index.h"
 #include "VocBase/transaction.h"
 #include "VocBase/update-policy.h"
 #include "VocBase/voc-types.h"
@@ -59,7 +56,7 @@ class KeyGenerator;
 
 namespace triagens {
   namespace mvcc {
-    class Index;
+    class PrimaryIndex;
     class MasterpointerManager;
   }
 }
@@ -476,8 +473,7 @@ TRI_doc_collection_info_t;
 
 struct TRI_document_collection_t : public TRI_collection_t {
   // ...........................................................................
-  // this lock protects the _primaryIndex plus the _allIndexes
-  // and _headers attributes in derived types
+  // this lock protects the primary index plus headers 
   // ...........................................................................
 
   TRI_read_write_lock_t        _lock;
@@ -508,18 +504,22 @@ public:
   int64_t                             _documentSize;
   TRI_voc_rid_t                       _revisionId;
  
+  std::string buildIndexFilename (TRI_idx_iid_t) const;
   void shutdownIndexes ();
   triagens::mvcc::Index* addIndex (triagens::mvcc::Index*);
   std::vector<triagens::mvcc::Index*> indexes () const;
   triagens::mvcc::Index* lookupIndex (TRI_idx_iid_t);
-  triagens::mvcc::Index* lookupIndex (TRI_idx_type_e);
+  triagens::mvcc::Index* lookupIndex (triagens::mvcc::Index::IndexType);
   bool unlinkIndex (triagens::mvcc::Index*);
   bool dropIndex (triagens::mvcc::Index*, bool);
   void indexStats (int64_t&, TRI_voc_ssize_t&);
-  void readLockIndexes();
-  void readUnlockIndexes();
-  void writeLockIndexes();
-  void writeUnlockIndexes();
+  void readLockIndexes ();
+  void readUnlockIndexes ();
+  void writeLockIndexes ();
+  void writeUnlockIndexes ();
+  triagens::mvcc::PrimaryIndex* primaryIndex ();
+  int removeIndexFile (TRI_idx_iid_t);
+  int saveIndexFile (triagens::mvcc::Index const*, bool);
   int64_t documentCount ();
   void updateDocumentCount (int64_t);
   int64_t documentSize ();
@@ -530,7 +530,8 @@ public:
   triagens::mvcc::MasterpointerManager* masterpointerManager () const;
   void fillIndex (triagens::mvcc::Index*);
   triagens::mvcc::MasterpointerManager* _masterpointerManager;
-  
+  triagens::mvcc::PrimaryIndex* _primaryIndex;
+
   inline bool useSecondaryIndexes () const {
     return _useSecondaryIndexes;
   }
@@ -546,8 +547,6 @@ public:
   mutable TRI_barrier_list_t   _barrierList;
   TRI_associative_pointer_t    _datafileInfo;
 
-  TRI_primary_index_t          _primaryIndex;
-  TRI_headers_t*               _headersPtr;
   KeyGenerator*                _keyGenerator;
 
   int64_t                      _uncollectedLogfileEntries;
@@ -947,15 +946,6 @@ int TRI_FromJsonIndexDocumentCollection (TRI_document_collection_t*,
                                          triagens::mvcc::Index*&);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief rolls back a document operation
-////////////////////////////////////////////////////////////////////////////////
-
-int TRI_RollbackOperationDocumentCollection (TRI_document_collection_t*,
-                                             TRI_voc_document_operation_e,
-                                             TRI_doc_mptr_t*,
-                                             TRI_doc_mptr_copy_t const*);
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief creates a new journal
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1170,61 +1160,6 @@ triagens::mvcc::Index* TRI_EnsureFulltextIndexDocumentCollection (TRI_document_c
 ////////////////////////////////////////////////////////////////////////////////
 
 int TRI_RotateJournalDocumentCollection (TRI_document_collection_t*);
-
-// -----------------------------------------------------------------------------
-// --SECTION--                                                      CRUD methods
-// -----------------------------------------------------------------------------
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief reads an element from the document collection
-////////////////////////////////////////////////////////////////////////////////
-
-int TRI_ReadShapedJsonDocumentCollection (TRI_transaction_collection_t*,
-                                          const TRI_voc_key_t,
-                                          TRI_doc_mptr_copy_t*,
-                                          bool);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief removes a shaped-json document (or edge)
-////////////////////////////////////////////////////////////////////////////////
-
-int TRI_RemoveShapedJsonDocumentCollection (TRI_transaction_collection_t*,
-                                            const TRI_voc_key_t,
-                                            TRI_voc_rid_t,
-                                            triagens::wal::Marker*,
-                                            TRI_doc_update_policy_t const*,
-                                            bool,
-                                            bool);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief insert a shaped-json document (or edge)
-/// note: key might be NULL. in this case, a key is auto-generated
-////////////////////////////////////////////////////////////////////////////////
-
-int TRI_InsertShapedJsonDocumentCollection (TRI_transaction_collection_t*,
-                                            const TRI_voc_key_t,
-                                            TRI_voc_rid_t,
-                                            triagens::wal::Marker*,
-                                            TRI_doc_mptr_copy_t*,
-                                            TRI_shaped_json_t const*,
-                                            TRI_document_edge_t const*,
-                                            bool,
-                                            bool,
-                                            bool);
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief updates a document in the collection from shaped json
-////////////////////////////////////////////////////////////////////////////////
-
-int TRI_UpdateShapedJsonDocumentCollection (TRI_transaction_collection_t*,
-                                            const TRI_voc_key_t,
-                                            TRI_voc_rid_t,
-                                            triagens::wal::Marker*,
-                                            TRI_doc_mptr_copy_t*,
-                                            TRI_shaped_json_t const*,
-                                            TRI_doc_update_policy_t const*,
-                                            bool,
-                                            bool);
 
 #endif
 

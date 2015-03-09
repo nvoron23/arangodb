@@ -2041,7 +2041,7 @@ class FilterToEnumCollFinder : public WalkerWorker<ExecutionNode> {
                     auto const idx = idxs.at(i);
                     TRI_ASSERT(idx != nullptr);
 
-                    if (idx->type == TRI_IDX_TYPE_PRIMARY_INDEX) {
+                    if (idx->type == triagens::mvcc::Index::TRI_IDX_TYPE_PRIMARY_INDEX) {
                       for (size_t k = 0; k < validPos.size(); k++) {
                         bool handled = false;
 
@@ -2072,7 +2072,7 @@ class FilterToEnumCollFinder : public WalkerWorker<ExecutionNode> {
                         }
                       }
                     }
-                    else if (idx->type == TRI_IDX_TYPE_EDGE_INDEX) {
+                    else if (idx->type == triagens::mvcc::Index::TRI_IDX_TYPE_EDGE_INDEX) {
                       for (size_t k = 0; k < validPos.size(); k++) {
                         bool handled = false;
 
@@ -2103,7 +2103,7 @@ class FilterToEnumCollFinder : public WalkerWorker<ExecutionNode> {
                         }
                       }
                     }
-                    else if (idx->type == TRI_IDX_TYPE_HASH_INDEX) {
+                    else if (idx->type == triagens::mvcc::Index::TRI_IDX_TYPE_HASH_INDEX) {
                       // each valid orCondition should match every field of the given index
                       for (size_t k = 0; k < validPos.size() && ! indexOrCondition.empty(); k++) {
                         auto const map = _rangeInfoMapVec->find(var->name, validPos[k]);
@@ -2149,7 +2149,7 @@ class FilterToEnumCollFinder : public WalkerWorker<ExecutionNode> {
                         }
                       }
                     }
-                    else if (idx->type == TRI_IDX_TYPE_SKIPLIST_INDEX) {
+                    else if (idx->type == triagens::mvcc::Index::TRI_IDX_TYPE_SKIPLIST_INDEX) {
                       for (size_t k = 0; k < validPos.size(); k++) {
                         auto const map = _rangeInfoMapVec->find(var->name, validPos[k]);
 
@@ -2340,7 +2340,7 @@ int triagens::aql::useIndexRangeRule (Optimizer* opt,
           // If in doubt, take a skiplist index:
           for (size_t k = 0; k < v.size(); k++) {
             auto n = static_cast<IndexRangeNode*>(v[k]);
-            if (n->getIndex()->type == TRI_IDX_TYPE_SKIPLIST_INDEX) {
+            if (n->getIndex()->type == triagens::mvcc::Index::TRI_IDX_TYPE_SKIPLIST_INDEX) {
               choice = k;
               break;
             }
