@@ -12,20 +12,17 @@ ArangoDB is a multi-model, open-source database with flexible data models for do
 
 ArangoDB is Polyglot Persistence done right. The supported data models could be used combined and allow ArangoDB to be the aggregation point for your data request in mind.
 
-To get started, try one of our 10 Minutes [Tutorials](https://www.arangodb.com/tutorials) in your favourite programming language.
+To get started, try one of our 10 Minutes [Tutorials](https://www.arangodb.com/tutorials) in your favourite programming language or try one of our [ArangoDB Cookbook recipes](https://docs.arangodb.com/cookbook).
 
 Key Features in ArangoDB
 ------------------------
 **Multi-Model**
-
 Documents, graphs and key-value pairs — model your data as you see fit for your application.
 
 **Joins**
-
 Conveniently join what belongs together for flexible ad-hoc querying, less data redundancy.
 
 **Transactions**
-
 Easy application development keeping your data consistent and safe. No hassle in your client.
 
 Here is an AQL query that makes use of all those features:
@@ -33,12 +30,12 @@ Here is an AQL query that makes use of all those features:
 
 Joins and Transactions are key features for flexible, secure data designs, widely used in RDBMSs that you won’t want to miss in NoSQL products. You decide how and when to use Joins and strong consistency guarantees, keeping all the power for scaling and performance as choice. 
 
-ArangoDB offers a microservice framework to build your own Rest API with a few lines of code.
+Furthermore, ArangoDB offers a microservice framework called [Foxx](https://www.arangodb.com/foxx) to build your own Rest API with a few lines of code.
 
 Microservice Example
 ![Microservice Example](https://www.arangodb.com/wp-content/uploads/2015/03/microservice.png)
 
-Next step, bundle your application as a docker container and get it running in the cloud with ease.
+Next step, bundle your Foxx application as a [docker container](https://docs.arangodb.com/cookbook/UsingArangoDBNodeJSDocker.html) and get it running in the cloud.
 
 
 
