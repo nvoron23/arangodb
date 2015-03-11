@@ -14,6 +14,8 @@ ArangoDB is Polyglot Persistence done right. The supported data models could be 
 
 To get started, try one of our 10 Minutes [Tutorials](https://www.arangodb.com/tutorials) in your favourite programming language or try one of our [ArangoDB Cookbook recipes](https://docs.arangodb.com/cookbook).
 
+For the impatient: [download](https://www.arangodb.com/download) and install ArangoDB. Start the server `arangod` and point your browser to `http://127.0.0.1:8529/`.
+
 Key Features in ArangoDB
 ------------------------
 **Multi-Model**
@@ -80,42 +82,6 @@ Installing an app is now as easy as it should be:
 * uninstall: shut it down and erase it from disk
 
 Developers can enable the new *development mode* for a single app. This deactivates caching and provides fine-graded debugging information.
-
-
-For the Impatient
------------------
-
-For Mac OSX users: execute
-
-    brew install arangodb
-
-For Windows and Linux users: use the installer script or distribution package
-from our [download page](http://www.arangodb.com/download).
-
-If the package manager has not already started the ArangoDB server, use the 
-following command to start it.
-
-    unix> /path/to/sbin/arangod
-    2012-03-30T12:54:19Z [11794] INFO ArangoDB (version 2.x.y) is ready for business
-    2012-03-30T12:54:19Z [11794] INFO Have Fun!
-
-`/path/to/sbin` is OS dependent. It will normally be either `/usr/sbin` or `/user/local/sbin`. 
-
-To access ArangoDB in your browser, open the following URL
-
-    http://localhost:8529/
-
-and select `Tools / JS Shell`. You can now use the Arango shell from within your browser. 
-
-Alternatively, a scriptable shell is available as a command-line tool _arangosh_.
-
-    arangosh> db._create("hello");
-    arangosh> db.hello.save({ world: "earth" });
-
-Congratulations! You have created your first collection named `hello` and your first document. 
-To verify your achievements, type:
-
-    arangosh> db.hello.toArray();
 
 
 More Information
