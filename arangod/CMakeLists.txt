@@ -52,6 +52,7 @@ add_executable(
     Aql/BindParameters.cpp
     Aql/Collection.cpp
     Aql/CollectionScanner.cpp
+    Aql/Condition.cpp
     Aql/ExecutionBlock.cpp
     Aql/ExecutionEngine.cpp
     Aql/ExecutionNode.cpp

@@ -147,8 +147,8 @@ std::unordered_map<int, std::string const> const AstNode::TypeNames{
   { static_cast<int>(NODE_TYPE_COLLECT_EXPRESSION),       "collect expression" },
   { static_cast<int>(NODE_TYPE_CALCULATED_OBJECT_ELEMENT),"calculated object element" },
   { static_cast<int>(NODE_TYPE_EXAMPLE),                  "example" },
-  { static_cast<int>(NODE_TYPE_CONDITION_AND),            "condition and" },
-  { static_cast<int>(NODE_TYPE_CONDITION_OR),             "condition or" }
+  { static_cast<int>(NODE_TYPE_OPERATOR_NARY_AND),        "n-ary and" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_NARY_OR),         "n-ary or" }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -564,8 +564,8 @@ AstNode::AstNode (Ast* ast,
     case NODE_TYPE_NOP:
     case NODE_TYPE_CALCULATED_OBJECT_ELEMENT:
     case NODE_TYPE_EXAMPLE:
-    case NODE_TYPE_CONDITION_AND:
-    case NODE_TYPE_CONDITION_OR:
+    case NODE_TYPE_OPERATOR_NARY_AND:
+    case NODE_TYPE_OPERATOR_NARY_OR:
       break;
   }
 

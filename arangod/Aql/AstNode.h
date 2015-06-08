@@ -172,8 +172,8 @@ namespace triagens {
       NODE_TYPE_CALCULATED_OBJECT_ELEMENT     = 53,
       NODE_TYPE_UPSERT                        = 54,
       NODE_TYPE_EXAMPLE                       = 55,
-      NODE_TYPE_CONDITION_AND                 = 56,
-      NODE_TYPE_CONDITION_OR                  = 57
+      NODE_TYPE_OPERATOR_NARY_AND             = 56,
+      NODE_TYPE_OPERATOR_NARY_OR              = 57
     };
 
     static_assert(NODE_TYPE_VALUE < NODE_TYPE_ARRAY, "incorrect node types");
@@ -308,7 +308,7 @@ namespace triagens {
                             bool) const;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief adds a JSON representation of the node to the JSON list specified
+/// @brief adds a JSON representation of the node to the JSON array specified
 /// in the first argument
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -569,6 +569,17 @@ namespace triagens {
 
         inline AstNode* getMemberUnchecked (size_t i) const throw() {
           return static_cast<AstNode*>(members._buffer[i]);
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief reduces the number of members of the node
+////////////////////////////////////////////////////////////////////////////////
+
+        void reduceMembers (size_t i) {
+          if (i > members._length) {
+            THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "member out of range");
+          }
+          members._length = i;
         }
 
 ////////////////////////////////////////////////////////////////////////////////

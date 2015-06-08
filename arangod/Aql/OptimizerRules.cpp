@@ -27,6 +27,7 @@
 
 #include "Aql/OptimizerRules.h"
 #include "Aql/AggregationOptions.h"
+#include "Aql/Condition.h"
 #include "Aql/ExecutionEngine.h"
 #include "Aql/ExecutionNode.h"
 #include "Aql/Function.h"
@@ -2025,20 +2026,14 @@ static RangeInfoMapVec* BuildRangeInfo (ExecutionPlan* plan,
 ////////////////////////////////////////////////////////////////////////////////
 
 class ConditionFinder : public WalkerWorker<ExecutionNode> {
-  private:
-    ExecutionPlan* _plan;
-    std::unordered_set<VariableId> _varIds;
-    bool _modified;
-    bool _canThrow; 
-  
+
   public:
 
     ConditionFinder (ExecutionPlan* plan,
                      Variable const* var) 
       : _plan(plan),
-        _varIds(),
-        _modified(false),
-        _canThrow(false) {
+        _condition(nullptr),
+        _varIds() {
 
       _varIds.emplace(var->id);
     };
@@ -2046,18 +2041,10 @@ class ConditionFinder : public WalkerWorker<ExecutionNode> {
     ~ConditionFinder () {
     }
     
-    bool modified () const {
-      return _modified;
-    }
-    
-    bool canThrow () const {
-      return _canThrow;
-    }
-    
     bool before (ExecutionNode* en) override final {
-      _canThrow |= en->canThrow(); // can any node walked over throw?
-
-      if (_canThrow) {
+      if (en->canThrow()) {
+        // something that can throw is not safe to optimize
+        _condition = nullptr;
         return true;
       }
 
@@ -2086,7 +2073,8 @@ class ConditionFinder : public WalkerWorker<ExecutionNode> {
         case EN::NORESULTS:
         case EN::ILLEGAL:
           // in all these cases something is seriously wrong and we better abort
-          // fall-through...
+
+          // fall-through intentional...
         case EN::LIMIT:           
           // if we meet a limit node between a filter and an enumerate
           // collection, we abort . . .
@@ -2104,50 +2092,27 @@ class ConditionFinder : public WalkerWorker<ExecutionNode> {
           auto outvar = en->getVariablesSetHere();
           TRI_ASSERT(outvar.size() == 1);
 
-          if (_varIds.find(outvar[0]->id) != _varIds.end()) {
-            auto node = static_cast<CalculationNode*>(en);
-            /*
-            std::string attr;
-            Variable const* enumCollVar = nullptr;
-            auto expression = node->expression()->node();
-            bool mustNotUseRanges = false;
-
-            // there is an implicit AND between FILTER statements
-            if (_rangeInfoMapVec == nullptr) {
-              // don't yet have anything to AND-combine
-              _rangeInfoMapVec = BuildRangeInfo(_plan, expression, enumCollVar, attr, mustNotUseRanges);
-            } 
-            else {
-              // AND-combine with previous ranges
-              auto other = BuildRangeInfo(_plan, expression, enumCollVar, attr, mustNotUseRanges);
-
-              if (mustNotUseRanges) {
-                mustNotUseRanges = false;
-
-                if (other != nullptr) {
-                  delete other;
-                }
-                // keep existing _rangeInfoMapVec
-              }
-              else {
-                // AND-combine ranges in FILTER found with previous ranges
-                _rangeInfoMapVec = andCombineRangeInfoMapVecsIgnoreEmpty(_rangeInfoMapVec, other);
-              }
-            }
-
-            if (_rangeInfoMapVec != nullptr && mustNotUseRanges) {
-              // it is unsafe to use the ranges found. throw them away immediately
-              delete _rangeInfoMapVec;
-              _rangeInfoMapVec = nullptr;
-            }
-            */
+          if (_varIds.find(outvar[0]->id) == _varIds.end()) {
+            // some non-interesting variable
+            break;
           }
+
+          auto expression = static_cast<CalculationNode const*>(en)->expression()->node();
+
+          if (_condition == nullptr) {
+            // did not have any expression before. now save what we found
+            _condition = new Condition(_plan->getAst());
+          }
+
+          TRI_ASSERT(_condition != nullptr);
+          _condition->andCombine(expression);
           break;
         }
 
         case EN::ENUMERATE_COLLECTION: {
-          auto node = static_cast<EnumerateCollectionNode*>(en);
-          auto var = node->getVariablesSetHere()[0];  // should only be 1
+          // auto node = static_cast<EnumerateCollectionNode*>(en);
+          // auto var = node->getVariablesSetHere()[0];  // should only be 1
+          _condition->normalize();
           break;
         }
       }
@@ -2158,6 +2123,13 @@ class ConditionFinder : public WalkerWorker<ExecutionNode> {
     bool enterSubquery (ExecutionNode* super, ExecutionNode* sub) final {
       return false;
     }
+
+  private:
+
+    ExecutionPlan*                 _plan;
+    Condition*                     _condition;
+    std::unordered_set<VariableId> _varIds;
+  
 };
 
 ////////////////////////////////////////////////////////////////////////////////

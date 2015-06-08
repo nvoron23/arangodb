@@ -717,6 +717,32 @@ AstNode* Ast::createNodeBinaryOperator (AstNodeType type,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST n-ary operator node
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeNaryOperator (AstNodeType type) {
+  TRI_ASSERT(type == NODE_TYPE_OPERATOR_NARY_AND ||
+             type == NODE_TYPE_OPERATOR_NARY_OR);
+
+  return createNode(type);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST n-ary operator node
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeNaryOperator (AstNodeType type,
+                                      AstNode const* child) {
+  TRI_ASSERT(type == NODE_TYPE_OPERATOR_NARY_AND ||
+             type == NODE_TYPE_OPERATOR_NARY_OR);
+
+  AstNode* node = createNode(type);
+  node->addMember(child);
+
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create an AST ternary operator node
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1488,8 +1514,9 @@ AstNode* Ast::clone (AstNode const* node) {
 
   // recursively clone subnodes
   size_t const n = node->numMembers();
+
   for (size_t i = 0; i < n; ++i) {
-    copy->addMember(clone(node->getMember(i)));
+    copy->addMember(clone(node->getMemberUnchecked(i)));
   }
 
   return copy;
@@ -1501,12 +1528,32 @@ AstNode* Ast::clone (AstNode const* node) {
 
 AstNodeType Ast::ReverseOperator (AstNodeType type) {
   auto it = ReversedOperators.find(static_cast<int>(type));
-  if (it == ReversedOperators.end()) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid node type for inversed operator");
+
+  if (it != ReversedOperators.end()) {
+    return (*it).second;
   }
-  
-  return (*it).second;
+
+  THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid node type for inversed operator");
 }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief get the n-ary operator type equivalent for a binary operator type
+////////////////////////////////////////////////////////////////////////////////
+
+AstNodeType Ast::NaryOperatorType (AstNodeType old) {
+  TRI_ASSERT(old == NODE_TYPE_OPERATOR_BINARY_AND ||
+             old == NODE_TYPE_OPERATOR_BINARY_OR);
+
+  if (old == NODE_TYPE_OPERATOR_BINARY_AND) {
+    return NODE_TYPE_OPERATOR_NARY_AND;
+  }
+  if (old == NODE_TYPE_OPERATOR_BINARY_OR) {
+    return NODE_TYPE_OPERATOR_NARY_OR;
+  }
+
+  THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid node type for n-ary operator");
+}
+
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
@@ -1620,7 +1667,7 @@ AstNode* Ast::executeConstExpression (AstNode const* node) {
   ISOLATE;
   v8::HandleScope scope(isolate); // do not delete this!
 
-  TRI_json_t* result = _query->executor()->executeExpression(_query, node); 
+  std::unique_ptr<TRI_json_t> result(_query->executor()->executeExpression(_query, node)); 
 
   // context is not left here, but later
   // this allows re-using the same context for multiple expressions
@@ -1631,13 +1678,11 @@ AstNode* Ast::executeConstExpression (AstNode const* node) {
 
   AstNode* value = nullptr;
   try {
-    value = nodeFromJson(result, true);
+    value = nodeFromJson(result.get(), true);
   }
   catch (...) {
   }
   
-  TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, result);
-
   if (value == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
