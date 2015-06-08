@@ -2021,6 +2021,146 @@ static RangeInfoMapVec* BuildRangeInfo (ExecutionPlan* plan,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief condition finder
+////////////////////////////////////////////////////////////////////////////////
+
+class ConditionFinder : public WalkerWorker<ExecutionNode> {
+  private:
+    ExecutionPlan* _plan;
+    std::unordered_set<VariableId> _varIds;
+    bool _modified;
+    bool _canThrow; 
+  
+  public:
+
+    ConditionFinder (ExecutionPlan* plan,
+                     Variable const* var) 
+      : _plan(plan),
+        _varIds(),
+        _modified(false),
+        _canThrow(false) {
+
+      _varIds.emplace(var->id);
+    };
+
+    ~ConditionFinder () {
+    }
+    
+    bool modified () const {
+      return _modified;
+    }
+    
+    bool canThrow () const {
+      return _canThrow;
+    }
+    
+    bool before (ExecutionNode* en) override final {
+      _canThrow |= en->canThrow(); // can any node walked over throw?
+
+      if (_canThrow) {
+        return true;
+      }
+
+      switch (en->getType()) {
+        case EN::ENUMERATE_LIST:
+        case EN::AGGREGATE:
+        case EN::SCATTER:
+        case EN::DISTRIBUTE:
+        case EN::GATHER:
+        case EN::REMOTE:
+        case EN::SUBQUERY:        
+        case EN::SORT:
+        case EN::INDEX_RANGE:
+          // in these cases we simply ignore the intermediate nodes, note
+          // that we have taken care of nodes that could throw exceptions
+          // above.
+          break;
+        
+        case EN::SINGLETON:
+        case EN::INSERT:
+        case EN::REMOVE:
+        case EN::REPLACE:
+        case EN::UPDATE:
+        case EN::UPSERT:
+        case EN::RETURN:
+        case EN::NORESULTS:
+        case EN::ILLEGAL:
+          // in all these cases something is seriously wrong and we better abort
+          // fall-through...
+        case EN::LIMIT:           
+          // if we meet a limit node between a filter and an enumerate
+          // collection, we abort . . .
+          return true;
+        
+        case EN::FILTER: {
+          std::vector<Variable const*>&& inVar = en->getVariablesUsedHere();
+          TRI_ASSERT(inVar.size() == 1);
+          // register which variable is used in a filter
+          _varIds.emplace(inVar[0]->id);
+          break;
+        }
+
+        case EN::CALCULATION: {
+          auto outvar = en->getVariablesSetHere();
+          TRI_ASSERT(outvar.size() == 1);
+
+          if (_varIds.find(outvar[0]->id) != _varIds.end()) {
+            auto node = static_cast<CalculationNode*>(en);
+            /*
+            std::string attr;
+            Variable const* enumCollVar = nullptr;
+            auto expression = node->expression()->node();
+            bool mustNotUseRanges = false;
+
+            // there is an implicit AND between FILTER statements
+            if (_rangeInfoMapVec == nullptr) {
+              // don't yet have anything to AND-combine
+              _rangeInfoMapVec = BuildRangeInfo(_plan, expression, enumCollVar, attr, mustNotUseRanges);
+            } 
+            else {
+              // AND-combine with previous ranges
+              auto other = BuildRangeInfo(_plan, expression, enumCollVar, attr, mustNotUseRanges);
+
+              if (mustNotUseRanges) {
+                mustNotUseRanges = false;
+
+                if (other != nullptr) {
+                  delete other;
+                }
+                // keep existing _rangeInfoMapVec
+              }
+              else {
+                // AND-combine ranges in FILTER found with previous ranges
+                _rangeInfoMapVec = andCombineRangeInfoMapVecsIgnoreEmpty(_rangeInfoMapVec, other);
+              }
+            }
+
+            if (_rangeInfoMapVec != nullptr && mustNotUseRanges) {
+              // it is unsafe to use the ranges found. throw them away immediately
+              delete _rangeInfoMapVec;
+              _rangeInfoMapVec = nullptr;
+            }
+            */
+          }
+          break;
+        }
+
+        case EN::ENUMERATE_COLLECTION: {
+          auto node = static_cast<EnumerateCollectionNode*>(en);
+          auto var = node->getVariablesSetHere()[0];  // should only be 1
+          break;
+        }
+      }
+
+      return false;
+    }
+
+    bool enterSubquery (ExecutionNode* super, ExecutionNode* sub) final {
+      return false;
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief prefer IndexRange nodes over EnumerateCollection nodes
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2475,6 +2615,35 @@ class FilterToEnumCollFinder : public WalkerWorker<ExecutionNode> {
       return false;
     }
 };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief useIndex, try to use an index for filtering
+////////////////////////////////////////////////////////////////////////////////
+
+int triagens::aql::useIndexesRule (Optimizer* opt, 
+                                   ExecutionPlan* plan, 
+                                   Optimizer::Rule const* rule) {
+  
+  // These are all the FILTER nodes where we start
+  bool modified = false;
+  std::vector<ExecutionNode*>&& nodes = plan->findNodesOfType(EN::FILTER, true);
+
+  for (auto const& n : nodes) {
+    auto nn = static_cast<FilterNode*>(n);
+    auto invars = nn->getVariablesUsedHere();
+    TRI_ASSERT(invars.size() == 1);
+    ConditionFinder finder(plan, invars[0]); //, changesPlaces, changes);
+    nn->walk(&finder);
+  }
+  
+  if (modified) {
+    plan->findVarUsage();
+  }
+  
+  opt->addPlan(plan, rule, modified);
+
+  return TRI_ERROR_NO_ERROR;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief useIndexRange, try to use an index for filtering
