@@ -31,12 +31,63 @@
 #define ARANGODB_AQL_CONDITION_H 1
 
 #include "Basics/Common.h"
+#include "Aql/AstNode.h"
 
 namespace triagens {
   namespace aql {
 
     class Ast;
-    struct AstNode;
+    struct Variable;
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                      public types
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief side on which an attribute occurs in a condition
+////////////////////////////////////////////////////////////////////////////////
+
+    enum AttributeSideType {
+      ATTRIBUTE_LEFT,
+      ATTRIBUTE_RIGHT
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                              struct ConditionPart
+// -----------------------------------------------------------------------------
+
+    struct ConditionPart {
+
+      enum ConditionPartCompareResult {
+        IMPOSSIBLE,
+        SELF_CONTAINED_IN_OTHER,
+        OTHER_CONTAINED_IN_SELF,
+        DISJOINT,
+        UNKNOWN
+      };
+
+      ConditionPart () = delete;
+
+      ConditionPart (Variable const*,
+                     std::string const&,
+                     size_t,
+                     AstNode const*,
+                     AttributeSideType);
+
+      ~ConditionPart ();
+
+      ConditionPartCompareResult compare (ConditionPart const&) const;
+
+      void dump () const;
+      
+      Variable const*   variable;
+      std::string const attributeName;
+      size_t            sourcePosition;
+      AstNodeType       operatorType;
+      AstNode const*    operatorNode;
+      AstNode const*    valueNode;
+
+    };
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   class Condition
@@ -81,9 +132,16 @@ namespace triagens {
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief normalize the condition
+/// this will convert the condition into its disjunctive normal form
 ////////////////////////////////////////////////////////////////////////////////
 
         void normalize ();
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief optimize the condition expression tree
+////////////////////////////////////////////////////////////////////////////////
+
+        void optimize ();
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief dump the condition
@@ -108,6 +166,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         AstNode*  _root;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the condition was already normalized
+////////////////////////////////////////////////////////////////////////////////
+
+        bool _isNormalized;
 
     };
   }

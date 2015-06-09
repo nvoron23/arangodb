@@ -98,6 +98,7 @@ std::unordered_map<int, AstNodeType> const Ast::NegatedOperators{
 
 std::unordered_map<int, AstNodeType> const Ast::ReversedOperators{ 
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ), NODE_TYPE_OPERATOR_BINARY_EQ },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE), NODE_TYPE_OPERATOR_BINARY_NE },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT), NODE_TYPE_OPERATOR_BINARY_LT },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE), NODE_TYPE_OPERATOR_BINARY_LE },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT), NODE_TYPE_OPERATOR_BINARY_GT },
@@ -1367,6 +1368,33 @@ void Ast::validateAndOptimize () {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief extract attribute access information from a node
+////////////////////////////////////////////////////////////////////////////////
+
+std::pair<Variable const*, std::string> Ast::extractAttributeAccess (AstNode const* node) {
+  TRI_ASSERT(node->type == NODE_TYPE_ATTRIBUTE_ACCESS);
+
+  std::string attributeName;
+
+  while (node->type == NODE_TYPE_ATTRIBUTE_ACCESS) {
+    if (attributeName.empty()) {
+      attributeName = node->getStringValue();
+    }
+    else {
+      attributeName = node->getStringValue() + '.' + attributeName;
+    }
+    node = node->getMember(0);
+  }
+
+  if (node->type == NODE_TYPE_REFERENCE) {
+    auto variable = static_cast<Variable const*>(node->getData());
+    return std::make_pair(variable, attributeName);
+  }
+
+  return std::make_pair(nullptr, std::string());
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief determines the variables referenced in an expression
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1520,6 +1548,14 @@ AstNode* Ast::clone (AstNode const* node) {
   }
 
   return copy;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief check if an operator is reversible
+////////////////////////////////////////////////////////////////////////////////
+  
+bool Ast::IsReversibleOperator (AstNodeType type) {
+  return (ReversedOperators.find(static_cast<int>(type)) != ReversedOperators.end());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1768,6 +1804,18 @@ AstNode* Ast::optimizeNotExpression (AstNode* node) {
     TRI_ASSERT(it != NegatedOperators.end());
 
     return createNodeBinaryOperator((*it).second, lhs, rhs); 
+  }
+
+  if (operand->type == NODE_TYPE_OPERATOR_UNARY_NOT) {
+    auto lhs = operand->getMember(0);
+
+    if (lhs->isConstant()) {
+      // NOT (NOT a) => a
+      return createNodeValueBool(lhs->isTrue());
+    }
+
+    // do not convert for non-value nodes because the expression may have a
+    // non-boolean type
   }
 
   return node;
