@@ -91,19 +91,20 @@ extern int Aqldebug;
     T_COLON = 300,
     T_SCOPE = 301,
     T_RANGE = 302,
-    T_COMMA = 303,
-    T_OPEN = 304,
-    T_CLOSE = 305,
-    T_OBJECT_OPEN = 306,
-    T_OBJECT_CLOSE = 307,
-    T_ARRAY_OPEN = 308,
-    T_ARRAY_CLOSE = 309,
-    T_NIN = 310,
-    UMINUS = 311,
-    UPLUS = 312,
-    FUNCCALL = 313,
-    REFERENCE = 314,
-    INDEXED = 315
+    T_MATCH = 303,
+    T_COMMA = 304,
+    T_OPEN = 305,
+    T_CLOSE = 306,
+    T_OBJECT_OPEN = 307,
+    T_OBJECT_CLOSE = 308,
+    T_ARRAY_OPEN = 309,
+    T_ARRAY_CLOSE = 310,
+    T_NIN = 311,
+    UMINUS = 312,
+    UPLUS = 313,
+    FUNCCALL = 314,
+    REFERENCE = 315,
+    INDEXED = 316
   };
 #endif
 
@@ -119,7 +120,7 @@ union YYSTYPE
   bool                     boolval;
   int64_t                  intval;
 
-#line 123 "arangod/Aql/grammar.hpp" /* yacc.c:1909  */
+#line 124 "arangod/Aql/grammar.hpp" /* yacc.c:1909  */
 };
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1

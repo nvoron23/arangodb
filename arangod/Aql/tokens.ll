@@ -240,6 +240,10 @@ namespace triagens {
 ".." {
   return T_RANGE; 
 }
+
+(?i:MATCH) {
+  return T_MATCH; 
+}
  
  /* ---------------------------------------------------------------------------
   * punctuation

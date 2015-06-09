@@ -1214,6 +1214,107 @@ function LOGICAL_NOT (lhs) {
 // --SECTION--                                             comparison operations
 // -----------------------------------------------------------------------------
 
+function RELATIONAL_CMP_ARRAY (comparator, lhs, rhs, options) {
+  'use strict';
+
+  if (! Array.isArray(lhs)) {
+    return false;
+  }
+
+  if (options.type === 'all') {
+    for (var i = 0; i < lhs.length; ++i) {
+      if (! comparator(lhs[i], rhs)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  else if (options.type === 'any') {
+    for (var i = 0; i < lhs.length; ++i) {
+      if (comparator(lhs[i], rhs)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  else if (options.type === 'none') {
+    for (var i = 0; i < lhs.length; ++i) {
+      if (comparator(lhs[i], rhs)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  else {
+    // range
+    var found = 0, n = lhs.length;
+    for (var i = 0; i < n; ++i) {
+      if (comparator(lhs[i], rhs)) {
+        ++found;
+        if (found >= options.min && found + (n - i) <= options.max) {
+          // quick exit
+          return true;
+        }
+      }
+    }
+    return (found >= options.min && found <= options.max);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief perform equality check
+///
+/// returns true if the operands are equal, false otherwise
+////////////////////////////////////////////////////////////////////////////////
+
+function RELATIONAL_EQUAL_ARRAY (lhs, rhs, options) {
+  'use strict';
+
+  return RELATIONAL_CMP_ARRAY(RELATIONAL_EQUAL, lhs, rhs, options);
+}
+
+function RELATIONAL_UNEQUAL_ARRAY (lhs, rhs, options) {
+  'use strict';
+
+  return RELATIONAL_CMP_ARRAY(RELATIONAL_UNEQUAL, lhs, rhs, options);
+}
+
+function RELATIONAL_GREATER_ARRAY (lhs, rhs, options) {
+  'use strict';
+
+  return RELATIONAL_CMP_ARRAY(RELATIONAL_GREATER, lhs, rhs, options);
+}
+
+function RELATIONAL_GREATEREQUAL_ARRAY (lhs, rhs, options) {
+  'use strict';
+
+  return RELATIONAL_CMP_ARRAY(RELATIONAL_GREATEREQUAL, lhs, rhs, options);
+}
+
+function RELATIONAL_LESS_ARRAY (lhs, rhs, options) {
+  'use strict';
+
+  return RELATIONAL_CMP_ARRAY(RELATIONAL_LESS, lhs, rhs, options);
+}
+
+function RELATIONAL_LESSEQUAL_ARRAY (lhs, rhs, options) {
+  'use strict';
+
+  return RELATIONAL_CMP_ARRAY(RELATIONAL_LESSEQUAL, lhs, rhs, options);
+}
+
+function RELATIONAL_IN_ARRAY (lhs, rhs, options) {
+  'use strict';
+
+  return RELATIONAL_CMP_ARRAY(RELATIONAL_IN, lhs, rhs, options);
+}
+
+function RELATIONAL_NOT_IN_ARRAY (lhs, rhs, options) {
+  'use strict';
+
+  return RELATIONAL_CMP_ARRAY(RELATIONAL_NOT_IN, lhs, rhs, options);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief perform equality check
 ///
@@ -8357,6 +8458,14 @@ exports.RELATIONAL_LESSEQUAL = RELATIONAL_LESSEQUAL;
 exports.RELATIONAL_CMP = RELATIONAL_CMP;
 exports.RELATIONAL_IN = RELATIONAL_IN;
 exports.RELATIONAL_NOT_IN = RELATIONAL_NOT_IN;
+exports.RELATIONAL_EQUAL_ARRAY = RELATIONAL_EQUAL_ARRAY;
+exports.RELATIONAL_UNEQUAL_ARRAY = RELATIONAL_UNEQUAL_ARRAY;
+exports.RELATIONAL_GREATER_ARRAY = RELATIONAL_GREATER_ARRAY;
+exports.RELATIONAL_GREATEREQUAL_ARRAY = RELATIONAL_GREATEREQUAL_ARRAY;
+exports.RELATIONAL_LESS_ARRAY = RELATIONAL_LESS_ARRAY;
+exports.RELATIONAL_LESSEQUAL_ARRAY = RELATIONAL_LESSEQUAL_ARRAY;
+exports.RELATIONAL_IN_ARRAY = RELATIONAL_IN_ARRAY;
+exports.RELATIONAL_NOT_IN_ARRAY = RELATIONAL_NOT_IN_ARRAY;
 exports.UNARY_PLUS = UNARY_PLUS;
 exports.UNARY_MINUS = UNARY_MINUS;
 exports.ARITHMETIC_PLUS = ARITHMETIC_PLUS;

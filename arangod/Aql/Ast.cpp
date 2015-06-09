@@ -81,7 +81,7 @@ AstNode const Ast::EmptyStringNode{ "", VALUE_TYPE_STRING };
 /// @brief inverse comparison operators
 ////////////////////////////////////////////////////////////////////////////////
 
-std::unordered_map<int, AstNodeType> const Ast::NegatedOperators{ 
+std::unordered_map<int, AstNodeType> const Ast::NegatedComparisonOperators{ 
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ), NODE_TYPE_OPERATOR_BINARY_NE },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE), NODE_TYPE_OPERATOR_BINARY_EQ },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT), NODE_TYPE_OPERATOR_BINARY_LE },
@@ -93,15 +93,30 @@ std::unordered_map<int, AstNodeType> const Ast::NegatedOperators{
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief reverse comparison operators
+/// @brief reverse comparison operators (used for swapping)
 ////////////////////////////////////////////////////////////////////////////////
 
-std::unordered_map<int, AstNodeType> const Ast::ReversedOperators{ 
+std::unordered_map<int, AstNodeType> const Ast::SwappedComparisonOperators{ 
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ), NODE_TYPE_OPERATOR_BINARY_EQ },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT), NODE_TYPE_OPERATOR_BINARY_LT },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE), NODE_TYPE_OPERATOR_BINARY_LE },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT), NODE_TYPE_OPERATOR_BINARY_GT },
   { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE), NODE_TYPE_OPERATOR_BINARY_GE }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief multi-comparison operators
+////////////////////////////////////////////////////////////////////////////////
+
+std::unordered_map<int, AstNodeType> const Ast::ArrayComparisonOperators{ 
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ), NODE_TYPE_OPERATOR_BINARY_EQ_ARRAY },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE), NODE_TYPE_OPERATOR_BINARY_NE_ARRAY },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT), NODE_TYPE_OPERATOR_BINARY_GT_ARRAY },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE), NODE_TYPE_OPERATOR_BINARY_GE_ARRAY },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT), NODE_TYPE_OPERATOR_BINARY_LT_ARRAY },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE), NODE_TYPE_OPERATOR_BINARY_LE_ARRAY },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN), NODE_TYPE_OPERATOR_BINARY_IN_ARRAY },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN), NODE_TYPE_OPERATOR_BINARY_NIN_ARRAY }
 };
 
 // -----------------------------------------------------------------------------
@@ -717,6 +732,33 @@ AstNode* Ast::createNodeBinaryOperator (AstNodeType type,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST binary operator node, with or without an array
+/// qualifier
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeBinaryOperatorQualified (AstNodeType type,
+                                                 AstNode const* qualifier,
+                                                 AstNode const* lhs,
+                                                 AstNode const* rhs) {
+  if (qualifier == nullptr) {
+    // scalar operator
+    return createNodeBinaryOperator(type, lhs, rhs);
+  }
+
+  // array operator
+  auto it = ArrayComparisonOperators.find(static_cast<int>(type));
+
+  if (it == ArrayComparisonOperators.end()) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid node type for array operator");
+  }
+
+  AstNode* node = createNodeBinaryOperator((*it).second, lhs, rhs);
+  node->addMember(qualifier);
+
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create an AST ternary operator node
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -727,6 +769,38 @@ AstNode* Ast::createNodeTernaryOperator (AstNode const* condition,
   node->addMember(condition);
   node->addMember(truePart);
   node->addMember(falsePart);
+
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST comparison qualifier
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeComparisonQualifier (ComparisonType type) {
+  TRI_ASSERT(type == COMPARISON_ALL ||
+             type == COMPARISON_ANY ||
+             type == COMPARISON_NONE);
+
+  AstNode* node = createNode(NODE_TYPE_COMPARISON_QUALIFIER);
+  node->setIntValue(static_cast<int64_t>(type));
+
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST comparison qualifier (range type)
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeComparisonQualifier (ComparisonType type,
+                                             AstNode const* lhs,
+                                             AstNode const* rhs) {
+  TRI_ASSERT(type == COMPARISON_RANGE);
+
+  AstNode* node = createNode(NODE_TYPE_COMPARISON_QUALIFIER);
+  node->setIntValue(static_cast<int64_t>(type));
+  node->addMember(lhs);
+  node->addMember(rhs);
 
   return node;
 }
@@ -1360,7 +1434,7 @@ std::unordered_set<Variable*> Ast::getReferencedVariables (AstNode const* node) 
 
       if (variable->needsRegister()) {
         auto result = static_cast<std::unordered_set<Variable*>*>(data);
-        result->insert(variable);
+        result->emplace(variable);
       }
     }
   };
@@ -1499,10 +1573,11 @@ AstNode* Ast::clone (AstNode const* node) {
 /// @brief get the reversed operator for a comparison operator
 ////////////////////////////////////////////////////////////////////////////////
 
-AstNodeType Ast::ReverseOperator (AstNodeType type) {
-  auto it = ReversedOperators.find(static_cast<int>(type));
-  if (it == ReversedOperators.end()) {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid node type for inversed operator");
+AstNodeType Ast::SwapOperator (AstNodeType type) {
+  auto it = SwappedComparisonOperators.find(static_cast<int>(type));
+
+  if (it == SwappedComparisonOperators.end()) {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid node type for operator swap");
   }
   
   return (*it).second;
@@ -1620,7 +1695,7 @@ AstNode* Ast::executeConstExpression (AstNode const* node) {
   ISOLATE;
   v8::HandleScope scope(isolate); // do not delete this!
 
-  TRI_json_t* result = _query->executor()->executeExpression(_query, node); 
+  std::unique_ptr<TRI_json_t> result(_query->executor()->executeExpression(_query, node)); 
 
   // context is not left here, but later
   // this allows re-using the same context for multiple expressions
@@ -1631,13 +1706,11 @@ AstNode* Ast::executeConstExpression (AstNode const* node) {
 
   AstNode* value = nullptr;
   try {
-    value = nodeFromJson(result, true);
+    value = nodeFromJson(result.get(), true);
   }
   catch (...) {
   }
   
-  TRI_FreeJson(TRI_UNKNOWN_MEM_ZONE, result);
-
   if (value == nullptr) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
@@ -1713,14 +1786,14 @@ AstNode* Ast::optimizeNotExpression (AstNode* node) {
 
   AstNode* operand = node->getMember(0);
 
-  if (operand->isComparisonOperator()) {
+  if (operand->isScalarComparisonOperator()) {
     // remove the NOT and reverse the operation, e.g. NOT (a == b) => (a != b)
     TRI_ASSERT(operand->numMembers() == 2);
     auto lhs = operand->getMember(0);
     auto rhs = operand->getMember(1);
 
-    auto it = NegatedOperators.find(static_cast<int>(operand->type));
-    TRI_ASSERT(it != NegatedOperators.end());
+    auto it = NegatedComparisonOperators.find(static_cast<int>(operand->type));
+    TRI_ASSERT(it != NegatedComparisonOperators.end());
 
     return createNodeBinaryOperator((*it).second, lhs, rhs); 
   }

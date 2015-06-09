@@ -417,6 +417,30 @@ namespace triagens {
                                            AstNode const*);
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST binary operator node, with or without an array
+/// qualifier
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode* createNodeBinaryOperatorQualified (AstNodeType,
+                                                    AstNode const*,
+                                                    AstNode const*,
+                                                    AstNode const*);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST comparison qualifier
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode* createNodeComparisonQualifier (ComparisonType);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST comparison qualifier
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode* createNodeComparisonQualifier (ComparisonType,
+                                                AstNode const*,
+                                                AstNode const*);
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create an AST ternary operator
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -584,10 +608,10 @@ namespace triagens {
         AstNode* clone (AstNode const*);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief get the reversed operator for a comparison operator
+/// @brief get the reversed operator for a comparison operator 
 ////////////////////////////////////////////////////////////////////////////////
 
-        static AstNodeType ReverseOperator (AstNodeType);
+        static AstNodeType SwapOperator (AstNodeType);
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   private methods
@@ -766,13 +790,19 @@ namespace triagens {
 /// @brief negated comparison operators
 ////////////////////////////////////////////////////////////////////////////////
 
-        static std::unordered_map<int, AstNodeType> const NegatedOperators;
+        static std::unordered_map<int, AstNodeType> const NegatedComparisonOperators;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief reverse comparison operators
+/// @brief reverse comparison operators (used for swapping)
 ////////////////////////////////////////////////////////////////////////////////
 
-        static std::unordered_map<int, AstNodeType> const ReversedOperators;
+        static std::unordered_map<int, AstNodeType> const SwappedComparisonOperators;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief multi-comparison operators
+////////////////////////////////////////////////////////////////////////////////
+
+        static std::unordered_map<int, AstNodeType> const ArrayComparisonOperators;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables

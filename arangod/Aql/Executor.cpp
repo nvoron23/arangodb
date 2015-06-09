@@ -48,25 +48,33 @@ using namespace triagens::aql;
 ////////////////////////////////////////////////////////////////////////////////
 
 std::unordered_map<int, std::string const> const Executor::InternalFunctionNames{ 
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_PLUS),   "UNARY_PLUS" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_MINUS),  "UNARY_MINUS" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_NOT),    "LOGICAL_NOT" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ),    "RELATIONAL_EQUAL" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE),    "RELATIONAL_UNEQUAL" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT),    "RELATIONAL_GREATER" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE),    "RELATIONAL_GREATEREQUAL" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT),    "RELATIONAL_LESS" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE),    "RELATIONAL_LESSEQUAL" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN),    "RELATIONAL_IN" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN),   "RELATIONAL_NOT_IN" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_PLUS),  "ARITHMETIC_PLUS" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MINUS), "ARITHMETIC_MINUS" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_TIMES), "ARITHMETIC_TIMES" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_DIV),   "ARITHMETIC_DIVIDE" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MOD),   "ARITHMETIC_MODULUS" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_AND),   "LOGICAL_AND" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_OR),    "LOGICAL_OR" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_TERNARY),      "TERNARY_OPERATOR" }
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_PLUS),         "UNARY_PLUS" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_MINUS),        "UNARY_MINUS" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_NOT),          "LOGICAL_NOT" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ),          "RELATIONAL_EQUAL" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE),          "RELATIONAL_UNEQUAL" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT),          "RELATIONAL_GREATER" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE),          "RELATIONAL_GREATEREQUAL" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT),          "RELATIONAL_LESS" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE),          "RELATIONAL_LESSEQUAL" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN),          "RELATIONAL_IN" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN),         "RELATIONAL_NOT_IN" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ_ARRAY),    "RELATIONAL_EQUAL_ARRAY" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE_ARRAY),    "RELATIONAL_UNEQUAL_ARRAY" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT_ARRAY),    "RELATIONAL_GREATER_ARRAY" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE_ARRAY),    "RELATIONAL_GREATEREQUAL_ARRAY" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT_ARRAY),    "RELATIONAL_LESS_ARRAY" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE_ARRAY),    "RELATIONAL_LESSEQUAL_ARRAY" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN_ARRAY),    "RELATIONAL_IN_ARRAY" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN_ARRAY),   "RELATIONAL_NOT_IN_ARRAY" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_PLUS),        "ARITHMETIC_PLUS" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MINUS),       "ARITHMETIC_MINUS" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_TIMES),       "ARITHMETIC_TIMES" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_DIV),         "ARITHMETIC_DIVIDE" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MOD),         "ARITHMETIC_MODULUS" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_AND),         "LOGICAL_AND" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_OR),          "LOGICAL_OR" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_TERNARY),            "TERNARY_OPERATOR" }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -339,7 +347,7 @@ TRI_json_t* Executor::executeExpression (Query* query,
   try {
     v8g->_query = static_cast<void*>(query);
     TRI_ASSERT(v8g->_query != nullptr);
- 
+
     // execute the function
     v8::Handle<v8::Value> args;
     result = v8::Handle<v8::Function>::Cast(func)->Call(v8::Object::New(isolate), 0, &args);
@@ -619,7 +627,7 @@ void Executor::generateCodeUnaryOperator (AstNode const* node) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief generate JavaScript code for a binary operator
+/// @brief generate JavaScript code for a binary (scalar) operator
 ////////////////////////////////////////////////////////////////////////////////
 
 void Executor::generateCodeBinaryOperator (AstNode const* node) {
@@ -655,6 +663,35 @@ void Executor::generateCodeBinaryOperator (AstNode const* node) {
 
   _buffer->appendChar(')');
 }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief generate JavaScript code for a binary (array) operator
+////////////////////////////////////////////////////////////////////////////////
+
+void Executor::generateCodeBinaryOperatorArray (AstNode const* node) {
+  TRI_ASSERT(node != nullptr);
+  TRI_ASSERT(node->numMembers() == 3);
+
+  auto it = InternalFunctionNames.find(static_cast<int>(node->type));
+
+  if (it == InternalFunctionNames.end()) {
+    // no function found for the type of node
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "function not found");
+  }
+  
+  _buffer->appendText("_AQL.", 5);
+  _buffer->appendText((*it).second);
+  _buffer->appendChar('(');
+
+  generateCodeNode(node->getMember(0));
+  _buffer->appendChar(',');
+  generateCodeNode(node->getMember(1));
+  _buffer->appendChar(',');
+  generateCodeNode(node->getMember(2));
+
+  _buffer->appendChar(')');
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief generate JavaScript code for the ternary operator
@@ -904,6 +941,33 @@ void Executor::generateCodeIndexedAccess (AstNode const* node) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief generate JavaScript code for an array comparison qualifier
+////////////////////////////////////////////////////////////////////////////////
+
+void Executor::generateCodeComparisonQualifier (AstNode const* node) {
+  TRI_ASSERT(node != nullptr);
+  auto type = static_cast<ComparisonType>(node->getIntValue(true));
+
+  if (type == ComparisonType::COMPARISON_RANGE) { 
+    TRI_ASSERT(node->numMembers() == 2);
+    _buffer->appendText("{type:\"range\",min:");
+    generateCodeNode(node->getMember(0));
+    _buffer->appendText(",max:");
+    generateCodeNode(node->getMember(1));
+    _buffer->appendText("}");
+  }
+  else if (type == ComparisonType::COMPARISON_ALL) {
+    _buffer->appendText("{type:\"all\"}");
+  }
+  else if (type == ComparisonType::COMPARISON_ANY) {
+    _buffer->appendText("{type:\"any\"}");
+  }
+  else if (type == ComparisonType::COMPARISON_NONE) {
+    _buffer->appendText("{type:\"none\"}");
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief generate JavaScript code for a node
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -945,6 +1009,17 @@ void Executor::generateCodeNode (AstNode const* node) {
     case NODE_TYPE_OPERATOR_BINARY_AND:
     case NODE_TYPE_OPERATOR_BINARY_OR:
       generateCodeBinaryOperator(node);
+      break;
+
+    case NODE_TYPE_OPERATOR_BINARY_EQ_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_NE_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_LT_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_LE_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_GT_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_GE_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_IN_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_NIN_ARRAY:
+      generateCodeBinaryOperatorArray(node);
       break;
 
     case NODE_TYPE_OPERATOR_TERNARY:
@@ -989,6 +1064,10 @@ void Executor::generateCodeNode (AstNode const* node) {
 
     case NODE_TYPE_INDEXED_ACCESS:
       generateCodeIndexedAccess(node);
+      break;
+      
+    case NODE_TYPE_COMPARISON_QUALIFIER:
+      generateCodeComparisonQualifier(node);
       break;
 
     case NODE_TYPE_VARIABLE:

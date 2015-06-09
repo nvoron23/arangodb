@@ -114,6 +114,7 @@ void Aqlerror (YYLTYPE* locp,
 %token T_COLON ":"
 %token T_SCOPE "::"
 %token T_RANGE ".."
+%token T_MATCH "matches"
 
 %token T_COMMA ","
 %token T_OPEN "("
@@ -124,7 +125,6 @@ void Aqlerror (YYLTYPE* locp,
 %token T_ARRAY_CLOSE "]"
 
 %token T_END 0 "end of query string"
-
 
 /* define operator precedence */
 %left T_COMMA 
@@ -138,6 +138,7 @@ void Aqlerror (YYLTYPE* locp,
 %left T_IN T_NIN 
 %left T_LT T_GT T_LE T_GE
 %left T_RANGE
+%left T_MATCH
 %left T_PLUS T_MINUS
 %left T_TIMES T_DIV T_MOD
 %right UMINUS UPLUS T_NOT
@@ -164,6 +165,8 @@ void Aqlerror (YYLTYPE* locp,
 %type <strval> count_into;
 %type <node> expression;
 %type <node> expression_or_query;
+%type <node> comparison_multiplicator;
+%type <node> comparison_matcher;
 %type <node> operator_unary;
 %type <node> operator_binary;
 %type <node> operator_ternary;
@@ -797,6 +800,32 @@ function_call:
     }
   ;
 
+comparison_multiplicator:
+    T_STRING {
+      if (TRI_CaseEqualString($1, "ALL")) {
+        $$ = parser->ast()->createNodeComparisonQualifier(ComparisonType::COMPARISON_ALL);
+      }
+      else if (TRI_CaseEqualString($1, "ANY")) {
+        $$ = parser->ast()->createNodeComparisonQualifier(ComparisonType::COMPARISON_ANY);
+      }
+      else if (TRI_CaseEqualString($1, "NONE")) {
+        $$ = parser->ast()->createNodeComparisonQualifier(ComparisonType::COMPARISON_NONE);
+      }
+      else {
+        parser->registerParseError(TRI_ERROR_QUERY_PARSE, "unexpected comparison qualifier '%s', expecting 'ALL', 'ANY' or 'NONE'", $1, yylloc.first_line, yylloc.first_column);
+      }
+    }
+  | T_OPEN expression T_RANGE expression T_CLOSE { 
+      $$ = parser->ast()->createNodeComparisonQualifier(ComparisonType::COMPARISON_RANGE, $2, $4);
+    }
+  ;
+
+comparison_matcher:
+    T_MATCH comparison_multiplicator {
+      $$ = $2;
+    }
+  ;
+
 operator_unary:
     T_PLUS expression %prec UPLUS {
       $$ = parser->ast()->createNodeUnaryOperator(NODE_TYPE_OPERATOR_UNARY_PLUS, $2);
@@ -854,6 +883,30 @@ operator_binary:
     }
   | expression T_NOT T_IN expression %prec T_NIN {
       $$ = parser->ast()->createNodeBinaryOperator(NODE_TYPE_OPERATOR_BINARY_NIN, $1, $4);
+    }
+  | expression comparison_matcher T_EQ expression {
+      $$ = parser->ast()->createNodeBinaryOperatorQualified(NODE_TYPE_OPERATOR_BINARY_EQ, $2, $1, $4);
+    }
+  | expression comparison_matcher T_NE expression {
+      $$ = parser->ast()->createNodeBinaryOperatorQualified(NODE_TYPE_OPERATOR_BINARY_NE, $2, $1, $4);
+    }
+  | expression comparison_matcher T_LT expression {
+      $$ = parser->ast()->createNodeBinaryOperatorQualified(NODE_TYPE_OPERATOR_BINARY_LT, $2, $1, $4);
+    }
+  | expression comparison_matcher T_GT expression {
+      $$ = parser->ast()->createNodeBinaryOperatorQualified(NODE_TYPE_OPERATOR_BINARY_GT, $2, $1, $4);
+    } 
+  | expression comparison_matcher T_LE expression {
+      $$ = parser->ast()->createNodeBinaryOperatorQualified(NODE_TYPE_OPERATOR_BINARY_LE, $2, $1, $4);
+    }
+  | expression comparison_matcher T_GE expression {
+      $$ = parser->ast()->createNodeBinaryOperatorQualified(NODE_TYPE_OPERATOR_BINARY_GE, $2, $1, $4);
+    }
+  | expression comparison_matcher T_IN expression {
+      $$ = parser->ast()->createNodeBinaryOperatorQualified(NODE_TYPE_OPERATOR_BINARY_IN, $2, $1, $2);
+    }
+  | expression comparison_matcher T_NOT T_IN expression %prec T_NIN {
+      $$ = parser->ast()->createNodeBinaryOperatorQualified(NODE_TYPE_OPERATOR_BINARY_NIN, $2, $1, $5);
     }
   ;
 

@@ -3075,7 +3075,7 @@ struct FilterCondition {
         lhs = node->getMember(1);
         rhs = node->getMember(0);
 
-        op = Ast::ReverseOperator(node->type);
+        op = Ast::SwapOperator(node->type);
         found = (lhs->type == NODE_TYPE_VALUE);
       }
 
@@ -4484,19 +4484,19 @@ struct RemoveRedundantOr {
           && lhs->isConstant()) {
         
         if (! isComparisonSet) {
-          comparison = Ast::ReverseOperator(type);
+          comparison = Ast::SwapOperator(type);
           bestValue = lhs;
           isComparisonSet = true;
           return true;
         }
 
-        int lowhigh = isCompatibleBound(Ast::ReverseOperator(type), lhs);
+        int lowhigh = isCompatibleBound(Ast::SwapOperator(type), lhs);
         if (lowhigh == 0) {
           return false;
         }
 
         if (compareBounds(type, lhs, lowhigh)) {
-          comparison = Ast::ReverseOperator(type);
+          comparison = Ast::SwapOperator(type);
           bestValue = lhs;
         }
         return true;

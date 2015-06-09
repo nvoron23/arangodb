@@ -66,24 +66,32 @@ static_assert(AstNodeValueType::VALUE_TYPE_STRING == 4, "incorrect ast node valu
 
 
 std::unordered_map<int, std::string const> const AstNode::Operators{ 
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_NOT),       "!" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_PLUS),      "+" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_MINUS),     "-" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_AND),      "&&" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_OR),       "||" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_PLUS),     "+" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MINUS),    "-" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_TIMES),    "*" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_DIV),      "/" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MOD),      "%" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ),       "==" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE),       "!=" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT),       "<" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE),       "<=" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT),       ">" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE),       ">=" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN),       "IN" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN),      "NOT IN" }
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_NOT),        "!" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_PLUS),       "+" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_MINUS),      "-" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_AND),       "&&" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_OR),        "||" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_PLUS),      "+" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MINUS),     "-" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_TIMES),     "*" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_DIV),       "/" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MOD),       "%" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ),        "==" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE),        "!=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT),        "<" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE),        "<=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT),        ">" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE),        ">=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN),        "IN" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN),       "NOT IN" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ_ARRAY),  "[*] ==" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE_ARRAY),  "[*] !=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT_ARRAY),  "[*] <" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE_ARRAY),  "[*] <=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT_ARRAY),  "[*] >" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE_ARRAY),  "[*] >=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN_ARRAY),  "[*] IN" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN_ARRAY), "[*] NOT IN" }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -91,62 +99,71 @@ std::unordered_map<int, std::string const> const AstNode::Operators{
 ////////////////////////////////////////////////////////////////////////////////
 
 std::unordered_map<int, std::string const> const AstNode::TypeNames{ 
-  { static_cast<int>(NODE_TYPE_ROOT),                     "root" },
-  { static_cast<int>(NODE_TYPE_FOR),                      "for" },
-  { static_cast<int>(NODE_TYPE_LET),                      "let" },
-  { static_cast<int>(NODE_TYPE_FILTER),                   "filter" },
-  { static_cast<int>(NODE_TYPE_RETURN),                   "return" },
-  { static_cast<int>(NODE_TYPE_REMOVE),                   "remove" },
-  { static_cast<int>(NODE_TYPE_INSERT),                   "insert" },
-  { static_cast<int>(NODE_TYPE_UPDATE),                   "update" },
-  { static_cast<int>(NODE_TYPE_REPLACE),                  "replace" },
-  { static_cast<int>(NODE_TYPE_UPSERT),                   "upsert" },
-  { static_cast<int>(NODE_TYPE_COLLECT),                  "collect" },
-  { static_cast<int>(NODE_TYPE_SORT),                     "sort" },
-  { static_cast<int>(NODE_TYPE_SORT_ELEMENT),             "sort element" },
-  { static_cast<int>(NODE_TYPE_LIMIT),                    "limit" },
-  { static_cast<int>(NODE_TYPE_VARIABLE),                 "variable" },
-  { static_cast<int>(NODE_TYPE_ASSIGN),                   "assign" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_PLUS),      "unary plus" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_MINUS),     "unary minus" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_NOT),       "unary not" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_AND),      "logical and" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_OR),       "logical or" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_PLUS),     "plus" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MINUS),    "minus" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_TIMES),    "times" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_DIV),      "division" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MOD),      "modulus" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ),       "compare ==" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE),       "compare !=" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT),       "compare <" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE),       "compare <=" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT),       "compare >" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE),       "compare >=" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN),       "compare in" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN),      "compare not in" },
-  { static_cast<int>(NODE_TYPE_OPERATOR_TERNARY),         "ternary" },
-  { static_cast<int>(NODE_TYPE_SUBQUERY),                 "subquery" },
-  { static_cast<int>(NODE_TYPE_ATTRIBUTE_ACCESS),         "attribute access" },
-  { static_cast<int>(NODE_TYPE_BOUND_ATTRIBUTE_ACCESS),   "bound attribute access" },
-  { static_cast<int>(NODE_TYPE_INDEXED_ACCESS),           "indexed access" },
-  { static_cast<int>(NODE_TYPE_EXPAND),                   "expand" },
-  { static_cast<int>(NODE_TYPE_ITERATOR),                 "iterator" },
-  { static_cast<int>(NODE_TYPE_VALUE),                    "value" },
-  { static_cast<int>(NODE_TYPE_ARRAY),                    "array" },
-  { static_cast<int>(NODE_TYPE_OBJECT),                   "object" },
-  { static_cast<int>(NODE_TYPE_OBJECT_ELEMENT),           "object element" },
-  { static_cast<int>(NODE_TYPE_COLLECTION),               "collection" },
-  { static_cast<int>(NODE_TYPE_REFERENCE),                "reference" },
-  { static_cast<int>(NODE_TYPE_PARAMETER),                "parameter" },
-  { static_cast<int>(NODE_TYPE_FCALL),                    "function call" },
-  { static_cast<int>(NODE_TYPE_FCALL_USER),               "user function call" },
-  { static_cast<int>(NODE_TYPE_RANGE),                    "range" },
-  { static_cast<int>(NODE_TYPE_NOP),                      "no-op" },
-  { static_cast<int>(NODE_TYPE_COLLECT_COUNT),            "collect count" },
-  { static_cast<int>(NODE_TYPE_COLLECT_EXPRESSION),       "collect expression" },
-  { static_cast<int>(NODE_TYPE_CALCULATED_OBJECT_ELEMENT),"calculated object element" },
-  { static_cast<int>(NODE_TYPE_EXAMPLE),                  "example" }
+  { static_cast<int>(NODE_TYPE_ROOT),                      "root" },
+  { static_cast<int>(NODE_TYPE_FOR),                       "for" },
+  { static_cast<int>(NODE_TYPE_LET),                       "let" },
+  { static_cast<int>(NODE_TYPE_FILTER),                    "filter" },
+  { static_cast<int>(NODE_TYPE_RETURN),                    "return" },
+  { static_cast<int>(NODE_TYPE_REMOVE),                    "remove" },
+  { static_cast<int>(NODE_TYPE_INSERT),                    "insert" },
+  { static_cast<int>(NODE_TYPE_UPDATE),                    "update" },
+  { static_cast<int>(NODE_TYPE_REPLACE),                   "replace" },
+  { static_cast<int>(NODE_TYPE_UPSERT),                    "upsert" },
+  { static_cast<int>(NODE_TYPE_COLLECT),                   "collect" },
+  { static_cast<int>(NODE_TYPE_SORT),                      "sort" },
+  { static_cast<int>(NODE_TYPE_SORT_ELEMENT),              "sort element" },
+  { static_cast<int>(NODE_TYPE_LIMIT),                     "limit" },
+  { static_cast<int>(NODE_TYPE_VARIABLE),                  "variable" },
+  { static_cast<int>(NODE_TYPE_ASSIGN),                    "assign" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_PLUS),       "unary plus" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_MINUS),      "unary minus" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_UNARY_NOT),        "unary not" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_AND),       "logical and" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_OR),        "logical or" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_PLUS),      "plus" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MINUS),     "minus" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_TIMES),     "times" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_DIV),       "division" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_MOD),       "modulus" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ),        "compare ==" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE),        "compare !=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT),        "compare <" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE),        "compare <=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT),        "compare >" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE),        "compare >=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN),        "compare in" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN),       "compare not in" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_TERNARY),          "ternary" },
+  { static_cast<int>(NODE_TYPE_SUBQUERY),                  "subquery" },
+  { static_cast<int>(NODE_TYPE_ATTRIBUTE_ACCESS),          "attribute access" },
+  { static_cast<int>(NODE_TYPE_BOUND_ATTRIBUTE_ACCESS),    "bound attribute access" },
+  { static_cast<int>(NODE_TYPE_INDEXED_ACCESS),            "indexed access" },
+  { static_cast<int>(NODE_TYPE_EXPAND),                    "expand" },
+  { static_cast<int>(NODE_TYPE_ITERATOR),                  "iterator" },
+  { static_cast<int>(NODE_TYPE_VALUE),                     "value" },
+  { static_cast<int>(NODE_TYPE_ARRAY),                     "array" },
+  { static_cast<int>(NODE_TYPE_OBJECT),                    "object" },
+  { static_cast<int>(NODE_TYPE_OBJECT_ELEMENT),            "object element" },
+  { static_cast<int>(NODE_TYPE_COLLECTION),                "collection" },
+  { static_cast<int>(NODE_TYPE_REFERENCE),                 "reference" },
+  { static_cast<int>(NODE_TYPE_PARAMETER),                 "parameter" },
+  { static_cast<int>(NODE_TYPE_FCALL),                     "function call" },
+  { static_cast<int>(NODE_TYPE_FCALL_USER),                "user function call" },
+  { static_cast<int>(NODE_TYPE_RANGE),                     "range" },
+  { static_cast<int>(NODE_TYPE_NOP),                       "no-op" },
+  { static_cast<int>(NODE_TYPE_COLLECT_COUNT),             "collect count" },
+  { static_cast<int>(NODE_TYPE_COLLECT_EXPRESSION),        "collect expression" },
+  { static_cast<int>(NODE_TYPE_CALCULATED_OBJECT_ELEMENT), "calculated object element" },
+  { static_cast<int>(NODE_TYPE_EXAMPLE),                   "example" },
+  { static_cast<int>(NODE_TYPE_COMPARISON_QUALIFIER),      "comparison qualifier" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_EQ_ARRAY),  "compare[*] ==" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NE_ARRAY),  "compare[*] !=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LT_ARRAY),  "compare[*] <" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_LE_ARRAY),  "compare[*] <=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GT_ARRAY),  "compare[*] >" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_GE_ARRAY),  "compare[*] >=" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_IN_ARRAY),  "compare[*] in" },
+  { static_cast<int>(NODE_TYPE_OPERATOR_BINARY_NIN_ARRAY), "compare[*] not in" }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -562,6 +579,15 @@ AstNode::AstNode (Ast* ast,
     case NODE_TYPE_NOP:
     case NODE_TYPE_CALCULATED_OBJECT_ELEMENT:
     case NODE_TYPE_EXAMPLE:
+    case NODE_TYPE_COMPARISON_QUALIFIER:
+    case NODE_TYPE_OPERATOR_BINARY_EQ_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_NE_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_LT_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_LE_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_GT_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_GE_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_IN_ARRAY:
+    case NODE_TYPE_OPERATOR_BINARY_NIN_ARRAY:
       break;
   }
 
@@ -1352,10 +1378,11 @@ bool AstNode::isConstant () const {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not a node is a comparison operator
+/// @brief whether or not a node is a scalar comparison operator
+/// note: this will return false for array comparison operators
 ////////////////////////////////////////////////////////////////////////////////
 
-bool AstNode::isComparisonOperator () const {
+bool AstNode::isScalarComparisonOperator () const {
   return (type == NODE_TYPE_OPERATOR_BINARY_EQ ||
           type == NODE_TYPE_OPERATOR_BINARY_NE ||
           type == NODE_TYPE_OPERATOR_BINARY_LT ||
@@ -1747,6 +1774,41 @@ void AstNode::stringify (triagens::basics::StringBuffer* buffer,
     buffer->appendText((*it).second);
     buffer->appendChar(' ');
     getMember(1)->stringify(buffer, verbose, failIfLong);
+    return;
+  }
+
+  if (type == NODE_TYPE_OPERATOR_BINARY_EQ_ARRAY ||
+      type == NODE_TYPE_OPERATOR_BINARY_NE_ARRAY ||
+      type == NODE_TYPE_OPERATOR_BINARY_LT_ARRAY ||
+      type == NODE_TYPE_OPERATOR_BINARY_LE_ARRAY ||
+      type == NODE_TYPE_OPERATOR_BINARY_GT_ARRAY ||
+      type == NODE_TYPE_OPERATOR_BINARY_GE_ARRAY ||
+      type == NODE_TYPE_OPERATOR_BINARY_IN_ARRAY ||
+      type == NODE_TYPE_OPERATOR_BINARY_NIN_ARRAY) {
+    // not used by V8
+    TRI_ASSERT(numMembers() == 3);
+    auto it = Operators.find(type);
+    TRI_ASSERT(it != Operators.end());
+
+    getMember(0)->stringify(buffer, verbose, failIfLong);
+    buffer->appendChar(' ');
+    buffer->appendText((*it).second);
+    buffer->appendChar(' ');
+    getMember(1)->stringify(buffer, verbose, failIfLong);
+
+    buffer->appendChar(' ');
+    // append qualifier type
+    auto qualifier = getMember(2);
+    ComparisonType type = static_cast<ComparisonType>(qualifier->getIntValue(true));
+    buffer->appendInteger(static_cast<int64_t>(type));
+
+    // append range bounds
+    if (type == ComparisonType::COMPARISON_RANGE) {
+      buffer->appendChar(' ');
+      qualifier->getMember(0)->stringify(buffer, verbose, failIfLong);
+      buffer->appendChar(' ');
+      qualifier->getMember(1)->stringify(buffer, verbose, failIfLong);
+    }
     return;
   }
 

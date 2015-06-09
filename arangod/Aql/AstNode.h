@@ -112,6 +112,17 @@ namespace triagens {
     };
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief enumeration of comparison types
+////////////////////////////////////////////////////////////////////////////////
+
+    enum ComparisonType : uint32_t {
+      COMPARISON_ALL    = 0,
+      COMPARISON_ANY    = 1,
+      COMPARISON_NONE   = 2,
+      COMPARISON_RANGE  = 3
+    };
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief enumeration of AST node types
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -171,7 +182,16 @@ namespace triagens {
       NODE_TYPE_COLLECT_EXPRESSION            = 52,
       NODE_TYPE_CALCULATED_OBJECT_ELEMENT     = 53,
       NODE_TYPE_UPSERT                        = 54,
-      NODE_TYPE_EXAMPLE                       = 55
+      NODE_TYPE_EXAMPLE                       = 55,
+      NODE_TYPE_COMPARISON_QUALIFIER          = 56,
+      NODE_TYPE_OPERATOR_BINARY_EQ_ARRAY      = 57,
+      NODE_TYPE_OPERATOR_BINARY_NE_ARRAY      = 58,
+      NODE_TYPE_OPERATOR_BINARY_LT_ARRAY      = 59,
+      NODE_TYPE_OPERATOR_BINARY_LE_ARRAY      = 60,
+      NODE_TYPE_OPERATOR_BINARY_GT_ARRAY      = 61,
+      NODE_TYPE_OPERATOR_BINARY_GE_ARRAY      = 62,
+      NODE_TYPE_OPERATOR_BINARY_IN_ARRAY      = 63,
+      NODE_TYPE_OPERATOR_BINARY_NIN_ARRAY     = 64
     };
 
     static_assert(NODE_TYPE_VALUE < NODE_TYPE_ARRAY, "incorrect node types");
@@ -473,10 +493,11 @@ namespace triagens {
         bool isConstant () const;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not a node is a comparison operator
+/// @brief whether or not a node is a (scalar) comparison operator
+/// note: this will return false for array comparison operators
 ////////////////////////////////////////////////////////////////////////////////
 
-        bool isComparisonOperator () const;
+        bool isScalarComparisonOperator () const;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief whether or not a node (and its subnodes) may throw a runtime 
