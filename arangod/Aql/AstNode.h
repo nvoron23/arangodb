@@ -173,7 +173,9 @@ namespace triagens {
       NODE_TYPE_UPSERT                        = 54,
       NODE_TYPE_EXAMPLE                       = 55,
       NODE_TYPE_PASSTHRU                      = 56,
-      NODE_TYPE_ARRAY_LIMIT                   = 57
+      NODE_TYPE_ARRAY_LIMIT                   = 57,
+      NODE_TYPE_TRAVERSAL                     = 58,
+      NODE_TYPE_COLLECTION_PAIR               = 59
     };
 
     static_assert(NODE_TYPE_VALUE < NODE_TYPE_ARRAY, "incorrect node types");

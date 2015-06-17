@@ -75,7 +75,8 @@ std::unordered_map<int, std::string const> const ExecutionNode::TypeNames{
   { static_cast<int>(DISTRIBUTE),                   "DistributeNode" },
   { static_cast<int>(GATHER),                       "GatherNode" },
   { static_cast<int>(NORESULTS),                    "NoResultsNode" },
-  { static_cast<int>(UPSERT),                       "UpsertNode" }
+  { static_cast<int>(UPSERT),                       "UpsertNode" },
+  { static_cast<int>(TRAVERSAL),                    "TraversalNode" }
 };
           
 // -----------------------------------------------------------------------------
@@ -227,6 +228,8 @@ ExecutionNode* ExecutionNode::fromJsonFactory (ExecutionPlan* plan,
       return new ScatterNode(plan, oneNode);
     case DISTRIBUTE: 
       return new DistributeNode(plan, oneNode);
+    case TRAVERSAL:
+      return new TraversalNode(plan, oneNode);
     case ILLEGAL: {
       THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "invalid node type");
     }
@@ -883,8 +886,7 @@ ExecutionNode::RegisterPlan* ExecutionNode::RegisterPlan::clone (ExecutionPlan* 
 
 void ExecutionNode::RegisterPlan::after (ExecutionNode *en) {
   switch (en->getType()) {
-    case ExecutionNode::ENUMERATE_COLLECTION: 
-    case ExecutionNode::INDEX_RANGE: {
+    case ExecutionNode::ENUMERATE_COLLECTION: { 
       depth++;
       nrRegsHere.emplace_back(1);
       // create a copy of the last value here
@@ -894,7 +896,23 @@ void ExecutionNode::RegisterPlan::after (ExecutionNode *en) {
 
       auto ep = static_cast<EnumerateCollectionNode const*>(en);
       TRI_ASSERT(ep != nullptr);
-      varInfo.emplace(make_pair(ep->_outVariable->id,
+      varInfo.emplace(make_pair(ep->outVariable()->id,
+                               VarInfo(depth, totalNrRegs)));
+      totalNrRegs++;
+      break;
+    }
+    
+    case ExecutionNode::INDEX_RANGE: {
+      depth++;
+      nrRegsHere.emplace_back(1);
+      // create a copy of the last value here
+      // this is requried because back returns a reference and emplace/push_back may invalidate all references
+      RegisterId registerId = 1 + nrRegs.back();
+      nrRegs.emplace_back(registerId);
+
+      auto ep = static_cast<IndexRangeNode const*>(en);
+      TRI_ASSERT(ep != nullptr);
+      varInfo.emplace(make_pair(ep->outVariable()->id,
                                VarInfo(depth, totalNrRegs)));
       totalNrRegs++;
       break;
@@ -910,7 +928,7 @@ void ExecutionNode::RegisterPlan::after (ExecutionNode *en) {
 
       auto ep = static_cast<EnumerateListNode const*>(en);
       TRI_ASSERT(ep != nullptr);
-      varInfo.emplace(make_pair(ep->_outVariable->id,
+      varInfo.emplace(make_pair(ep->outVariable()->id,
                                VarInfo(depth, totalNrRegs)));
       totalNrRegs++;
       break;
@@ -1097,6 +1115,22 @@ void ExecutionNode::RegisterPlan::after (ExecutionNode *en) {
     case ExecutionNode::REMOTE: 
     case ExecutionNode::NORESULTS: {
       // these node types do not produce any new registers
+      break;
+    }
+    
+    case ExecutionNode::TRAVERSAL: {
+      depth++;
+      nrRegsHere.emplace_back(1);
+      // create a copy of the last value here
+      // this is requried because back returns a reference and emplace/push_back may invalidate all references
+      RegisterId registerId = 1 + nrRegs.back();
+      nrRegs.emplace_back(registerId);
+
+      auto ep = static_cast<TraversalNode const*>(en);
+      TRI_ASSERT(ep != nullptr);
+      varInfo.emplace(make_pair(ep->_outVariable->id,
+                               VarInfo(depth, totalNrRegs)));
+      totalNrRegs++;
       break;
     }
 
@@ -2448,7 +2482,8 @@ struct UserVarFinder : public WalkerWorker<ExecutionNode> {
     else if (en->getType() == ExecutionNode::ENUMERATE_COLLECTION ||
              en->getType() == ExecutionNode::INDEX_RANGE ||
              en->getType() == ExecutionNode::ENUMERATE_LIST ||
-             en->getType() == ExecutionNode::AGGREGATE) {
+             en->getType() == ExecutionNode::AGGREGATE ||
+             en->getType() == ExecutionNode::TRAVERSAL) {
       depth += 1;
     }
     // Now depth is set correct for this node.
@@ -3222,6 +3257,73 @@ void GatherNode::toJsonHelper (triagens::basics::Json& nodes,
         
 double GatherNode::estimateCost (size_t& nrItems) const {
   double depCost = _dependencies[0]->getCost(nrItems);
+  return depCost + nrItems;
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                          methods of TraversalNode
+// -----------------------------------------------------------------------------
+
+TraversalNode::TraversalNode (ExecutionPlan* plan,
+                              triagens::basics::Json const& base)
+  : ExecutionNode(plan, base),
+    _vocbase(plan->getAst()->query()->vocbase()),
+    _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
+    _astNode(nullptr) { // TODO: FIXME
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief toJson, for TraversalNode
+////////////////////////////////////////////////////////////////////////////////
+
+void TraversalNode::toJsonHelper (triagens::basics::Json& nodes,
+                                  TRI_memory_zone_t* zone,
+                                  bool verbose) const {
+  triagens::basics::Json json(ExecutionNode::toJsonHelperGeneric(nodes, zone, verbose));  // call base class method
+
+  if (json.isEmpty()) {
+    return;
+  }
+
+  // Now put info about vocbase and cid in there
+  json("database", triagens::basics::Json(_vocbase->_name))
+      ("outVariable", _outVariable->toJson());
+
+  // TODO: FIXME
+
+  // And add it:
+  nodes(json);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief clone ExecutionNode recursively
+////////////////////////////////////////////////////////////////////////////////
+
+ExecutionNode* TraversalNode::clone (ExecutionPlan* plan,
+                                     bool withDependencies,
+                                     bool withProperties) const {
+  auto outVariable = _outVariable;
+  if (withProperties) {
+    outVariable = plan->getAst()->variables()->createVariable(outVariable);
+    TRI_ASSERT(outVariable != nullptr);
+  }
+    
+  auto c = new TraversalNode(plan, _id, _vocbase, outVariable, nullptr); // TODO: FIXME
+
+  cloneHelper(c, plan, withDependencies, withProperties);
+
+  return static_cast<ExecutionNode*>(c);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the cost of a traversal node
+////////////////////////////////////////////////////////////////////////////////
+        
+double TraversalNode::estimateCost (size_t& nrItems) const { 
+  size_t incoming;
+  double depCost = _dependencies.at(0)->getCost(incoming);
+  size_t count = 1000; // TODO: FIXME
+  nrItems = incoming * count;
   return depCost + nrItems;
 }
 

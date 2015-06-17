@@ -101,7 +101,8 @@ namespace triagens {
           RETURN                  = 18,
           NORESULTS               = 19,
           DISTRIBUTE              = 20,
-          UPSERT                  = 21
+          UPSERT                  = 21,
+          TRAVERSAL               = 22
         };
 
 // -----------------------------------------------------------------------------
@@ -1075,6 +1076,14 @@ namespace triagens {
 
         std::vector<Variable const*> getVariablesSetHere () const override final {
           return std::vector<Variable const*>{ _outVariable };
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return out variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* outVariable () const {
+          return _outVariable;
         }
 
 // -----------------------------------------------------------------------------
@@ -3594,6 +3603,122 @@ namespace triagens {
 
         Collection const* _collection;
 
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                               class TraversalNode
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief class TraversalNode
+////////////////////////////////////////////////////////////////////////////////
+
+    class TraversalNode : public ExecutionNode {
+      friend class ExecutionNode;
+      friend class ExecutionBlock;
+      friend class TraversalCollectionBlock;
+      
+////////////////////////////////////////////////////////////////////////////////
+/// @brief constructor with a vocbase and a collection name
+////////////////////////////////////////////////////////////////////////////////
+
+      public:
+
+        TraversalNode (ExecutionPlan* plan,
+                       size_t id,
+                       TRI_vocbase_t* vocbase, 
+                       Variable const* outVariable,
+                       AstNode const* astNode)
+          : ExecutionNode(plan, id), 
+            _vocbase(vocbase), 
+            _outVariable(outVariable), 
+            _astNode(astNode) { 
+
+          TRI_ASSERT(_vocbase != nullptr);
+          TRI_ASSERT(_outVariable != nullptr);
+          TRI_ASSERT(_astNode != nullptr);
+        }
+
+        TraversalNode (ExecutionPlan* plan,
+                       triagens::basics::Json const& base);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the type of the node
+////////////////////////////////////////////////////////////////////////////////
+
+        NodeType getType () const override final {
+          return TRAVERSAL;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief export to JSON
+////////////////////////////////////////////////////////////////////////////////
+
+        void toJsonHelper (triagens::basics::Json&,
+                           TRI_memory_zone_t*,
+                           bool) const override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief clone ExecutionNode recursively
+////////////////////////////////////////////////////////////////////////////////
+
+        ExecutionNode* clone (ExecutionPlan* plan,
+                              bool withDependencies,
+                              bool withProperties) const override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the cost of a traversal node
+////////////////////////////////////////////////////////////////////////////////
+        
+        double estimateCost (size_t&) const override final;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief getVariablesSetHere
+////////////////////////////////////////////////////////////////////////////////
+
+        std::vector<Variable const*> getVariablesSetHere () const override final{
+          return std::vector<Variable const*>{ _outVariable };
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the database
+////////////////////////////////////////////////////////////////////////////////
+
+        TRI_vocbase_t* vocbase () const {
+          return _vocbase;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the out variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* outVariable () const {
+          return _outVariable;
+        }
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+
+      private:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the database
+////////////////////////////////////////////////////////////////////////////////
+
+        TRI_vocbase_t* _vocbase;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief output variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* _outVariable;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the traversal information AST node
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode const* _astNode;
     };
 
   }   // namespace triagens::aql

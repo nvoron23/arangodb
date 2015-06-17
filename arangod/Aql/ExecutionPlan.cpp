@@ -420,6 +420,10 @@ ExecutionNode* ExecutionPlan::fromNodeFor (ExecutionNode* previous,
     TRI_ASSERT(inVariable != nullptr);
     en = registerNode(new EnumerateListNode(this, nextId(), inVariable, v));
   }
+  else if (expression->type == NODE_TYPE_TRAVERSAL) {
+    // second operand is a traversal
+    en = registerNode(new TraversalNode(this, nextId(), _ast->query()->vocbase(), v, expression));
+  }
   else {
     // second operand is some misc. expression
     auto calc = createTemporaryCalculation(expression);
@@ -1723,7 +1727,8 @@ bool ExecutionPlan::isDeadSimple () const {
     if (nodeType == ExecutionNode::SUBQUERY ||
         nodeType == ExecutionNode::ENUMERATE_COLLECTION ||
         nodeType == ExecutionNode::ENUMERATE_LIST ||
-        nodeType == ExecutionNode::INDEX_RANGE) {
+        nodeType == ExecutionNode::INDEX_RANGE ||
+        nodeType == ExecutionNode::TRAVERSAL) {
       // these node types are not simple
       return false;
     }

@@ -2485,6 +2485,52 @@ namespace triagens {
 
         ExecutionStats _deltaStats;
         
+    };
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                    TraversalBlock
+// -----------------------------------------------------------------------------
+
+    class TraversalBlock : public ExecutionBlock {
+
+      public:
+
+        TraversalBlock (ExecutionEngine* engine,
+                        TraversalNode const* ep);
+
+        ~TraversalBlock ();
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initialize, here we fetch all docs from the database
+////////////////////////////////////////////////////////////////////////////////
+
+        int initialize () override;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initializeCursor
+////////////////////////////////////////////////////////////////////////////////
+
+        int initializeCursor (AqlItemBlock* items, size_t pos) override;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief getSome
+////////////////////////////////////////////////////////////////////////////////
+
+        AqlItemBlock* getSome (size_t atLeast, size_t atMost) override final;
+
+////////////////////////////////////////////////////////////////////////////////
+// skip between atLeast and atMost, returns the number actually skipped . . .
+// will only return less than atLeast if there aren't atLeast many
+// things to skip overall.
+////////////////////////////////////////////////////////////////////////////////
+
+        size_t skipSome (size_t atLeast, size_t atMost) override final;
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 private variables
+// -----------------------------------------------------------------------------
+
+      private:
 
     };
 

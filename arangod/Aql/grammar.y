@@ -74,6 +74,11 @@ void Aqlerror (YYLTYPE* locp,
 %token T_IN "IN keyword"
 %token T_WITH "WITH keyword"
 %token T_INTO "INTO keyword"
+%token T_FROM "FROM keyword"
+
+%token T_GRAPH "GRAPH keyword"
+%token T_TRAVERSE "TRAVERSE keyword"
+%token T_STEPS "STEPS keyword"
 
 %token T_REMOVE "REMOVE command"
 %token T_INSERT "INSERT command"
@@ -184,6 +189,9 @@ void Aqlerror (YYLTYPE* locp,
 %type <node> optional_array_filter;
 %type <node> optional_array_limit;
 %type <node> optional_array_return;
+%type <node> graph_subject;
+%type <node> graph_direction;
+%type <node> graph_collection;
 %type <node> reference;
 %type <node> simple_value;
 %type <node> value_literal;
@@ -1014,6 +1022,39 @@ optional_array_return:
     }
   ;
 
+graph_collection:
+    T_STRING {
+      $$ = parser->ast()->createNodeValueString($1);
+    }
+  | bind_parameter {
+      $$ = $1;
+    }
+  ;
+
+graph_subject:
+    graph_collection T_COMMA graph_collection {
+      // collection, collection
+      $$ = parser->ast()->createNodeCollectionPair($1, $3);
+    }
+  | T_QUOTED_STRING {
+      // graph name
+      $$ = parser->ast()->createNodeValueString($1);
+    }
+  | bind_parameter {
+      // graph name
+      $$ = $1;
+    }
+  ;
+
+graph_direction:
+    /* empty */ {
+      $$ = nullptr;
+    }
+  | expression {
+      $$ = $1;
+    }
+  ;
+
 reference:
     T_STRING {
       // variable or collection
@@ -1062,6 +1103,9 @@ reference:
     }
   | bind_parameter {
       $$ = $1;
+    }
+  | T_TRAVERSE graph_direction T_FROM expression T_GRAPH graph_subject expression T_STEPS {
+      $$ = parser->ast()->createNodeTraversal($2, $4, $6, $7); 
     }
   | function_call {
       $$ = $1;

@@ -1011,6 +1011,49 @@ AstNode* Ast::createNodeCalculatedObjectElement (AstNode const* attributeName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST collection pair node
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeCollectionPair (AstNode const* edgeCollection,
+                                        AstNode const* vertexCollection) {
+
+  AstNode* node = createNode(NODE_TYPE_COLLECTION_PAIR);
+
+  node->addMember(edgeCollection);
+  node->addMember(vertexCollection);
+
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST traversal node
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeTraversal (AstNode const* direction,
+                                   AstNode const* start,
+                                   AstNode const* graph,
+                                   AstNode const* steps) {
+
+  AstNode* node = createNode(NODE_TYPE_TRAVERSAL);
+
+  if (direction == nullptr) {
+    // direction can be a nullptr. default is "outbound"
+    node->addMember(createNodeValueString("outbound"));
+  }
+  else {
+    node->addMember(direction);
+  }
+
+  node->addMember(start);
+  node->addMember(graph);
+  node->addMember(steps);
+
+  TRI_ASSERT(node->numMembers() == 4);
+
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief create an AST function call node
 ////////////////////////////////////////////////////////////////////////////////
 

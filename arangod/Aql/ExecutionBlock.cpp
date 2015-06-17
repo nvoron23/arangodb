@@ -7094,6 +7094,52 @@ int64_t RemoteBlock::remaining () {
   LEAVE_BLOCK
 }
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                              class TraversalBlock
+// -----------------------------------------------------------------------------
+
+TraversalBlock::TraversalBlock (ExecutionEngine* engine,
+                                TraversalNode const* ep)
+  : ExecutionBlock(engine, ep) {
+
+}
+
+TraversalBlock::~TraversalBlock () {
+}
+
+int TraversalBlock::initialize () {
+  return ExecutionBlock::initialize();
+}
+
+int TraversalBlock::initializeCursor (AqlItemBlock* items, 
+                                      size_t pos) {
+  int res = ExecutionBlock::initializeCursor(items, pos);
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    return res;
+  }
+
+  return TRI_ERROR_NO_ERROR;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief getSome
+////////////////////////////////////////////////////////////////////////////////
+
+AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
+                                       size_t atMost) {
+
+  // TODO: FIXME
+  return nullptr;
+}
+
+size_t TraversalBlock::skipSome (size_t atLeast, size_t atMost) {
+  // TODO: FIXME
+  size_t skipped = 0;
+
+  return skipped;
+}
+
 // Local Variables:
 // mode: outline-minor
 // outline-regexp: "^\\(/// @brief\\|/// {@inheritDoc}\\|/// @addtogroup\\|// --SECTION--\\|/// @\\}\\)"

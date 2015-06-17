@@ -148,7 +148,9 @@ std::unordered_map<int, std::string const> const AstNode::TypeNames{
   { static_cast<int>(NODE_TYPE_CALCULATED_OBJECT_ELEMENT),"calculated object element" },
   { static_cast<int>(NODE_TYPE_EXAMPLE),                  "example" },
   { static_cast<int>(NODE_TYPE_PASSTHRU),                 "passthru" },
-  { static_cast<int>(NODE_TYPE_ARRAY_LIMIT),              "array limit" }
+  { static_cast<int>(NODE_TYPE_ARRAY_LIMIT),              "array limit" },
+  { static_cast<int>(NODE_TYPE_TRAVERSAL),                "traversal" },
+  { static_cast<int>(NODE_TYPE_COLLECTION_PAIR),          "collection pair" }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -569,6 +571,8 @@ AstNode::AstNode (Ast* ast,
     case NODE_TYPE_EXAMPLE:
     case NODE_TYPE_PASSTHRU:
     case NODE_TYPE_ARRAY_LIMIT:
+    case NODE_TYPE_TRAVERSAL:
+    case NODE_TYPE_COLLECTION_PAIR:
       break;
   }
 

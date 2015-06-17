@@ -64,6 +64,9 @@ static ExecutionBlock* CreateBlock (ExecutionEngine* engine,
       return new EnumerateListBlock(engine,
                                     static_cast<EnumerateListNode const*>(en));
     }
+    case ExecutionNode::TRAVERSAL: {
+      return new TraversalBlock(engine, static_cast<TraversalNode const*>(en));
+    }
     case ExecutionNode::CALCULATION: {
       return new CalculationBlock(engine,
                                   static_cast<CalculationNode const*>(en));
