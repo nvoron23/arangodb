@@ -1,4 +1,4 @@
-/*jshint strict:false, globalstrict: true, esnext: true */
+/*jshint esnext: true */
 /*global describe, beforeEach, it, expect, afterEach*/
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -28,233 +28,235 @@
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
-"use strict";
+(function() {
+  "use strict";
 
-const internal = require("internal");
-const db = internal.db;
-const arangodb = require("org/arangodb");
-const errors = arangodb.errors;
-const gm = require("org/arangodb/general-graph");
-const vn = "UnitTestVertexCollection";
-const en = "UnitTestEdgeCollection";
-const vertex = {};
-const edge = {};
+  const internal = require("internal");
+  const db = internal.db;
+  const arangodb = require("org/arangodb");
+  const errors = arangodb.errors;
+  const gm = require("org/arangodb/general-graph");
+  const vn = "UnitTestVertexCollection";
+  const en = "UnitTestEdgeCollection";
+  const vertex = {};
+  const edge = {};
 
-let cleanup = function () {
-  db._drop(vn);
-  db._drop(en);
-};
+  let cleanup = function () {
+    db._drop(vn);
+    db._drop(en);
+  };
 
-let isWellFormedResult = function (result) {
-  expect(result[0].hasOwnProperty("path")).toBeTruthy();
-  expect(result[0].hasOwnProperty("vertex")).toBeTruthy();
-  expect(result[0].path.hasOwnProperty("edges")).toBeTruthy();
-  expect(result[0].path.hasOwnProperty("vertices")).toBeTruthy();
-};
+  let isWellFormedResult = function (result) {
+    expect(result[0].hasOwnProperty("path")).toBeTruthy();
+    expect(result[0].hasOwnProperty("vertex")).toBeTruthy();
+    expect(result[0].path.hasOwnProperty("edges")).toBeTruthy();
+    expect(result[0].path.hasOwnProperty("vertices")).toBeTruthy();
+  };
 
-describe("The FOR x IN GRAPH statement", function () {
+  describe("The FOR x IN GRAPH statement", function () {
 
-  /***********************************************************************
-   * Graph under test:
-   *
-   *  A -> B -> C -> D
-   *      /|\  \|/
-   *       E <- F
-   *
-   *
-   *
-   *
-   *
-   *
-   *
-   *
-   *
-   *
-   *
-   *
-   *
-   * *********************************************************************/
-  beforeEach(function() {
-    cleanup();
-    let vc = db._create(vn);
-    let ec = db._createEdgeCollection(en);
-    vertex.A = vc.save({_key: "A"})._id;
-    vertex.B = vc.save({_key: "B"})._id;
-    vertex.C = vc.save({_key: "C"})._id;
-    vertex.D = vc.save({_key: "D"})._id;
-    vertex.E = vc.save({_key: "E"})._id;
-    vertex.F = vc.save({_key: "F"})._id;
-
-    edge.AB = ec.save(vertex.A, vertex.B, {})._id;
-    edge.BC = ec.save(vertex.B, vertex.C, {})._id;
-    edge.CD = ec.save(vertex.C, vertex.D, {})._id;
-    edge.CF = ec.save(vertex.C, vertex.F, {})._id;
-    edge.EB = ec.save(vertex.E, vertex.B, {})._id;
-    edge.FE = ec.save(vertex.F, vertex.E, {})._id;
-  });
-
-  afterEach(function() {
-    cleanup();
-  });
-
-  describe("with a named graph", function () {
-
-    let g;
-    const gn = "UnitTestGraph;";
-
+    /***********************************************************************
+     * Graph under test:
+     *
+     *  A -> B -> C -> D
+     *      /|\  \|/
+     *       E <- F
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     * *********************************************************************/
     beforeEach(function() {
-      try {
-        gm._drop(gn);
-      } catch (e) {
-        // It is expected that this graph does not exist.
-      }
-      g = gm._create(gn, [gm._relation(en, vn, vn)]);
+      cleanup();
+      let vc = db._create(vn);
+      let ec = db._createEdgeCollection(en);
+      vertex.A = vc.save({_key: "A"})._id;
+      vertex.B = vc.save({_key: "B"})._id;
+      vertex.C = vc.save({_key: "C"})._id;
+      vertex.D = vc.save({_key: "D"})._id;
+      vertex.E = vc.save({_key: "E"})._id;
+      vertex.F = vc.save({_key: "F"})._id;
+
+      edge.AB = ec.save(vertex.A, vertex.B, {})._id;
+      edge.BC = ec.save(vertex.B, vertex.C, {})._id;
+      edge.CD = ec.save(vertex.C, vertex.D, {})._id;
+      edge.CF = ec.save(vertex.C, vertex.F, {})._id;
+      edge.EB = ec.save(vertex.E, vertex.B, {})._id;
+      edge.FE = ec.save(vertex.F, vertex.E, {})._id;
     });
 
     afterEach(function() {
-      gm._drop(gn);
+      cleanup();
     });
 
-    describe("no steps definition", function() {
+    describe("with a named graph", function () {
 
-      it("should default to exactly one outbound step", function () {
-        let query = "FOR x IN GRAPH @graph FROM @startId RETURN x";
-        let bindVars = {
-          graph: gn,
-          startId: vertex.B
-        };
-        let result = db._query(query, bindVars);
-        expect(result.length).toEqual(1);
-        let entry = result[0];
-        isWellFormedResult(entry);
-        expect(entry.vertex._id).toEqual(vertex.C);
-        expect(entry.path.vertices.length).toEqual(2);
-        expect(entry.path.vertices[0]).toEqual(vertex.B);
-        expect(entry.path.vertices[1]).toEqual(vertex.C);
-        expect(entry.path.edges.length).toEqual(1);
-        expect(entry.path.edges[0]).toEqual(edge.BC);
+      let g;
+      const gn = "UnitTestGraph";
+
+      beforeEach(function() {
+        try {
+          gm._drop(gn);
+        } catch (e) {
+          // It is expected that this graph does not exist.
+        }
+        g = gm._create(gn, [gm._relation(en, vn, vn)]);
       });
 
-      it("should be able to explicitly use outbound direction, equivalent to none", function () {
-        let query = "FOR x IN GRAPH @graph FROM @startId OUTBOUND RETURN x";
-        let bindVars = {
-          graph: gn,
-          startId: vertex.B
-        };
-        let result = db._query(query, bindVars);
-        expect(result.length).toEqual(1);
-        let entry = result[0];
-        isWellFormedResult(entry);
-        expect(entry.vertex._id).toEqual(vertex.C);
-        expect(entry.path.vertices.length).toEqual(2);
-        expect(entry.path.vertices[0]).toEqual(vertex.B);
-        expect(entry.path.vertices[1]).toEqual(vertex.C);
-        expect(entry.path.edges.length).toEqual(1);
-        expect(entry.path.edges[0]).toEqual(edge.BC);
+      afterEach(function() {
+        gm._drop(gn);
       });
 
-      it("should be able to explicitly use inbound direction", function () {
-        let query = "FOR x IN GRAPH @graph FROM @startId INBOUND RETURN x";
-        let bindVars = {
-          graph: gn,
-          startId: vertex.C
-        };
-        let result = db._query(query, bindVars);
-        expect(result.length).toEqual(1);
-        let entry = result[0];
-        isWellFormedResult(entry);
-        expect(entry.vertex._id).toEqual(vertex.B);
-        expect(entry.path.vertices.length).toEqual(2);
-        expect(entry.path.vertices[0]).toEqual(vertex.C);
-        expect(entry.path.vertices[1]).toEqual(vertex.B);
-        expect(entry.path.edges.length).toEqual(1);
-        expect(entry.path.edges[0]).toEqual(edge.BC);
-      });
+      describe("return format", function() {
 
-      it("should be able to sort the result", function () {
-        let query = "FOR x IN GRAPH @graph FROM @startId SORT x.vertex._id ASC RETURN x";
-        let bindVars = {
-          graph: gn,
-          startId: vertex.C
-        };
-        let isCD = function(entry) {
-          expect(entry.vertex._id).toEqual(vertex.D);
+        it("should return path and vertex", function () {
+          let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 1 STEPS RETURN x";
+          let bindVars = {
+            graph: gn,
+            startId: vertex.B
+          };
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(1);
+          let entry = result[0];
+          isWellFormedResult(entry);
+          expect(entry.vertex._id).toEqual(vertex.C);
           expect(entry.path.vertices.length).toEqual(2);
-          expect(entry.path.vertices[0]).toEqual(vertex.C);
-          expect(entry.path.vertices[1]).toEqual(vertex.D);
+          expect(entry.path.vertices[0]._id).toEqual(vertex.B);
+          expect(entry.path.vertices[1]._id).toEqual(vertex.C);
           expect(entry.path.edges.length).toEqual(1);
-          expect(entry.path.edges[0]).toEqual(edge.CD);
-        };
-
-        let isCF = function(entry) {
-          expect(entry.vertex._id).toEqual(vertex.F);
-          expect(entry.path.vertices.length).toEqual(2);
-          expect(entry.path.vertices[0]).toEqual(vertex.C);
-          expect(entry.path.vertices[1]).toEqual(vertex.F);
-          expect(entry.path.edges.length).toEqual(1);
-          expect(entry.path.edges[0]).toEqual(edge.CF);
-        };
-
-        let result = db._query(query, bindVars);
-        expect(result.length).toEqual(2);
-
-        let entry = result[0];
-        isWellFormedResult(result[0]);
-        isCD(result[0]);
-        isWellFormedResult(result[1]);
-        isCF(result[1]);
-
-        // Reverse ordering
-        query = "FOR x IN GRAPH @graph FROM @startId SORT x.vertex._id DESC RETURN x";
-
-        result = db._query(query, bindVars);
-        expect(result.length).toEqual(2);
-        entry = result[0];
-        isWellFormedResult(result[0]);
-        isCF(result[0]);
-        isWellFormedResult(result[1]);
-        isCD(result[1]);
+          expect(entry.path.edges[0]._id).toEqual(edge.BC);
+        });
       });
 
-      it("should be able to explicity use any direction", function () {
-        let query = "FOR x IN GRAPH @graph FROM @startId ANY SORT x.vertex._id ASC RETURN x";
-        let bindVars = {
-          graph: gn,
-          startId: vertex.B
-        };
-        let result = db._query(query, bindVars);
-        expect(result.length).toEqual(3);
+      describe("direction", function() {
 
-        let entry = result[0];
-        isWellFormedResult(entry);
-        expect(entry.vertex._id).toEqual(vertex.A);
-        expect(entry.path.vertices.length).toEqual(2);
-        expect(entry.path.vertices[0]).toEqual(vertex.B);
-        expect(entry.path.vertices[1]).toEqual(vertex.A);
-        expect(entry.path.edges.length).toEqual(1);
-        expect(entry.path.edges[0]).toEqual(edge.AB);
- 
-        entry = result[1];
-        isWellFormedResult(entry);
-        expect(entry.vertex._id).toEqual(vertex.C);
-        expect(entry.path.vertices.length).toEqual(2);
-        expect(entry.path.vertices[0]).toEqual(vertex.B);
-        expect(entry.path.vertices[1]).toEqual(vertex.C);
-        expect(entry.path.edges.length).toEqual(1);
-        expect(entry.path.edges[0]).toEqual(edge.BC);
+        it("can use outbound direction, equivalent to default", function () {
+          let query = "FOR x IN TRAVERSE OUTBOUND FROM @startId GRAPH @graph 1 STEPS RETURN x._vertex._id";
+          let bindVars = {
+            graph: gn,
+            startId: vertex.B
+          };
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(1);
+          let entry = result[0];
+          expect(entry).toEqual(vertex.C);
+        });
 
-        entry = result[2];
-        isWellFormedResult(entry);
-        expect(entry.vertex._id).toEqual(vertex.F);
-        expect(entry.path.vertices.length).toEqual(2);
-        expect(entry.path.vertices[0]).toEqual(vertex.B);
-        expect(entry.path.vertices[1]).toEqual(vertex.F);
-        expect(entry.path.edges.length).toEqual(1);
-        expect(entry.path.edges[0]).toEqual(edge.FB);
+        it("can use inbound direction", function () {
+          let query = "FOR x IN TRAVERSE INBOUND FROM @startId GRAPH @graph 1 STEPS RETURN x._vertex._id";
+          let bindVars = {
+            graph: gn,
+            startId: vertex.C
+          };
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(1);
+          let entry = result[0];
+          expect(entry).toEqual(vertex.B);
+        });
+
+        it("can use any direction", function () {
+          let query = "FOR x IN TRAVERSE ANY FROM @startId GRAPH @graph 1 STEPS "
+                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+          let bindVars = {
+            graph: gn,
+            startId: vertex.B
+          };
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(3);
+
+          let entry = result[0];
+          expect(entry).toEqual(vertex.A);
+          entry = result[1];
+          expect(entry).toEqual(vertex.C);
+          entry = result[2];
+          expect(entry).toEqual(vertex.F);
+        });
+
+      });
+
+      describe("steps", function () {
+
+        it("can use an exact number of steps", function () {
+          let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 2 STEPS "
+                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+          let bindVars = {
+            graph: gn,
+            startId: vertex.B
+          };
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(2);
+
+          expect(result[0]).toEqual(vertex.D);
+          expect(result[1]).toEqual(vertex.F);
+        });
+
+        it("can use a range of steps", function () {
+          let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 2..3 STEPS "
+                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+          let bindVars = {
+            graph: gn,
+            startId: vertex.B
+          };
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(3);
+
+          expect(result[0]).toEqual(vertex.D);
+          expect(result[1]).toEqual(vertex.E);
+          expect(result[2]).toEqual(vertex.F);
+        });
+
+        it("can use a computed function of steps", function () {
+          let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph LENGTH([1, 2]) STEPS "
+                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+          let bindVars = {
+            graph: gn,
+            startId: vertex.B
+          };
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(3);
+
+          expect(result[0]).toEqual(vertex.D);
+          expect(result[1]).toEqual(vertex.F);
+        });
+
+      });
+
+      describe("sorting", function () {
+        it("should be able to sort the result", function () {
+          let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 1 STEPS " 
+                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+          let bindVars = {
+            graph: gn,
+            startId: vertex.C
+          };
+
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(2);
+          expect(result[0]).toEqual(vertex.D);
+          expect(result[1]).toEqual(vertex.F);
+
+          // Reverse ordering
+          query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 1 STEPS SORT x._vertex._id DESC RETURN x._vertex._id";
+
+          result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(2);
+          expect(result[0]).toEqual(vertex.F);
+          expect(result[1]).toEqual(vertex.D);
+        });
+
       });
 
     });
 
   });
 
-});
+}());
