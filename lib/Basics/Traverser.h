@@ -1267,7 +1267,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Function to get the connected vertex from index.
 ////////////////////////////////////////////////////////////////////////////////
-       std::function<vertexIdentifier (edgeIdentifier&)> _getVertex;
+       std::function<vertexIdentifier (edgeIdentifier&, vertexIdentifier&)> _getVertex;
 
       public: 
 
@@ -1277,7 +1277,7 @@ namespace triagens {
 
         PathEnumerator (
           std::function<void(vertexIdentifier&, std::vector<edgeIdentifier>&, void*&, size_t)> getEdge,
-          std::function<vertexIdentifier (edgeIdentifier&)> getVertex,
+          std::function<vertexIdentifier (edgeIdentifier&, vertexIdentifier&)> getVertex,
           vertexIdentifier& startVertex
         ) : _getEdge(getEdge),
             _getVertex(getVertex) {
@@ -1299,7 +1299,7 @@ namespace triagens {
         if (_lastEdges.top() != nullptr) {
           // Could continue the path in the next depth.
           _lastEdges.push(nullptr); 
-          vertexIdentifier v = _getVertex(_traversalPath.edges.back());
+          vertexIdentifier v = _getVertex(_traversalPath.edges.back(), _traversalPath.vertices.back());
           _traversalPath.vertices.push_back(v);
           TRI_ASSERT(_traversalPath.vertices.size() == _traversalPath.edges.size() + 1);
         } else {

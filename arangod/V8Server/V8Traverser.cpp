@@ -39,6 +39,7 @@
 #include "V8Server/v8-collection.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/key-generator.h"
+#include "Indexes/EdgeIndex.h"
 #include <v8.h>
 
 using namespace std;
@@ -623,3 +624,61 @@ void TRI_RunNeighborsSearch (
   }
 }
 
+// -----------------------------------------------------------------------------
+// --SECTION--                                         class DepthFirstTraverser
+// -----------------------------------------------------------------------------
+
+DepthFirstTraverser::DepthFirstTraverser (
+    TRI_document_collection_t* edgeCollection,
+    TRI_edge_direction_e direction,
+    VertexId startVertex,
+    uint64_t minDepth,
+    uint64_t maxDepth
+  ) : _minDepth(minDepth), _maxDepth(maxDepth), _pruneNext(false) {
+  auto edgeIndex = edgeCollection->edgeIndex();
+  auto getEdge = [edgeIndex, direction] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, size_t amount) {
+    // TODO fill Statistics
+    TRI_edge_index_iterator_t it(direction, startVertex.cid, startVertex.key);
+    edgeIndex->lookup(&it, edges, last, amount);
+  };
+  auto getVertex = [] (TRI_doc_mptr_copy_t& edge, VertexId& vertex) -> VertexId {
+    // TODO fill Statistics
+    if (TRI_EXTRACT_MARKER_FROM_KEY(&edge) == vertex.key &&
+        TRI_EXTRACT_MARKER_FROM_CID(&edge) == vertex.cid) {
+      return VertexId(TRI_EXTRACT_MARKER_TO_CID(&edge), TRI_EXTRACT_MARKER_TO_KEY(&edge));
+    }
+    return VertexId(TRI_EXTRACT_MARKER_FROM_CID(&edge), TRI_EXTRACT_MARKER_FROM_KEY(&edge));
+  };
+  _enumerator.reset(new PathEnumerator<TRI_doc_mptr_copy_t, VertexId>(getEdge, getVertex, startVertex));
+}
+
+
+void DepthFirstTraverser::skip (int amount) {
+  TraversalPath<TRI_doc_mptr_copy_t, VertexId> p;
+  for (int i = 0; i < amount; ++i) {
+    p = next();
+    if (p.edges.size() == 0) {
+      break;
+    }
+  }
+}
+
+
+const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& DepthFirstTraverser::next () {
+  if (_pruneNext) {
+    _pruneNext = false;
+    _enumerator->prune();
+  }
+  const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p = _enumerator->next();
+  int countEdges = p.edges.size();
+  if (countEdges == 0) {
+    // Done traversing
+  }
+  if (countEdges >= _maxDepth) {
+    _pruneNext = true;
+  }
+  if (countEdges < _minDepth) {
+    return next();
+  }
+  return p;
+}

@@ -105,7 +105,7 @@ auto integerEdgeEnumerator = [] (int& start, std::vector<int>& result, void*& ne
   }
 };
 
-auto integerVertexEnumerator = [] (int& edge) -> int {
+auto integerVertexEnumerator = [] (int& edge, int& vertex) -> int {
   return 1;
 };
 
