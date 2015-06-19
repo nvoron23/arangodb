@@ -104,7 +104,7 @@ ArangoQueryCursor.prototype.toString = function () {
     result += "\n\n" + internal.stopCaptureMode(old);
 
     if (this.hasNext()) {
-      result += "\ntype 'more' to show more documents\n";
+      result += "\ntype 'more' to show more documents";
       more = this; // assign cursor to global variable more!
     }
   }

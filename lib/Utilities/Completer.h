@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief a basis class which defines the methods for determining
-///        when an input is "complete"
+/// @brief a base class which defines the methods for determining
+/// if an input is "complete"
 ///
 /// @file
 ///

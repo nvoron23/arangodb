@@ -44,28 +44,48 @@
 namespace triagens {
 
   class V8Completer : public Completer {
+    public:
 
-    enum {
-      NORMAL,             // start
-      NORMAL_1,           // from NORMAL: seen a single /
-      DOUBLE_QUOTE,       // from NORMAL: seen a single "
-      DOUBLE_QUOTE_ESC,   // from DOUBLE_QUOTE: seen a backslash
-      SINGLE_QUOTE,       // from NORMAL: seen a single '
-      SINGLE_QUOTE_ESC,   // from SINGLE_QUOTE: seen a backslash
-      BACKTICK,           // from NORMAL: seen a single `
-      BACKTICK_ESC,       // from BACKTICK: seen a backslash
-      MULTI_COMMENT,      // from NORMAL_1: seen a *
-      MULTI_COMMENT_1,    // from MULTI_COMMENT, seen a *
-      SINGLE_COMMENT      // from NORMAL_1; seen a /
-    }
-    state;
+      V8Completer ()
+        : _requireSemicolon(false) {
+      }
 
-    virtual bool isComplete (std::string const&, 
-                            size_t lineno, 
-                            size_t column);
+      ~V8Completer () {
+      }
 
-    virtual void getAlternatives (char const*, 
-                                  std::vector<std::string>&);
+    public:
+      
+      char const* getStatementEnd (char const*) const; 
+
+      bool isComplete (std::string const&, 
+                       size_t lineno, 
+                       size_t column) override final;
+
+      void getAlternatives (char const*, 
+                            std::vector<std::string>&) override final;
+
+      void requireSemicolon (bool value) {
+        _requireSemicolon = value;
+      } 
+
+    private:
+
+      enum TokenizeState {
+        NORMAL,             // start
+        NORMAL_1,           // from NORMAL: seen a single /
+        DOUBLE_QUOTE,       // from NORMAL: seen a single "
+        DOUBLE_QUOTE_ESC,   // from DOUBLE_QUOTE: seen a backslash
+        SINGLE_QUOTE,       // from NORMAL: seen a single '
+        SINGLE_QUOTE_ESC,   // from SINGLE_QUOTE: seen a backslash
+        BACKTICK,           // from NORMAL: seen a single `
+        BACKTICK_ESC,       // from BACKTICK: seen a backslash
+        MULTI_COMMENT,      // from NORMAL_1: seen a *
+        MULTI_COMMENT_1,    // from MULTI_COMMENT, seen a *
+        SINGLE_COMMENT      // from NORMAL_1; seen a /
+      };
+
+      bool _requireSemicolon;
+
   };
 
 // -----------------------------------------------------------------------------
@@ -100,11 +120,33 @@ namespace triagens {
       ~V8LineEditor ();
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                                    public methods
+// -----------------------------------------------------------------------------
+
+    public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief toggles whether the input requires a semicolon
+////////////////////////////////////////////////////////////////////////////////
+
+      void requireSemicolon (bool value) {
+        _completer.requireSemicolon(value);
+      }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the last position of the input
+////////////////////////////////////////////////////////////////////////////////
+
+      char const* getStatementEnd (char const* input) {
+        return _completer.getStatementEnd(input);
+      }
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief     creates a concrete Shell with the correct parameter (Completer!!)
+/// @brief creates a concrete Shell with the correct parameter (Completer!!)
 ////////////////////////////////////////////////////////////////////////////////
 
     protected:

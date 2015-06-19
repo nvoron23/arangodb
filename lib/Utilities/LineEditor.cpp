@@ -49,8 +49,8 @@ using namespace triagens;
 ////////////////////////////////////////////////////////////////////////////////
 
 LineEditor::LineEditor (std::string const& history)
-  : _history(history) {
-  _shellImpl = 0;
+  : _shellImpl(nullptr),
+    _history(history) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -134,6 +134,16 @@ void LineEditor::sortAlternatives (vector<string>& completions) {
   );
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief prefill the input
+////////////////////////////////////////////////////////////////////////////////
+
+void LineEditor::prefill (char const* input) {
+  if (_shellImpl != nullptr) {
+    _shellImpl->prefill(input);
+  }
+}
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 protected methods
 // -----------------------------------------------------------------------------
@@ -144,6 +154,7 @@ void LineEditor::prepareShell () {
     initializeShell();
   }
 }
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                       END-OF-FILE
 // -----------------------------------------------------------------------------

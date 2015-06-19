@@ -77,7 +77,7 @@ using namespace triagens::arango;
 /// @brief command prompt
 ////////////////////////////////////////////////////////////////////////////////
 
-static string Prompt = "arangosh [%d]> ";
+static string Prompt = "%m [%d]> ";
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief base class for clients
@@ -194,6 +194,15 @@ static triagens::V8LineEditor* Console = nullptr;
 ////////////////////////////////////////////////////////////////////////////////
 
 static bool VoiceMode = false;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief input mode type
+////////////////////////////////////////////////////////////////////////////////
+  
+enum InputMode {
+  MODE_ARANGOSH,     // entering JavaScript commands. this is the default
+  MODE_AQL           // entering AQL commands
+};
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                              JavaScript functions
@@ -1030,7 +1039,6 @@ static void ClientConnection_httpPostAny (const v8::FunctionCallbackInfo<v8::Val
   v8::Isolate* isolate = args.GetIsolate();
   v8::HandleScope scope(isolate);
 
-
   // get the connection
   V8ClientConnection* connection = TRI_UnwrapClass<V8ClientConnection>(args.Holder(), WRAP_TYPE_CONNECTION);
 
@@ -1454,10 +1462,32 @@ static void ClientConnection_setDatabaseName (const v8::FunctionCallbackInfo<v8:
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief dynamically replace %d, %e, %u in the prompt
+/// @brief translate a mode into a string
 ////////////////////////////////////////////////////////////////////////////////
 
-static std::string BuildPrompt () {
+static std::string ModeString (InputMode mode) {
+  if (mode == MODE_ARANGOSH) {
+    return "arangosh";
+  }
+  return "aql";
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief get the other mode
+////////////////////////////////////////////////////////////////////////////////
+
+static InputMode OtherMode (InputMode current) {
+  if (current == MODE_ARANGOSH) {
+    return MODE_AQL;
+  }
+  return MODE_ARANGOSH;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief dynamically replace %d, %e, %u, %m in the prompt
+////////////////////////////////////////////////////////////////////////////////
+
+static std::string BuildPrompt (InputMode mode) {
   string result;
 
   char const* p = Prompt.c_str();
@@ -1482,6 +1512,9 @@ static std::string BuildPrompt () {
       }
       else if (c == 'u') {
         result.append(BaseClient.username());
+      }
+      else if (c == 'm') {
+        result.append(ModeString(mode));
       }
 
       esc = false;
@@ -1523,10 +1556,110 @@ static void SignalHandler (int signal) {
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief AQL keywords and built-in functions
+////////////////////////////////////////////////////////////////////////////////
+  
+static const std::vector<char const*> AqlCompletionValues{
+  "FOR", "LET", "FILTER", "RETURN", "COLLECT", "SORT", "LIMIT", "ASC", "DESC", "NOT", "AND", "OR",
+  "IN", "INTO", "WITH", "REMOVE", "INSERT", "UPDATE", "REPLACE", "UPSERT", "null", "true", "false",
+
+  "IS_NULL()", "IS_BOOL()", "IS_NUMBER()", "IS_STRING()", "IS_ARRAY()", "IS_LIST()", "IS_OBJECT()", "IS_DOCUMENT()", 
+  "TO_NUMBER()", "TO_STRING()", "TO_BOOL()", "TO_ARRAY()", "TO_LIST()", "CONCAT()", "CONCAT_SEPARATOR()", "CHAR_LENGTH()", 
+  "LOWER()", "UPPER()", "SUBSTRING()", "CONTAINS()", "LIKE()", "LEFT()", "RIGHT()", "TRIM()", "LTRIM()", "RTRIM()", 
+  "FIND_FIRST()", "FIND_LAST()", "SPLIT()", "SUBSTITUTE()", "MD5()", "SHA1()", "RANDOM_TOKEN()", 
+  "FLOOR()", "CEIL()", "ROUND()", "ABS()", "RAND()", "SQRT()", "RANGE()", "UNION()", "UNION_DISTINCT()", "MINUS()", "INTERSECTION()", 
+  "FLATTEN()", "LENGTH()", "MIN()", "MAX()", "SUM()", "MEDIAN()", "PERCENTILE()", "AVERAGE()", 
+  "VARIANCE_SAMPLE()", "VARIANCE_POPULATION()", "STDDEV_SAMPLE()", "STDDEV_POPULATION()", "UNIQUE()", "SLICE()", 
+  "REVERSE()", "FIRST()", "LAST()", "NTH()", "POSITION()", "CALL()", "APPLY()", "PUSH()", "APPEND()", "POP()", "SHIFT()", "UNSHIFT()", 
+  "REMOVE_VALUE()", "REMOVE_VALUES()", "REMOVE_NTH()", "HAS()", "ATTRIBUTES()", "VALUES()", "MERGE()", "MERGE_RECURSIVE()", 
+  "DOCUMENT()", "MATCHES()", "UNSET()", "KEEP()", "TRANSLATE()", "ZIP()", 
+  "NEAR()", "WITHIN()", "WITHIN_RECTANGLE()", "IS_IN_POLYGON()", "FULLTEXT()", 
+  "PATHS()", "GRAPH_PATHS()", "SHORTEST_PATH()", "GRAPH_SHORTEST_PATH()", "GRAPH_DISTANCE_TO()", "TRAVERSAL()", 
+  "GRAPH_TRAVERSAL()", "TRAVERSAL_TREE()", "GRAPH_TRAVERSAL_TREE()", "EDGES()", "GRAPH_EDGES()", "GRAPH_VERTICES()", 
+  "NEIGHBORS()", "GRAPH_NEIGHBORS()", "GRAPH_COMMON_NEIGHBORS()", "GRAPH_COMMON_PROPERTIES()", "GRAPH_ECCENTRICITY()", 
+  "GRAPH_BETWEENNESS()", "GRAPH_CLOSENESS()", "GRAPH_ABSOLUTE_ECCENTRICITY()", "GRAPH_ABSOLUTE_BETWEENNESS()", 
+  "GRAPH_ABSOLUTE_CLOSENESS()", "GRAPH_DIAMETER()", "GRAPH_RADIUS()", 
+  "DATE_NOW()", "DATE_TIMESTAMP()", "DATE_ISO8601()", "DATE_DAYOFWEEK()", "DATE_YEAR()", "DATE_MONTH()", "DATE_DAY()", 
+  "DATE_HOUR()", "DATE_MINUTE()", "DATE_SECOND()", "DATE_MILLISECOND()", 
+  "COLLECTIONS()", "NOT_NULL()", "FIRST_LIST()", "FIRST_DOCUMENT()", "PARSE_IDENTIFIER()", 
+  "CURRENT_USER()", "CURRENT_DATABASE()"
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief callback for AQL completions
+////////////////////////////////////////////////////////////////////////////////
+
+static void AqlCompletions (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TRI_V8_TRY_CATCH_BEGIN(isolate);
+  v8::HandleScope scope(isolate);
+
+  // add keywords and function names from hard-coded list
+  uint32_t j = 0;
+  v8::Handle<v8::Array> result = v8::Array::New(isolate, static_cast<int>(AqlCompletionValues.size()));
+  for (auto const& it : AqlCompletionValues) {
+    result->Set(j++, TRI_V8_ASCII_STRING(it));
+  }
+
+  // dynamically add names of all collections present
+  v8::Handle<v8::Object> current = isolate->GetCurrentContext()->Global();
+  if (current->Has(TRI_V8_ASCII_STRING("db"))) {
+    auto db = current->Get(TRI_V8_ASCII_STRING("db"))->ToObject();
+
+    if (! db.IsEmpty()) {
+      auto names = db->GetOwnPropertyNames();
+
+      for (uint32_t i = 0; i < names->Length(); ++i) {
+        auto name = names->Get(i);
+        auto value = db->Get(name);
+
+        if (! value->IsObject() ||
+            value->IsNull() || 
+            value->IsString() || 
+            value->IsNumber() || 
+            value->IsFunction() ||
+            value->IsRegExp() ||
+            value->IsArray()) {
+          continue;
+        }
+
+        if (! value->ToObject()->Has(TRI_V8_ASCII_STRING("_id"))) {
+          continue;
+        }
+
+        result->Set(j++, name);
+      }
+    }
+  }
+
+  TRI_V8_RETURN(result);
+  TRI_V8_TRY_CATCH_END
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief remove completions for AQL
+////////////////////////////////////////////////////////////////////////////////
+
+static void ResetAqlCompletions (v8::Isolate* isolate,
+                                 v8::Handle<v8::Context> context) {  
+  context->Global()->Delete(TRI_V8_ASCII_STRING("_COMPLETIONS"));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initialize completions for AQL
+////////////////////////////////////////////////////////////////////////////////
+
+static void InitAqlCompletions (v8::Isolate* isolate,
+                                v8::Handle<v8::Context> context) {  
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("_COMPLETIONS"), AqlCompletions);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief executes the shell
 ////////////////////////////////////////////////////////////////////////////////
 
-static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, bool promptError) {
+static void RunShell (v8::Isolate* isolate, 
+                      v8::Handle<v8::Context> context, 
+                      bool promptError) {
   v8::Context::Scope contextScope(context);
   v8::Local<v8::String> name(TRI_V8_ASCII_STRING(TRI_V8_SHELL_COMMAND_NAME));
 
@@ -1550,6 +1683,7 @@ static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, boo
   }
 #endif
 
+  InputMode inputMode = MODE_ARANGOSH;
   uint64_t nrCommands = 0;
 
 #ifdef __APPLE__
@@ -1562,7 +1696,7 @@ static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, boo
     // set up prompts
     string dynamicPrompt;
     if (ClientConnection != nullptr) {
-      dynamicPrompt = BuildPrompt();
+      dynamicPrompt = BuildPrompt(inputMode);
     }
     else {
       dynamicPrompt = "disconnected> ";
@@ -1625,10 +1759,11 @@ static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, boo
       nrCommands = 0;
 
       isolate->LowMemoryNotification();
-      //   todo 1000 was the old V8-default, is this really good?
       while (! isolate->IdleNotification(1000)) {
       }
     }
+  
+    context->Global()->ForceSet(TRI_V8_ASCII_STRING("_promptError"), v8::False(isolate), v8::DontEnum);
 
 #ifdef __APPLE__
     if (VoiceMode && promptError) {
@@ -1650,22 +1785,108 @@ static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, boo
 
     BaseClient.log("%s%s\n", dynamicPrompt.c_str(), input);
 
+    // handle special commands
+    // take a trimmed copy of the string
     string i = triagens::basics::StringUtils::trim(input);
 
-    if (i == "exit" || i == "quit" || i == "exit;" || i == "quit;") {
-      TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, input);
-      break;
-    }
+    // transform the first few bytes of the trimmed copy and lower-case them 
+    std::transform(i.begin(), (i.size() >= 10) ? i.begin() + 10 : i.end(), i.begin(), ::tolower);
 
-    if (i == "help" || i == "help;") {
-      TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, input);
-      input = TRI_DuplicateStringZ(TRI_UNKNOWN_MEM_ZONE, "help()");
-      if (input == nullptr) {
-        LOG_FATAL_AND_EXIT("out of memory");
+    bool const canBeSpecialCommand = (i.size() >= 3 && i.size() <= 9); // note: adjust bounds when adding more commands
+
+    // handle special commands
+    if (canBeSpecialCommand) { 
+      if (i == "exit" || i == "quit" || i == "exit;" || i == "quit;") {
+        TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, input);
+        break;
+      }
+
+      if (i == "help" || i == "help;") {
+        TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, input);
+        input = TRI_DuplicateStringZ(TRI_UNKNOWN_MEM_ZONE, "help()");
+        if (input == nullptr) {
+          LOG_FATAL_AND_EXIT("out of memory");
+        }
+      }
+      else if (i == "mode" || i == "mode;") {
+        // print mode info
+        BaseClient.printLine("Currently in " + ModeString(inputMode) + " mode", true);
+        BaseClient.printLine("Type '" + ModeString(OtherMode(inputMode)) + "' to switch to " + ModeString(OtherMode(inputMode)) + " mode", true);
+        BaseClient.printLine("");
+        promptError = false;
+        continue;
+      }
+      else if (i == "aql" || i == "aql;" || i == "arangosh" || i == "arangosh;") {
+        // mode change
+        Console->addHistory(input);
+
+        bool change = ((inputMode == MODE_ARANGOSH && (i == "aql" || i == "aql;")) ||
+                       (inputMode == MODE_AQL && (i == "arangosh" || i == "arangosh;")));
+
+        if (change) {
+          BaseClient.printLine("Switching to " + ModeString(OtherMode(inputMode)) + " mode", true);
+          BaseClient.printLine("Type '" + ModeString(inputMode) + "' to switch back to " + ModeString(inputMode) + " mode", true);
+        }
+        else {
+          BaseClient.printLine("Already in " + ModeString(inputMode) + " mode", true);
+        }
+        BaseClient.printLine("");
+        promptError = false;
+        if (change) {
+          inputMode = OtherMode(inputMode);
+
+          if (inputMode == MODE_AQL) {
+            InitAqlCompletions(isolate, context);
+            Console->requireSemicolon(true);
+          }
+          else {
+            ResetAqlCompletions(isolate, context);
+            Console->requireSemicolon(false);
+          }
+        }
+        continue;
       }
     }
 
-    Console->addHistory(input);
+    if (inputMode == MODE_AQL && (i != "more" && i != "more;" && i != "help" && i != "help;")) {
+      Console->addHistory(input);
+
+      StringBuffer buffer(TRI_UNKNOWN_MEM_ZONE, 256);
+      buffer.appendText("try {\n");
+
+      static char const* const explain = "explain ";
+        
+      char const* end = Console->getStatementEnd(input);
+      if (end != nullptr) {
+        *const_cast<char*>(end) = '\0';
+
+        if ((end + 1) != '\0') {
+          Console->prefill(end + 1);
+        }
+      }
+
+
+      if (i.substr(0, strlen(explain)) == explain) {
+        // explain a query
+        buffer.appendText("require(\"org/arangodb/aql/explainer\").explain(\"");
+        buffer.appendJsonEncoded(input + strlen(explain));
+        buffer.appendText("\");");
+      }
+      else {
+        // execute a query
+        buffer.appendText("db._query(\"");
+        buffer.appendJsonEncoded(input);
+        buffer.appendText("\");\n");
+      }
+      buffer.appendText("} catch (err) { _promptError = true; err; }");
+
+      // swap input
+      TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, input);
+      input = buffer.steal();
+    }
+    else {
+      Console->addHistory(input);
+    }
 
     v8::TryCatch tryCatch;
 
@@ -1674,17 +1895,17 @@ static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, boo
     // assume the command succeeds
     promptError = false;
 
-    // execute command and register its result in __LAST__
+    // execute command 
     v8::Handle<v8::Value> v = TRI_ExecuteJavaScriptString(isolate, context, TRI_V8_STRING(input), name, true);
+    TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, input);
 
+    // register last result in _last variable
     if (v.IsEmpty()) {
       context->Global()->Set(TRI_V8_ASCII_STRING("_last"), v8::Undefined(isolate));
     }
     else {
       context->Global()->Set(TRI_V8_ASCII_STRING("_last"), v);
     }
-
-    TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, input);
 
     if (tryCatch.HasCaught()) {
       // command failed
@@ -1695,6 +1916,14 @@ static void RunShell (v8::Isolate* isolate, v8::Handle<v8::Context> context, boo
 
       // this will change the prompt for the next round
       promptError = true;
+    }
+    else {
+      // prompt error indicated by setting global variable _promptError
+      auto promptErrorVariable = context->Global()->Get(TRI_V8_ASCII_STRING("_promptError"));
+
+      if (! promptErrorVariable.IsEmpty()) {
+        promptError = TRI_ObjectToBoolean(promptErrorVariable);
+      }
     }
 
     BaseClient.stopPager();
@@ -2011,7 +2240,7 @@ static bool printHelo(bool useServer, bool promptError) {
 #ifdef _WIN32
 
     // .............................................................................
-    // Quick hack for windows
+    // Quick hack for Windows
     // .............................................................................
 
     if (BaseClient.colors()) {
@@ -2299,6 +2528,7 @@ static int WarmupEnvironment (v8::Isolate *isolate,
 static int Run (v8::Isolate* isolate, eRunMode runMode, bool promptError) {
   auto context = isolate->GetCurrentContext();
   bool ok = false;
+
   try {
     switch (runMode) {
       case eInteractive: 

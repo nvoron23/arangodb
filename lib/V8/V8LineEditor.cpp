@@ -42,16 +42,180 @@ using namespace triagens;
 // --SECTION--                                                 class V8Completer
 // -----------------------------------------------------------------------------
 
-bool V8Completer::isComplete (std::string const& source, size_t lineno, size_t column) {
+////////////////////////////////////////////////////////////////////////////////
+/// @brief get the end of the input
+////////////////////////////////////////////////////////////////////////////////
+
+char const* V8Completer::getStatementEnd (char const* input) const {
   int openParen    = 0;
   int openBrackets = 0;
   int openBraces   = 0;
   int openStrings  = 0;  // only used for template strings, which can be multi-line
   int openComments = 0;
 
+  char const* ptr = input;
+  TokenizeState state = NORMAL;
+
+  while (ptr != '\0') {
+    if (state == DOUBLE_QUOTE) {
+      if (*ptr == '\\') {
+        state = DOUBLE_QUOTE_ESC;
+      }
+      else if (*ptr == '"') {
+        state = NORMAL;
+      }
+
+      ++ptr;
+    }
+    else if (state == DOUBLE_QUOTE_ESC) {
+      state = DOUBLE_QUOTE;
+      ptr++;
+    }
+    else if (state == SINGLE_QUOTE) {
+      if (*ptr == '\\') {
+        state = SINGLE_QUOTE_ESC;
+      }
+      else if (*ptr == '\'') {
+        state = NORMAL;
+      }
+
+      ++ptr;
+    }
+    else if (state == SINGLE_QUOTE_ESC) {
+      state = SINGLE_QUOTE;
+      ptr++;
+    }
+    else if (state == BACKTICK) {
+      if (*ptr == '\\') {
+        state = BACKTICK_ESC;
+      }
+      else if (*ptr == '`') {
+        state = NORMAL;
+        --openStrings;
+      }
+
+      ++ptr;
+    }
+    else if (state == BACKTICK_ESC) {
+      state = BACKTICK;
+      ptr++;
+    }
+    else if (state == MULTI_COMMENT) {
+      if (*ptr == '*') {
+        state = MULTI_COMMENT_1;
+      }
+
+      ++ptr;
+    }
+    else if (state == MULTI_COMMENT_1) {
+      if (*ptr == '/') {
+        state = NORMAL;
+        --openComments;
+      }
+
+      ++ptr;
+    }
+    else if (state == SINGLE_COMMENT) {
+      ++ptr;
+
+      if (ptr == '\0') {
+        state = NORMAL;
+        --openComments;
+      }
+    }
+    else if (state == NORMAL_1) {
+      switch (*ptr) {
+        case '/':
+          state = SINGLE_COMMENT;
+          ++openComments;
+          ++ptr;
+          break;
+
+        case '*':
+          state = MULTI_COMMENT;
+          ++openComments;
+          ++ptr;
+          break;
+
+        default:
+          state = NORMAL; // try again, do not change ptr
+          break;
+      }
+    }
+    else {
+      switch (*ptr) {
+        case '"':
+          state = DOUBLE_QUOTE;
+          break;
+
+        case '\'':
+          state = SINGLE_QUOTE;
+          break;
+
+        case '`':
+          state = BACKTICK;
+          ++openStrings;
+          break;
+
+        case '/':
+          state = NORMAL_1;
+          break;
+
+        case '(':
+          ++openParen;
+          break;
+
+        case ')':
+          --openParen;
+          break;
+
+        case '[':
+          ++openBrackets;
+          break;
+
+        case ']':
+          --openBrackets;
+          break;
+
+        case '{':
+          ++openBraces;
+          break;
+
+        case '}':
+          --openBraces;
+          break;
+
+        case ';':
+          return ptr;
+          break;
+
+        case '\\':
+          ++ptr;
+          break;
+      }
+
+      ++ptr;
+    }
+  }
+
+  return nullptr;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief tests whether or not the input is complete
+////////////////////////////////////////////////////////////////////////////////
+
+bool V8Completer::isComplete (std::string const& source, size_t lineno, size_t column) {
+  int openParen    = 0;
+  int openBrackets = 0;
+  int openBraces   = 0;
+  int openStrings  = 0;  // only used for template strings, which can be multi-line
+  int openComments = 0;
+  bool seenSemicolon = false;
+
   char const* ptr = source.c_str();
   char const* end = ptr + source.length();
-  state = NORMAL;
+  TokenizeState state = NORMAL;
 
   while (ptr < end) {
     if (state == DOUBLE_QUOTE) {
@@ -182,6 +346,10 @@ bool V8Completer::isComplete (std::string const& source, size_t lineno, size_t c
           --openBraces;
           break;
 
+        case ';':
+          seenSemicolon = true;
+          break;
+
         case '\\':
           ++ptr;
           break;
@@ -191,11 +359,16 @@ bool V8Completer::isComplete (std::string const& source, size_t lineno, size_t c
     }
   }
 
-  return (openParen <= 0 && openBrackets <= 0 && openBraces <= 0 && openStrings <= 0 && openComments <= 0);
+  return (openParen <= 0 && 
+          openBrackets <= 0 && 
+          openBraces <= 0 && 
+          openStrings <= 0 && 
+          openComments <= 0 && 
+          (seenSemicolon || ! _requireSemicolon));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief  computes all strings which begins with the given text
+/// @brief computes all strings which begin with the given text
 ////////////////////////////////////////////////////////////////////////////////
 
 void V8Completer::getAlternatives (char const * text, 
@@ -315,7 +488,9 @@ void V8Completer::getAlternatives (char const * text,
 ////////////////////////////////////////////////////////////////////////////////
 
 V8LineEditor::V8LineEditor (v8::Handle<v8::Context> context, std::string const& history)
-  : LineEditor(history), _context(context),  _completer(V8Completer()) {
+  : LineEditor(history), 
+    _context(context),  
+    _completer(V8Completer()) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

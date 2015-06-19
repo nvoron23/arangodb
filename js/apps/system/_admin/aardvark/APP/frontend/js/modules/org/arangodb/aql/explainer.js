@@ -17,7 +17,7 @@ var stringBuilder = {
   output: "",
 
   appendLine: function(line) {
-    if (!line) {
+    if (! line) {
       this.output += "\n";
     }
     else {
@@ -649,7 +649,7 @@ function explain (data, options, shouldPrint) {
   processQuery(data.query, result, true);
 
   if (shouldPrint === undefined || shouldPrint) {
-    print(stringBuilder.getOutput());
+    print("\n" + stringBuilder.getOutput().trim());
   }
   else {
     return stringBuilder.getOutput();

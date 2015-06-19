@@ -153,6 +153,9 @@ bool ReadlineShell::open (bool autoComplete) {
 
     // use readline's built-in page-wise completer
     rl_variable_bind("page-completions", "1");
+
+    // allocate space for line buffer
+    rl_extend_line_buffer(4096);
 #endif
 
     rl_bind_key('\t', rl_complete);
@@ -252,8 +255,24 @@ bool ReadlineShell::writeHistory () {
   return (write_history(historyPath().c_str()) == 0);
 }
 
-char * ReadlineShell::getLine (char const * input) {
+////////////////////////////////////////////////////////////////////////////////
+/// @brief get the entered line
+////////////////////////////////////////////////////////////////////////////////
+
+char* ReadlineShell::getLine (char const* input) {
   return readline(input);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief prefill the input
+////////////////////////////////////////////////////////////////////////////////
+
+void ReadlineShell::prefill (char const* value) {
+std::cout << "PREFILLING WITH: " << value << "\n";
+  while (*value != '\0') {
+    rl_stuff_char(static_cast<int>(*value));
+    ++value;
+  }
 }
 
 // -----------------------------------------------------------------------------

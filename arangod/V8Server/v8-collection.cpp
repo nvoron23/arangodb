@@ -4434,7 +4434,7 @@ void TRI_InitV8collection (v8::Handle<v8::Context> context,
                            const size_t threadNumber,
                            TRI_v8_global_t* v8g,
                            v8::Isolate* isolate,
-                           v8::Handle<v8::ObjectTemplate> ArangoDBNS){
+                           v8::Handle<v8::ObjectTemplate> ArangoDBNS) {
 
   TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_changeMode"), JS_ChangeOperationModeVocbase);
   TRI_AddMethodVocbase(isolate, ArangoDBNS, TRI_V8_ASCII_STRING("_collection"), JS_CollectionVocbase);
