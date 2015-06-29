@@ -630,8 +630,8 @@ void TRI_RunNeighborsSearch (
 
 DepthFirstTraverser::DepthFirstTraverser (
     TRI_document_collection_t* edgeCollection,
-    TRI_edge_direction_e direction,
-    VertexId startVertex,
+    TRI_edge_direction_e& direction,
+    VertexId& startVertex,
     uint64_t minDepth,
     uint64_t maxDepth
   ) : _minDepth(minDepth), _maxDepth(maxDepth), _pruneNext(false) {
@@ -643,7 +643,7 @@ DepthFirstTraverser::DepthFirstTraverser (
   };
   auto getVertex = [] (TRI_doc_mptr_copy_t& edge, VertexId& vertex) -> VertexId {
     // TODO fill Statistics
-    if (TRI_EXTRACT_MARKER_FROM_KEY(&edge) == vertex.key &&
+    if (strcmp(TRI_EXTRACT_MARKER_FROM_KEY(&edge), vertex.key) == 0 &&
         TRI_EXTRACT_MARKER_FROM_CID(&edge) == vertex.cid) {
       return VertexId(TRI_EXTRACT_MARKER_TO_CID(&edge), TRI_EXTRACT_MARKER_TO_KEY(&edge));
     }
@@ -673,6 +673,7 @@ const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& DepthFirstTraverser::next ()
   int countEdges = p.edges.size();
   if (countEdges == 0) {
     // Done traversing
+    return p;
   }
   if (countEdges >= _maxDepth) {
     _pruneNext = true;
@@ -681,4 +682,33 @@ const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& DepthFirstTraverser::next ()
     return next();
   }
   return p;
+}
+
+void DepthFirstTraverser::prune () {
+  _pruneNext = true;
+}
+
+void TRI_RunTravTest (
+    TRI_document_collection_t* collection,
+    VertexId& startVertex
+  ) {
+
+  TRI_edge_direction_e dir = TRI_EDGE_OUT;
+  DepthFirstTraverser t(collection, dir, startVertex, 2, 256);
+
+  TraversalPath<TRI_doc_mptr_copy_t, VertexId> tp = t.next();
+  while (tp.edges.size() > 0) {
+    cout << "Path: ";
+    for (int i = 0; i < tp.vertices.size(); ++i) {
+      cout << tp.vertices[i].key << " ";
+    }
+    cout << endl;
+    if (strcmp(tp.vertices.back().key, "1") == 0) {
+      t.prune();
+    }
+    if (strcmp(tp.vertices.back().key, "31") == 0) {
+      t.prune();
+    }
+    tp = t.next();
+  }
 }

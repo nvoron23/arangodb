@@ -263,8 +263,8 @@ namespace triagens {
 
           DepthFirstTraverser (
             TRI_document_collection_t* edgeCollection,
-            TRI_edge_direction_e direction,
-            VertexId startVertex,
+            TRI_edge_direction_e& direction,
+            VertexId& startVertex,
             uint64_t minDepth,
             uint64_t maxDepth
           );
@@ -280,6 +280,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
           const TraversalPath<TRI_doc_mptr_copy_t, VertexId>&  next ();
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Prune the current path prefix. Do not evaluate it any further.
+////////////////////////////////////////////////////////////////////////////////
+
+          void prune ();
 
       };
 
@@ -352,6 +358,7 @@ class EdgeCollectionInfo {
     double weightEdge (TRI_doc_mptr_copy_t& ptr) {
       return _weighter(ptr);
     }
+
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -413,5 +420,12 @@ void TRI_RunNeighborsSearch (std::vector<EdgeCollectionInfo*>& collectionInfos,
                              triagens::basics::traverser::NeighborsOptions& opts,
                              std::unordered_set<VertexId>& distinct,
                              std::vector<VertexId>& result);
+
+
+
+void TRI_RunTravTest (
+  TRI_document_collection_t* collection,
+  VertexId& startVertex
+);
 
 #endif

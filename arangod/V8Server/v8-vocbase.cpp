@@ -2375,6 +2375,46 @@ static void JS_QueryNeighbors (const v8::FunctionCallbackInfo<v8::Value>& args) 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief TODO DELETE!
+////////////////////////////////////////////////////////////////////////////////
+
+static void JS_MyTest (const v8::FunctionCallbackInfo<v8::Value>& args) {
+  TRI_V8_TRY_CATCH_BEGIN(isolate);
+  v8::EscapableHandleScope scope(isolate);
+  TRI_vocbase_t* vocbase = GetContextVocBase(isolate);
+  if (vocbase == nullptr) {
+    TRI_V8_THROW_EXCEPTION(TRI_ERROR_ARANGO_DATABASE_NOT_FOUND);
+  }
+
+  vector<TRI_voc_cid_t> readCollections;
+  vector<TRI_voc_cid_t> writeCollections;
+
+  V8ResolverGuard resolverGuard(vocbase);
+  CollectionNameResolver const* resolver = resolverGuard.getResolver();
+  string vertexCol = "v";
+  string edgeCol = "e";
+
+  readCollections.emplace_back(resolver->getCollectionId(vertexCol));
+  readCollections.emplace_back(resolver->getCollectionId(edgeCol));
+
+  // Start the transaction and order ditches
+  unordered_map<TRI_voc_cid_t, CollectionDitchInfo> ditches;
+  std::unique_ptr<ExplicitTransaction> trx(BeginTransaction(vocbase, readCollections, writeCollections, resolver, ditches));
+
+  const string startVertex = "v/0";
+
+  VertexId start = IdStringToVertexId(resolver, startVertex);
+
+  auto cid = resolver->getCollectionId(edgeCol);
+  auto colObj = ditches.find(cid)->second.col->_collection->_collection;
+
+  TRI_RunTravTest(colObj, start);
+  TRI_V8_RETURN(scope.Escape<v8::Value>(v8::Null(isolate)));
+  TRI_V8_TRY_CATCH_END
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief sleeps and checks for query abortion in between
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -3708,7 +3748,7 @@ void TRI_InitV8VocBridge (v8::Isolate* isolate,
 
   TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("CPP_SHORTEST_PATH"), JS_QueryShortestPath, true);
   TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("CPP_NEIGHBORS"), JS_QueryNeighbors, true);
-
+  TRI_AddGlobalFunctionVocbase(isolate, context, TRI_V8_ASCII_STRING("CPP_TESTUNG"), JS_MyTest, true);
 
   TRI_InitV8Replication(isolate, context, server, vocbase, loader, threadNumber, v8g);
 
