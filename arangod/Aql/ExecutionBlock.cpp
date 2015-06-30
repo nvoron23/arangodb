@@ -31,6 +31,7 @@
 #include "Basics/ScopeGuard.h"
 #include "Basics/StringUtils.h"
 #include "Basics/StringBuffer.h"
+#include "Basics/Traverser.h"
 #include "Basics/json-utilities.h"
 #include "Basics/Exceptions.h"
 #include "Dispatcher/DispatcherThread.h"
@@ -43,6 +44,7 @@
 #include "VocBase/vocbase.h"
 
 using namespace std;
+using namespace triagens::basics;
 using namespace triagens::arango;
 using namespace triagens::aql;
 
@@ -7102,6 +7104,32 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
                                 TraversalNode const* ep)
   : ExecutionBlock(engine, ep) {
 
+  // TODO: FIXME
+  CollectionNameResolver resolver(_trx->vocbase());
+  string eN = "e";
+  string vN = "v";
+  auto eId = resolver.getCollectionId(eN);
+  VertexId startVertex(resolver.getCollectionId(vN), "0");
+  _trx->addCollection(resolver.getCollectionId(eN), eN.c_str(), TRI_TRANSACTION_READ);
+  _trx->addCollection(resolver.getCollectionId(vN), vN.c_str(), TRI_TRANSACTION_READ);
+ 
+  basics::traverser::TraverserOptions opts;
+  opts.minDepth = 2;
+  opts.maxDepth = 256;
+  opts.direction = TRI_EDGE_OUT;
+  auto pruner = [] (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path) -> bool {
+    if (strcmp(path.vertices.back().key, "1") == 0) {
+      return true;
+    }
+    if (strcmp(path.vertices.back().key, "31") == 0) {
+      return true;
+    }
+    return false;
+  };
+  opts.setPruningFunction(pruner);
+
+  basics::traverser::DepthFirstTraverser t(_trx->documentCollection(eId), startVertex, opts);
+  _traverser.reset(&t);
 }
 
 TraversalBlock::~TraversalBlock () {
@@ -7122,6 +7150,53 @@ int TraversalBlock::initializeCursor (AqlItemBlock* items,
   return TRI_ERROR_NO_ERROR;
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Transform the path to AQLValue object
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue TraversalBlock::pathToAqlValue (
+  const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p
+) {
+  Json path(Json::Object, 2);
+  Json vertices(Json::Array);
+  // TODO FIXME
+  for (size_t i = 0; i < p.vertices.size(); ++i) {
+   vertices(Json(p.vertices[i].key));
+  }
+  Json edges(Json::Array);
+  for (size_t i = 0; i < p.edges.size(); ++i) {
+   edges(Json(TRI_EXTRACT_MARKER_KEY(&p.edges[i])));
+  }
+  path("vertices", vertices)
+      ("edges", edges);
+  cout << "Intermediate json " <<  path.toString() << endl;
+  return AqlValue(&path);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief read more paths
+////////////////////////////////////////////////////////////////////////////////
+
+bool TraversalBlock::morePaths (size_t hint) {
+  cout << "Moorhuhn" << endl;
+  for (size_t j = 0; j < hint; ++j) {
+    auto p = _traverser->next();
+    if (p.edges.size() == 0) {
+      // There are no further paths available.
+      break;
+    }
+    cout << "push" << endl;
+    _paths.push_back(pathToAqlValue(p));
+  }
+  return _paths.size() > 0;
+}
+
+
+void TraversalBlock::initializePaths () {
+  // TODO: FIXME
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief getSome
 ////////////////////////////////////////////////////////////////////////////////
@@ -7129,8 +7204,81 @@ int TraversalBlock::initializeCursor (AqlItemBlock* items,
 AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
                                        size_t atMost) {
 
-  // TODO: FIXME
-  return nullptr;
+  cout << "Getting some" << endl;
+  if (_done) {
+    return nullptr;
+  }
+
+  if (_buffer.empty()) {
+
+    size_t toFetch = (std::min)(DefaultBatchSize, atMost);
+    if (! ExecutionBlock::getBlock(toFetch, toFetch)) {
+      _done = true;
+      return nullptr;
+    }
+    _pos = 0;           // this is in the first block
+    initializePaths();
+  }
+
+  // If we get here, we do have _buffer.front()
+  AqlItemBlock* cur = _buffer.front();
+  size_t const curRegs = cur->getNrRegs();
+
+  // Iterate more paths:
+  if (_posInPaths >= _paths.size()) {
+    // TODO: FIXME
+    if (! morePaths(atMost)) {
+      _done = true;
+      return nullptr;
+    }
+  }
+
+  size_t available = _paths.size() - _posInPaths;
+  size_t toSend = (std::min)(atMost, available);
+  RegisterId nrRegs = getPlanNode()->getRegisterPlan()->nrRegs[getPlanNode()->getDepth()];
+
+  std::unique_ptr<AqlItemBlock> res(requestBlock(toSend, nrRegs));
+  // automatically freed if we throw
+  TRI_ASSERT(curRegs <= res->getNrRegs());
+
+  // only copy 1st row of registers inherited from previous frame(s)
+  inheritRegisters(cur, res.get(), _pos);
+
+  for (size_t j = 0; j < toSend; j++) {
+    if (j > 0) {
+      // re-use already copied aqlvalues
+      for (RegisterId i = 0; i < curRegs; i++) {
+        res->setValue(j, i, res->getValueReference(0, i));
+        // Note: if this throws, then all values will be deleted
+        // properly since the first one is.
+      }
+    }
+    res->setValue(j,
+      static_cast<triagens::aql::RegisterId>(curRegs),
+      _paths[_posInPaths]
+    );
+    ++_posInPaths;
+  }
+
+  // Advance read position:
+  if (_posInPaths >= _paths.size()) {
+    // we have exhausted our local paths buffer
+    // fetch more paths into our buffer
+    if (! morePaths(atMost)) {
+      // nothing more to read, re-initialize fetching of paths
+      initializePaths();
+      if (++_pos >= cur->size()) {
+        _buffer.pop_front();  // does not throw
+        returnBlock(cur);
+        _pos = 0;
+      }
+    }
+  }
+
+  // Clear out registers no longer needed later:
+  clearRegisters(res.get());
+
+  return res.release();
 }
 
 size_t TraversalBlock::skipSome (size_t atLeast, size_t atMost) {
