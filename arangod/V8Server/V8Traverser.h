@@ -230,22 +230,61 @@ namespace triagens {
       };
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                                 Traverser options
+// -----------------------------------------------------------------------------
+
+      struct TraverserOptions {
+
+        private:
+          std::function<bool (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path)> pruningFunction;
+
+        public:
+          TRI_edge_direction_e direction;
+
+          uint64_t minDepth;
+
+          uint64_t maxDepth;
+
+          bool usesPrune;
+
+
+          TraverserOptions () : 
+            direction(TRI_EDGE_OUT),
+            minDepth(1),
+            maxDepth(1),
+            usesPrune(false)
+          { };
+
+          void setPruningFunction (
+            std::function<bool (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path)> callback
+          ) {
+            pruningFunction = callback;
+            usesPrune = true;
+          }
+
+          bool shouldPrunePath (
+            const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path
+          ) {
+            if (!usesPrune) {
+              return false;
+            }
+            return pruningFunction(path);
+          }
+
+      };
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                         class DepthFirstTraverser
 // -----------------------------------------------------------------------------
       class DepthFirstTraverser {
 
         private:
-////////////////////////////////////////////////////////////////////////////////
-/// @brief minimal depth of returned paths
-////////////////////////////////////////////////////////////////////////////////
-
-          uint64_t _minDepth;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief maximal depth of returned paths
+/// @brief options for traversal
 ////////////////////////////////////////////////////////////////////////////////
 
-          uint64_t _maxDepth;
+          TraverserOptions _opts;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief toggle if this path should be pruned on next step
@@ -263,10 +302,16 @@ namespace triagens {
 
           DepthFirstTraverser (
             TRI_document_collection_t* edgeCollection,
-            TRI_edge_direction_e& direction,
             VertexId& startVertex,
+            TRI_edge_direction_e& direction,
             uint64_t minDepth,
             uint64_t maxDepth
+          );
+
+          DepthFirstTraverser (
+            TRI_document_collection_t* edgeCollection,
+            VertexId& startVertex,
+            TraverserOptions _opts
           );
 
 ////////////////////////////////////////////////////////////////////////////////
