@@ -7169,7 +7169,6 @@ AqlValue TraversalBlock::pathToAqlValue (
   }
   path("vertices", vertices)
       ("edges", edges);
-  cout << "Intermediate json " <<  path.toString() << endl;
   return AqlValue(&path);
 }
 
@@ -7178,14 +7177,12 @@ AqlValue TraversalBlock::pathToAqlValue (
 ////////////////////////////////////////////////////////////////////////////////
 
 bool TraversalBlock::morePaths (size_t hint) {
-  cout << "Moorhuhn" << endl;
   for (size_t j = 0; j < hint; ++j) {
     auto p = _traverser->next();
     if (p.edges.size() == 0) {
       // There are no further paths available.
       break;
     }
-    cout << "push" << endl;
     _paths.push_back(pathToAqlValue(p));
   }
   return _paths.size() > 0;
@@ -7203,7 +7200,6 @@ void TraversalBlock::initializePaths () {
 AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
                                        size_t atMost) {
 
-  cout << "Getting some" << endl;
   if (_done) {
     return nullptr;
   }
