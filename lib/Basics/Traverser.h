@@ -1283,9 +1283,12 @@ namespace triagens {
             _getVertex(getVertex) {
           _traversalPath.vertices.push_back(startVertex);
           _lastEdges.push(nullptr);
+          TRI_ASSERT(_traversalPath.vertices.size() == 1);
+          TRI_ASSERT(_lastEdges.size() == 1);
         };
 
-        ~PathEnumerator () {};
+        ~PathEnumerator () {
+        };
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  public functions

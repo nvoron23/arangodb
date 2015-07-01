@@ -7157,7 +7157,7 @@ int TraversalBlock::initializeCursor (AqlItemBlock* items,
 AqlValue TraversalBlock::pathToAqlValue (
   const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p
 ) {
-  Json path(Json::Object, 2);
+  auto path = new Json(Json::Object, 2); 
   Json vertices(Json::Array);
   // TODO FIXME
   for (size_t i = 0; i < p.vertices.size(); ++i) {
@@ -7167,9 +7167,10 @@ AqlValue TraversalBlock::pathToAqlValue (
   for (size_t i = 0; i < p.edges.size(); ++i) {
    edges(Json(TRI_EXTRACT_MARKER_KEY(&p.edges[i])));
   }
-  path("vertices", vertices)
+  (*path)("vertices", vertices)
       ("edges", edges);
-  return AqlValue(&path);
+
+  return AqlValue(path);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -7177,6 +7178,9 @@ AqlValue TraversalBlock::pathToAqlValue (
 ////////////////////////////////////////////////////////////////////////////////
 
 bool TraversalBlock::morePaths (size_t hint) {
+  if (!_traverser->hasMore()) {
+    return false;
+  }
   for (size_t j = 0; j < hint; ++j) {
     auto p = _traverser->next();
     if (p.edges.size() == 0) {
@@ -7230,6 +7234,7 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
 
   size_t available = _paths.size() - _posInPaths;
   size_t toSend = (std::min)(atMost, available);
+
   RegisterId nrRegs = getPlanNode()->getRegisterPlan()->nrRegs[getPlanNode()->getDepth()];
 
   std::unique_ptr<AqlItemBlock> res(requestBlock(toSend, nrRegs));
@@ -7250,11 +7255,10 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
     }
     res->setValue(j,
       static_cast<triagens::aql::RegisterId>(curRegs),
-      _paths[_posInPaths]
+      _paths[_posInPaths].clone()
     );
     ++_posInPaths;
   }
-
   // Advance read position:
   if (_posInPaths >= _paths.size()) {
     // we have exhausted our local paths buffer
@@ -7272,7 +7276,6 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
 
   // Clear out registers no longer needed later:
   clearRegisters(res.get());
-
   return res.release();
 }
 

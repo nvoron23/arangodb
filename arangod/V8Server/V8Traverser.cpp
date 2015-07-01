@@ -689,15 +689,20 @@ void DepthFirstTraverser::skip (int amount) {
   }
 }
 
+bool DepthFirstTraverser::hasMore () {
+  return !_done;
+}
 
 const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& DepthFirstTraverser::next () {
   if (_pruneNext) {
     _pruneNext = false;
     _enumerator->prune();
   }
+  TRI_ASSERT(!_done);
   const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p = _enumerator->next();
   int countEdges = p.edges.size();
   if (countEdges == 0) {
+    _done = true;
     // Done traversing
     return p;
   }
