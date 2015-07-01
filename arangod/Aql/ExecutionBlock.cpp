@@ -39,6 +39,7 @@
 #include "Indexes/EdgeIndex.h"
 #include "Indexes/HashIndex.h"
 #include "Indexes/SkiplistIndex2.h"
+#include "Utils/ShapedJsonTransformer.h"
 #include "V8/v8-globals.h"
 #include "VocBase/edge-collection.h"
 #include "VocBase/vocbase.h"
@@ -7158,14 +7159,33 @@ AqlValue TraversalBlock::pathToAqlValue (
   const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p
 ) {
   auto path = new Json(Json::Object, 2); 
+  CollectionNameResolver resolver(_trx->vocbase());
   Json vertices(Json::Array);
   // TODO FIXME
   for (size_t i = 0; i < p.vertices.size(); ++i) {
-   vertices(Json(p.vertices[i].key));
+    auto collection = _trx->trxCollection(p.vertices[i].cid);
+    TRI_doc_mptr_copy_t mptr;
+    _trx->readSingle(collection, &mptr, p.vertices[i].key);
+    vertices(TRI_ExpandShapedJson(
+      collection->_collection->_collection->getShaper(),
+      &resolver,
+      p.vertices[i].cid,
+      &mptr
+    ));
   }
   Json edges(Json::Array);
+  // TODO FIXME
+  auto eId = resolver.getCollectionId("e");
+  auto edgeShaper = _trx->documentCollection(eId)->getShaper();
   for (size_t i = 0; i < p.edges.size(); ++i) {
-   edges(Json(TRI_EXTRACT_MARKER_KEY(&p.edges[i])));
+    TRI_shaped_json_t shapedJson;
+    TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, &p.edges[i]);
+    edges(TRI_ExpandShapedJson(
+      edgeShaper,
+      &resolver,
+      eId,
+      &p.edges[i]
+    ));
   }
   (*path)("vertices", vertices)
       ("edges", edges);

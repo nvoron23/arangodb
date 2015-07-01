@@ -104,6 +104,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Utils/Cursor.cpp \
 	arangod/Utils/CursorRepository.cpp \
 	arangod/Utils/DocumentHelper.cpp \
+	arangod/Utils/ShapedJsonTransformer.cpp \
 	arangod/Utils/StandaloneTransactionContext.cpp \
 	arangod/Utils/Transaction.cpp \
 	arangod/Utils/TransactionContext.cpp \
