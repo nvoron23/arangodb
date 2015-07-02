@@ -42,9 +42,11 @@
 #include "Aql/Variable.h"
 #include "Aql/WalkerWorker.h"
 #include "Basics/JsonHelper.h"
+#include "Basics/Traverser.h"
 #include "lib/Basics/json-utilities.h"
 #include "VocBase/voc-types.h"
 #include "VocBase/vocbase.h"
+#include "V8Server/V8Traverser.h"
 
 namespace triagens {
   namespace basics {
@@ -3628,11 +3630,17 @@ namespace triagens {
                        size_t id,
                        TRI_vocbase_t* vocbase, 
                        Variable const* outVariable,
+                       AstNode const* direction,
+                       AstNode const* start,
                        AstNode const* astNode)
           : ExecutionNode(plan, id), 
             _vocbase(vocbase), 
             _outVariable(outVariable), 
-            _astNode(astNode) { 
+            _astNode(astNode),
+            _direction(direction),
+            _start(start),
+            _resolver(new arango::CollectionNameResolver(vocbase)),
+            _edgeCid(0) {  //TODO: FIXME
 
           TRI_ASSERT(_vocbase != nullptr);
           TRI_ASSERT(_outVariable != nullptr);
@@ -3696,6 +3704,33 @@ namespace triagens {
           return _outVariable;
         }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Fill the traversal options with all values known to this node or
+///        with default values.
+////////////////////////////////////////////////////////////////////////////////
+
+        void fillTraversalOptions (basics::traverser::TraverserOptions& opts) const {
+          opts.minDepth = 1;
+          opts.maxDepth = 256;
+          // TODO Assumed that _direction is always a lowercase string
+          auto dir = _direction->getStringValue();
+          if (strcmp(dir, "outbound") == 0) {
+            opts.direction = TRI_EDGE_OUT;
+          } else if (strcmp(dir, "inbound") == 0) {
+            opts.direction = TRI_EDGE_IN;
+          } else if (strcmp(dir, "any") == 0) {
+            opts.direction = TRI_EDGE_ANY;
+          }
+        }
+
+        VertexId const getStartId () const {
+          return std::move(VertexId(_resolver->getCollectionId("v"), "0"));
+        }
+
+        TRI_voc_cid_t const edgeCid () const {
+          return _edgeCid;
+        }
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
 // -----------------------------------------------------------------------------
@@ -3719,6 +3754,31 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         AstNode const* _astNode;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief TODO FIXME direction
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode const* _direction;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief TODO FIXME start
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode const* _start;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief TODO FIXME Resolver
+////////////////////////////////////////////////////////////////////////////////
+
+        arango::CollectionNameResolver* _resolver;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief the edge collection cid
+////////////////////////////////////////////////////////////////////////////////
+
+        TRI_voc_cid_t const _edgeCid;
+
     };
 
   }   // namespace triagens::aql

@@ -2550,6 +2550,13 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         std::unique_ptr<triagens::basics::traverser::DepthFirstTraverser> _traverser;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief The cid of the traversed edge collection
+////////////////////////////////////////////////////////////////////////////////
+
+        TRI_voc_cid_t const _edgeCid;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
@@ -2568,7 +2575,13 @@ namespace triagens {
           const basics::TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p
         );
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Initialize the path enumerator
+////////////////////////////////////////////////////////////////////////////////
+
         void initializePaths ();
+
+
     };
 
   }  // namespace triagens::aql

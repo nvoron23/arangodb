@@ -3269,7 +3269,10 @@ TraversalNode::TraversalNode (ExecutionPlan* plan,
   : ExecutionNode(plan, base),
     _vocbase(plan->getAst()->query()->vocbase()),
     _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
-    _astNode(nullptr) { // TODO: FIXME
+    _astNode(nullptr),
+    _direction(nullptr),
+    _start(nullptr),
+    _edgeCid(0) { // TODO: FIXME
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3308,7 +3311,7 @@ ExecutionNode* TraversalNode::clone (ExecutionPlan* plan,
     TRI_ASSERT(outVariable != nullptr);
   }
     
-  auto c = new TraversalNode(plan, _id, _vocbase, outVariable, nullptr); // TODO: FIXME
+  auto c = new TraversalNode(plan, _id, _vocbase, outVariable, _direction, _start, nullptr); // TODO: FIXME
 
   cloneHelper(c, plan, withDependencies, withProperties);
 

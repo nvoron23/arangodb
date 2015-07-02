@@ -423,15 +423,16 @@ ExecutionNode* ExecutionPlan::fromNodeFor (ExecutionNode* previous,
   else if (expression->type == NODE_TYPE_TRAVERSAL) {
     // second operand is a traversal
 
+    AstNode const* direction = expression->getMember(0);
+    AstNode const* start = expression->getMember(1);
     /*
-    AstNode const* direction = node->getMember(0);
-    AstNode const* start = node->getMember(1);
-    AstNode const* graph = node->getMember(2);
-    AstNode const* steps = node->getMember(3);
+    AstNode const* graph = expression->getMember(2);
+    AstNode const* steps = expression->getMember(3);
     en = registerNode(new TraversalNode(this, nextId(), _ast->query()->vocbase(), v,
           direction, start, graph, steps));
     */
-    en = registerNode(new TraversalNode(this, nextId(), _ast->query()->vocbase(), v, expression));
+    en = registerNode(new TraversalNode(this, nextId(), _ast->query()->vocbase(), v, 
+          direction, start, expression));
   }
   else {
     // second operand is some misc. expression

@@ -22,7 +22,9 @@
 /// Copyright holder is triAGENS GmbH, Cologne, Germany
 ///
 /// @author Max Neunhoeffer
+/// @author Michael Hackstein
 /// @author Copyright 2014, triagens GmbH, Cologne, Germany
+/// @author Copyright 2014-2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Aql/ExecutionBlock.h"
@@ -7103,7 +7105,9 @@ int64_t RemoteBlock::remaining () {
 
 TraversalBlock::TraversalBlock (ExecutionEngine* engine,
                                 TraversalNode const* ep)
-  : ExecutionBlock(engine, ep) {
+  : ExecutionBlock(engine, ep),
+    _edgeCid(0)
+  {
 
   // TODO: FIXME
   //
@@ -7112,12 +7116,11 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   string eN = "e";
   string vN = "v";
   auto eId = resolver.getCollectionId(eN);
-  VertexId startVertex(resolver.getCollectionId(vN), "0");
  
   basics::traverser::TraverserOptions opts;
-  opts.minDepth = 2;
-  opts.maxDepth = 256;
-  opts.direction = TRI_EDGE_OUT;
+  ep->fillTraversalOptions(opts);
+  VertexId startVertex = ep->getStartId();
+  /*
   auto pruner = [] (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path) -> bool {
     if (strcmp(path.vertices.back().key, "1") == 0) {
       return true;
@@ -7128,6 +7131,7 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
     return false;
   };
   opts.setPruningFunction(pruner);
+  */
 
   _traverser.reset(new basics::traverser::DepthFirstTraverser(_trx->documentCollection(eId), startVertex, opts));
 }
