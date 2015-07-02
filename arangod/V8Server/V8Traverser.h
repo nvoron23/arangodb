@@ -52,6 +52,10 @@ struct VertexId {
   VertexId (TRI_voc_cid_t cid, char const* key) 
     : cid(cid), key(key) {
   }
+
+  VertexId (TRI_voc_cid_t cid, std::string key) 
+    : cid(cid), key(triagens::basics::StringUtils::duplicate(key)) {
+  }
   
   bool operator== (const VertexId& other) const {
     if (cid == other.cid) {

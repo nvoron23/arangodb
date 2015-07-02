@@ -3632,19 +3632,20 @@ namespace triagens {
                        Variable const* outVariable,
                        AstNode const* direction,
                        AstNode const* start,
-                       AstNode const* astNode)
+                       AstNode const* graph,
+                       AstNode const* steps)
           : ExecutionNode(plan, id), 
             _vocbase(vocbase), 
             _outVariable(outVariable), 
-            _astNode(astNode),
             _direction(direction),
             _start(start),
+            _graph(graph),
+            _steps(steps),
             _resolver(new arango::CollectionNameResolver(vocbase)),
             _edgeCid(0) {  //TODO: FIXME
 
           TRI_ASSERT(_vocbase != nullptr);
           TRI_ASSERT(_outVariable != nullptr);
-          TRI_ASSERT(_astNode != nullptr);
         }
 
         TraversalNode (ExecutionPlan* plan,
@@ -3710,8 +3711,16 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         void fillTraversalOptions (basics::traverser::TraverserOptions& opts) const {
-          opts.minDepth = 1;
-          opts.maxDepth = 256;
+          if (_steps->isIntValue()) {
+            opts.minDepth = _steps->getIntValue();
+            opts.maxDepth = _steps->getIntValue();
+          } else {
+            // TODO Range depth
+            // TODO open Range depth
+            opts.minDepth = 1;
+            opts.maxDepth = 256;
+          }
+          opts.direction = TRI_EDGE_OUT;
           // TODO Assumed that _direction is always a lowercase string
           auto dir = _direction->getStringValue();
           if (strcmp(dir, "outbound") == 0) {
@@ -3723,10 +3732,11 @@ namespace triagens {
           }
         }
 
-        VertexId const getStartId () const {
+        VertexId getStartId () const {
           std::string vId(_start->getStringValue());
           auto pos = vId.find("/");
-          return std::move(VertexId(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1).c_str()));
+          VertexId start(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1));
+          return start;
         }
 
         TRI_voc_cid_t const edgeCid () const {
@@ -3752,12 +3762,6 @@ namespace triagens {
         Variable const* _outVariable;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief the traversal information AST node
-////////////////////////////////////////////////////////////////////////////////
-
-        AstNode const* _astNode;
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief TODO FIXME direction
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -3768,6 +3772,18 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         AstNode const* _start;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief TODO FIXME graph information
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode const* _graph;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief TODO FIXME steps
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode const* _steps;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief TODO FIXME Resolver

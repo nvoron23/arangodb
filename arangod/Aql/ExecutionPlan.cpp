@@ -425,14 +425,10 @@ ExecutionNode* ExecutionPlan::fromNodeFor (ExecutionNode* previous,
 
     AstNode const* direction = expression->getMember(0);
     AstNode const* start = expression->getMember(1);
-    /*
     AstNode const* graph = expression->getMember(2);
     AstNode const* steps = expression->getMember(3);
-    en = registerNode(new TraversalNode(this, nextId(), _ast->query()->vocbase(), v,
-          direction, start, graph, steps));
-    */
     en = registerNode(new TraversalNode(this, nextId(), _ast->query()->vocbase(), v, 
-          direction, start, expression));
+          direction, start, graph, steps));
   }
   else {
     // second operand is some misc. expression
