@@ -3652,7 +3652,11 @@ namespace triagens {
           if (_graph->type == NODE_TYPE_COLLECTION_PAIR) {
             // Graph is a collection pair (edge, vertex)
             auto eColName = _graph->getMember(0)->getStringValue();
-            _edgeCid = _resolver->getCollectionId(eColName);
+            auto edgeStruct = _resolver->getCollectionStruct(eColName);
+            if (edgeStruct->_type != TRI_COL_TYPE_EDGE) {
+              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_TYPE_INVALID);
+            }
+            _edgeCid = edgeStruct->_cid;
           } else {
             // TODO Graph is a Graph by name
           }
