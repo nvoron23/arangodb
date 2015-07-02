@@ -3641,11 +3641,21 @@ namespace triagens {
             _start(start),
             _graph(graph),
             _steps(steps),
-            _resolver(new arango::CollectionNameResolver(vocbase)),
-            _edgeCid(0) {  //TODO: FIXME
+            _resolver(new arango::CollectionNameResolver(vocbase))
+        {
 
           TRI_ASSERT(_vocbase != nullptr);
           TRI_ASSERT(_outVariable != nullptr);
+          TRI_ASSERT(_direction != nullptr);
+          TRI_ASSERT(_start != nullptr);
+          TRI_ASSERT(_resolver != nullptr);
+          if (_graph->type == NODE_TYPE_COLLECTION_PAIR) {
+            // Graph is a collection pair (edge, vertex)
+            auto eColName = _graph->getMember(0)->getStringValue();
+            _edgeCid = _resolver->getCollectionId(eColName);
+          } else {
+            // TODO Graph is a Graph by name
+          }
         }
 
         TraversalNode (ExecutionPlan* plan,
@@ -3795,7 +3805,7 @@ namespace triagens {
 /// @brief the edge collection cid
 ////////////////////////////////////////////////////////////////////////////////
 
-        TRI_voc_cid_t const _edgeCid;
+        TRI_voc_cid_t _edgeCid;
 
     };
 

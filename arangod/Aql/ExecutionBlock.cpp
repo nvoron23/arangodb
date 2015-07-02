@@ -7109,14 +7109,6 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
     _edgeCid(0)
   {
 
-  // TODO: FIXME
-  //
-  // Hard coded example
-  CollectionNameResolver resolver(_trx->vocbase());
-  string eN = "e";
-  string vN = "v";
-  auto eId = resolver.getCollectionId(eN);
- 
   basics::traverser::TraverserOptions opts;
   ep->fillTraversalOptions(opts);
   VertexId startVertex = ep->getStartId();
@@ -7133,7 +7125,7 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   opts.setPruningFunction(pruner);
   */
 
-  _traverser.reset(new basics::traverser::DepthFirstTraverser(_trx->documentCollection(eId), startVertex, opts));
+  _traverser.reset(new basics::traverser::DepthFirstTraverser(_trx->documentCollection(ep->edgeCid()), startVertex, opts));
 }
 
 TraversalBlock::~TraversalBlock () {
