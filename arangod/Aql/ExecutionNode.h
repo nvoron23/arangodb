@@ -3724,7 +3724,9 @@ namespace triagens {
         }
 
         VertexId const getStartId () const {
-          return std::move(VertexId(_resolver->getCollectionId("v"), "0"));
+          std::string vId(_start->getStringValue());
+          auto pos = vId.find("/");
+          return std::move(VertexId(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1).c_str()));
         }
 
         TRI_voc_cid_t const edgeCid () const {
