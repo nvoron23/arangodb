@@ -1022,11 +1022,13 @@ AstNode* Ast::createNodeCollectionPair (AstNode const* edgeCollection,
   node->addMember(edgeCollection);
   node->addMember(vertexCollection);
 
-  TRI_ASSERT(edgeCollection->isStringValue());
-  TRI_ASSERT(vertexCollection->isStringValue());
+  if (edgeCollection->isStringValue()) {
+    _query->collections()->add(edgeCollection->getStringValue(), TRI_TRANSACTION_READ);
+  } // else bindParameter
+  if (vertexCollection->isStringValue()) {
+    _query->collections()->add(vertexCollection->getStringValue(), TRI_TRANSACTION_READ);
+  } // else bindParameter
   
-  _query->collections()->add(edgeCollection->getStringValue(), TRI_TRANSACTION_READ);
-  _query->collections()->add(vertexCollection->getStringValue(), TRI_TRANSACTION_READ);
 
   return node;
 }
