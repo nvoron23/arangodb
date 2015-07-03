@@ -1024,12 +1024,11 @@ AstNode* Ast::createNodeCollectionPair (AstNode const* edgeCollection,
 
   if (edgeCollection->isStringValue()) {
     _query->collections()->add(edgeCollection->getStringValue(), TRI_TRANSACTION_READ);
-  } // else bindParameter
+  } // else bindParameter use default for collection bindVar
   if (vertexCollection->isStringValue()) {
     _query->collections()->add(vertexCollection->getStringValue(), TRI_TRANSACTION_READ);
-  } // else bindParameter
+  } // else bindParameter use default for collection bindVar
   
-
   return node;
 }
 
