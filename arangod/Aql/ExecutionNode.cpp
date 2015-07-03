@@ -3274,6 +3274,7 @@ TraversalNode::TraversalNode (ExecutionPlan* plan,
     _graph(nullptr),
     _steps(nullptr),
     _edgeCid(0) { // TODO: FIXME
+  TRI_ASSERT(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
