@@ -314,6 +314,35 @@
           validateResult(db._query(query, bindVars).toArray());
         });
 
+        it("should be able to bind the steps", function () {
+          let query = "FOR x IN TRAVERSE FROM '" + vertex.B + "' GRAPH " + en + ", " + vn + " @steps STEPS RETURN x";
+          let bindVars = {
+            "steps": 1
+          };
+          validateResult(db._query(query, bindVars).toArray());
+        });
+
+        it("should be able to bind the steps as range with two values", function () {
+          let query = "FOR x IN TRAVERSE FROM '" + vertex.B + "' GRAPH " + en + ", "
+                    + vn + " @lsteps..@rsteps STEPS RETURN x";
+          let bindVars = {
+            "lsteps": 1,
+            "rsteps": 1
+          };
+          validateResult(db._query(query, bindVars).toArray());
+        });
+
+        /* TODO: Should we support this?
+        it("should be able to bind the steps as range in one value", function () {
+          let query = "FOR x IN TRAVERSE FROM '" + vertex.B + "' GRAPH " + en + ", "
+                    + vn + " @steps STEPS RETURN x";
+          let bindVars = {
+            "steps": "1..1",
+          };
+          validateResult(db._query(query, bindVars).toArray());
+        });
+        */
+
       });
 
       describe("return format", function() {
@@ -366,7 +395,6 @@
           expect(entry).toEqual(vertex.B);
         });
 
-        /*
         it("can use any direction", function () {
           let query = "FOR x IN TRAVERSE 'any' FROM @startId GRAPH @@eCol, @@vCol 1 STEPS "
                     + "SORT x.vertex._id ASC RETURN x.vertex._id";
@@ -383,9 +411,8 @@
           entry = result[1];
           expect(entry).toEqual(vertex.C);
           entry = result[2];
-          expect(entry).toEqual(vertex.F);
+          expect(entry).toEqual(vertex.E);
         });
-        */
 
       });
 
