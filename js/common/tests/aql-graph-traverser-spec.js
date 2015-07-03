@@ -341,7 +341,7 @@
       describe("direction", function() {
 
         it("can use outbound direction, equivalent to default", function () {
-          let query = "FOR x IN TRAVERSE 'outbound' FROM @startId GRAPH @@eCol, @@vCol 1 STEPS RETURN x._vertex._id";
+          let query = "FOR x IN TRAVERSE 'outbound' FROM @startId GRAPH @@eCol, @@vCol 1 STEPS RETURN x.vertex._id";
           let bindVars = {
             "@eCol": en,
             "@vCol": vn,
@@ -354,7 +354,7 @@
         });
 
         it("can use inbound direction", function () {
-          let query = "FOR x IN TRAVERSE 'inbound' FROM @startId GRAPH @@eCol, @@vCol 1 STEPS RETURN x._vertex._id";
+          let query = "FOR x IN TRAVERSE 'inbound' FROM @startId GRAPH @@eCol, @@vCol 1 STEPS RETURN x.vertex._id";
           let bindVars = {
             "@eCol": en,
             "@vCol": vn,
@@ -369,7 +369,7 @@
         /*
         it("can use any direction", function () {
           let query = "FOR x IN TRAVERSE 'any' FROM @startId GRAPH @@eCol, @@vCol 1 STEPS "
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             "@eCol": en,
             "@vCol": vn,
@@ -393,7 +393,7 @@
 
         it("can use an exact number of steps", function () {
           let query = "FOR x IN TRAVERSE FROM @startId GRAPH @@eCol, @@vCol 2 STEPS "
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             "@eCol": en,
             "@vCol": vn,
@@ -406,10 +406,9 @@
           expect(result[1]).toEqual(vertex.F);
         });
 
-        /*
         it("can use a range of steps", function () {
-          let query = "FOR x IN TRAVERSE FROM @startId GRAPH @@eCol, @@vCol2..3 STEPS "
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+          let query = "FOR x IN TRAVERSE FROM @startId GRAPH @@eCol, @@vCol 2..3 STEPS "
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             "@eCol": en,
             "@vCol": vn,
@@ -422,18 +421,17 @@
           expect(result[1]).toEqual(vertex.E);
           expect(result[2]).toEqual(vertex.F);
         });
-        */
 
         it("can use a computed function of steps", function () {
           let query = "FOR x IN TRAVERSE FROM @startId GRAPH @@eCol, @@vCol LENGTH([1, 2]) STEPS "
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             "@eCol": en,
             "@vCol": vn,
             startId: vertex.B
           };
           let result = db._query(query, bindVars).toArray();
-          expect(result.length).toEqual(3);
+          expect(result.length).toEqual(2);
 
           expect(result[0]).toEqual(vertex.D);
           expect(result[1]).toEqual(vertex.F);
@@ -444,7 +442,7 @@
       describe("sorting", function () {
         it("should be able to sort the result", function () {
           let query = "FOR x IN TRAVERSE FROM @startId GRAPH @@eCol, @@vCol 1 STEPS " 
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             "@eCol": en,
             "@vCol": vn,
@@ -458,7 +456,7 @@
 
           // Reverse ordering
           query = "FOR x IN TRAVERSE FROM @startId GRAPH @@eCol, @@vCol 1 STEPS "
-                + "SORT x._vertex._id DESC RETURN x._vertex._id";
+                + "SORT x.vertex._id DESC RETURN x.vertex._id";
 
           result = db._query(query, bindVars).toArray();
           expect(result.length).toEqual(2);

@@ -3725,11 +3725,23 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         void fillTraversalOptions (basics::traverser::TraverserOptions& opts) const {
-          if (_steps->isIntValue()) {
+          if (_steps->isNumericValue()) {
+            // Fixed scalar depth
             opts.minDepth = _steps->getIntValue();
             opts.maxDepth = _steps->getIntValue();
+          } else if (_steps->type == NODE_TYPE_RANGE) {
+            // Range depth
+            auto lhs = _steps->getMember(0);
+            auto rhs = _steps->getMember(1);
+            if (lhs->isNumericValue()) {
+              // Range is left-closed
+              opts.minDepth = lhs->getIntValue();
+            }
+            if (rhs->isNumericValue()) {
+              // Range is right-closed
+              opts.maxDepth = rhs->getIntValue();
+            }
           } else {
-            // TODO Range depth
             // TODO open Range depth
             opts.minDepth = 1;
             opts.maxDepth = 256;
@@ -3743,6 +3755,8 @@ namespace triagens {
             opts.direction = TRI_EDGE_IN;
           } else if (strcmp(dir, "any") == 0) {
             opts.direction = TRI_EDGE_ANY;
+          } else {
+            TRI_ASSERT(false);
           }
         }
 
