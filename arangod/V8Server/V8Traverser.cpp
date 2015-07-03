@@ -635,7 +635,6 @@ DepthFirstTraverser::DepthFirstTraverser (
     uint64_t minDepth,
     uint64_t maxDepth
   ) : _pruneNext(false) {
-  // _minDepth(minDepth), _maxDepth(maxDepth), _pruneNext(false) {
   _opts.minDepth = minDepth;
   _opts.maxDepth = maxDepth;
   _opts.direction = direction;
@@ -660,7 +659,7 @@ DepthFirstTraverser::DepthFirstTraverser (
   TRI_document_collection_t* edgeCollection,
   VertexId& startVertex,
   TraverserOptions opts
-) : _opts(opts) {
+) : _opts(opts), _pruneNext(false) {
   auto edgeIndex = edgeCollection->edgeIndex();
   auto direction = _opts.direction;
   auto getEdge = [edgeIndex, direction] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, size_t amount) {
@@ -694,11 +693,12 @@ bool DepthFirstTraverser::hasMore () {
 }
 
 const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& DepthFirstTraverser::next () {
+  TRI_ASSERT(!_done);
   if (_pruneNext) {
     _pruneNext = false;
     _enumerator->prune();
   }
-  TRI_ASSERT(!_done);
+  TRI_ASSERT(!_pruneNext);
   const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p = _enumerator->next();
   int countEdges = p.edges.size();
   if (countEdges == 0) {
@@ -706,12 +706,12 @@ const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& DepthFirstTraverser::next ()
     // Done traversing
     return p;
   }
-  if (countEdges >= _opts.maxDepth) {
-    _pruneNext = true;
-  }
   if (_opts.shouldPrunePath(p)) {
     _enumerator->prune();
     return next();
+  }
+  if (countEdges >= _opts.maxDepth) {
+    _pruneNext = true;
   }
   if (countEdges < _opts.minDepth) {
     return next();

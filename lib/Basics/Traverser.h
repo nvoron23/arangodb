@@ -1297,7 +1297,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Get the next Path element from the traversal.
 ////////////////////////////////////////////////////////////////////////////////
-      const TraversalPath<edgeIdentifier, vertexIdentifier>& next() {
+      const TraversalPath<edgeIdentifier, vertexIdentifier>& next () {
+        if (_lastEdges.size() == 0) {
+          _traversalPath.edges.clear();
+          _traversalPath.vertices.clear();
+          return _traversalPath;
+        }
         _getEdge(_traversalPath.vertices.back(), _traversalPath.edges, _lastEdges.top(), 1); 
         if (_lastEdges.top() != nullptr) {
           // Could continue the path in the next depth.
@@ -1323,9 +1328,13 @@ namespace triagens {
 ///        any path having this prefix anymore.
 ////////////////////////////////////////////////////////////////////////////////
       void prune () {
-        _lastEdges.pop();
-        _traversalPath.edges.pop_back();
-        _traversalPath.vertices.pop_back();
+        if (_lastEdges.size() > 0) {
+          _lastEdges.pop();
+          if (_traversalPath.edges.size() > 0) {
+            _traversalPath.edges.pop_back();
+            _traversalPath.vertices.pop_back();
+          }
+        }
       }
 
     };
