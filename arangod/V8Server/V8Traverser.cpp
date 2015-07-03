@@ -630,7 +630,6 @@ void TRI_RunNeighborsSearch (
 
 DepthFirstTraverser::DepthFirstTraverser (
     TRI_document_collection_t* edgeCollection,
-    VertexId& startVertex,
     TRI_edge_direction_e& direction,
     uint64_t minDepth,
     uint64_t maxDepth
@@ -638,62 +637,19 @@ DepthFirstTraverser::DepthFirstTraverser (
   _opts.minDepth = minDepth;
   _opts.maxDepth = maxDepth;
   _opts.direction = direction;
-  auto edgeIndex = edgeCollection->edgeIndex();
-  auto getVertex = [] (TRI_doc_mptr_copy_t& edge, VertexId& vertex) -> VertexId {
-    // TODO fill Statistics
-    if (strcmp(TRI_EXTRACT_MARKER_FROM_KEY(&edge), vertex.key) == 0 &&
-        TRI_EXTRACT_MARKER_FROM_CID(&edge) == vertex.cid) {
-      return VertexId(TRI_EXTRACT_MARKER_TO_CID(&edge), TRI_EXTRACT_MARKER_TO_KEY(&edge));
-    }
-    return VertexId(TRI_EXTRACT_MARKER_FROM_CID(&edge), TRI_EXTRACT_MARKER_FROM_KEY(&edge));
-  };
-  if (direction == TRI_EDGE_ANY) {
-    unordered_map<VertexId, bool> isBackward;
-
-    auto getEdge = [edgeIndex] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, bool& dir) {
-      // TODO fill Statistics
-      if (dir) {
-        TRI_edge_index_iterator_t it(TRI_EDGE_OUT, startVertex.cid, startVertex.key);
-        edgeIndex->lookup(&it, edges, last, 1);
-        if (last == nullptr) {
-          // We are done enumerating. Requester has to be informed that this nullptr is final.
-          dir = false;
-        }
-      } else {
-        TRI_edge_index_iterator_t it(TRI_EDGE_IN, startVertex.cid, startVertex.key);
-        edgeIndex->lookup(&it, edges, last, 1);
-        if (last == nullptr) {
-          // now change direction
-          dir = true;
-          TRI_edge_index_iterator_t it(TRI_EDGE_OUT, startVertex.cid, startVertex.key);
-          edgeIndex->lookup(&it, edges, last, 1);
-          if (last == nullptr) {
-            // We are done enumerating. Requester has to be informed that this nullptr is final.
-            dir = false;
-          }
-        }
-      }
-    };
-    _enumerator.reset(new PathEnumerator<TRI_doc_mptr_copy_t, VertexId>(getEdge, getVertex, startVertex));
-  } else {
-    auto getEdge = [edgeIndex, direction] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, bool&) {
-      // Do not touch the bool parameter, as long as it is default the first encountered nullptr is final
-      // TODO fill Statistics
-      TRI_edge_index_iterator_t it(direction, startVertex.cid, startVertex.key);
-      edgeIndex->lookup(&it, edges, last, 1);
-    };
-    _enumerator.reset(new PathEnumerator<TRI_doc_mptr_copy_t, VertexId>(getEdge, getVertex, startVertex));
-  }
+  _defInternalFunctions(edgeCollection->edgeIndex());
 }
 
 DepthFirstTraverser::DepthFirstTraverser (
   TRI_document_collection_t* edgeCollection,
-  VertexId& startVertex,
   TraverserOptions opts
 ) : _opts(opts), _pruneNext(false) {
-  auto edgeIndex = edgeCollection->edgeIndex();
+  _defInternalFunctions(edgeCollection->edgeIndex());
+}
+
+void DepthFirstTraverser::_defInternalFunctions (EdgeIndex* edgeIndex) {
   auto direction = _opts.direction;
-  auto getVertex = [] (TRI_doc_mptr_copy_t& edge, VertexId& vertex) -> VertexId {
+  _getVertex = [] (TRI_doc_mptr_copy_t& edge, VertexId& vertex) -> VertexId {
     // TODO fill Statistics
     if (strcmp(TRI_EXTRACT_MARKER_FROM_KEY(&edge), vertex.key) == 0 &&
         TRI_EXTRACT_MARKER_FROM_CID(&edge) == vertex.cid) {
@@ -704,13 +660,14 @@ DepthFirstTraverser::DepthFirstTraverser (
 
   if (direction == TRI_EDGE_ANY) {
     unordered_map<VertexId, bool> isBackward;
-    auto getEdge = [edgeIndex] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, bool& dir) {
+
+    _getEdge = [edgeIndex] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, bool& dir) {
       // TODO fill Statistics
+      // TODO Self referencing edges
       if (dir) {
         TRI_edge_index_iterator_t it(TRI_EDGE_OUT, startVertex.cid, startVertex.key);
         edgeIndex->lookup(&it, edges, last, 1);
         if (last == nullptr) {
-          // We are done enumerating. Requester has to be informed that this nullptr is final.
           dir = false;
         }
       } else {
@@ -722,22 +679,23 @@ DepthFirstTraverser::DepthFirstTraverser (
           TRI_edge_index_iterator_t it(TRI_EDGE_OUT, startVertex.cid, startVertex.key);
           edgeIndex->lookup(&it, edges, last, 1);
           if (last == nullptr) {
-            // We are done enumerating. Requester has to be informed that this nullptr is final.
             dir = false;
           }
         }
       }
     };
-    _enumerator.reset(new PathEnumerator<TRI_doc_mptr_copy_t, VertexId>(getEdge, getVertex, startVertex));
   } else {
-    auto getEdge = [edgeIndex, direction] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, bool&) {
+    _getEdge = [edgeIndex, direction] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, bool&) {
       // Do not touch the bool parameter, as long as it is default the first encountered nullptr is final
       // TODO fill Statistics
       TRI_edge_index_iterator_t it(direction, startVertex.cid, startVertex.key);
       edgeIndex->lookup(&it, edges, last, 1);
     };
-    _enumerator.reset(new PathEnumerator<TRI_doc_mptr_copy_t, VertexId>(getEdge, getVertex, startVertex));
   }
+}
+
+void DepthFirstTraverser::setStartVertex (VertexId& v) {
+  _enumerator.reset(new PathEnumerator<TRI_doc_mptr_copy_t, VertexId>(_getEdge, _getVertex, v));
 }
 
 void DepthFirstTraverser::skip (int amount) {
@@ -748,6 +706,8 @@ void DepthFirstTraverser::skip (int amount) {
       break;
     }
   }
+
+
 }
 
 bool DepthFirstTraverser::hasMore () {
@@ -805,7 +765,8 @@ void TRI_RunTravTest (
   };
   opts.setPruningFunction(pruner);
 
-  DepthFirstTraverser t(collection, startVertex, opts);
+  DepthFirstTraverser t(collection, opts);
+  t.setStartVertex(startVertex);
 
   TraversalPath<TRI_doc_mptr_copy_t, VertexId> tp = t.next();
   while (tp.edges.size() > 0) {

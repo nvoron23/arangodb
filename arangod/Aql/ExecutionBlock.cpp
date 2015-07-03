@@ -7111,7 +7111,12 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
 
   basics::traverser::TraverserOptions opts;
   ep->fillTraversalOptions(opts);
-  VertexId startVertex = ep->getStartId();
+  _traverser.reset(new basics::traverser::DepthFirstTraverser(_trx->documentCollection(ep->edgeCid()), opts));
+  // TODO Change as StartId might either be a constant value or a variable.
+  // Has to be stored in either way still.
+  VertexId v = ep->getStartId();
+  _traverser->setStartVertex(v);
+
   /*
   auto pruner = [] (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path) -> bool {
     if (strcmp(path.vertices.back().key, "1") == 0) {
@@ -7124,8 +7129,6 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   };
   opts.setPruningFunction(pruner);
   */
-
-  _traverser.reset(new basics::traverser::DepthFirstTraverser(_trx->documentCollection(ep->edgeCid()), startVertex, opts));
 }
 
 TraversalBlock::~TraversalBlock () {
@@ -7268,6 +7271,9 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
   std::unique_ptr<AqlItemBlock> res(requestBlock(toSend, nrRegs));
   // automatically freed if we throw
   TRI_ASSERT(curRegs <= res->getNrRegs());
+  
+  // Known value
+  // 
 
   // only copy 1st row of registers inherited from previous frame(s)
   inheritRegisters(cur, res.get(), _pos);

@@ -493,6 +493,33 @@
 
       });
 
+      /*
+      describe("document input" , function () {
+
+        it("should be able to use a document from a further iteratrion as input", function () {
+          let query = "FOR y IN @@vCol FILTER y._id == @startId "
+                    + "FOR x IN TRAVERSE FROM y GRAPH @@eCol, @@vCol 1 STEPS RETURN x";
+          let bindVars = {
+            startId: vertex.B,
+            "@eCol": en,
+            "@vCol": vn
+          };
+          let result = db._query(query, bindVars).toArray();
+          require("internal").print(result);
+          expect(result.length).toEqual(1);
+          let entry = result[0];
+          isWellFormedResult(entry);
+          expect(entry.vertex._id).toEqual(vertex.C);
+          expect(entry.path.vertices.length).toEqual(2);
+          expect(entry.path.vertices[0]._id).toEqual(vertex.B);
+          expect(entry.path.vertices[1]._id).toEqual(vertex.C);
+          expect(entry.path.edges.length).toEqual(1);
+          expect(entry.path.edges[0]._id).toEqual(edge.BC);
+        });
+
+      });
+      */
+
     });
 
 

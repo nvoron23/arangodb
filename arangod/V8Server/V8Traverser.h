@@ -308,11 +308,28 @@ namespace triagens {
 
           std::unique_ptr<PathEnumerator<TRI_doc_mptr_copy_t, VertexId>> _enumerator;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief internal function to extract an edge
+////////////////////////////////////////////////////////////////////////////////
+
+          std::function<void(VertexId&, std::vector<TRI_doc_mptr_copy_t>&, void*&, bool&)> _getEdge;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief internal function to extract vertex information
+////////////////////////////////////////////////////////////////////////////////
+
+          std::function<VertexId (TRI_doc_mptr_copy_t&, VertexId&)> _getVertex;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief internal function to define the _getVertex and _getEdge functions
+////////////////////////////////////////////////////////////////////////////////
+
+          void _defInternalFunctions (triagens::arango::EdgeIndex* idx);
+
         public:
 
           DepthFirstTraverser (
             TRI_document_collection_t* edgeCollection,
-            VertexId& startVertex,
             TRI_edge_direction_e& direction,
             uint64_t minDepth,
             uint64_t maxDepth
@@ -320,9 +337,14 @@ namespace triagens {
 
           DepthFirstTraverser (
             TRI_document_collection_t* edgeCollection,
-            VertexId& startVertex,
             TraverserOptions _opts
           );
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Reset the traverser to use another start vertex
+////////////////////////////////////////////////////////////////////////////////
+
+          void setStartVertex (VertexId& v);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Skip amount many paths of the graph.
