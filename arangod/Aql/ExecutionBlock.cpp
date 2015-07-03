@@ -7106,7 +7106,7 @@ int64_t RemoteBlock::remaining () {
 TraversalBlock::TraversalBlock (ExecutionEngine* engine,
                                 TraversalNode const* ep)
   : ExecutionBlock(engine, ep),
-    _edgeCid(0)
+    _edgeCid(ep->edgeCid())
   {
 
   basics::traverser::TraverserOptions opts;
@@ -7154,7 +7154,8 @@ int TraversalBlock::initializeCursor (AqlItemBlock* items,
 AqlValue TraversalBlock::pathToAqlValue (
   const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p
 ) {
-  auto path = new Json(Json::Object, 2); 
+  auto result = new Json(Json::Object, 2); 
+  Json path(Json::Object, 2); 
   CollectionNameResolver resolver(_trx->vocbase());
   Json vertices(Json::Array);
   // TODO FIXME
@@ -7171,22 +7172,31 @@ AqlValue TraversalBlock::pathToAqlValue (
   }
   Json edges(Json::Array);
   // TODO FIXME
-  auto eId = resolver.getCollectionId("e");
-  auto edgeShaper = _trx->documentCollection(eId)->getShaper();
+  auto edgeShaper = _trx->documentCollection(_edgeCid)->getShaper();
   for (size_t i = 0; i < p.edges.size(); ++i) {
     TRI_shaped_json_t shapedJson;
     TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, &p.edges[i]);
     edges(TRI_ExpandShapedJson(
       edgeShaper,
       &resolver,
-      eId,
+      _edgeCid,
       &p.edges[i]
     ));
   }
-  (*path)("vertices", vertices)
+  path("vertices", vertices)
       ("edges", edges);
 
-  return AqlValue(path);
+  auto collection = _trx->trxCollection(p.vertices.back().cid);
+  TRI_doc_mptr_copy_t mptr;
+  _trx->readSingle(collection, &mptr, p.vertices.back().key);
+  (*result)("path", path)
+           ("vertex", TRI_ExpandShapedJson(
+              collection->_collection->_collection->getShaper(),
+              &resolver,
+              p.vertices.back().cid,
+              &mptr
+            ));
+  return AqlValue(result);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -7194,6 +7204,8 @@ AqlValue TraversalBlock::pathToAqlValue (
 ////////////////////////////////////////////////////////////////////////////////
 
 bool TraversalBlock::morePaths (size_t hint) {
+  _paths.clear();
+  _posInPaths = 0;
   if (!_traverser->hasMore()) {
     return false;
   }
