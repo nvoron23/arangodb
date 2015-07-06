@@ -3635,10 +3635,10 @@ namespace triagens {
                        AstNode const* graph,
                        AstNode const* steps)
           : ExecutionNode(plan, id), 
+            _start(start),
             _vocbase(vocbase), 
             _outVariable(outVariable), 
             _direction(direction),
-            _start(start),
             _graph(graph),
             _steps(steps),
             _resolver(new arango::CollectionNameResolver(vocbase))
@@ -3659,6 +3659,11 @@ namespace triagens {
             _edgeCid = edgeStruct->_cid;
           } else {
             // TODO Graph is a Graph by name
+          }
+          if (_start->type == NODE_TYPE_REFERENCE) {
+            _inVariable = static_cast<Variable*>(_start->getData());
+          } else {
+            _inVariable = nullptr;
           }
         }
 
@@ -3696,6 +3701,25 @@ namespace triagens {
         double estimateCost (size_t&) const override final;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief Test if this node uses an in variable or constant.
+////////////////////////////////////////////////////////////////////////////////
+
+        bool usesInVariable () const{
+          return _inVariable != nullptr; 
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief getVariablesUsedHere
+////////////////////////////////////////////////////////////////////////////////
+
+        std::vector<Variable const*> getVariablesUsedHere () const override final {
+          if (usesInVariable()) {
+            return std::vector<Variable const*>{ _inVariable };
+          }
+            return std::vector<Variable const*>{ };
+        }
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief getVariablesSetHere
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -3717,6 +3741,14 @@ namespace triagens {
 
         Variable const* outVariable () const {
           return _outVariable;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the in variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* inVariable () const {
+          return _inVariable;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3776,6 +3808,15 @@ namespace triagens {
           return _edgeCid;
         }
 
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief TODO FIXME start
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode const* _start;
+
+
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
 // -----------------------------------------------------------------------------
@@ -3795,16 +3836,16 @@ namespace triagens {
         Variable const* _outVariable;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief input variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* _inVariable;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief TODO FIXME direction
 ////////////////////////////////////////////////////////////////////////////////
 
         AstNode const* _direction;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief TODO FIXME start
-////////////////////////////////////////////////////////////////////////////////
-
-        AstNode const* _start;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief TODO FIXME graph information

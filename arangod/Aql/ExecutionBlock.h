@@ -2557,6 +2557,36 @@ namespace triagens {
 
         TRI_voc_cid_t const _edgeCid;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief The information to get the starting point. Can either be a constant
+///        which is known at construction time _startId, or a variable, which
+///        has to be extracted from register _reg.
+////////////////////////////////////////////////////////////////////////////////
+        union {
+          VertexId _startId;
+          size_t _reg;
+        };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Indicator if we use a register for input variable.
+///        Invariant: _useRegister == true <=> _reg != undefined
+////////////////////////////////////////////////////////////////////////////////
+
+        bool _useRegister;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Indicator if we have used the constant input parameter for computation
+///        We use it to check if we are done with enumerating.
+////////////////////////////////////////////////////////////////////////////////
+
+        bool _usedConstant;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief A collection name resolver required to identify vertex collections
+////////////////////////////////////////////////////////////////////////////////
+
+        triagens::arango::CollectionNameResolver* _resolver;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
@@ -2579,7 +2609,7 @@ namespace triagens {
 /// @brief Initialize the path enumerator
 ////////////////////////////////////////////////////////////////////////////////
 
-        void initializePaths ();
+        void initializePaths (AqlItemBlock*);
 
 
     };

@@ -493,10 +493,9 @@
 
       });
 
-      /*
       describe("document input" , function () {
 
-        it("should be able to use a document from a further iteratrion as input", function () {
+        it("should be able to use a document from a further iteration as input", function () {
           let query = "FOR y IN @@vCol FILTER y._id == @startId "
                     + "FOR x IN TRAVERSE FROM y GRAPH @@eCol, @@vCol 1 STEPS RETURN x";
           let bindVars = {
@@ -505,7 +504,6 @@
             "@vCol": vn
           };
           let result = db._query(query, bindVars).toArray();
-          require("internal").print(result);
           expect(result.length).toEqual(1);
           let entry = result[0];
           isWellFormedResult(entry);
@@ -517,8 +515,22 @@
           expect(entry.path.edges[0]._id).toEqual(edge.BC);
         });
 
+        it("should be able to use a list of documents as input", function () {
+          let query = "FOR y IN @@vCol "
+                    + "FOR x IN TRAVERSE FROM y GRAPH @@eCol, @@vCol 1 STEPS RETURN x";
+          let bindVars = {
+            "@eCol": en,
+            "@vCol": vn
+          };
+          let result = db._query(query, bindVars).toArray();
+          expect(result.length).toEqual(6);
+          for (let entry of result) {
+            isWellFormedResult(entry);
+          }
+        });
+
+ 
       });
-      */
 
     });
 

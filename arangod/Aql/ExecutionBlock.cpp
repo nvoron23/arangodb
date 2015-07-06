@@ -7106,16 +7106,25 @@ int64_t RemoteBlock::remaining () {
 TraversalBlock::TraversalBlock (ExecutionEngine* engine,
                                 TraversalNode const* ep)
   : ExecutionBlock(engine, ep),
-    _edgeCid(ep->edgeCid())
+    _edgeCid(ep->edgeCid()),
+    _useRegister(false),
+    _usedConstant(false)
   {
 
   basics::traverser::TraverserOptions opts;
   ep->fillTraversalOptions(opts);
   _traverser.reset(new basics::traverser::DepthFirstTraverser(_trx->documentCollection(ep->edgeCid()), opts));
-  // TODO Change as StartId might either be a constant value or a variable.
-  // Has to be stored in either way still.
-  VertexId v = ep->getStartId();
-  _traverser->setStartVertex(v);
+  _resolver = new CollectionNameResolver(_trx->vocbase());
+  if (!ep->usesInVariable()) {
+    std::string vId(ep->_start->getStringValue());
+    auto pos = vId.find("/");
+    _startId = VertexId(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1));
+  } else {
+    auto it = ep->getRegisterPlan()->varInfo.find(ep->inVariable()->id);
+    TRI_ASSERT(it != ep->getRegisterPlan()->varInfo.end());
+    _reg = it->second.registerId;
+    _useRegister = true;
+  }
 
   /*
   auto pruner = [] (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path) -> bool {
@@ -7132,6 +7141,7 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
 }
 
 TraversalBlock::~TraversalBlock () {
+  delete _resolver;
 }
 
 int TraversalBlock::initialize () {
@@ -7159,7 +7169,6 @@ AqlValue TraversalBlock::pathToAqlValue (
 ) {
   auto result = new Json(Json::Object, 2); 
   Json path(Json::Object, 2); 
-  CollectionNameResolver resolver(_trx->vocbase());
   Json vertices(Json::Array);
   // TODO FIXME
   for (size_t i = 0; i < p.vertices.size(); ++i) {
@@ -7168,7 +7177,7 @@ AqlValue TraversalBlock::pathToAqlValue (
     _trx->readSingle(collection, &mptr, p.vertices[i].key);
     vertices(TRI_ExpandShapedJson(
       collection->_collection->_collection->getShaper(),
-      &resolver,
+      _resolver,
       p.vertices[i].cid,
       &mptr
     ));
@@ -7181,7 +7190,7 @@ AqlValue TraversalBlock::pathToAqlValue (
     TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, &p.edges[i]);
     edges(TRI_ExpandShapedJson(
       edgeShaper,
-      &resolver,
+      _resolver,
       _edgeCid,
       &p.edges[i]
     ));
@@ -7195,7 +7204,7 @@ AqlValue TraversalBlock::pathToAqlValue (
   (*result)("path", path)
            ("vertex", TRI_ExpandShapedJson(
               collection->_collection->_collection->getShaper(),
-              &resolver,
+              _resolver,
               p.vertices.back().cid,
               &mptr
             ));
@@ -7224,8 +7233,22 @@ bool TraversalBlock::morePaths (size_t hint) {
 }
 
 
-void TraversalBlock::initializePaths () {
-  // TODO: FIXME
+void TraversalBlock::initializePaths (AqlItemBlock* items) {
+  if (!_useRegister) {
+    if (!_usedConstant) {
+      _usedConstant = true;
+      _traverser->setStartVertex(_startId);
+    }
+  } else {
+    auto in = items->getValueReference(_pos, _reg);
+    if (in.isShaped()) {
+      auto col = items->getDocumentCollection(_reg);
+      VertexId v(col->_info._cid, TRI_EXTRACT_MARKER_KEY(in.getMarker()));
+      _traverser->setStartVertex(v);
+    } else {
+      std::cout << "FOUND Type: " << in.getTypeString() << std::endl;
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -7247,19 +7270,30 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
       return nullptr;
     }
     _pos = 0;           // this is in the first block
-    initializePaths();
   }
 
   // If we get here, we do have _buffer.front()
   AqlItemBlock* cur = _buffer.front();
   size_t const curRegs = cur->getNrRegs();
 
+  if (_pos == 0) {
+    // Initial initialisation
+    initializePaths(cur);
+  }
+
   // Iterate more paths:
   if (_posInPaths >= _paths.size()) {
-    // TODO: FIXME
     if (! morePaths(atMost)) {
-      _done = true;
-      return nullptr;
+      // This input does not have any more paths. maybe the nextone has.
+      // we can only return nullptr iff the buffer is empty.
+      if (++_pos >= cur->size()) {
+        _buffer.pop_front();  // does not throw
+        returnBlock(cur);
+        _pos = 0;
+      } else {
+        initializePaths(cur);
+      }
+      return getSome(atMost, atMost);
     }
   }
 
@@ -7272,9 +7306,6 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
   // automatically freed if we throw
   TRI_ASSERT(curRegs <= res->getNrRegs());
   
-  // Known value
-  // 
-
   // only copy 1st row of registers inherited from previous frame(s)
   inheritRegisters(cur, res.get(), _pos);
 
@@ -7299,11 +7330,12 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
     // fetch more paths into our buffer
     if (! morePaths(atMost)) {
       // nothing more to read, re-initialize fetching of paths
-      initializePaths();
       if (++_pos >= cur->size()) {
         _buffer.pop_front();  // does not throw
         returnBlock(cur);
         _pos = 0;
+      } else {
+        initializePaths(cur);
       }
     }
   }
