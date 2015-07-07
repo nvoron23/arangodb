@@ -7108,7 +7108,8 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   : ExecutionBlock(engine, ep),
     _edgeCid(ep->edgeCid()),
     _useRegister(false),
-    _usedConstant(false)
+    _usedConstant(false),
+    _posInPaths(0)
   {
 
   basics::traverser::TraverserOptions opts;
@@ -7118,7 +7119,7 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   if (!ep->usesInVariable()) {
     std::string vId(ep->_start->getStringValue());
     auto pos = vId.find("/");
-    _startId = VertexId(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1));
+    _startId.setCopy(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1));
   } else {
     auto it = ep->getRegisterPlan()->varInfo.find(ep->inVariable()->id);
     TRI_ASSERT(it != ep->getRegisterPlan()->varInfo.end());
@@ -7142,6 +7143,10 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
 
 TraversalBlock::~TraversalBlock () {
   delete _resolver;
+  for (auto p : _paths) {
+    p.destroy();
+  }
+  _paths.clear();
 }
 
 int TraversalBlock::initialize () {
@@ -7167,7 +7172,7 @@ int TraversalBlock::initializeCursor (AqlItemBlock* items,
 AqlValue TraversalBlock::pathToAqlValue (
   const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p
 ) {
-  auto result = new Json(Json::Object, 2); 
+  Json* result = new Json(Json::Object, 2);
   Json path(Json::Object, 2); 
   Json vertices(Json::Array);
   // TODO FIXME
@@ -7216,6 +7221,9 @@ AqlValue TraversalBlock::pathToAqlValue (
 ////////////////////////////////////////////////////////////////////////////////
 
 bool TraversalBlock::morePaths (size_t hint) {
+  for (auto p : _paths) {
+    p.destroy();
+  }
   _paths.clear();
   _posInPaths = 0;
   if (!_traverser->hasMore()) {

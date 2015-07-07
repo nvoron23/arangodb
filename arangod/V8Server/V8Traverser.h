@@ -43,20 +43,35 @@
 struct VertexId {
   TRI_voc_cid_t cid;
   char const*   key;
+  char* dispKey;
 
   VertexId () 
     : cid(0), 
-      key(nullptr) {
+      key(nullptr),
+      dispKey(nullptr) {
   }
 
   VertexId (TRI_voc_cid_t cid, char const* key) 
-    : cid(cid), key(key) {
+    : cid(cid),
+      key(key),
+      dispKey(nullptr) {
   }
 
-// TODO this might cause memleaks
-// Investigate further
+  ~VertexId () {
+    delete dispKey;
+  }
+
+  void setCopy (TRI_voc_cid_t pcid, std::string pkey) {
+    cid = pcid;
+    delete dispKey;
+    dispKey = triagens::basics::StringUtils::duplicate(pkey);
+    key = dispKey;
+  }
+  
   VertexId (TRI_voc_cid_t cid, std::string key) 
-    : cid(cid), key(triagens::basics::StringUtils::duplicate(key)) {
+    : cid(cid), key(nullptr),
+      dispKey(triagens::basics::StringUtils::duplicate(key)) {
+      key = dispKey;
   }
   
   bool operator== (const VertexId& other) const {
@@ -66,8 +81,17 @@ struct VertexId {
     return false;
   }
 
+  VertexId(const VertexId& v) {
+    cid = v.cid;
+    if (v.dispKey != nullptr) {
+      dispKey = triagens::basics::StringUtils::duplicate(v.dispKey);
+      key = dispKey;
+    } else {
+      dispKey = nullptr;
+      key = v.key;
+    }
+  };
   // Find unnecessary copies
-  //   VertexId(const VertexId&) = delete;
   // VertexId(const VertexId& v) : first(v.first), second(v.second) { std::cout << "move failed!\n";}
   // VertexId(VertexId&& v) : first(v.first), second(std::move(v.second)) {}
 };
