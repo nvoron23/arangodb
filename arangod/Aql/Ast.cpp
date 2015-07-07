@@ -2624,12 +2624,13 @@ std::pair<std::string, bool> Ast::normalizeFunctionName (char const* name) {
 
   std::string functionName(upperName);
 
-  TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, upperName);
 
   if (functionName.find(':') == std::string::npos) {
+    TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, upperName);
     // prepend default namespace for internal functions
     return std::make_pair(functionName, true);
   }
+  TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, upperName);
 
   // user-defined function
   return std::make_pair(functionName, false);

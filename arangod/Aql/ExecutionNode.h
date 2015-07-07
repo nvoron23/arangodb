@@ -3667,6 +3667,10 @@ namespace triagens {
           }
         }
 
+        ~TraversalNode () {
+          delete _resolver;
+        }
+
         TraversalNode (ExecutionPlan* plan,
                        triagens::basics::Json const& base);
 

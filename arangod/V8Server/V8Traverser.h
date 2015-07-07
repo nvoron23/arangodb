@@ -53,6 +53,8 @@ struct VertexId {
     : cid(cid), key(key) {
   }
 
+// TODO this might cause memleaks
+// Investigate further
   VertexId (TRI_voc_cid_t cid, std::string key) 
     : cid(cid), key(triagens::basics::StringUtils::duplicate(key)) {
   }
