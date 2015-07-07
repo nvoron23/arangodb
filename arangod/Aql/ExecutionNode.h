@@ -3796,18 +3796,6 @@ namespace triagens {
           }
         }
 
-        VertexId getStartId () const {
-          if (!_start->isStringValue()) {
-            auto v = static_cast<Variable*>(_start->getData());
-            TRI_ASSERT(v != nullptr);
-            std::cout << "Value" << std::endl;
-          }
-          std::string vId(_start->getStringValue());
-          auto pos = vId.find("/");
-          VertexId start(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1));
-          return start;
-        }
-
         TRI_voc_cid_t const edgeCid () const {
           return _edgeCid;
         }

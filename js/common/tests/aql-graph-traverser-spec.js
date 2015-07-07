@@ -537,4 +537,42 @@
 
   });
 
+  describe("Potential errors", function () {
+
+    let vc, ec;
+
+    beforeEach(function () {
+      cleanup();
+      vc = db._create(vn);
+      ec = db._createEdgeCollection(en);
+    });
+
+    afterEach(function () {
+      cleanup();
+    });
+
+    describe("Malformed AQL", function () {
+
+    });
+
+    it("should not return documents from unknown vertex collections", function () {
+      const vn2 = "UnitTestVertexCollectionOther";
+      db._drop(vn2);
+      const vc2 = db._create(vn2);
+      vc.save({_key: "1"});
+      vc2.save({_key: "1"});
+      ec.save(vn + "/1", vn2 + "/1", {});
+      let query = "FOR x IN TRAVERSE FROM @startId GRAPH @@eCol, @@vCol 1 STEPS RETURN x";
+      let bindVars = {
+        "@eCol": en,
+        "@vCol": vn,
+        "startId": vn + "/1"
+      };
+      // NOTE: vn2 is not explicitly named in AQL
+      let result = db._query(query, bindVars).toArray();
+      expect(result.length).toEqual(0);
+      db._drop(vn2);
+    });
+  });
+
 }());

@@ -7108,8 +7108,8 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   : ExecutionBlock(engine, ep),
     _edgeCid(ep->edgeCid()),
     _useRegister(false),
-    _usedConstant(false),
-    _posInPaths(0)
+    _posInPaths(0),
+    _usedConstant(false)
   {
 
   basics::traverser::TraverserOptions opts;
@@ -7117,6 +7117,7 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   _traverser.reset(new basics::traverser::DepthFirstTraverser(_trx->documentCollection(ep->edgeCid()), opts));
   _resolver = new CollectionNameResolver(_trx->vocbase());
   if (!ep->usesInVariable()) {
+    _startId = VertexId();
     std::string vId(ep->_start->getStringValue());
     auto pos = vId.find("/");
     _startId.setCopy(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1));
@@ -7178,6 +7179,10 @@ AqlValue TraversalBlock::pathToAqlValue (
   // TODO FIXME
   for (size_t i = 0; i < p.vertices.size(); ++i) {
     auto collection = _trx->trxCollection(p.vertices[i].cid);
+    if (collection == nullptr) {
+      // This collection is not known, will be ignored
+      return AqlValue();
+    }
     TRI_doc_mptr_copy_t mptr;
     _trx->readSingle(collection, &mptr, p.vertices[i].key);
     vertices(TRI_ExpandShapedJson(
@@ -7235,7 +7240,10 @@ bool TraversalBlock::morePaths (size_t hint) {
       // There are no further paths available.
       break;
     }
-    _paths.push_back(pathToAqlValue(p));
+    auto tmp = pathToAqlValue(p);
+    if (!tmp.isEmpty()) {
+      _paths.push_back(tmp);
+    }
   }
   return _paths.size() > 0;
 }

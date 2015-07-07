@@ -3267,10 +3267,10 @@ double GatherNode::estimateCost (size_t& nrItems) const {
 TraversalNode::TraversalNode (ExecutionPlan* plan,
                               triagens::basics::Json const& base)
   : ExecutionNode(plan, base),
+    _start(nullptr),
     _vocbase(plan->getAst()->query()->vocbase()),
     _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
     _direction(nullptr),
-    _start(nullptr),
     _graph(nullptr),
     _steps(nullptr),
     _edgeCid(0) { // TODO: FIXME

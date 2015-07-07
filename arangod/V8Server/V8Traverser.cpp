@@ -633,8 +633,9 @@ DepthFirstTraverser::DepthFirstTraverser (
     TRI_edge_direction_e& direction,
     uint64_t minDepth,
     uint64_t maxDepth
-  ) : _pruneNext(false),
-      _done(false) {
+  ) : _done(false),
+      _pruneNext(false)
+       {
   _opts.minDepth = minDepth;
   _opts.maxDepth = maxDepth;
   _opts.direction = direction;
@@ -644,9 +645,9 @@ DepthFirstTraverser::DepthFirstTraverser (
 DepthFirstTraverser::DepthFirstTraverser (
   TRI_document_collection_t* edgeCollection,
   TraverserOptions opts
-) : _opts(opts),
-    _pruneNext(false),
-    _done(false) {
+) : _done(false),
+    _opts(opts),
+    _pruneNext(false) {
   _defInternalFunctions(edgeCollection->edgeIndex());
 }
 
