@@ -34,6 +34,7 @@
 #include "Basics/tri-strings.h"
 #include "Basics/Exceptions.h"
 #include "VocBase/collection.h"
+#include "VocBase/Graphs.h"
 
 using namespace triagens::aql;
 
@@ -1057,6 +1058,11 @@ AstNode* Ast::createNodeTraversal (AstNode const* direction,
 
   TRI_ASSERT(node->numMembers() == 4);
 
+  if (graph->type != NODE_TYPE_COLLECTION_PAIR) {
+    std::cout << graph->type << std::endl;
+  }
+  // Evaluate the graphName and make the collections known to the transaction
+
   return node;
 }
 
@@ -1222,6 +1228,23 @@ void Ast::injectBindParameters (BindParameters& parameters) {
       }
       // convert into a regular attribute access node to simplify handling later
       return createNodeAttributeAccess(node->getMember(0), name->getStringValue());
+    }
+    else if (node->type == NODE_TYPE_TRAVERSAL) {
+      auto graphNode = node->getMember(2);
+      if (graphNode->type == NODE_TYPE_VALUE) {
+        auto graph = triagens::arango::GraphFactory::factory()->byName(
+          _query->vocbase(),
+          graphNode->getStringValue()
+        );
+        auto vColls = graph.vertexCollections();
+        for (const auto& n: vColls) {
+          _query->collections()->add(n, TRI_TRANSACTION_READ);
+        }
+        auto eColls = graph.edgeCollections();
+        for (const auto& n: eColls) {
+          _query->collections()->add(n, TRI_TRANSACTION_READ);
+        }
+      }
     }
 
     return node;

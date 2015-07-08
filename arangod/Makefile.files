@@ -137,6 +137,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/VocBase/document-collection.cpp \
 	arangod/VocBase/ExampleMatcher.cpp \
 	arangod/VocBase/edge-collection.cpp \
+	arangod/VocBase/Graphs.cpp \
 	arangod/VocBase/headers.cpp \
 	arangod/VocBase/key-generator.cpp \
 	arangod/VocBase/replication-applier.cpp \

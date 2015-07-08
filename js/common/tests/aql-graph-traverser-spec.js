@@ -98,7 +98,6 @@
       cleanup();
     });
 
-    /*
     describe("with a named graph", function () {
 
       let g;
@@ -137,6 +136,8 @@
           expect(entry.path.edges[0]._id).toEqual(edge.BC);
         });
       });
+
+      /*
 
       describe("direction", function() {
 
@@ -256,8 +257,8 @@
 
       });
 
-    });
     */
+    });
 
     describe("with a collection pair", function () {
 

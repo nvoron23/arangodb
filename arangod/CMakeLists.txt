@@ -163,6 +163,7 @@ add_executable(
     VocBase/document-collection.cpp
     VocBase/ExampleMatcher.cpp
     VocBase/edge-collection.cpp
+    VocBase/Graphs.cpp
     VocBase/headers.cpp
     VocBase/key-generator.cpp
     VocBase/replication-applier.cpp
