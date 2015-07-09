@@ -51,7 +51,7 @@ static int internalCounter = 0;
 static int first = 0;
 static int second = 0;
 static int third = 0;
-auto integerEdgeEnumerator = [] (int& start, std::vector<int>& result, void*& next, bool&) {
+auto integerEdgeEnumerator = [] (int& start, std::vector<int>& result, void*& next, size_t&, bool&) {
   if (result.size() >= 3) {
     next = nullptr;
   } else if (next == nullptr) {
