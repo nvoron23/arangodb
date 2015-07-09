@@ -2552,12 +2552,6 @@ namespace triagens {
         std::unique_ptr<triagens::basics::traverser::DepthFirstTraverser> _traverser;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief The cid of the traversed edge collection
-////////////////////////////////////////////////////////////////////////////////
-
-        TRI_voc_cid_t const _edgeCid;
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief The information to get the starting point. Can either be a constant
 ///        which is known at construction time _startId, or a variable, which
 ///        has to be extracted from register _reg.
@@ -2602,7 +2596,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         AqlValue pathToAqlValue (
-          const basics::TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p
+          const basics::TraversalPath<EdgeInfo, VertexId>& p
         );
 
 ////////////////////////////////////////////////////////////////////////////////

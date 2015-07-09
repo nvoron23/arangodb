@@ -3272,8 +3272,7 @@ TraversalNode::TraversalNode (ExecutionPlan* plan,
     _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
     _direction(nullptr),
     _graph(nullptr),
-    _steps(nullptr),
-    _edgeCid(0) { // TODO: FIXME
+    _steps(nullptr) { // TODO: FIXME
   TRI_ASSERT(false);
 }
 

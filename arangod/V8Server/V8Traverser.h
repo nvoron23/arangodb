@@ -90,6 +90,16 @@ struct VertexId {
   // VertexId(VertexId&& v) : first(v.first), second(std::move(v.second)) {}
 };
 
+struct EdgeInfo {
+  TRI_voc_cid_t cid;
+  TRI_doc_mptr_copy_t mptr;
+
+  EdgeInfo (
+    TRI_voc_cid_t& pcid,
+    TRI_doc_mptr_copy_t& pmptr
+  ) : cid(pcid), mptr(pmptr) { }
+};
+
 namespace std {
   template<>
   struct hash<VertexId> {
@@ -260,7 +270,7 @@ namespace triagens {
       struct TraverserOptions {
 
         private:
-          std::function<bool (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path)> pruningFunction;
+          std::function<bool (const TraversalPath<EdgeInfo, VertexId>& path)> pruningFunction;
 
         public:
           TRI_edge_direction_e direction;
@@ -280,14 +290,14 @@ namespace triagens {
           { };
 
           void setPruningFunction (
-            std::function<bool (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path)> callback
+            std::function<bool (const TraversalPath<EdgeInfo, VertexId>& path)> callback
           ) {
             pruningFunction = callback;
             usesPrune = true;
           }
 
           bool shouldPrunePath (
-            const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path
+            const TraversalPath<EdgeInfo, VertexId>& path
           ) {
             if (!usesPrune) {
               return false;
@@ -326,25 +336,31 @@ namespace triagens {
 /// @brief internal cursor to enumerate the paths of a graph
 ////////////////////////////////////////////////////////////////////////////////
 
-          std::unique_ptr<PathEnumerator<TRI_doc_mptr_copy_t, VertexId>> _enumerator;
+          std::unique_ptr<PathEnumerator<EdgeInfo, VertexId>> _enumerator;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief internal function to extract an edge
 ////////////////////////////////////////////////////////////////////////////////
 
-          std::function<void(VertexId&, std::vector<TRI_doc_mptr_copy_t>&, void*&, bool&)> _getEdge;
+          std::function<void(VertexId&, std::vector<EdgeInfo>&, void*&, size_t&, bool&)> _getEdge;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief internal function to extract vertex information
 ////////////////////////////////////////////////////////////////////////////////
 
-          std::function<VertexId (TRI_doc_mptr_copy_t&, VertexId&)> _getVertex;
+          std::function<VertexId (EdgeInfo&, VertexId&)> _getVertex;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief a vector containing all required edge collection structures
+////////////////////////////////////////////////////////////////////////////////
+
+          std::vector<TRI_document_collection_t*> _edgeCols;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief internal function to define the _getVertex and _getEdge functions
 ////////////////////////////////////////////////////////////////////////////////
 
-          void _defInternalFunctions (triagens::arango::EdgeIndex* idx);
+          void _defInternalFunctions ();
 
         public:
 
@@ -356,7 +372,7 @@ namespace triagens {
           );
 
           DepthFirstTraverser (
-            TRI_document_collection_t* edgeCollection,
+            std::vector<TRI_document_collection_t*> edgeCollections,
             TraverserOptions _opts
           );
 
@@ -376,7 +392,7 @@ namespace triagens {
 /// @brief Get the next possible path in the graph.
 ////////////////////////////////////////////////////////////////////////////////
 
-          const TraversalPath<TRI_doc_mptr_copy_t, VertexId>&  next ();
+          const TraversalPath<EdgeInfo, VertexId>&  next ();
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Prune the current path prefix. Do not evaluate it any further.
@@ -525,12 +541,5 @@ void TRI_RunNeighborsSearch (std::vector<EdgeCollectionInfo*>& collectionInfos,
                              triagens::basics::traverser::NeighborsOptions& opts,
                              std::unordered_set<VertexId>& distinct,
                              std::vector<VertexId>& result);
-
-
-
-void TRI_RunTravTest (
-  TRI_document_collection_t* collection,
-  VertexId& startVertex
-);
 
 #endif

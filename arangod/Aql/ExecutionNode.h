@@ -44,6 +44,7 @@
 #include "Basics/JsonHelper.h"
 #include "Basics/Traverser.h"
 #include "lib/Basics/json-utilities.h"
+#include "VocBase/Graphs.h"
 #include "VocBase/voc-types.h"
 #include "VocBase/vocbase.h"
 #include "V8Server/V8Traverser.h"
@@ -3656,9 +3657,21 @@ namespace triagens {
             if (edgeStruct->_type != TRI_COL_TYPE_EDGE) {
               THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_TYPE_INVALID);
             }
-            _edgeCid = edgeStruct->_cid;
+            _edgeCids.push_back(edgeStruct->_cid);
           } else {
-            // TODO Graph is a Graph by name
+            if (_edgeCids.size() == 0) {
+              if (_graph->isStringValue()) {
+                auto graph = triagens::arango::GraphFactory::factory()->byName(
+                  _vocbase,
+                  _graph->getStringValue()
+                );
+                auto eColls = graph.edgeCollections();
+                for (const auto& n: eColls) {
+                  TRI_voc_cid_t cid = _resolver->getCollectionId(n);
+                  _edgeCids.push_back(cid);
+                }
+              }
+            }
           }
           if (_start->type == NODE_TYPE_REFERENCE) {
             _inVariable = static_cast<Variable*>(_start->getData());
@@ -3796,8 +3809,8 @@ namespace triagens {
           }
         }
 
-        TRI_voc_cid_t const edgeCid () const {
-          return _edgeCid;
+        std::vector<TRI_voc_cid_t> const edgeCids () const {
+          return _edgeCids;
         }
 
 
@@ -3861,7 +3874,7 @@ namespace triagens {
 /// @brief the edge collection cid
 ////////////////////////////////////////////////////////////////////////////////
 
-        TRI_voc_cid_t _edgeCid;
+        std::vector<TRI_voc_cid_t> _edgeCids;
 
     };
 

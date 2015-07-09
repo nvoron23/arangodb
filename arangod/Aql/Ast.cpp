@@ -1058,11 +1058,6 @@ AstNode* Ast::createNodeTraversal (AstNode const* direction,
 
   TRI_ASSERT(node->numMembers() == 4);
 
-  if (graph->type != NODE_TYPE_COLLECTION_PAIR) {
-    std::cout << graph->type << std::endl;
-  }
-  // Evaluate the graphName and make the collections known to the transaction
-
   return node;
 }
 
@@ -1232,6 +1227,7 @@ void Ast::injectBindParameters (BindParameters& parameters) {
     else if (node->type == NODE_TYPE_TRAVERSAL) {
       auto graphNode = node->getMember(2);
       if (graphNode->type == NODE_TYPE_VALUE) {
+        TRI_ASSERT(graphNode->isStringValue());
         auto graph = triagens::arango::GraphFactory::factory()->byName(
           _query->vocbase(),
           graphNode->getStringValue()

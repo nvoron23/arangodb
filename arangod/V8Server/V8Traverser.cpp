@@ -639,72 +639,129 @@ DepthFirstTraverser::DepthFirstTraverser (
   _opts.minDepth = minDepth;
   _opts.maxDepth = maxDepth;
   _opts.direction = direction;
-  _defInternalFunctions(edgeCollection->edgeIndex());
+  _defInternalFunctions();
 }
 
 DepthFirstTraverser::DepthFirstTraverser (
-  TRI_document_collection_t* edgeCollection,
+  std::vector<TRI_document_collection_t*> edgeCollections,
   TraverserOptions opts
 ) : _done(false),
     _opts(opts),
-    _pruneNext(false) {
-  _defInternalFunctions(edgeCollection->edgeIndex());
+    _pruneNext(false),
+    _edgeCols(edgeCollections) {
+  _defInternalFunctions();
 }
 
-void DepthFirstTraverser::_defInternalFunctions (EdgeIndex* edgeIndex) {
-  auto direction = _opts.direction;
-  _getVertex = [] (TRI_doc_mptr_copy_t& edge, VertexId& vertex) -> VertexId {
+void DepthFirstTraverser::_defInternalFunctions () {
+  _getVertex = [] (EdgeInfo& edge, VertexId& vertex) -> VertexId {
+    auto mptr = edge.mptr;
     // TODO fill Statistics
-    if (strcmp(TRI_EXTRACT_MARKER_FROM_KEY(&edge), vertex.key) == 0 &&
-        TRI_EXTRACT_MARKER_FROM_CID(&edge) == vertex.cid) {
-      return VertexId(TRI_EXTRACT_MARKER_TO_CID(&edge), TRI_EXTRACT_MARKER_TO_KEY(&edge));
+    if (strcmp(TRI_EXTRACT_MARKER_FROM_KEY(&mptr), vertex.key) == 0 &&
+        TRI_EXTRACT_MARKER_FROM_CID(&mptr) == vertex.cid) {
+      return VertexId(TRI_EXTRACT_MARKER_TO_CID(&mptr), TRI_EXTRACT_MARKER_TO_KEY(&mptr));
     }
-    return VertexId(TRI_EXTRACT_MARKER_FROM_CID(&edge), TRI_EXTRACT_MARKER_FROM_KEY(&edge));
+    return VertexId(TRI_EXTRACT_MARKER_FROM_CID(&mptr), TRI_EXTRACT_MARKER_FROM_KEY(&mptr));
   };
 
+  auto direction = _opts.direction;
+  auto edgeCols = _edgeCols;
   if (direction == TRI_EDGE_ANY) {
-    unordered_map<VertexId, bool> isBackward;
-
-    _getEdge = [edgeIndex] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, bool& dir) {
+    _getEdge = [edgeCols] (VertexId& startVertex, std::vector<EdgeInfo>& edges, void*& last, size_t& eColIdx, bool& dir) {
+      std::vector<TRI_doc_mptr_copy_t> tmp;
+      TRI_ASSERT(eColIdx < edgeCols.size());
       // TODO fill Statistics
       // TODO Self referencing edges
+      triagens::arango::EdgeIndex* edgeIndex = edgeCols.at(eColIdx)->edgeIndex();
       if (dir) {
         TRI_edge_index_iterator_t it(TRI_EDGE_OUT, startVertex.cid, startVertex.key);
-        edgeIndex->lookup(&it, edges, last, 1);
-        if (last == nullptr) {
+        edgeIndex->lookup(&it, tmp, last, 1);
+        while (last == nullptr) {
+          // Switch back direction
           dir = false;
+          ++eColIdx;
+          if (edgeCols.size() == eColIdx) {
+            // No more to do, stop here
+            return;
+          }
+          TRI_edge_index_iterator_t it(TRI_EDGE_IN, startVertex.cid, startVertex.key);
+          edgeIndex = edgeCols.at(eColIdx)->edgeIndex();
+          edgeIndex->lookup(&it, tmp, last, 1);
+          if (last == nullptr) {
+            dir = true;
+            TRI_edge_index_iterator_t it(TRI_EDGE_OUT, startVertex.cid, startVertex.key);
+            edgeIndex->lookup(&it, tmp, last, 1);
+          }
         }
       } else {
         TRI_edge_index_iterator_t it(TRI_EDGE_IN, startVertex.cid, startVertex.key);
-        edgeIndex->lookup(&it, edges, last, 1);
-        if (last == nullptr) {
+        edgeIndex->lookup(&it, tmp, last, 1);
+        while (last == nullptr) {
           // now change direction
           dir = true;
           TRI_edge_index_iterator_t it(TRI_EDGE_OUT, startVertex.cid, startVertex.key);
-          edgeIndex->lookup(&it, edges, last, 1);
+          edgeIndex->lookup(&it, tmp, last, 1);
           if (last == nullptr) {
+            // The other direction also has no further edges
             dir = false;
+            ++eColIdx;
+            if (edgeCols.size() == eColIdx) {
+              // No more to do, stop here
+              return;
+            }
+            TRI_edge_index_iterator_t it(TRI_EDGE_IN, startVertex.cid, startVertex.key);
+            edgeIndex = edgeCols.at(eColIdx)->edgeIndex();
+            edgeIndex->lookup(&it, tmp, last, 1);
           }
         }
       }
+      if (last != nullptr) {
+        // sth is stored in tmp. Now push it on edges
+        TRI_ASSERT(tmp.size() == 1);
+        EdgeInfo e(
+          edgeCols.at(eColIdx)->_info._cid,
+          tmp.back()
+        );
+        edges.push_back(e);
+      }
     };
   } else {
-    _getEdge = [edgeIndex, direction] (VertexId& startVertex, std::vector<TRI_doc_mptr_copy_t>& edges, void*& last, bool&) {
+    _getEdge = [edgeCols, direction] (VertexId& startVertex, std::vector<EdgeInfo>& edges, void*& last, size_t& eColIdx, bool&) {
+      std::vector<TRI_doc_mptr_copy_t> tmp;
+      TRI_ASSERT(eColIdx < edgeCols.size());
       // Do not touch the bool parameter, as long as it is default the first encountered nullptr is final
       // TODO fill Statistics
       TRI_edge_index_iterator_t it(direction, startVertex.cid, startVertex.key);
-      edgeIndex->lookup(&it, edges, last, 1);
+      triagens::arango::EdgeIndex* edgeIndex = edgeCols.at(eColIdx)->edgeIndex();
+      edgeIndex->lookup(&it, tmp, last, 1);
+      while (last == nullptr) {
+        // This edge collection does not have any more edges for this vertex. Check the next one
+        ++eColIdx;
+        if (edgeCols.size() == eColIdx) {
+          // No more to do, stop here
+          return;
+        }
+        edgeIndex = edgeCols.at(eColIdx)->edgeIndex();
+        edgeIndex->lookup(&it, tmp, last, 1);
+      }
+      if (last != nullptr) {
+        // sth is stored in tmp. Now push it on edges
+        TRI_ASSERT(tmp.size() == 1);
+        edges.push_back(EdgeInfo(
+          edgeCols.at(eColIdx)->_info._cid,
+          tmp.back()
+        ));
+      }
     };
   }
 }
 
 void DepthFirstTraverser::setStartVertex (VertexId& v) {
-  _enumerator.reset(new PathEnumerator<TRI_doc_mptr_copy_t, VertexId>(_getEdge, _getVertex, v));
+  _enumerator.reset(new PathEnumerator<EdgeInfo, VertexId>(_getEdge, _getVertex, v));
   _done = false;
 }
 
 void DepthFirstTraverser::skip (int amount) {
-  TraversalPath<TRI_doc_mptr_copy_t, VertexId> p;
+  TraversalPath<EdgeInfo, VertexId> p;
   for (int i = 0; i < amount; ++i) {
     p = next();
     if (p.edges.size() == 0) {
@@ -719,14 +776,14 @@ bool DepthFirstTraverser::hasMore () {
   return !_done;
 }
 
-const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& DepthFirstTraverser::next () {
+const TraversalPath<EdgeInfo, VertexId>& DepthFirstTraverser::next () {
   TRI_ASSERT(!_done);
   if (_pruneNext) {
     _pruneNext = false;
     _enumerator->prune();
   }
   TRI_ASSERT(!_pruneNext);
-  const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p = _enumerator->next();
+  const TraversalPath<EdgeInfo, VertexId>& p = _enumerator->next();
   int countEdges = p.edges.size();
   if (countEdges == 0) {
     _done = true;
@@ -748,38 +805,4 @@ const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& DepthFirstTraverser::next ()
 
 void DepthFirstTraverser::prune () {
   _pruneNext = true;
-}
-
-void TRI_RunTravTest (
-    TRI_document_collection_t* collection,
-    VertexId& startVertex
-  ) {
-
-  TraverserOptions opts;
-  opts.minDepth = 2;
-  opts.maxDepth = 256;
-  opts.direction = TRI_EDGE_OUT;
-  auto pruner = [] (const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& path) -> bool {
-    if (strcmp(path.vertices.back().key, "1") == 0) {
-      return true;
-    }
-    if (strcmp(path.vertices.back().key, "31") == 0) {
-      return true;
-    }
-    return false;
-  };
-  opts.setPruningFunction(pruner);
-
-  DepthFirstTraverser t(collection, opts);
-  t.setStartVertex(startVertex);
-
-  TraversalPath<TRI_doc_mptr_copy_t, VertexId> tp = t.next();
-  while (tp.edges.size() > 0) {
-    cout << "Path: ";
-    for (int i = 0; i < tp.vertices.size(); ++i) {
-      cout << tp.vertices[i].key << " ";
-    }
-    cout << endl;
-    tp = t.next();
-  }
 }

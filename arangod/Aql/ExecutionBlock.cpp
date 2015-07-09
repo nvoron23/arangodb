@@ -7106,15 +7106,19 @@ int64_t RemoteBlock::remaining () {
 TraversalBlock::TraversalBlock (ExecutionEngine* engine,
                                 TraversalNode const* ep)
   : ExecutionBlock(engine, ep),
-    _edgeCid(ep->edgeCid()),
-    _useRegister(false),
     _posInPaths(0),
+    _useRegister(false),
     _usedConstant(false)
   {
 
   basics::traverser::TraverserOptions opts;
   ep->fillTraversalOptions(opts);
-  _traverser.reset(new basics::traverser::DepthFirstTraverser(_trx->documentCollection(ep->edgeCid()), opts));
+  std::vector<TRI_document_collection_t*> edgeCollections;
+  auto cids = ep->edgeCids();
+  for (auto const& cid : cids) {
+    edgeCollections.push_back(_trx->documentCollection(cid));
+  }
+  _traverser.reset(new basics::traverser::DepthFirstTraverser(edgeCollections, opts));
   _resolver = new CollectionNameResolver(_trx->vocbase());
   if (!ep->usesInVariable()) {
     _startId = VertexId();
@@ -7171,7 +7175,7 @@ int TraversalBlock::initializeCursor (AqlItemBlock* items,
 ////////////////////////////////////////////////////////////////////////////////
 
 AqlValue TraversalBlock::pathToAqlValue (
-  const TraversalPath<TRI_doc_mptr_copy_t, VertexId>& p
+  const TraversalPath<EdgeInfo, VertexId>& p
 ) {
   Json* result = new Json(Json::Object, 2);
   Json path(Json::Object, 2); 
@@ -7194,15 +7198,16 @@ AqlValue TraversalBlock::pathToAqlValue (
   }
   Json edges(Json::Array);
   // TODO FIXME
-  auto edgeShaper = _trx->documentCollection(_edgeCid)->getShaper();
   for (size_t i = 0; i < p.edges.size(); ++i) {
+    auto cid = p.edges[i].cid;
+    auto collection = _trx->trxCollection(cid);
     TRI_shaped_json_t shapedJson;
-    TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, &p.edges[i]);
+    TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, &(p.edges[i].mptr));
     edges(TRI_ExpandShapedJson(
-      edgeShaper,
+      collection->_collection->_collection->getShaper(),
       _resolver,
-      _edgeCid,
-      &p.edges[i]
+      cid,
+      &p.edges[i].mptr
     ));
   }
   path("vertices", vertices)

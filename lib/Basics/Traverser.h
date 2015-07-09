@@ -1260,6 +1260,12 @@ namespace triagens {
 
         std::stack<bool> _lastEdgesDir;
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief An internal index for the edge collection used at each depth level
+////////////////////////////////////////////////////////////////////////////////
+
+        std::stack<size_t> _lastEdgesIdx;
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                                     data provider
 // -----------------------------------------------------------------------------
@@ -1267,7 +1273,7 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Function to get the next edge from index.
 ////////////////////////////////////////////////////////////////////////////////
-       std::function<void (vertexIdentifier&, std::vector<edgeIdentifier>&, void*&, bool&)> _getEdge;
+       std::function<void (vertexIdentifier&, std::vector<edgeIdentifier>&, void*&, size_t&, bool&)> _getEdge;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1282,14 +1288,15 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 
         PathEnumerator (
-          std::function<void(vertexIdentifier&, std::vector<edgeIdentifier>&, void*&, bool&)> getEdge,
+          std::function<void(vertexIdentifier&, std::vector<edgeIdentifier>&, void*&, size_t&, bool&)> getEdge,
           std::function<vertexIdentifier (edgeIdentifier&, vertexIdentifier&)> getVertex,
           vertexIdentifier& startVertex
         ) : _getEdge(getEdge),
-            _getVertex(getVertex) { // TODO
+            _getVertex(getVertex) {
           _traversalPath.vertices.push_back(startVertex);
           _lastEdges.push(nullptr);
           _lastEdgesDir.push(false);
+          _lastEdgesIdx.push(0);
           TRI_ASSERT(_traversalPath.vertices.size() == 1);
           TRI_ASSERT(_lastEdges.size() == 1);
           TRI_ASSERT(_lastEdgesDir.size() == 1);
@@ -1311,11 +1318,12 @@ namespace triagens {
           _traversalPath.vertices.clear();
           return _traversalPath;
         }
-        _getEdge(_traversalPath.vertices.back(), _traversalPath.edges, _lastEdges.top(), _lastEdgesDir.top());
+        _getEdge(_traversalPath.vertices.back(), _traversalPath.edges, _lastEdges.top(), _lastEdgesIdx.top(), _lastEdgesDir.top());
         if (_lastEdges.top() != nullptr) {
           // Could continue the path in the next depth.
           _lastEdges.push(nullptr); 
           _lastEdgesDir.push(false);
+          _lastEdgesIdx.push(0);
           vertexIdentifier v = _getVertex(_traversalPath.edges.back(), _traversalPath.vertices.back());
           _traversalPath.vertices.push_back(v);
           TRI_ASSERT(_traversalPath.vertices.size() == _traversalPath.edges.size() + 1);
@@ -1340,6 +1348,7 @@ namespace triagens {
         if (_lastEdges.size() > 0) {
           _lastEdges.pop();
           _lastEdgesDir.pop();
+          _lastEdgesIdx.pop();
           if (_traversalPath.edges.size() > 0) {
             _traversalPath.edges.pop_back();
             _traversalPath.vertices.pop_back();
