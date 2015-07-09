@@ -99,7 +99,6 @@
     });
 
     describe("with a named graph", function () {
-
       let g;
       const gn = "UnitTestGraph";
 
@@ -137,12 +136,10 @@
         });
       });
 
-      /*
-
       describe("direction", function() {
 
         it("can use outbound direction, equivalent to default", function () {
-          let query = "FOR x IN TRAVERSE OUTBOUND FROM @startId GRAPH @graph 1 STEPS RETURN x._vertex._id";
+          let query = "FOR x IN TRAVERSE 'outbound' FROM @startId GRAPH @graph 1 STEPS RETURN x.vertex._id";
           let bindVars = {
             graph: gn,
             startId: vertex.B
@@ -154,7 +151,7 @@
         });
 
         it("can use inbound direction", function () {
-          let query = "FOR x IN TRAVERSE INBOUND FROM @startId GRAPH @graph 1 STEPS RETURN x._vertex._id";
+          let query = "FOR x IN TRAVERSE 'inbound' FROM @startId GRAPH @graph 1 STEPS RETURN x.vertex._id";
           let bindVars = {
             graph: gn,
             startId: vertex.C
@@ -166,8 +163,8 @@
         });
 
         it("can use any direction", function () {
-          let query = "FOR x IN TRAVERSE ANY FROM @startId GRAPH @graph 1 STEPS "
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+          let query = "FOR x IN TRAVERSE 'any' FROM @startId GRAPH @graph 1 STEPS "
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             graph: gn,
             startId: vertex.B
@@ -180,7 +177,7 @@
           entry = result[1];
           expect(entry).toEqual(vertex.C);
           entry = result[2];
-          expect(entry).toEqual(vertex.F);
+          expect(entry).toEqual(vertex.E);
         });
 
       });
@@ -189,7 +186,7 @@
 
         it("can use an exact number of steps", function () {
           let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 2 STEPS "
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             graph: gn,
             startId: vertex.B
@@ -203,7 +200,7 @@
 
         it("can use a range of steps", function () {
           let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 2..3 STEPS "
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             graph: gn,
             startId: vertex.B
@@ -218,13 +215,13 @@
 
         it("can use a computed function of steps", function () {
           let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph LENGTH([1, 2]) STEPS "
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             graph: gn,
             startId: vertex.B
           };
           let result = db._query(query, bindVars).toArray();
-          expect(result.length).toEqual(3);
+          expect(result.length).toEqual(2);
 
           expect(result[0]).toEqual(vertex.D);
           expect(result[1]).toEqual(vertex.F);
@@ -235,7 +232,7 @@
       describe("sorting", function () {
         it("should be able to sort the result", function () {
           let query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 1 STEPS " 
-                    + "SORT x._vertex._id ASC RETURN x._vertex._id";
+                    + "SORT x.vertex._id ASC RETURN x.vertex._id";
           let bindVars = {
             graph: gn,
             startId: vertex.C
@@ -247,7 +244,7 @@
           expect(result[1]).toEqual(vertex.F);
 
           // Reverse ordering
-          query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 1 STEPS SORT x._vertex._id DESC RETURN x._vertex._id";
+          query = "FOR x IN TRAVERSE FROM @startId GRAPH @graph 1 STEPS SORT x.vertex._id DESC RETURN x.vertex._id";
 
           result = db._query(query, bindVars).toArray();
           expect(result.length).toEqual(2);
@@ -256,8 +253,6 @@
         });
 
       });
-
-    */
     });
 
     describe("with a collection pair", function () {
