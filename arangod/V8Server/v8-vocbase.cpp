@@ -68,6 +68,7 @@
 
 using namespace std;
 using namespace triagens::basics;
+using namespace triagens::basics::traverser;
 using namespace triagens::arango;
 using namespace triagens::rest;
 
@@ -1831,30 +1832,6 @@ class AttributeWeightCalculator {
       return json.get()->_value._number;
     }
 };
-
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief Helper to transform a vertex _id string to VertexId struct.
-////////////////////////////////////////////////////////////////////////////////
-
-static VertexId IdStringToVertexId (CollectionNameResolver const* resolver,
-                                    string const& vertex) {
-  size_t split;
-  char const* str = vertex.c_str();
-
-  if (! TRI_ValidateDocumentIdKeyGenerator(str, &split)) {
-    throw TRI_ERROR_ARANGO_INVALID_KEY_GENERATOR;
-  }
-
-  string const collectionName = vertex.substr(0, split);
-  auto coli = resolver->getCollectionStruct(collectionName);
-
-  if (coli == nullptr) {
-    throw TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND;
-  }
-
-  return VertexId(coli->_cid, const_cast<char*>(str + split + 1));
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Executes a shortest Path Traversal

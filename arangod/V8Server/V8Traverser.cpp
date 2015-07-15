@@ -67,6 +67,35 @@ static VertexId ExtractToId (TRI_doc_mptr_copy_t const& ptr) {
                   TRI_EXTRACT_MARKER_TO_KEY(&ptr));
 };
 
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Helper to transform a vertex _id string to VertexId struct.
+////////////////////////////////////////////////////////////////////////////////
+
+VertexId triagens::basics::traverser::IdStringToVertexId (
+    CollectionNameResolver const* resolver,
+    string const& vertex
+  ) {
+  size_t split;
+  char const* str = vertex.c_str();
+
+  if (! TRI_ValidateDocumentIdKeyGenerator(str, &split)) {
+    throw TRI_ERROR_ARANGO_INVALID_KEY_GENERATOR;
+  }
+
+  string const collectionName = vertex.substr(0, split);
+  auto coli = resolver->getCollectionStruct(collectionName);
+
+  if (coli == nullptr) {
+    throw TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND;
+  }
+
+  return VertexId(coli->_cid, const_cast<char*>(str + split + 1));
+}
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Expander for Multiple edge collections
 ////////////////////////////////////////////////////////////////////////////////
