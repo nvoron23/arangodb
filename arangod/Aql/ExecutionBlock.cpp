@@ -7266,6 +7266,33 @@ void TraversalBlock::initializePaths (AqlItemBlock* items) {
       auto col = items->getDocumentCollection(_reg);
       VertexId v(col->_info._cid, TRI_EXTRACT_MARKER_KEY(in.getMarker()));
       _traverser->setStartVertex(v);
+    } else if (in.isObject()) {
+      Json input = in.toJson(nullptr, nullptr);
+      if (input.has("_id") ) {
+        Json _idJson = input.get("_id");
+        if (_idJson.isString()) {
+          string _idStr = JsonHelper::getStringValue(_idJson.json(), "");
+          VertexId v = triagens::basics::traverser::IdStringToVertexId (
+            _resolver,
+            _idStr
+          );
+          _traverser->setStartVertex(v);
+        }
+      } else if (input.has("vertex")) {
+        // This is used whenever the input is the result of another traversal.
+        Json vertexJson = input.get("vertex");
+        if (vertexJson.has("_id") ) {
+          Json _idJson = vertexJson.get("_id");
+          if (_idJson.isString()) {
+            string _idStr = JsonHelper::getStringValue(_idJson.json(), "");
+            VertexId v = triagens::basics::traverser::IdStringToVertexId (
+              _resolver,
+              _idStr
+            );
+            _traverser->setStartVertex(v);
+          }
+        }
+      }
     } else {
       std::cout << "FOUND Type: " << in.getTypeString() << std::endl;
     }
