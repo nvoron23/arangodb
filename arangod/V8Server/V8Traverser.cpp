@@ -89,7 +89,11 @@ VertexId triagens::basics::traverser::IdStringToVertexId (
   if (coli == nullptr) {
     throw TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND;
   }
-
+  /*
+  VertexId v;
+  v.setCopy(coli->_cid, vertex.substr(split + 1));
+  */
+  // return VertexId(coli->_cid, vertex.substr(split + 1).c_str());
   return VertexId(coli->_cid, const_cast<char*>(str + split + 1));
 }
 

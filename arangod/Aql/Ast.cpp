@@ -1016,19 +1016,25 @@ AstNode* Ast::createNodeCalculatedObjectElement (AstNode const* attributeName,
 ////////////////////////////////////////////////////////////////////////////////
 
 AstNode* Ast::createNodeCollectionPair (AstNode const* edgeCollection,
-                                        AstNode const* vertexCollection) {
+                                        AstNode const* vertexCollections) {
 
   AstNode* node = createNode(NODE_TYPE_COLLECTION_PAIR);
 
   node->addMember(edgeCollection);
-  node->addMember(vertexCollection);
+  TRI_ASSERT(vertexCollections->type == NODE_TYPE_ARRAY);
 
   if (edgeCollection->isStringValue()) {
     _query->collections()->add(edgeCollection->getStringValue(), TRI_TRANSACTION_READ);
   } // else bindParameter use default for collection bindVar
-  if (vertexCollection->isStringValue()) {
-    _query->collections()->add(vertexCollection->getStringValue(), TRI_TRANSACTION_READ);
-  } // else bindParameter use default for collection bindVar
+
+  for (size_t i = 0; i < vertexCollections->numMembers(); ++i) {
+    auto vC = vertexCollections->getMember(i);
+    if (vC->isStringValue()) {
+      _query->collections()->add(vC->getStringValue(), TRI_TRANSACTION_READ);
+    } // else bindParameter use default for collection bindVar
+    // We do not need to propagate these members
+    node->addMember(vC);
+  }
   
   return node;
 }

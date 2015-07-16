@@ -3651,7 +3651,7 @@ namespace triagens {
           TRI_ASSERT(_start != nullptr);
           TRI_ASSERT(_resolver != nullptr);
           if (_graph->type == NODE_TYPE_COLLECTION_PAIR) {
-            // Graph is a collection pair (edge, vertex)
+            // Graph is a whitelist of collections (edge, vertex(, vertex)*)
             auto eColName = _graph->getMember(0)->getStringValue();
             auto edgeStruct = _resolver->getCollectionStruct(eColName);
             if (edgeStruct->_type != TRI_COL_TYPE_EDGE) {

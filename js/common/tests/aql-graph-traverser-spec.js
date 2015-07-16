@@ -255,6 +255,47 @@
       });
     });
 
+    describe("with a multi-collection graph", function () {
+
+    /***********************************************************************
+     * Graph under test:
+     *
+     *  A -> B -> C -> D <-E2- V2:G
+     *      /|\  \|/   
+     *       E <- F
+     *
+     *
+     *
+     ***********************************************************************/
+ 
+
+      let g;
+      const gn = "UnitTestGraph";
+      const vn2 = "UnitTestVertexCollection2";
+      const en2 = "UnitTestEdgeCollection2";
+
+      beforeEach(function() {
+        try {
+          gm._drop(gn);
+        } catch (e) {
+          // It is expected that this graph does not exist.
+        }
+        db._drop(vn2);
+        db._drop(en2);
+        g = gm._create(gn, [gm._relation(en, vn, vn), gm._relation(en2, vn2, vn)]);
+        db[vn2].save({_key: "G"});
+        db[en2].save(vn2 + "/G", vn + "/D", {});
+      });
+
+      afterEach(function() {
+        gm._drop(gn);
+        db._drop(vn2);
+        db._drop(en2);
+      });
+
+ 
+    });
+
     describe("with a collection pair", function () {
 
       describe("bind parameter positions", function () {

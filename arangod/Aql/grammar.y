@@ -9,6 +9,7 @@
 %{
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 
 #include <Basics/Common.h>
 #include <Basics/conversions.h>
@@ -1031,10 +1032,26 @@ graph_collection:
     }
   ;
 
+graph_collection_list:
+     graph_collection {
+       auto node = static_cast<AstNode*>(parser->peekStack());
+       node->addMember($1);
+     }
+   | graph_collection_list T_COMMA graph_collection {
+       auto node = static_cast<AstNode*>(parser->peekStack());
+       node->addMember($3);
+     }
+   ;
+
 graph_subject:
-    graph_collection T_COMMA graph_collection {
-      // collection, collection
-      $$ = parser->ast()->createNodeCollectionPair($1, $3);
+    graph_collection {
+      auto node = parser->ast()->createNodeArray();
+      parser->pushStack(node);
+    }
+    T_COMMA graph_collection_list {
+      // edgecollection, nodecollection(, nodecollection)*
+      auto node = static_cast<AstNode*>(parser->popStack());
+      $$ = parser->ast()->createNodeCollectionPair($1, node);
     }
   | T_QUOTED_STRING {
       // graph name

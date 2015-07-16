@@ -7254,7 +7254,7 @@ bool TraversalBlock::morePaths (size_t hint) {
 }
 
 
-void TraversalBlock::initializePaths (AqlItemBlock* items) {
+void TraversalBlock::initializePaths (AqlItemBlock const* items) {
   if (!_useRegister) {
     if (!_usedConstant) {
       _usedConstant = true;
@@ -7336,7 +7336,8 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
       // we can only return nullptr iff the buffer is empty.
       if (++_pos >= cur->size()) {
         _buffer.pop_front();  // does not throw
-        returnBlock(cur);
+        // returnBlock(cur);
+        delete cur;
         _pos = 0;
       } else {
         initializePaths(cur);
@@ -7351,6 +7352,7 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
   RegisterId nrRegs = getPlanNode()->getRegisterPlan()->nrRegs[getPlanNode()->getDepth()];
 
   std::unique_ptr<AqlItemBlock> res(requestBlock(toSend, nrRegs));
+  // std::unique_ptr<AqlItemBlock> res(new AqlItemBlock(toSend, nrRegs));
   // automatically freed if we throw
   TRI_ASSERT(curRegs <= res->getNrRegs());
   
@@ -7380,7 +7382,8 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
       // nothing more to read, re-initialize fetching of paths
       if (++_pos >= cur->size()) {
         _buffer.pop_front();  // does not throw
-        returnBlock(cur);
+        // returnBlock(cur);
+        delete cur;
         _pos = 0;
       } else {
         initializePaths(cur);

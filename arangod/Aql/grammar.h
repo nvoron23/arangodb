@@ -116,7 +116,7 @@ extern int Aqldebug;
 
 union YYSTYPE
 {
-#line 22 "arangod/Aql/grammar.y" /* yacc.c:1915  */
+#line 23 "arangod/Aql/grammar.y" /* yacc.c:1915  */
 
   triagens::aql::AstNode*  node;
   char*                    strval;

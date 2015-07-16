@@ -180,16 +180,63 @@
       let query = 'FOR tom IN @@Person FILTER tom.name == @name '
           + 'FOR m IN TRAVERSE FROM tom GRAPH @@Acted_In, @@Movie 1 STEPS '
           + 'FOR coActors IN TRAVERSE "inbound" FROM m GRAPH @@Acted_In, @@Person 1 STEPS '
-          + 'RETURN coActors.vertex';
-          // + 'RETURN coActors.vertex.name';
+          + 'FILTER coActors.vertex._id != tom._id '
+          + 'RETURN coActors.vertex.name';
       let result = db._query(query, {
         name: "Tom Hanks",
         "@Person": Person,
         "@Movie": Movie,
         "@Acted_In": Acted_In
       }).toArray();
-      require("internal").print(result);
+      let expected = [
+        "Julia Roberts",
+        "Philip Seymour Hoffman",
+        "Rosie O'Donnell",
+        "Lori Petty",
+        "Bill Paxton",
+        "Madonna",
+        "Geena Davis",
+        "Helen Hunt",
+        "Gary Sinise",
+        "Bill Paxton",
+        "Ed Harris",
+        "Kevin Bacon",
+        "Gary Sinise",
+        "Patricia Clarkson",
+        "Bonnie Hunt",
+        "David Morse",
+        "Sam Rockwell",
+        "James Cromwell",
+        "Michael Clarke Duncan",
+        "Ian McKellen",
+        "Paul Bettany",
+        "Audrey Tautou",
+        "Jim Broadbent",
+        "Hugo Weaving",
+        "Halle Berry",
+        "Liv Tyler",
+        "Charlize Theron",
+        "Nathan Lane",
+        "Meg Ryan",
+        "Greg Kinnear",
+        "Parker Posey",
+        "Meg Ryan",
+        "Dave Chappelle",
+        "Steve Zahn",
+        "Rita Wilson",
+        "Meg Ryan",
+        "Victor Garber",
+        "Bill Pullman",
+        "Rosie O'Donnell"
+      ].sort();
       expect(result.length).toEqual(39);
+      result.sort();
+      for (let i = 0; i < result.length && i < expected.length; ++i) {
+        expect(result[i]).toEqual(expected[i], "differs in " + i + "th element.");
+        if (result[i] !== expected[i]) {
+          break;
+        }
+      }
     });
 
     it('MATCH (people:Person)-[relatedTo]-(:Movie {title: "Cloud Atlas"})'
@@ -256,7 +303,8 @@
         graph: graph.__name
       }).toArray();
       expect(result.length).toEqual(1);
-      expect(result[0].distance).toEqual(4);
+      expect(result[0].length).toEqual(1);
+      expect(result[0][0].distance).toEqual(4);
     });
 
     it('MATCH (tom:Person {name:"Tom Hanks"})-[:ACTED_IN]->(m)<-[:ACTED_IN]-(coActors),'
@@ -265,31 +313,30 @@
       + ' RETURN cocoActors.name AS Recommended, count(*) AS Strength ORDER BY Strength DESC', function () {
 
       let query = 'FOR tom IN @@Person FILTER tom.name == @name '
-        + 'LET tomHanksMovies = (FOR m2 IN TRAVERSE FROM tom GRAPH @@Acted_In, @@Movie 1 STEPS RETURN m2.vertex._id) '
-        + 'FOR m IN TRAVERSE FROM tom GRAPH @@Acted_In, @@Movie 1 STEPS '
-        + 'FOR coActors IN TRAVERSE "inbound" FROM m.vertex GRAPH @@Acted_In, @@Person 1 STEPS '
-        + 'FOR m2 IN TRAVERSE FROM coActors.vertex GRAPH @@Acted_In, @@Movie 1 STEPS '
-        + 'FILTER m2 NOT IN tomHanksMovies '
-        + 'FOR cocoActors IN TRAVERSE "inbound" FROM m2.vertex GRAPH @@Acted_In, @@Person 1 STEPS '
-        + 'COLLECT name = cocoActors.vertex.name INTO v '
-        + 'SORT LENGTH(v) DESC '
-        + 'RETURN { '
-        + 'Recommended: name, '
-        + 'Strength: LENGTH(v)'
-        + '}';
+        + 'LET tomHanksMovies = '
+        + '(FOR m2 IN TRAVERSE FROM tom GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS RETURN m2.vertex._id) '
+        + 'FOR m IN TRAVERSE FROM tom GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS '
+        + 'FOR coActors IN TRAVERSE "inbound" FROM m GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS '
+        + 'FILTER coActors.vertex._id != tom._id '
+        + 'FOR m2 IN TRAVERSE FROM coActors GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS '
+        + 'FILTER m2.vertex._id NOT IN tomHanksMovies '
+        + 'FOR cocoActors IN TRAVERSE "inbound" FROM m2 GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS '
+        + 'FILTER cocoActors.vertex._id != coActors.vertex._id '
+        + 'COLLECT name = cocoActors.vertex.name WITH COUNT INTO strength '
+        + 'SORT strength DESC '
+        + 'RETURN { Recommended: name, Strength: strength }';
       let result = db._query(query, {
         name: "Tom Hanks",
         "@Acted_In": Acted_In,
         "@Person": Person,
         "@Movie": Movie
       }).toArray();
-      // TODO
       expect(result.length).toEqual(50);
       result.sort(function (a, b) {
-        if (a.Strength < b.Strength) {
+        if (a.Strength > b.Strength) {
           return -1;
         }
-        if (a.Strength > b.Strength) {
+        if (a.Strength < b.Strength) {
           return 1;
         }
         if (a.Recommended < b.Recommended) {

@@ -2603,7 +2603,7 @@ namespace triagens {
 /// @brief Initialize the path enumerator
 ////////////////////////////////////////////////////////////////////////////////
 
-        void initializePaths (AqlItemBlock*);
+        void initializePaths (AqlItemBlock const*);
 
 
     };
