@@ -101,13 +101,16 @@ extern int Aqldebug;
     T_OBJECT_CLOSE = 310,
     T_ARRAY_OPEN = 311,
     T_ARRAY_CLOSE = 312,
-    T_NIN = 313,
-    UMINUS = 314,
-    UPLUS = 315,
-    FUNCCALL = 316,
-    REFERENCE = 317,
-    INDEXED = 318,
-    EXPANSION = 319
+    T_OUTBOUND = 313,
+    T_INBOUND = 314,
+    T_ANY = 315,
+    T_NIN = 316,
+    UMINUS = 317,
+    UPLUS = 318,
+    FUNCCALL = 319,
+    REFERENCE = 320,
+    INDEXED = 321,
+    EXPANSION = 322
   };
 #endif
 
@@ -123,7 +126,7 @@ union YYSTYPE
   bool                     boolval;
   int64_t                  intval;
 
-#line 127 "arangod/Aql/grammar.hpp" /* yacc.c:1915  */
+#line 130 "arangod/Aql/grammar.hpp" /* yacc.c:1915  */
 };
 
 typedef union YYSTYPE YYSTYPE;

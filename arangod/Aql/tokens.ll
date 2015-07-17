@@ -157,6 +157,18 @@ namespace triagens {
   return T_STEPS;
 }
 
+(?i:OUTBOUND) {
+  return T_OUTBOUND;
+}
+
+(?i:INBOUND) {
+  return T_INBOUND;
+}
+
+(?i:ANY) {
+  return T_ANY;
+}
+
  /* ---------------------------------------------------------------------------
   * predefined type literals
   * --------------------------------------------------------------------------- */
