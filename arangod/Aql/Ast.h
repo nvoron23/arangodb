@@ -561,19 +561,31 @@ namespace triagens {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create an AST traversal node
+/// @brief create an AST traversal node with only vertex variable
 ////////////////////////////////////////////////////////////////////////////////
 
-        AstNode* createNodeTraversal (AstNode const*,
+        AstNode* createNodeTraversal (char const*,
+                                      AstNode const*,
                                       AstNode const*,
                                       AstNode const*);
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST traversal node with vertex and edge variable
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode* createNodeTraversal (char const*,
+                                      char const*,
+                                      AstNode const*,
+                                      AstNode const*,
+                                      AstNode const*);
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create an AST traversal node TODO DELETE ME
+/// @brief create an AST traversal node with vertex, edge and path variable
 ////////////////////////////////////////////////////////////////////////////////
 
-        AstNode* createNodeTraversal (AstNode const*,
+        AstNode* createNodeTraversal (char const*,
+                                      char const*,
+                                      char const*,
                                       AstNode const*,
                                       AstNode const*,
                                       AstNode const*);

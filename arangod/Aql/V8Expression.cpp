@@ -202,6 +202,7 @@ AqlValue V8Expression::execute (v8::Isolate* isolate,
   }
 
   if (json.get() == nullptr) {
+    std::cout << "Isset" << std::endl;
     THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
 

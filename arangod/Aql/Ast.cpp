@@ -1050,50 +1050,73 @@ AstNode* Ast::createNodeDirection (uint64_t const& direction,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create an AST traversal node
+/// @brief create an AST traversal node with only vertex variable
 ////////////////////////////////////////////////////////////////////////////////
 
-AstNode* Ast::createNodeTraversal (AstNode const* direction,
-                                   AstNode const* start,
-                                   AstNode const* graph
-                                  ) {
+AstNode* Ast::createNodeTraversal (char const* vertexVarName,
+                              AstNode const* direction,
+                              AstNode const* start,
+                              AstNode const* graph) {
 
+  if (vertexVarName == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
+  }
   AstNode* node = createNode(NODE_TYPE_TRAVERSAL);
 
   node->addMember(direction);
   node->addMember(start);
   node->addMember(graph);
 
-  TRI_ASSERT(node->numMembers() == 3);
+  AstNode* vertexVar = createNodeVariable(vertexVarName, false);
+  node->addMember(vertexVar);
 
-  std::cout << "Created Trav node" << std::endl;
+  TRI_ASSERT(node->numMembers() == 4);
+
   return node;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create an AST traversal node
+/// @brief create an AST traversal node with vertex and edge variable
 ////////////////////////////////////////////////////////////////////////////////
 
-AstNode* Ast::createNodeTraversal (AstNode const* direction,
-                                   AstNode const* start,
-                                   AstNode const* graph,
-                                   AstNode const* steps) {
-
-  AstNode* node = createNode(NODE_TYPE_TRAVERSAL);
-
-  if (direction == nullptr) {
-    // direction can be a nullptr. default is "outbound"
-    node->addMember(createNodeValueString("outbound"));
+AstNode* Ast::createNodeTraversal (char const* vertexVarName,
+                              char const* edgeVarName,
+                              AstNode const* direction,
+                              AstNode const* start,
+                              AstNode const* graph) {
+  if (edgeVarName == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
-  else {
-    node->addMember(direction);
+  AstNode* node = createNodeTraversal(vertexVarName, direction, start, graph);
+
+  AstNode* edgeVar = createNodeVariable(edgeVarName, false);
+  node->addMember(edgeVar);
+
+  TRI_ASSERT(node->numMembers() == 5);
+
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST traversal node with vertex, edge and path variable
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeTraversal (char const* vertexVarName,
+                              char const* edgeVarName,
+                              char const* pathVarName,
+                              AstNode const* direction,
+                              AstNode const* start,
+                              AstNode const* graph) {
+
+  if (pathVarName == nullptr) {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_OUT_OF_MEMORY);
   }
+  AstNode* node = createNodeTraversal(vertexVarName, edgeVarName, direction, start, graph);
 
-  node->addMember(start);
-  node->addMember(graph);
-  node->addMember(steps);
+  AstNode* pathVar = createNodeVariable(pathVarName, false);
+  node->addMember(pathVar);
 
-  TRI_ASSERT(node->numMembers() == 4);
+  TRI_ASSERT(node->numMembers() == 6);
 
   return node;
 }
