@@ -1012,30 +1012,61 @@ AstNode* Ast::createNodeCalculatedObjectElement (AstNode const* attributeName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief create an AST collection pair node
+/// @brief create an AST collection list node
 ////////////////////////////////////////////////////////////////////////////////
 
-AstNode* Ast::createNodeCollectionPair (AstNode const* edgeCollection,
-                                        AstNode const* vertexCollections) {
+AstNode* Ast::createNodeCollectionList (AstNode const* edgeCollections) {
 
-  AstNode* node = createNode(NODE_TYPE_COLLECTION_PAIR);
+  AstNode* node = createNode(NODE_TYPE_COLLECTION_LIST);
 
-  node->addMember(edgeCollection);
-  TRI_ASSERT(vertexCollections->type == NODE_TYPE_ARRAY);
+  TRI_ASSERT(edgeCollections->type == NODE_TYPE_ARRAY);
 
-  if (edgeCollection->isStringValue()) {
-    _query->collections()->add(edgeCollection->getStringValue(), TRI_TRANSACTION_READ);
-  } // else bindParameter use default for collection bindVar
-
-  for (size_t i = 0; i < vertexCollections->numMembers(); ++i) {
-    auto vC = vertexCollections->getMember(i);
-    if (vC->isStringValue()) {
-      _query->collections()->add(vC->getStringValue(), TRI_TRANSACTION_READ);
+  for (size_t i = 0; i < edgeCollections->numMembers(); ++i) {
+    auto eC = edgeCollections->getMember(i);
+    if (eC->isStringValue()) {
+      _query->collections()->add(eC->getStringValue(), TRI_TRANSACTION_READ);
     } // else bindParameter use default for collection bindVar
     // We do not need to propagate these members
-    node->addMember(vC);
+    node->addMember(eC);
   }
   
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST direction node
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeDirection (uint64_t const& direction,
+                              uint64_t const& steps) {
+  AstNode* node = createNode(NODE_TYPE_DIRECTION);
+  AstNode* dir = createNodeValueInt(direction);
+  AstNode* step = createNodeValueInt(steps);
+  node->addMember(dir);
+  node->addMember(step);
+
+  TRI_ASSERT(node->numMembers() == 2);
+  return node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST traversal node
+////////////////////////////////////////////////////////////////////////////////
+
+AstNode* Ast::createNodeTraversal (AstNode const* direction,
+                                   AstNode const* start,
+                                   AstNode const* graph
+                                  ) {
+
+  AstNode* node = createNode(NODE_TYPE_TRAVERSAL);
+
+  node->addMember(direction);
+  node->addMember(start);
+  node->addMember(graph);
+
+  TRI_ASSERT(node->numMembers() == 3);
+
+  std::cout << "Created Trav node" << std::endl;
   return node;
 }
 

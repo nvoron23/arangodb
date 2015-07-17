@@ -7111,6 +7111,7 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
     _usedConstant(false)
   {
 
+    std::cout << "Startung" << std::endl;
   basics::traverser::TraverserOptions opts;
   ep->fillTraversalOptions(opts);
   std::vector<TRI_document_collection_t*> edgeCollections;

@@ -3312,7 +3312,7 @@ ExecutionNode* TraversalNode::clone (ExecutionPlan* plan,
     TRI_ASSERT(outVariable != nullptr);
   }
     
-  auto c = new TraversalNode(plan, _id, _vocbase, outVariable, _direction, _start, _graph, _steps);
+  auto c = new TraversalNode(plan, _id, _vocbase, outVariable, _direction, _start, _graph);
 
   cloneHelper(c, plan, withDependencies, withProperties);
 

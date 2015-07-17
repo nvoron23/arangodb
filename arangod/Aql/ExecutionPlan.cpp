@@ -422,13 +422,13 @@ ExecutionNode* ExecutionPlan::fromNodeFor (ExecutionNode* previous,
   }
   else if (expression->type == NODE_TYPE_TRAVERSAL) {
     // second operand is a traversal
-
+    
+    TRI_ASSERT(expression->numMembers() == 3);
     AstNode const* direction = expression->getMember(0);
     AstNode const* start = expression->getMember(1);
     AstNode const* graph = expression->getMember(2);
-    AstNode const* steps = expression->getMember(3);
     en = registerNode(new TraversalNode(this, nextId(), _ast->query()->vocbase(), v, 
-          direction, start, graph, steps));
+          direction, start, graph));
   }
   else {
     // second operand is some misc. expression

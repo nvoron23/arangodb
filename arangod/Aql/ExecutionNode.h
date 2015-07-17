@@ -3633,15 +3633,14 @@ namespace triagens {
                        Variable const* outVariable,
                        AstNode const* direction,
                        AstNode const* start,
-                       AstNode const* graph,
-                       AstNode const* steps)
+                       AstNode const* graph)
           : ExecutionNode(plan, id), 
             _start(start),
             _vocbase(vocbase), 
             _outVariable(outVariable), 
             _direction(direction),
             _graph(graph),
-            _steps(steps),
+            _steps(nullptr),
             _resolver(new arango::CollectionNameResolver(vocbase))
         {
 
@@ -3650,7 +3649,7 @@ namespace triagens {
           TRI_ASSERT(_direction != nullptr);
           TRI_ASSERT(_start != nullptr);
           TRI_ASSERT(_resolver != nullptr);
-          if (_graph->type == NODE_TYPE_COLLECTION_PAIR) {
+          if (_graph->type == NODE_TYPE_COLLECTION_LIST) {
             // Graph is a whitelist of collections (edge, vertex(, vertex)*)
             auto eColName = _graph->getMember(0)->getStringValue();
             auto edgeStruct = _resolver->getCollectionStruct(eColName);
@@ -3774,40 +3773,75 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         void fillTraversalOptions (basics::traverser::TraverserOptions& opts) const {
-          if (_steps->isNumericValue()) {
+          // This check is only necessary during transaction old => new
+          if (_direction->type == NODE_TYPE_DIRECTION) {
+            TRI_ASSERT(_direction->numMembers() == 2);
+            // Member 0 is the direction. Already the correct Integer.
+            // Is not inserted by user but by enum.
+            auto dir = _direction->getMember(0);
+            auto steps = _direction->getMember(1);
+
+            TRI_ASSERT(dir->isNumericValue());
+            auto dirNum = dir->getIntValue();
+            switch (dirNum) {
+              case 0:
+                opts.direction = TRI_EDGE_ANY;
+                break;
+              case 1:
+                opts.direction = TRI_EDGE_IN;
+                break;
+              case 2:
+                opts.direction = TRI_EDGE_OUT;
+                break;
+              default:
+                TRI_ASSERT(false);
+                break;
+            }
+
+            // TODO FIXME
             // Fixed scalar depth
-            opts.minDepth = _steps->getIntValue();
-            opts.maxDepth = _steps->getIntValue();
-          } else if (_steps->type == NODE_TYPE_RANGE) {
-            // Range depth
-            auto lhs = _steps->getMember(0);
-            auto rhs = _steps->getMember(1);
-            if (lhs->isNumericValue()) {
-              // Range is left-closed
-              opts.minDepth = lhs->getIntValue();
-            }
-            if (rhs->isNumericValue()) {
-              // Range is right-closed
-              opts.maxDepth = rhs->getIntValue();
-            }
+            TRI_ASSERT(steps->isNumericValue());
+            opts.minDepth = steps->getIntValue();
+            opts.maxDepth = steps->getIntValue();
+            
           } else {
-            // TODO open Range depth
-            opts.minDepth = 1;
-            opts.maxDepth = 256;
-          }
-          opts.direction = TRI_EDGE_OUT;
-          // TODO Assumed that _direction is always a lowercase string
-          auto dir = _direction->getStringValue();
-          if (strcmp(dir, "outbound") == 0) {
+            if (_steps->isNumericValue()) {
+              // Fixed scalar depth
+              opts.minDepth = _steps->getIntValue();
+              opts.maxDepth = _steps->getIntValue();
+            } else if (_steps->type == NODE_TYPE_RANGE) {
+              // Range depth
+              auto lhs = _steps->getMember(0);
+              auto rhs = _steps->getMember(1);
+              if (lhs->isNumericValue()) {
+                // Range is left-closed
+                opts.minDepth = lhs->getIntValue();
+              }
+              if (rhs->isNumericValue()) {
+                // Range is right-closed
+                opts.maxDepth = rhs->getIntValue();
+              }
+            } else {
+              // TODO open Range depth
+              opts.minDepth = 1;
+              opts.maxDepth = 256;
+            }
             opts.direction = TRI_EDGE_OUT;
-          } else if (strcmp(dir, "inbound") == 0) {
-            opts.direction = TRI_EDGE_IN;
-          } else if (strcmp(dir, "any") == 0) {
-            opts.direction = TRI_EDGE_ANY;
-          } else {
-            TRI_ASSERT(false);
+            // TODO Assumed that _direction is always a lowercase string
+            std::cout << "Type " << _direction->getTypeString() << std::endl;
+            auto dir = _direction->getStringValue();
+            if (strcmp(dir, "outbound") == 0) {
+              opts.direction = TRI_EDGE_OUT;
+            } else if (strcmp(dir, "inbound") == 0) {
+              opts.direction = TRI_EDGE_IN;
+            } else if (strcmp(dir, "any") == 0) {
+              opts.direction = TRI_EDGE_ANY;
+            } else {
+              TRI_ASSERT(false);
+            }
+ 
           }
-        }
+       }
 
         std::vector<TRI_voc_cid_t> const edgeCids () const {
           return _edgeCids;
