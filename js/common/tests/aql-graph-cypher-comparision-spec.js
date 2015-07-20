@@ -126,12 +126,11 @@
 
     it('MATCH (tom:Person {name: "Tom Hanks"})-[:ACTED_IN]->(tomHanksMovies) RETURN tom,tomHanksMovies', function() {
       let query = 'FOR tom IN @@Person FILTER tom.name == @name '
-          + 'FOR tomHanksMovies IN TRAVERSE FROM tom GRAPH @@Acted, @@Movie 1 STEPS '
-          + 'RETURN {actor: tom, movie: tomHanksMovies.vertex}';
+          + 'FOR tomHanksMovies IN OUTBOUND tom @@Acted '
+          + 'RETURN {actor: tom, movie: tomHanksMovies}';
       let result = db._query(query, {
         name: "Tom Hanks",
         "@Person": Person,
-        "@Movie": Movie,
         "@Acted": Acted_In
       }).toArray();
       expect(result.length).toEqual(12);
@@ -158,13 +157,12 @@
       expect(result[11].movie._key).toEqual("YouveGotMail");
     });
 
-    it('MATCH (cloudAtlas {title: "Cloud Atlas"})<-[:DIRECTED]-(directors) RETURN directors.vertex.name', function() {
+    it('MATCH (cloudAtlas {title: "Cloud Atlas"})<-[:DIRECTED]-(directors) RETURN directors.name', function() {
       let query = 'FOR cloudAtlas IN @@Movie FILTER cloudAtlas.title == @title '
-         + 'FOR directors IN TRAVERSE "inbound" FROM cloudAtlas GRAPH @@Directed, @@Person 1 STEPS '
-         + 'RETURN directors.vertex.name';
+         + 'FOR directors IN INBOUND cloudAtlas @@Directed '
+         + 'RETURN directors.name';
       let result = db._query(query, {
         title: "Cloud Atlas",
-        "@Person": Person,
         "@Movie": Movie,
         "@Directed": Directed
       }).toArray();
@@ -178,14 +176,13 @@
     it('MATCH (tom:Person {name:"Tom Hanks"})-[:ACTED_IN]->(m)<-[:ACTED_IN]-(coActors) '
       + 'RETURN coActors.name', function() {
       let query = 'FOR tom IN @@Person FILTER tom.name == @name '
-          + 'FOR m IN TRAVERSE FROM tom GRAPH @@Acted_In, @@Movie 1 STEPS '
-          + 'FOR coActors IN TRAVERSE "inbound" FROM m GRAPH @@Acted_In, @@Person 1 STEPS '
-          + 'FILTER coActors.vertex._id != tom._id '
-          + 'RETURN coActors.vertex.name';
+          + 'FOR m IN OUTBOUND tom @@Acted_In '
+          + 'FOR coActors IN INBOUND m @@Acted_In '
+          + 'FILTER coActors._id != tom._id '
+          + 'RETURN coActors.name';
       let result = db._query(query, {
         name: "Tom Hanks",
         "@Person": Person,
-        "@Movie": Movie,
         "@Acted_In": Acted_In
       }).toArray();
       let expected = [
@@ -242,11 +239,10 @@
     it('MATCH (people:Person)-[relatedTo]-(:Movie {title: "Cloud Atlas"})'
       + ' RETURN people.name, Type(relatedTo), relatedTo', function () {
       let query = 'FOR m IN @@Movie FILTER m.title == @title '
-      + 'FOR people IN TRAVERSE "any" FROM m GRAPH @graph 1 STEPS '
-      + 'FILTER PARSE_IDENTIFIER(people.vertex._id).collection == @Person '
-      + 'LET relatedTo = people.path.edges[0] '
+      + 'FOR people, relatedTo IN ANY m GRAPH @graph '
+      + 'FILTER PARSE_IDENTIFIER(people._id).collection == @Person '
       + 'RETURN {'
-        + 'name: people.vertex.name,'
+        + 'name: people.name,'
         + 'type: PARSE_IDENTIFIER(relatedTo._id).collection,'
         + 'relation: relatedTo'
       + '}';
@@ -279,10 +275,11 @@
 
     });
 
+    /*
     it('MATCH (bacon:Person {name:"Kevin Bacon"})-[*1..4]-(hollywood) RETURN DISTINCT hollywood', function () {
       let query = 'FOR bacon IN @@Person FILTER bacon.name == @name'
-        + ' FOR hollywood IN TRAVERSE "any" FROM bacon GRAPH @graph 1..4 STEPS'
-        + ' COLLECT h = hollywood.vertex RETURN h';
+        + ' FOR hollywood IN ANY*1..4 FROM bacon GRAPH @graph'
+        + ' COLLECT h = hollywood RETURN h';
       let result = db._query(query, {
         name: "Kevin Bacon",
         "@Person": Person,
@@ -290,6 +287,7 @@
       }).toArray();
       expect(result.length).toEqual(135);
     });
+    */
 
     it('MATCH p=shortestPath((bacon:Person {name:"Kevin Bacon"})'
       + '-[*]-(meg:Person {name:"Meg Ryan"})) RETURN p', function () {
@@ -313,23 +311,23 @@
       + ' RETURN cocoActors.name AS Recommended, count(*) AS Strength ORDER BY Strength DESC', function () {
 
       let query = 'FOR tom IN @@Person FILTER tom.name == @name '
-        + 'LET tomHanksMovies = '
-        + '(FOR m2 IN TRAVERSE FROM tom GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS RETURN m2.vertex._id) '
-        + 'FOR m IN TRAVERSE FROM tom GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS '
-        + 'FOR coActors IN TRAVERSE "inbound" FROM m GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS '
-        + 'FILTER coActors.vertex._id != tom._id '
-        + 'FOR m2 IN TRAVERSE FROM coActors GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS '
-        + 'FILTER m2.vertex._id NOT IN tomHanksMovies '
-        + 'FOR cocoActors IN TRAVERSE "inbound" FROM m2 GRAPH @@Acted_In, @@Movie, @@Person 1 STEPS '
-        + 'FILTER cocoActors.vertex._id != coActors.vertex._id '
-        + 'COLLECT name = cocoActors.vertex.name WITH COUNT INTO strength '
-        + 'SORT strength DESC '
-        + 'RETURN { Recommended: name, Strength: strength }';
+                + 'LET thm = (FOR k IN OUTBOUND tom @@Acted_In RETURN k) '
+                + 'FOR m IN thm '
+                + 'FOR coActors IN INBOUND m @@Acted_In '
+                + 'FILTER coActors._id != tom._id '
+                + 'FOR m2 IN OUTBOUND coActors @@Acted_In '
+                + 'FILTER m2 NOT IN  thm '
+                + 'FOR cocoActors IN INBOUND m2 @@Acted_In '
+                + 'FILTER cocoActors._id != tom._id '
+                + '&& cocoActors._id != coActors._id '
+                + 'COLLECT name = cocoActors.name WITH COUNT INTO strength '
+                + 'SORT strength DESC '
+                + 'RETURN {Recommended: name, Strength: strength}';
+
       let result = db._query(query, {
         name: "Tom Hanks",
         "@Acted_In": Acted_In,
-        "@Person": Person,
-        "@Movie": Movie
+        "@Person": Person
       }).toArray();
       expect(result.length).toEqual(50);
       result.sort(function (a, b) {

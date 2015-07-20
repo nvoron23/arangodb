@@ -106,71 +106,6 @@
         gm._drop(gn);
       });
 
-      it("t1", function () {
-        let query = "FOR x IN OUTBOUND '" + vn + "/1' " + en + " RETURN x";
-        require("internal").print(query);
-        require("internal").print(db._query(query).toArray());
-        require("internal").print("DONE!");
-      });
-
-      describe("Newest syntax", function () {
-
-        it("t1", function () {
-          let query = "FOR x IN INBOUND '" + vn + "/1' " + en +  " RETURN x";
-          require("internal").print(query);
-          require("internal").print(db._query(query).toArray());
-        });
-
-        it("t1", function () {
-          let query = "FOR x IN ANY '" + vn + "/1' " + en +  " RETURN x";
-          require("internal").print(query);
-          require("internal").print(db._query(query).toArray());
-        });
-
-        it("t1", function () {
-          let query = "FOR x IN OUTBOUND @startId " + en +  " RETURN x";
-          require("internal").print(query);
-          let bindVars = {
-            "startId": vn + "/1"
-          };
-          require("internal").print(db._query(query, bindVars).toArray());
-        });
-
-        it("t1", function () {
-          let query = "FOR x IN OUTBOUND @startId @@eCol RETURN x";
-          require("internal").print(query);
-          let bindVars = {
-            "@eCol": en,
-            "startId": vn + "/1"
-          };
-          require("internal").print(db._query(query, bindVars).toArray());
-        });
-
-        /*
-        it("t1", function () {
-          let query = "FOR x IN OUTBOUND @startId @@eCol, " + vn + " RETURN x";
-          require("internal").print(query);
-          let bindVars = {
-            "@eCol": en,
-            "startId": vn + "/1"
-          };
-          require("internal").print(db._query(query, bindVars).toArray());
-        });
-        */
-
-        it("t1", function () {
-          let query = "FOR y IN @@vCol FOR x IN OUTBOUND y @@eCol RETURN x";
-          require("internal").print(query);
-          let bindVars = {
-            "@eCol": en,
-            "@vCol": vn
-          };
-          require("internal").print(db._query(query, bindVars).toArray());
-
-        });
-
-      });
-
       describe("return format", function() {
 
         it("should return the vertex as first entry", function () {
@@ -510,7 +445,7 @@
         });
 
         it("can use any direction", function () {
-          let query = "FOR x IN ANY @startId @@eCol RETURN x._id";
+          let query = "FOR x IN ANY @startId @@eCol SORT x._id ASC RETURN x._id";
           let bindVars = {
             "@eCol": en,
             startId: vertex.B

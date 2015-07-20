@@ -158,17 +158,33 @@ AqlValue TraversalBlock::pathToAqlValue (
   for (size_t i = 0; i < p.vertices.size(); ++i) {
     auto collection = _trx->trxCollection(p.vertices[i].cid);
     if (collection == nullptr) {
-      // This collection is not known, will be ignored
-      return AqlValue();
+      // TODO Might be optimized
+      SingleCollectionReadOnlyTransaction intTrx(new StandaloneTransactionContext(), _trx->vocbase(), p.vertices[i].cid);
+      int res = intTrx.begin();
+
+      if (res != TRI_ERROR_NO_ERROR) {
+        THROW_ARANGO_EXCEPTION(res);
+      }
+      collection = intTrx.trxCollection();
+      TRI_doc_mptr_copy_t mptr;
+      intTrx.read(&mptr, p.vertices[i].key);
+      vertices(TRI_ExpandShapedJson(
+        collection->_collection->_collection->getShaper(),
+        _resolver,
+        p.vertices[i].cid,
+        &mptr
+      ));
+      intTrx.finish(res);
+    } else {
+      TRI_doc_mptr_copy_t mptr;
+      _trx->readSingle(collection, &mptr, p.vertices[i].key);
+      vertices(TRI_ExpandShapedJson(
+        collection->_collection->_collection->getShaper(),
+        _resolver,
+        p.vertices[i].cid,
+        &mptr
+      ));
     }
-    TRI_doc_mptr_copy_t mptr;
-    _trx->readSingle(collection, &mptr, p.vertices[i].key);
-    vertices(TRI_ExpandShapedJson(
-      collection->_collection->_collection->getShaper(),
-      _resolver,
-      p.vertices[i].cid,
-      &mptr
-    ));
   }
   Json edges(Json::Array);
   // TODO FIXME
