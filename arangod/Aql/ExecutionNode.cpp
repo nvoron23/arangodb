@@ -1,4 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
 /// @brief Infrastructure for ExecutionPlans
 ///
 /// @file arangod/Aql/ExecutionNode.cpp
@@ -28,6 +27,7 @@
 #include "Aql/ExecutionNode.h"
 #include "Aql/Collection.h"
 #include "Aql/ExecutionPlan.h"
+#include "Aql/TraversalNode.h"
 #include "Aql/WalkerWorker.h"
 #include "Aql/Ast.h"
 #include "Basics/StringBuffer.h"
@@ -3263,100 +3263,7 @@ double GatherNode::estimateCost (size_t& nrItems) const {
   return depCost + nrItems;
 }
 
-// -----------------------------------------------------------------------------
-// --SECTION--                                          methods of TraversalNode
-// -----------------------------------------------------------------------------
-
-TraversalNode::TraversalNode (ExecutionPlan* plan,
-                              triagens::basics::Json const& base)
-  : ExecutionNode(plan, base),
-    _start(nullptr),
-    _vocbase(plan->getAst()->query()->vocbase()),
-    // _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
-    _direction(nullptr),
-    _graph(nullptr),
-    _steps(nullptr) { // TODO: FIXME
-  TRI_ASSERT(false);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief toJson, for TraversalNode
-////////////////////////////////////////////////////////////////////////////////
-
-void TraversalNode::toJsonHelper (triagens::basics::Json& nodes,
-                                  TRI_memory_zone_t* zone,
-                                  bool verbose) const {
-  triagens::basics::Json json(ExecutionNode::toJsonHelperGeneric(nodes, zone, verbose));  // call base class method
-
-  if (json.isEmpty()) {
-    return;
-  }
-
-  // Now put info about vocbase and cid in there
-  json("database", triagens::basics::Json(_vocbase->_name));
-      // ("outVariable", _outVariable->toJson());
-
-  // TODO: FIXME
-
-  // And add it:
-  nodes(json);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief clone ExecutionNode recursively
-////////////////////////////////////////////////////////////////////////////////
-
-ExecutionNode* TraversalNode::clone (ExecutionPlan* plan,
-                                     bool withDependencies,
-                                     bool withProperties) const {
-  auto c = new TraversalNode(plan, _id, _vocbase, _direction, _start, _graph);
-
-  if (usesVertexOutVariable()) {
-    auto vertexOutVariable = _vertexOutVariable;
-    if (withProperties) {
-      vertexOutVariable = plan->getAst()->variables()->createVariable(vertexOutVariable);
-    }
-    TRI_ASSERT(vertexOutVariable != nullptr);
-    c->setVertexOutput(vertexOutVariable);
-  }
-
-  if (usesEdgeOutVariable()) {
-    auto edgeOutVariable = _edgeOutVariable;
-    if (withProperties) {
-      edgeOutVariable = plan->getAst()->variables()->createVariable(edgeOutVariable);
-    }
-    TRI_ASSERT(edgeOutVariable != nullptr);
-    c->setEdgeOutput(edgeOutVariable);
-  }
-
-  if (usesPathOutVariable()) {
-    auto pathOutVariable = _pathOutVariable;
-    if (withProperties) {
-      pathOutVariable = plan->getAst()->variables()->createVariable(pathOutVariable);
-    }
-    TRI_ASSERT(pathOutVariable != nullptr);
-    c->setPathOutput(pathOutVariable);
-  }
-
-  cloneHelper(c, plan, withDependencies, withProperties);
-
-  return static_cast<ExecutionNode*>(c);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief the cost of a traversal node
-////////////////////////////////////////////////////////////////////////////////
-        
-double TraversalNode::estimateCost (size_t& nrItems) const { 
-  size_t incoming;
-  double depCost = _dependencies.at(0)->getCost(incoming);
-  size_t count = 1000; // TODO: FIXME
-  nrItems = incoming * count;
-  return depCost + nrItems;
-}
-
 // Local Variables:
 // mode: outline-minor
 // outline-regexp: "^\\(/// @brief\\|/// {@inheritDoc}\\|/// @addtogroup\\|// --SECTION--\\|/// @\\}\\)"
 // End:
-

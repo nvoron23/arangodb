@@ -194,7 +194,8 @@ void Aqlerror (YYLTYPE* locp,
 %type <node> optional_array_limit;
 %type <node> optional_array_return;
 %type <node> graph_subject;
-%type <node> graph_direction;
+%type <intval> graph_direction;
+%type <node> graph_direction_steps;
 %type <node> graph_collection;
 %type <node> reference;
 %type <node> simple_value;
@@ -273,17 +274,17 @@ for_statement:
       auto node = parser->ast()->createNodeFor($2, $4);
       parser->ast()->addOperation(node);
     }
-    | T_FOR variable_name T_IN graph_direction expression graph_subject {
+    | T_FOR variable_name T_IN graph_direction_steps expression graph_subject {
       parser->ast()->scopes()->start(triagens::aql::AQL_SCOPE_FOR);
       auto node = parser->ast()->createNodeTraversal($2, $4, $5, $6);
       parser->ast()->addOperation(node);
     }
-    | T_FOR variable_name T_COMMA variable_name T_IN graph_direction expression graph_subject {
+    | T_FOR variable_name T_COMMA variable_name T_IN graph_direction_steps expression graph_subject {
       parser->ast()->scopes()->start(triagens::aql::AQL_SCOPE_FOR);
       auto node = parser->ast()->createNodeTraversal($2, $4, $6, $7, $8);
       parser->ast()->addOperation(node);
     }
-    | T_FOR variable_name T_COMMA variable_name T_COMMA variable_name T_IN graph_direction expression graph_subject {
+    | T_FOR variable_name T_COMMA variable_name T_COMMA variable_name T_IN graph_direction_steps expression graph_subject {
       parser->ast()->scopes()->start(triagens::aql::AQL_SCOPE_FOR);
       auto node = parser->ast()->createNodeTraversal($2, $4, $6, $8, $9, $10);
       parser->ast()->addOperation(node);
@@ -1091,13 +1092,22 @@ graph_direction:
     // Returns the edge direction number.
     // Identical order as TRI_edge_direction_e
     T_OUTBOUND {
-      $$ = parser->ast()->createNodeDirection(2, 1);
+      $$ = 2;
     }
     | T_INBOUND {
-      $$ = parser->ast()->createNodeDirection(1, 1);
+      $$ = 1;
     }
     | T_ANY {
-      $$ = parser->ast()->createNodeDirection(0, 1);
+      $$ = 0; 
+    }
+  ;
+
+graph_direction_steps:
+    graph_direction {
+      $$ = parser->ast()->createNodeDirection($1, 1);
+    }
+    | expression graph_direction {
+      $$ = parser->ast()->createNodeDirection($2, $1);
     }
   ;
 

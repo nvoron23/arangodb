@@ -556,9 +556,15 @@ namespace triagens {
 /// @brief create an AST direction node
 ////////////////////////////////////////////////////////////////////////////////
 
-        AstNode* createNodeDirection (uint64_t const&,
-                                      uint64_t const&);
+        AstNode* createNodeDirection (uint64_t,
+                                      uint64_t);
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an AST direction node
+////////////////////////////////////////////////////////////////////////////////
+
+        AstNode* createNodeDirection (uint64_t,
+                                      AstNode const*);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief create an AST traversal node with only vertex variable

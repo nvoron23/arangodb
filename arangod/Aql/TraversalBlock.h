@@ -25,7 +25,11 @@
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifndef ARANGODB_AQL_TRAVERSAL_BLOCK_H
+#define ARANGODB_AQL_TRAVERSAL_BLOCK_H 1
+
 #include "Aql/ExecutionBlock.h"
+#include "Aql/TraversalNode.h"
 
 namespace triagens {
   namespace aql {
@@ -211,3 +215,4 @@ namespace triagens {
   }  // namespace triagens::aql
 }  // namespace triagens
 
+#endif

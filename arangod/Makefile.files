@@ -48,6 +48,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Aql/Scopes.cpp \
 	arangod/Aql/ShortStringStorage.cpp \
 	arangod/Aql/TraversalBlock.cpp \
+	arangod/Aql/TraversalNode.cpp \
 	arangod/Aql/tokens.cpp \
 	arangod/Aql/V8Expression.cpp \
 	arangod/Aql/Variable.cpp \

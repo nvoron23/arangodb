@@ -275,10 +275,9 @@
 
     });
 
-    /*
     it('MATCH (bacon:Person {name:"Kevin Bacon"})-[*1..4]-(hollywood) RETURN DISTINCT hollywood', function () {
       let query = 'FOR bacon IN @@Person FILTER bacon.name == @name'
-        + ' FOR hollywood IN ANY*1..4 FROM bacon GRAPH @graph'
+        + ' FOR hollywood IN 1..4 ANY bacon GRAPH @graph'
         + ' COLLECT h = hollywood RETURN h';
       let result = db._query(query, {
         name: "Kevin Bacon",
@@ -287,7 +286,6 @@
       }).toArray();
       expect(result.length).toEqual(135);
     });
-    */
 
     it('MATCH p=shortestPath((bacon:Person {name:"Kevin Bacon"})'
       + '-[*]-(meg:Person {name:"Meg Ryan"})) RETURN p', function () {

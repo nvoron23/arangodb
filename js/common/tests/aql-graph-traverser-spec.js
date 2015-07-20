@@ -193,11 +193,10 @@
 
       });
 
-      /*
       describe("steps", function () {
 
         it("can use an exact number of steps", function () {
-          let query = "FOR x IN OUTBOUND*2 @startId GRAPH @graph SORT x._id ASC RETURN x._id";
+          let query = "FOR x IN 2 OUTBOUND @startId GRAPH @graph SORT x._id ASC RETURN x._id";
           let bindVars = {
             graph: gn,
             startId: vertex.B
@@ -210,7 +209,7 @@
         });
 
         it("can use a range of steps", function () {
-          let query = "FOR x IN OUTBOUND*2..3 @startId @GRAPH graph SORT x._id ASC RETURN x._id";
+          let query = "FOR x IN 2..3 OUTBOUND @startId GRAPH @graph SORT x._id ASC RETURN x._id";
           let bindVars = {
             graph: gn,
             startId: vertex.B
@@ -224,7 +223,7 @@
         });
 
         it("can use a computed function of steps", function () {
-          let query = "FOR x IN OUTBOUND*LENGTH([1,2]) @startId GRAPH @graph SORT x._id ASC RETURN x._id";
+          let query = "FOR x IN LENGTH([1,2]) OUTBOUND @startId GRAPH @graph SORT x._id ASC RETURN x._id";
           let bindVars = {
             graph: gn,
             startId: vertex.B
@@ -237,7 +236,6 @@
         });
 
       });
-      */
 
       describe("sorting", function () {
         it("should be able to sort the result", function () {
@@ -277,7 +275,6 @@
      *
      ***********************************************************************/
  
-
       let g;
       const gn = "UnitTestGraph";
       const vn2 = "UnitTestVertexCollection2";
@@ -344,24 +341,23 @@
           validateResult(db._query(query, bindVars).toArray());
         });
 
-        /*
         it("should be able to bind the steps", function () {
-          let query = "FOR x, p IN OUTBOUND*@steps '" + vertex.B + "' " + en + " RETURN {vertex: x, path: p}";
+          let query = "FOR x, p IN @steps OUTBOUND '" + vertex.B + "' " + en + " RETURN {vertex: x, path: p}";
           let bindVars = {
-            "steps": 1
+            steps: 1
           };
           validateResult(db._query(query, bindVars).toArray());
         });
 
         it("should be able to bind the steps as range with two values", function () {
-          let query = "FOR x, p IN OUTBOUND*@lsteps..@rsteps '" + vertex.B + "' " + en + " RETURN {vertex: x, path: p}";
+          let query = "FOR x, p IN @lsteps..@rsteps OUTBOUND '" + vertex.B
+                    + "' " + en + " RETURN {vertex: x, path: p}";
           let bindVars = {
-            "lsteps": 1,
-            "rsteps": 1
+            lsteps: 1,
+            rsteps: 1
           };
           validateResult(db._query(query, bindVars).toArray());
         });
-        */
 
         /* TODO: Should we support this?
         it("should be able to bind the steps as range in one value", function () {
@@ -463,11 +459,10 @@
 
       });
 
-      /*
       describe("steps", function () {
 
         it("can use an exact number of steps", function () {
-          let query = "FOR x IN OUTBOUND*2 @startId @@eCol SORT x._id ASC RETURN x._id";
+          let query = "FOR x IN 2 OUTBOUND @startId @@eCol SORT x._id ASC RETURN x._id";
           let bindVars = {
             "@eCol": en,
             startId: vertex.B
@@ -480,7 +475,7 @@
         });
 
         it("can use a range of steps", function () {
-          let query = "FOR x IN OUTBOUND*2..3 @startId @@eCol SORT x._id ASC RETURN x._id";
+          let query = "FOR x IN 2..3 OUTBOUND @startId @@eCol SORT x._id ASC RETURN x._id";
           let bindVars = {
             "@eCol": en,
             startId: vertex.B
@@ -494,7 +489,7 @@
         });
 
         it("can use a computed function of steps", function () {
-          let query = "FOR x IN OUTBOUND*LENGTH([1,2]) @startId @@eCol SORT x._id ASC RETURN x._id";
+          let query = "FOR x IN LENGTH([1,2]) OUTBOUND @startId @@eCol SORT x._id ASC RETURN x._id";
           let bindVars = {
             "@eCol": en,
             startId: vertex.B
@@ -507,7 +502,6 @@
         });
 
       });
-      */
 
       describe("sorting", function () {
         it("should be able to sort the result", function () {
@@ -573,7 +567,6 @@
 
   });
 
-  /*
   describe("Potential errors", function () {
 
     let vc, ec;
@@ -592,25 +585,23 @@
 
     });
 
-    it("should not return documents from unknown vertex collections", function () {
+    it("should return documents from unknown vertex collections", function () {
       const vn2 = "UnitTestVertexCollectionOther";
       db._drop(vn2);
       const vc2 = db._create(vn2);
       vc.save({_key: "1"});
       vc2.save({_key: "1"});
       ec.save(vn + "/1", vn2 + "/1", {});
-      let query = "FOR x IN TRAVERSE FROM @startId GRAPH @@eCol, @@vCol 1 STEPS RETURN x";
+      let query = "FOR x IN OUTBOUND @startId @@eCol RETURN x";
       let bindVars = {
         "@eCol": en,
-        "@vCol": vn,
         "startId": vn + "/1"
       };
       // NOTE: vn2 is not explicitly named in AQL
       let result = db._query(query, bindVars).toArray();
-      expect(result.length).toEqual(0);
+      expect(result.length).toEqual(1);
       db._drop(vn2);
     });
   });
-  */
 
 }());

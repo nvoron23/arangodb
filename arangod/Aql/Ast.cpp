@@ -1037,13 +1037,25 @@ AstNode* Ast::createNodeCollectionList (AstNode const* edgeCollections) {
 /// @brief create an AST direction node
 ////////////////////////////////////////////////////////////////////////////////
 
-AstNode* Ast::createNodeDirection (uint64_t const& direction,
-                              uint64_t const& steps) {
+AstNode* Ast::createNodeDirection (uint64_t direction,
+                                   uint64_t steps) {
   AstNode* node = createNode(NODE_TYPE_DIRECTION);
   AstNode* dir = createNodeValueInt(direction);
   AstNode* step = createNodeValueInt(steps);
   node->addMember(dir);
   node->addMember(step);
+
+  TRI_ASSERT(node->numMembers() == 2);
+  return node;
+}
+
+AstNode* Ast::createNodeDirection (uint64_t direction,
+                                   AstNode const* steps) {
+  AstNode* node = createNode(NODE_TYPE_DIRECTION);
+  AstNode* dir = createNodeValueInt(direction);
+
+  node->addMember(dir);
+  node->addMember(steps);
 
   TRI_ASSERT(node->numMembers() == 2);
   return node;
