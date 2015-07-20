@@ -1120,17 +1120,20 @@ void ExecutionNode::RegisterPlan::after (ExecutionNode *en) {
     
     case ExecutionNode::TRAVERSAL: {
       depth++;
-      nrRegsHere.emplace_back(1);
-      // create a copy of the last value here
-      // this is requried because back returns a reference and emplace/push_back may invalidate all references
-      RegisterId registerId = 1 + nrRegs.back();
-      nrRegs.emplace_back(registerId);
-
       auto ep = static_cast<TraversalNode const*>(en);
       TRI_ASSERT(ep != nullptr);
-      varInfo.emplace(make_pair(ep->_outVariable->id,
-                               VarInfo(depth, totalNrRegs)));
-      totalNrRegs++;
+      auto vars = ep->getVariablesSetHere();
+      nrRegsHere.emplace_back(vars.size());
+      // create a copy of the last value here
+      // this is requried because back returns a reference and emplace/push_back may invalidate all references
+      RegisterId registerId = vars.size() + nrRegs.back();
+      nrRegs.emplace_back(registerId);
+
+      for (auto& it : vars) {
+        varInfo.emplace(make_pair(it->id,
+                                 VarInfo(depth, totalNrRegs)));
+        totalNrRegs++;
+      }
       break;
     }
 
@@ -3269,7 +3272,7 @@ TraversalNode::TraversalNode (ExecutionPlan* plan,
   : ExecutionNode(plan, base),
     _start(nullptr),
     _vocbase(plan->getAst()->query()->vocbase()),
-    _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
+    // _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
     _direction(nullptr),
     _graph(nullptr),
     _steps(nullptr) { // TODO: FIXME
@@ -3290,8 +3293,8 @@ void TraversalNode::toJsonHelper (triagens::basics::Json& nodes,
   }
 
   // Now put info about vocbase and cid in there
-  json("database", triagens::basics::Json(_vocbase->_name))
-      ("outVariable", _outVariable->toJson());
+  json("database", triagens::basics::Json(_vocbase->_name));
+      // ("outVariable", _outVariable->toJson());
 
   // TODO: FIXME
 
@@ -3306,13 +3309,34 @@ void TraversalNode::toJsonHelper (triagens::basics::Json& nodes,
 ExecutionNode* TraversalNode::clone (ExecutionPlan* plan,
                                      bool withDependencies,
                                      bool withProperties) const {
-  auto outVariable = _outVariable;
-  if (withProperties) {
-    outVariable = plan->getAst()->variables()->createVariable(outVariable);
-    TRI_ASSERT(outVariable != nullptr);
+  auto c = new TraversalNode(plan, _id, _vocbase, _direction, _start, _graph);
+
+  if (usesVertexOutVariable()) {
+    auto vertexOutVariable = _vertexOutVariable;
+    if (withProperties) {
+      vertexOutVariable = plan->getAst()->variables()->createVariable(vertexOutVariable);
+    }
+    TRI_ASSERT(vertexOutVariable != nullptr);
+    c->setVertexOutput(vertexOutVariable);
   }
-    
-  auto c = new TraversalNode(plan, _id, _vocbase, outVariable, _direction, _start, _graph);
+
+  if (usesEdgeOutVariable()) {
+    auto edgeOutVariable = _edgeOutVariable;
+    if (withProperties) {
+      edgeOutVariable = plan->getAst()->variables()->createVariable(edgeOutVariable);
+    }
+    TRI_ASSERT(edgeOutVariable != nullptr);
+    c->setEdgeOutput(edgeOutVariable);
+  }
+
+  if (usesPathOutVariable()) {
+    auto pathOutVariable = _pathOutVariable;
+    if (withProperties) {
+      pathOutVariable = plan->getAst()->variables()->createVariable(pathOutVariable);
+    }
+    TRI_ASSERT(pathOutVariable != nullptr);
+    c->setPathOutput(pathOutVariable);
+  }
 
   cloneHelper(c, plan, withDependencies, withProperties);
 

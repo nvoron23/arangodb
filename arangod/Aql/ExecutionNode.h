@@ -3630,14 +3630,12 @@ namespace triagens {
         TraversalNode (ExecutionPlan* plan,
                        size_t id,
                        TRI_vocbase_t* vocbase, 
-                       Variable const* outVariable,
                        AstNode const* direction,
                        AstNode const* start,
                        AstNode const* graph)
           : ExecutionNode(plan, id), 
             _start(start),
             _vocbase(vocbase), 
-            _outVariable(outVariable), 
             _direction(direction),
             _graph(graph),
             _steps(nullptr),
@@ -3645,18 +3643,22 @@ namespace triagens {
         {
 
           TRI_ASSERT(_vocbase != nullptr);
-          TRI_ASSERT(_outVariable != nullptr);
           TRI_ASSERT(_direction != nullptr);
           TRI_ASSERT(_start != nullptr);
           TRI_ASSERT(_resolver != nullptr);
+          _vertexOutVariable = nullptr;
+          _edgeOutVariable = nullptr;
+          _pathOutVariable = nullptr;
           if (_graph->type == NODE_TYPE_COLLECTION_LIST) {
-            // Graph is a whitelist of collections (edge, vertex(, vertex)*)
-            auto eColName = _graph->getMember(0)->getStringValue();
-            auto edgeStruct = _resolver->getCollectionStruct(eColName);
-            if (edgeStruct->_type != TRI_COL_TYPE_EDGE) {
-              THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_TYPE_INVALID);
+            // List of edge collection names
+            for (size_t i = 0; i <  _graph->numMembers(); ++i) {
+              auto eColName = _graph->getMember(i)->getStringValue();
+              auto edgeStruct = _resolver->getCollectionStruct(eColName);
+              if (edgeStruct->_type != TRI_COL_TYPE_EDGE) {
+                THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_TYPE_INVALID);
+              }
+              _edgeCids.push_back(edgeStruct->_cid);
             }
-            _edgeCids.push_back(edgeStruct->_cid);
           } else {
             if (_edgeCids.size() == 0) {
               if (_graph->isStringValue()) {
@@ -3740,7 +3742,15 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         std::vector<Variable const*> getVariablesSetHere () const override final{
-          return std::vector<Variable const*>{ _outVariable };
+          std::vector<Variable const*> vars;
+          vars.push_back(_vertexOutVariable);
+          if (_edgeOutVariable != nullptr) {
+            vars.push_back(_edgeOutVariable);
+            if (_pathOutVariable != nullptr) {
+              vars.push_back(_pathOutVariable);
+            }
+          }
+          return vars;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3752,11 +3762,75 @@ namespace triagens {
         }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief return the out variable
+/// @brief return the vertex out variable
 ////////////////////////////////////////////////////////////////////////////////
 
-        Variable const* outVariable () const {
-          return _outVariable;
+        Variable const* vertexOutVariable () const {
+          return _vertexOutVariable;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief checks if the vertex out variable is used
+////////////////////////////////////////////////////////////////////////////////
+
+        bool const usesVertexOutVariable () const {
+          return _vertexOutVariable != nullptr;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief set the vertex out variable
+////////////////////////////////////////////////////////////////////////////////
+
+        void setVertexOutput (Variable const* outVar) {
+          _vertexOutVariable = outVar;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the edge out variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* edgeOutVariable () const {
+          return _edgeOutVariable;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief checks if the edge out variable is used
+////////////////////////////////////////////////////////////////////////////////
+
+        bool const usesEdgeOutVariable () const {
+          return _edgeOutVariable != nullptr;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief set the edge out variable
+////////////////////////////////////////////////////////////////////////////////
+
+        void setEdgeOutput (Variable const* outVar) {
+          _edgeOutVariable = outVar;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief checks if the path out variable is used
+////////////////////////////////////////////////////////////////////////////////
+
+        bool const usesPathOutVariable () const {
+          return _pathOutVariable != nullptr;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the path out variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* pathOutVariable () const {
+          return _pathOutVariable;
+        }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief set the path out variable
+////////////////////////////////////////////////////////////////////////////////
+
+        void setPathOutput (Variable const* outVar) {
+          _pathOutVariable = outVar;
         }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3869,10 +3943,22 @@ namespace triagens {
         TRI_vocbase_t* _vocbase;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief output variable
+/// @brief vertex output variable
 ////////////////////////////////////////////////////////////////////////////////
 
-        Variable const* _outVariable;
+        Variable const* _vertexOutVariable;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief vertex output variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* _edgeOutVariable;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief vertex output variable
+////////////////////////////////////////////////////////////////////////////////
+
+        Variable const* _pathOutVariable;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief input variable

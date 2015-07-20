@@ -32,6 +32,7 @@
 #include "Aql/ExecutionBlock.h"
 #include "Aql/ExecutionNode.h"
 #include "Aql/ExecutionPlan.h"
+#include "Aql/TraversalBlock.h"
 #include "Aql/QueryRegistry.h"
 #include "Aql/WalkerWorker.h"
 #include "Basics/Exceptions.h"

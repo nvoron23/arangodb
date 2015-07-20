@@ -420,16 +420,6 @@ ExecutionNode* ExecutionPlan::fromNodeFor (ExecutionNode* previous,
     TRI_ASSERT(inVariable != nullptr);
     en = registerNode(new EnumerateListNode(this, nextId(), inVariable, v));
   }
-  else if (expression->type == NODE_TYPE_TRAVERSAL) {
-    // second operand is a traversal
-    
-    TRI_ASSERT(expression->numMembers() == 3);
-    AstNode const* direction = expression->getMember(0);
-    AstNode const* start = expression->getMember(1);
-    AstNode const* graph = expression->getMember(2);
-    en = registerNode(new TraversalNode(this, nextId(), _ast->query()->vocbase(), v, 
-          direction, start, graph));
-  }
   else {
     // second operand is some misc. expression
     auto calc = createTemporaryCalculation(expression);
@@ -441,6 +431,56 @@ ExecutionNode* ExecutionPlan::fromNodeFor (ExecutionNode* previous,
 
   TRI_ASSERT(en != nullptr);
   
+  return addDependency(previous, en);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief create an execution plan element from an AST FOR TRAVERSAL node
+////////////////////////////////////////////////////////////////////////////////
+
+ExecutionNode* ExecutionPlan::fromNodeTraversal (ExecutionNode* previous,
+                                                 AstNode const* node) {
+  TRI_ASSERT(node != nullptr && node->type == NODE_TYPE_TRAVERSAL);
+  TRI_ASSERT(node->numMembers() >= 4);
+  TRI_ASSERT(node->numMembers() <= 6);
+
+  // the first 3 members are used by traversal internally.
+  // The members 4-6, where 5 and 6 are optional, are used
+  // as out variables.
+  AstNode const* direction = node->getMember(0);
+  AstNode const* start = node->getMember(1);
+  AstNode const* graph = node->getMember(2);
+
+  // First create the node
+  auto travNode = new TraversalNode(this, nextId(), _ast->query()->vocbase(),
+          direction, start, graph);
+
+  auto variable = node->getMember(3);
+  TRI_ASSERT(variable->type == NODE_TYPE_VARIABLE);
+  auto v = static_cast<Variable*>(variable->getData());
+  TRI_ASSERT(v != nullptr);
+  travNode->setVertexOutput(v);
+
+  if (node->numMembers() > 4) {
+    // return the edge as well
+    variable = node->getMember(4);
+    TRI_ASSERT(variable->type == NODE_TYPE_VARIABLE);
+    v = static_cast<Variable*>(variable->getData());
+    TRI_ASSERT(v != nullptr);
+    travNode->setEdgeOutput(v);
+    if (node->numMembers() > 5) {
+      // return the path as well
+      variable = node->getMember(5);
+      TRI_ASSERT(variable->type == NODE_TYPE_VARIABLE);
+      v = static_cast<Variable*>(variable->getData());
+      TRI_ASSERT(v != nullptr);
+      travNode->setPathOutput(v);
+    }
+  }
+
+  ExecutionNode* en = registerNode(travNode);
+  TRI_ASSERT(en != nullptr);
   return addDependency(previous, en);
 }
 
@@ -1246,6 +1286,11 @@ ExecutionNode* ExecutionPlan::fromNode (AstNode const* node) {
         break;
       }
 
+      case NODE_TYPE_TRAVERSAL: {
+        en = fromNodeTraversal(en, member);
+        break;
+      }
+
       case NODE_TYPE_FILTER: {
         en = fromNodeFilter(en, member);
         break;
@@ -1312,6 +1357,7 @@ ExecutionNode* ExecutionPlan::fromNode (AstNode const* node) {
       }
 
       default: {
+                 std::cout << member->type << std::endl;
         // node type not implemented
         en = nullptr;
         break;

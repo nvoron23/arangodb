@@ -74,6 +74,7 @@ add_executable(
     Aql/RestAqlHandler.cpp
     Aql/Scopes.cpp
     Aql/ShortStringStorage.cpp
+    Aql/TraversalBlock.cpp
     Aql/tokens.cpp
     Aql/V8Expression.cpp
     Aql/Variable.cpp
