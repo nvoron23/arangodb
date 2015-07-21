@@ -782,6 +782,64 @@
         expect(result[0]._id).toEqual(vertex.B);
       });
 
+      it("should be able to return a vast amount of results", function () {
+        let query = "FOR x IN OUTBOUND @startId @@eCol RETURN x";
+        let amount = 10000;
+        let startId = vn + "/test";
+        let bindVars = {
+          "@eCol": en,
+          "startId": startId
+        };
+        vc.save({_key: startId.split("/")[1]});
+        
+        // Insert amount many edges and vertices into the collections.
+        for (let i = 0; i < amount; ++i) {
+          let tmp = vc.save({_key: "" + i})._id;
+          ec.save(startId, tmp, {});
+        }
+
+        // Check that we can get all of them out again.
+        let result = db._query(query, bindVars).toArray();
+        // Internally: The Query selects elements in chunks, check that nothing is lost.
+        expect(result.length).toEqual(amount);
+      });
+
+      it("should be able to skip some results", function () {
+        let query = "FOR x, e, p IN 1..2 OUTBOUND @startId @@eCol LIMIT 4, 100 RETURN p.vertices[1]._key";
+        let startId = vn + "/test";
+        let bindVars = {
+          "@eCol": en,
+          "startId": startId
+        };
+        vc.save({_key: startId.split("/")[1]});
+        
+        // Insert amount many edges and vertices into the collections.
+        for (let i = 0; i < 3; ++i) {
+          let tmp = vc.save({_key: "" + i})._id;
+          ec.save(startId, tmp, {});
+          for (let k = 0; k < 3; ++k) {
+            let tmp2 = vc.save({_key: "" + i + "_" + k})._id;
+            ec.save(tmp, tmp2, {});
+          }
+        }
+
+        // Check that we can get all of them out again.
+        let result = db._query(query, bindVars).toArray();
+        // Internally: The Query selects elements in chunks, check that nothing is lost.
+        expect(result.length).toEqual(8);
+
+        // Each of the 3 parts of this graph contains of 4 nodes, one connected to the start.
+        // And 3 connected to the first one. As we do a depth first traversal we expect to skip
+        // exactly one sub-tree. Therefor we expect exactly two sub-trees to be traversed.
+        let seen = {};
+        for (let r of result) {
+          if (!seen.hasOwnProperty(r)) {
+            seen[r] = true;
+          }
+        }
+        expect(Object.keys(seen).length).toEqual(2);
+      });
+
     });
 
   });
