@@ -184,7 +184,7 @@ void TraversalNode::fillTraversalOptions (basics::traverser::TraverserOptions& o
   auto dir = _direction->getMember(0);
   auto steps = _direction->getMember(1);
 
-  TRI_ASSERT(dir->isNumericValue());
+  TRI_ASSERT(dir->isIntValue());
   auto dirNum = dir->getIntValue();
   switch (dirNum) {
     case 0:
@@ -202,24 +202,40 @@ void TraversalNode::fillTraversalOptions (basics::traverser::TraverserOptions& o
   }
 
   if (steps->isNumericValue()) {
-    TRI_ASSERT(steps->isNumericValue());
-    opts.minDepth = steps->getIntValue();
-    opts.maxDepth = steps->getIntValue();
+    // Check if a double value is integer
+    double v = steps->getDoubleValue();
+    double intpart;
+    if (modf(v, &intpart) != 0.0) {
+      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
+    }
+    opts.minDepth = static_cast<int>(v);
+    opts.maxDepth = static_cast<int>(v);
   } else if (steps->type == NODE_TYPE_RANGE) {
     // Range depth
     auto lhs = steps->getMember(0);
     auto rhs = steps->getMember(1);
     if (lhs->isNumericValue()) {
       // Range is left-closed
-      opts.minDepth = lhs->getIntValue();
+      // Check if a double value is integer
+      double v = lhs->getDoubleValue();
+      double intpart;
+      if (modf(v, &intpart) != 0.0) {
+        THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
+      }
+      opts.minDepth = static_cast<int>(v);
     }
     if (rhs->isNumericValue()) {
       // Range is right-closed
-      opts.maxDepth = rhs->getIntValue();
+      // Check if a double value is integer
+      double v = rhs->getDoubleValue();
+      double intpart;
+      if (modf(v, &intpart) != 0.0) {
+        THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
+      }
+      opts.maxDepth = static_cast<int>(v);
     }
   } else {
-    // TODO FIXME
-    TRI_ASSERT(false);
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
   }
 }
 
