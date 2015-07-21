@@ -233,6 +233,25 @@ bool TraversalBlock::morePaths (size_t hint) {
   return _paths.size() > 0;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// @brief skip the next paths
+////////////////////////////////////////////////////////////////////////////////
+
+size_t TraversalBlock::skipPaths (size_t hint) {
+  for (auto p : _paths) {
+    p.destroy();
+  }
+  _paths.clear();
+  _posInPaths = 0;
+  if (!_traverser->hasMore()) {
+    return 0;
+  }
+  return _traverser->skip(hint);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief initialize the list of paths
+////////////////////////////////////////////////////////////////////////////////
 
 void TraversalBlock::initializePaths (AqlItemBlock const* items) {
   if (!_useRegister) {
@@ -407,10 +426,48 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
 }
 
 size_t TraversalBlock::skipSome (size_t atLeast, size_t atMost) {
-  // TODO: FIXME
   size_t skipped = 0;
 
-  return skipped;
+  if (_done) {
+    return skipped;
+  }
+
+  if (_buffer.empty()) {
+
+    size_t toFetch = (std::min)(DefaultBatchSize, atMost);
+    if (! ExecutionBlock::getBlock(toFetch, toFetch)) {
+      _done = true;
+      return skipped;
+    }
+    _pos = 0;           // this is in the first block
+  }
+
+  // If we get here, we do have _buffer.front()
+  AqlItemBlock* cur = _buffer.front();
+  size_t const curRegs = cur->getNrRegs();
+
+  if (_pos == 0) {
+    // Initial initialisation
+    initializePaths(cur);
+  }
+
+  size_t available = _paths.size() - _posInPaths;
+  // We have not yet fetched any paths. We can skip the next atMost many
+  if (available == 0) {
+    return skipPaths(atMost);
+  }
+  // We have fewer paths available in our list, so we clear the list and thereby skip these.
+  if (available <= atMost) {
+    for (auto p : _paths) {
+      p.destroy();
+    }
+    _paths.clear();
+    _posInPaths = 0;
+    return available;
+  }
+  _posInPaths += atMost;
+  // Skip the next atMost many paths.
+  return atMost;
 }
 
 // Local Variables:

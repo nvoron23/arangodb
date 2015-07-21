@@ -793,16 +793,17 @@ void DepthFirstTraverser::setStartVertex (VertexId& v) {
   _done = false;
 }
 
-void DepthFirstTraverser::skip (int amount) {
+size_t DepthFirstTraverser::skip (size_t amount) {
+  size_t skipped = 0;
   TraversalPath<EdgeInfo, VertexId> p;
   for (int i = 0; i < amount; ++i) {
     p = next();
     if (p.edges.size() == 0) {
       break;
     }
+    ++skipped;
   }
-
-
+  return skipped;
 }
 
 bool DepthFirstTraverser::hasMore () {
