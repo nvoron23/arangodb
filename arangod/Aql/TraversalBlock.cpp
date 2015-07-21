@@ -240,14 +240,16 @@ void TraversalBlock::initializePaths (AqlItemBlock const* items) {
       _usedConstant = true;
       _traverser->setStartVertex(_startId);
     }
-  } else {
+  }
+  else {
     auto in = items->getValueReference(_pos, _reg);
     if (in.isShaped()) {
       auto col = items->getDocumentCollection(_reg);
       VertexId v(col->_info._cid, TRI_EXTRACT_MARKER_KEY(in.getMarker()));
       _traverser->setStartVertex(v);
-    } else if (in.isObject()) {
-      Json input = in.toJson(nullptr, nullptr);
+    }
+    else if (in.isObject()) {
+      Json input = in.toJson(_trx, nullptr);
       if (input.has("_id") ) {
         Json _idJson = input.get("_id");
         if (_idJson.isString()) {
@@ -258,7 +260,8 @@ void TraversalBlock::initializePaths (AqlItemBlock const* items) {
           );
           _traverser->setStartVertex(v);
         }
-      } else if (input.has("vertex")) {
+      }
+      else if (input.has("vertex")) {
         // This is used whenever the input is the result of another traversal.
         Json vertexJson = input.get("vertex");
         if (vertexJson.has("_id") ) {
@@ -273,7 +276,12 @@ void TraversalBlock::initializePaths (AqlItemBlock const* items) {
           }
         }
       }
-    } else {
+    }
+    else if (in._type == AqlValue::DOCVEC) {
+      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, 
+                                     std::string("Only one start vertex allowed. Embed it in a FOR loop."));
+    }
+    else {
       std::cout << "FOUND Type: " << in.getTypeString() << std::endl;
     }
   }

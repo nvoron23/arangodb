@@ -1,5 +1,5 @@
 /*jshint esnext: true */
-/*global describe, beforeEach, it, expect, afterEach*/
+/*global describe, beforeEach, it, expect, afterEach, fail*/
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Spec for the AQL FOR x IN GRAPH name statement
@@ -33,11 +33,13 @@
 
   const internal = require("internal");
   const db = internal.db;
+  const errors = require("org/arangodb").errors;
   const gm = require("org/arangodb/general-graph");
   const vn = "UnitTestVertexCollection";
   const en = "UnitTestEdgeCollection";
   const vertex = {};
   const edge = {};
+  const console = require("console");
 
   let cleanup = function () {
     db._drop(vn);
@@ -65,7 +67,8 @@
      *
      *
      *
-     * *********************************************************************/
+     ***********************************************************************/
+
     beforeEach(function() {
       cleanup();
       let vc = db._create(vn);
@@ -583,25 +586,204 @@
 
     describe("Malformed AQL", function () {
 
+      it("should not allow non-integer numbers of steps", function () {
+        let query = "FOR x IN 2.5 OUTBOUND @startId @@eCol RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "startId": vertex.A
+        };
+        try {
+          db._query(query, bindVars).toArray();
+          fail(query + " should not be allowed");
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_QUERY_PARSE.code);
+        }
+      });
+
+      it("should not allow non numbers of steps", function () {
+        let query = "FOR x IN 'invalid' OUTBOUND @startId @@eCol RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "startId": vertex.A
+        };
+        try {
+          db._query(query, bindVars).toArray();
+          fail(query + " should not be allowed");
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_QUERY_PARSE.code);
+        }
+      });
+
+      it("should not allow more than one direction", function () {
+        let query = "FOR x IN OUTBOUND ANY @startId @@eCol RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "startId": vertex.A
+        };
+        try {
+          db._query(query, bindVars).toArray();
+          fail(query + " should not be allowed");
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_QUERY_PARSE.code);
+        }
+      });
+
+      it("should not allow an empty collection list", function () {
+        let query = "FOR x IN OUTBOUND @startId RETURN x";
+        let bindVars = {
+          "startId": vertex.A
+        };
+        try {
+          db._query(query, bindVars).toArray();
+          fail(query + " should not be allowed");
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_QUERY_PARSE.code);
+        }
+      });
+
+      it("should not allow a query without a start vertex", function () {
+        let query = "FOR x IN OUTBOUND @@eCol RETURN x";
+        let bindVars = {
+          "@eCol": en
+        };
+        try {
+          db._query(query, bindVars).toArray();
+          fail(query + " should not be allowed");
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_QUERY_PARSE.code);
+        }
+      });
+
+      it("should not allow more than three output parameters", function () {
+        let query = "FOR x, y, z, f IN OUTBOUND @startId @@eCol RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "startId": vertex.A
+        };
+        try {
+          db._query(query, bindVars).toArray();
+          fail(query + " should not be allowed");
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_QUERY_PARSE.code);
+        }
+      });
+
+      it("should not allow to use a vertex collection for traversing", function () {
+        let query = "FOR x IN OUTBOUND @startId @@eCol, @@vCol RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "@vCol": vn,
+          "startId": vertex.A
+        };
+        try {
+          db._query(query, bindVars).toArray();
+          fail(query + " should not be allowed");
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_ARANGO_COLLECTION_TYPE_INVALID.code);
+        }
+      });
+
+      it("should not allow starting with a subquery", function () {
+        let query = "FOR x IN OUTBOUND (FOR y IN @@vCol SORT y._id LIMIT 3 RETURN y) @@eCol SORT x._id RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "@vCol": vn
+        };
+        try {
+          db._query(query, bindVars).toArray();
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_QUERY_PARSE.code);
+        }
+        /*
+        let result = db._query(query, bindVars).toArray();
+        expect(result.length).toEqual(4);
+        expect(result[0]._id).toEqual(vertex.B);
+        expect(result[1]._id).toEqual(vertex.C);
+        expect(result[2]._id).toEqual(vertex.D);
+        expect(result[3]._id).toEqual(vertex.F);
+        */
+      });
+
+      it("should not allow to determine the steps with a subquery", function () {
+        let query = "FOR x IN (FOR y IN 1..1 RETURN y) OUTBOUND @startId @@eCol RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "startId": vertex.A
+        };
+        try {
+          db._query(query, bindVars).toArray();
+        } catch (e) {
+          expect(e.errorNum).toEqual(errors.ERROR_QUERY_PARSE.code);
+        }
+        /*
+        let result = db._query(query, bindVars).toArray();
+        expect(result.length).toEqual(1);
+        expect(result[0]._id).toEqual(vertex.B);
+        */
+      });
+
+
     });
 
-    it("should return documents from unknown vertex collections", function () {
-      const vn2 = "UnitTestVertexCollectionOther";
-      db._drop(vn2);
-      const vc2 = db._create(vn2);
-      vc.save({_key: "1"});
-      vc2.save({_key: "1"});
-      ec.save(vn + "/1", vn2 + "/1", {});
-      let query = "FOR x IN OUTBOUND @startId @@eCol RETURN x";
-      let bindVars = {
-        "@eCol": en,
-        "startId": vn + "/1"
-      };
-      // NOTE: vn2 is not explicitly named in AQL
-      let result = db._query(query, bindVars).toArray();
-      expect(result.length).toEqual(1);
-      db._drop(vn2);
+    describe("queries with complex interna", function () {
+      let vc, ec;
+
+      beforeEach(function() {
+        cleanup();
+        vc = db._create(vn);
+        ec = db._createEdgeCollection(en);
+        vertex.A = vc.save({_key: "A"})._id;
+        vertex.B = vc.save({_key: "B"})._id;
+        vertex.C = vc.save({_key: "C"})._id;
+        vertex.D = vc.save({_key: "D"})._id;
+        vertex.E = vc.save({_key: "E"})._id;
+        vertex.F = vc.save({_key: "F"})._id;
+
+        edge.AB = ec.save(vertex.A, vertex.B, {})._id;
+        edge.BC = ec.save(vertex.B, vertex.C, {})._id;
+        edge.CD = ec.save(vertex.C, vertex.D, {})._id;
+        edge.CF = ec.save(vertex.C, vertex.F, {})._id;
+        edge.EB = ec.save(vertex.E, vertex.B, {})._id;
+        edge.FE = ec.save(vertex.F, vertex.E, {})._id;
+      });
+
+      afterEach(function() {
+        cleanup();
+      });
+
+      it("should return documents from unknown vertex collections", function () {
+        const vn2 = "UnitTestVertexCollectionOther";
+        db._drop(vn2);
+        const vc2 = db._create(vn2);
+        vc.save({_key: "1"});
+        vc2.save({_key: "1"});
+        ec.save(vn + "/1", vn2 + "/1", {});
+        let query = "FOR x IN OUTBOUND @startId @@eCol RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "startId": vn + "/1"
+        };
+        // NOTE: vn2 is not explicitly named in AQL
+        let result = db._query(query, bindVars).toArray();
+        expect(result.length).toEqual(1);
+        expect(result[0]._id).toEqual(vn2 + "/1");
+        db._drop(vn2);
+      });
+
+      it("should use the steps from let", function () {
+        let query = "LET s = 1 FOR x IN s OUTBOUND @startId @@eCol RETURN x";
+        let bindVars = {
+          "@eCol": en,
+          "startId": vertex.A
+        };
+
+        let result = db._query(query, bindVars).toArray();
+        expect(result.length).toEqual(1);
+        expect(result[0]._id).toEqual(vertex.B);
+      });
+
     });
+
   });
 
 }());
