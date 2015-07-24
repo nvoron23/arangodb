@@ -1300,9 +1300,10 @@ void Ast::injectBindParameters (BindParameters& parameters) {
       auto graphNode = node->getMember(2);
       if (graphNode->type == NODE_TYPE_VALUE) {
         TRI_ASSERT(graphNode->isStringValue());
+        std::string graphName = graphNode->getStringValue();
         auto graph = triagens::arango::GraphFactory::factory()->byName(
           _query->vocbase(),
-          graphNode->getStringValue()
+          graphName
         );
         auto vColls = graph.vertexCollections();
         for (const auto& n: vColls) {

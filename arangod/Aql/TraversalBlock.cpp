@@ -382,7 +382,8 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
       auto p = _paths[_posInPaths].toJson(nullptr, nullptr);
       Json vertices = p.get("vertices");
       size_t length = vertices.size();
-      AqlValue v(new Json(vertices.at(length - 1)));
+      std::unique_ptr<Json> vertex(new Json(vertices.at(length - 1)));
+      AqlValue v(vertex.get());
       res->setValue(j,
         _vertexReg,
         v.clone()
@@ -392,7 +393,8 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
       auto p = _paths[_posInPaths].toJson(nullptr, nullptr);
       Json edges = p.get("edges");
       size_t length = edges.size();
-      AqlValue v(new Json(edges.at(length - 1)));
+      std::unique_ptr<Json> edge(new Json(edges.at(length - 1)));
+      AqlValue v(edge.get());
       res->setValue(j,
         _edgeReg,
         v.clone()

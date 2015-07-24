@@ -52,7 +52,7 @@ function ahuacatlQueryGeneralEdgesTestSuite() {
 
   var AQL_VERTICES = "FOR e IN GRAPH_VERTICES(@name, @example, @options) SORT e._id RETURN e";
   var AQL_EDGES = "FOR e IN GRAPH_EDGES(@name, @example, @options) SORT e.what RETURN e.what";
-  var AQL_NEIGHBORS = "FOR e IN GRAPH_NEIGHBORS(@name, @example, @options) SORT e RETURN e";
+  var AQL_NEIGHBORS = "FOR e IN GRAPH_NEIGHBORS(@name, @example, @options) SORT e._id RETURN e";
 
   var startExample = [{hugo : true}, {heinz : 1}];
   var vertexExample = {_key: "v1"};
@@ -2722,8 +2722,8 @@ function ahuacatlQueryMultiCollectionMadnessTestSuite() {
       };
       var actual = getRawQueryResults(AQL_NEIGHBORS, bindVars);
       assertEqual(actual.length, 2);
-      assertEqual(actual[0]._id, t2);
-      assertEqual(actual[1]._id, t1);
+      assertEqual(actual[0]._id, t1);
+      assertEqual(actual[1]._id, t2);
     }
   };
 }
