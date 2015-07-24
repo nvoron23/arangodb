@@ -447,7 +447,6 @@ size_t TraversalBlock::skipSome (size_t atLeast, size_t atMost) {
 
   // If we get here, we do have _buffer.front()
   AqlItemBlock* cur = _buffer.front();
-  size_t const curRegs = cur->getNrRegs();
 
   if (_pos == 0) {
     // Initial initialisation

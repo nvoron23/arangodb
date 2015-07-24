@@ -70,6 +70,8 @@ static VertexId ExtractToId (TRI_doc_mptr_copy_t const& ptr) {
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Helper to transform a vertex _id string to VertexId struct.
+/// NOTE:  Make sure the given string is not freed as long as the resulting
+///        VertexId is in use
 ////////////////////////////////////////////////////////////////////////////////
 
 VertexId triagens::basics::traverser::IdStringToVertexId (
@@ -89,12 +91,7 @@ VertexId triagens::basics::traverser::IdStringToVertexId (
   if (coli == nullptr) {
     throw TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND;
   }
-  /*
-  VertexId v;
-  v.setCopy(coli->_cid, vertex.substr(split + 1));
-  */
-  // return VertexId(coli->_cid, vertex.substr(split + 1).c_str());
-  return VertexId(coli->_cid, const_cast<char*>(str + split + 1));
+  return VertexId(coli->_cid, const_cast<char *>(str + split + 1));
 }
 
 
@@ -677,7 +674,7 @@ DepthFirstTraverser::DepthFirstTraverser (
 
 DepthFirstTraverser::DepthFirstTraverser (
   std::vector<TRI_document_collection_t*> edgeCollections,
-  TraverserOptions opts
+  TraverserOptions& opts
 ) : _done(false),
     _opts(opts),
     _pruneNext(false),
@@ -796,7 +793,7 @@ void DepthFirstTraverser::setStartVertex (VertexId& v) {
 size_t DepthFirstTraverser::skip (size_t amount) {
   size_t skipped = 0;
   TraversalPath<EdgeInfo, VertexId> p;
-  for (int i = 0; i < amount; ++i) {
+  for (size_t i = 0; i < amount; ++i) {
     p = next();
     if (p.edges.size() == 0) {
       break;
@@ -818,7 +815,7 @@ const TraversalPath<EdgeInfo, VertexId>& DepthFirstTraverser::next () {
   }
   TRI_ASSERT(!_pruneNext);
   const TraversalPath<EdgeInfo, VertexId>& p = _enumerator->next();
-  int countEdges = p.edges.size();
+  size_t countEdges = p.edges.size();
   if (countEdges == 0) {
     _done = true;
     // Done traversing
