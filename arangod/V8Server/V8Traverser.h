@@ -38,40 +38,25 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Template for a vertex id. Is simply a pair of cid and key
+/// NOTE: This struct will never free the value asigned to char const* key
+///       The environment has to make sure that the string it points to is
+///       not freed as long as this struct is in use!
 ////////////////////////////////////////////////////////////////////////////////
 
 struct VertexId {
   TRI_voc_cid_t cid;
-  char const*   key;
-  char* dispKey;
+  char const* key;
 
   VertexId () 
     : cid(0), 
-      key(nullptr),
-      dispKey(nullptr) {
-    // printf("B: %p :: null\n", (void *)this);
+      key(nullptr) {
   }
 
   VertexId (TRI_voc_cid_t cid, char const* key) 
     : cid(cid),
-      key(key),
-      dispKey(nullptr) {
-    // printf("D: %p :: %s\n", (void *)this, key);
+      key(key) {
   }
 
-  ~VertexId () {
-    // printf("F: %p :: %s\n", (void *)this, key);
-    delete dispKey;
-  }
-
-  void setCopy (TRI_voc_cid_t pcid, std::string pkey) {
-    // printf("C: %p <- %s\n", (void *)this, pkey.c_str());
-    cid = pcid;
-    delete dispKey;
-    dispKey = triagens::basics::StringUtils::duplicate(pkey);
-    key = dispKey;
-  }
-  
   bool operator== (const VertexId& other) const {
     if (cid == other.cid) {
       return strcmp(key, other.key) == 0;
@@ -79,42 +64,6 @@ struct VertexId {
     return false;
   }
 
-  // TODO DELETE ME FIXES an Assignment-bug right now
-  VertexId& operator=(const VertexId& v) {
-    cid = v.cid;
-    if (v.dispKey != nullptr) {
-      // printf("AX: %p <- %p :: %s\n", (void *)this, &v, v.key);
-      dispKey = triagens::basics::StringUtils::duplicate(v.dispKey);
-      key = dispKey;
-    } else {
-      // DO WE NEED THIS FKN COPY HERE?!
-      // printf("AZ: %p <- %p :: %s\n", (void *)this, &v, v.key);
-      dispKey = triagens::basics::StringUtils::duplicate(v.key);
-      key = dispKey;
-      /*
-      dispKey = nullptr;
-      strcpy(key, v.key);
-      */
-    }
-    return *this;
-  };
-
-  VertexId(const VertexId& v) {
-    cid = v.cid;
-    if (v.dispKey != nullptr) {
-      // printf("X: %p <- %p :: %s\n", (void *)this, &v, v.key);
-      dispKey = triagens::basics::StringUtils::duplicate(v.dispKey);
-      key = dispKey;
-    } else {
-      // DO WE NEED THIS FKN COPY HERE?!
-      // printf("Z: %p <- %p :: %s\n", (void *)this, &v, v.key);
-      dispKey = triagens::basics::StringUtils::duplicate(v.key);
-      key = dispKey;
-    }
-  };
-  // Find unnecessary copies
-  // VertexId(const VertexId& v) : first(v.first), second(v.second) { std::cout << "move failed!\n";}
-  // VertexId(VertexId&& v) : first(v.first), second(std::move(v.second)) {}
 };
 
 struct EdgeInfo {
@@ -406,7 +355,7 @@ namespace triagens {
 
           DepthFirstTraverser (
             std::vector<TRI_document_collection_t*> edgeCollections,
-            TraverserOptions _opts
+            TraverserOptions& _opts
           );
 
 ////////////////////////////////////////////////////////////////////////////////

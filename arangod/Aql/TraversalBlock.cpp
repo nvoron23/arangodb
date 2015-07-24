@@ -58,10 +58,13 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   _traverser.reset(new basics::traverser::DepthFirstTraverser(edgeCollections, opts));
   _resolver = new CollectionNameResolver(_trx->vocbase());
   if (!ep->usesInVariable()) {
-    _startId = VertexId();
-    std::string vId(ep->_start->getStringValue());
-    auto pos = vId.find("/");
-    _startId.setCopy(_resolver->getCollectionId(vId.substr(0, pos).c_str()), vId.substr(pos + 1));
+    _vertexId = ep->_start->getStringValue();
+    auto pos = _vertexId.find("/");
+    
+    _startId = VertexId(
+      _resolver->getCollectionId(_vertexId.substr(0, pos).c_str()),
+      _vertexId.c_str() + pos + 1
+    );
   }
   else {
     auto it = ep->getRegisterPlan()->varInfo.find(ep->inVariable()->id);
@@ -272,10 +275,10 @@ void TraversalBlock::initializePaths (AqlItemBlock const* items) {
       if (input.has("_id") ) {
         Json _idJson = input.get("_id");
         if (_idJson.isString()) {
-          string _idStr = JsonHelper::getStringValue(_idJson.json(), "");
+          _vertexId = JsonHelper::getStringValue(_idJson.json(), "");
           VertexId v = triagens::basics::traverser::IdStringToVertexId (
             _resolver,
-            _idStr
+            _vertexId
           );
           _traverser->setStartVertex(v);
         }
@@ -286,10 +289,10 @@ void TraversalBlock::initializePaths (AqlItemBlock const* items) {
         if (vertexJson.has("_id") ) {
           Json _idJson = vertexJson.get("_id");
           if (_idJson.isString()) {
-            string _idStr = JsonHelper::getStringValue(_idJson.json(), "");
+            _vertexId = JsonHelper::getStringValue(_idJson.json(), "");
             VertexId v = triagens::basics::traverser::IdStringToVertexId (
               _resolver,
-              _idStr
+              _vertexId
             );
             _traverser->setStartVertex(v);
           }
