@@ -42,10 +42,9 @@ TraversalNode::TraversalNode (ExecutionPlan* plan,
     _vocbase(vocbase), 
     _direction(direction),
     _graph(graph),
-    _steps(nullptr),
-    _resolver(new arango::CollectionNameResolver(vocbase))
+    _steps(nullptr)
 {
-
+  _resolver = new arango::CollectionNameResolver(vocbase);
   TRI_ASSERT(_vocbase != nullptr);
   TRI_ASSERT(_direction != nullptr);
   TRI_ASSERT(_start != nullptr);

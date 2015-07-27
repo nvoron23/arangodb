@@ -42,7 +42,8 @@ static void insertVertexCollectionsFromJsonArray(Graph& g, Json& arr) {
   for (size_t j = 0; j < arr.size(); ++j) {
     Json c = arr.at(j);
     TRI_ASSERT(c.isString());
-    g.addVertexCollection(JsonHelper::getStringValue(c.json(), ""));
+    std::string name = JsonHelper::getStringValue(c.json(), "");
+    g.addVertexCollection(name);
   }
 }
 
@@ -134,7 +135,8 @@ Graph const& GraphFactory::byName (TRI_vocbase_t* vocbase, std::string name) {
       TRI_ASSERT(def.isObject());
       Json e = def.get("collection");
       TRI_ASSERT(e.isString());
-      g.addEdgeCollection(JsonHelper::getStringValue(e.json(), ""));
+      std::string eCol = JsonHelper::getStringValue(e.json(), "");
+      g.addEdgeCollection(eCol);
       e = def.get("from");
       TRI_ASSERT(e.isArray());
       insertVertexCollectionsFromJsonArray(g, e);
