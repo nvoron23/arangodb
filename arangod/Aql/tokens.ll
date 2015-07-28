@@ -121,10 +121,6 @@ namespace triagens {
   return T_WITH;
 }
 
-(?i:FROM) {
-  return T_FROM;
-}
-
 (?i:REMOVE) {
   return T_REMOVE;
 }
@@ -147,10 +143,6 @@ namespace triagens {
 
 (?i:GRAPH) {
   return T_GRAPH;
-}
-
-(?i:TRAVERSE) {
-  return T_TRAVERSE;
 }
 
 (?i:STEPS) {
