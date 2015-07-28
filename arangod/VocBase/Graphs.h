@@ -30,7 +30,6 @@
 #ifndef ARANGODB_GRAPHS_H
 #define ARANGODB_GRAPHS_H 1
 
-#include "common.h"
 #include "vocbase.h"
 #include "voc-types.h"
 

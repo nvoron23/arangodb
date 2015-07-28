@@ -28,7 +28,7 @@
 #include "Aql/AqlValue.h"
 #include "Aql/AqlItemBlock.h"
 #include "Basics/json-utilities.h"
-#include "Utils/shapedJsonTransformer.h"
+#include "Utils/ShapedJsonTransformer.h"
 #include "V8/v8-conv.h"
 #include "V8Server/v8-wrapshapedjson.h"
 #include "VocBase/voc-shaper.h"
