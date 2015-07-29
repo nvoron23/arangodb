@@ -39,7 +39,6 @@
   const en = "UnitTestEdgeCollection";
   const vertex = {};
   const edge = {};
-  const console = require("console");
 
   let cleanup = function () {
     db._drop(vn);

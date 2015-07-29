@@ -21,7 +21,7 @@
 ///
 /// Copyright holder is ArangoDB GmbH, Cologne, Germany
 ///
-/// @author Michael hackstein
+/// @author Michael Hackstein
 /// @author Copyright 2015, ArangoDB GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -61,12 +61,29 @@ namespace triagens {
                        AstNode const* start,
                        AstNode const* graph);
 
-        ~TraversalNode () {
-          delete _resolver;
-        }
-
         TraversalNode (ExecutionPlan* plan,
                        triagens::basics::Json const& base);
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Internal constructor to clone the node.
+////////////////////////////////////////////////////////////////////////////////
+
+     private:
+
+        TraversalNode (ExecutionPlan* plan,
+                       size_t id,
+                       TRI_vocbase_t* vocbase, 
+                       std::vector<TRI_voc_cid_t> const& edgeCids,
+                       Variable const* inVariable,
+                       std::string const& vertexId,
+                       TRI_edge_direction_e direction,
+                       uint64_t minDepth,
+                       uint64_t maxDepth);
+
+
+
+
+     public:
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief return the type of the node
@@ -221,6 +238,10 @@ namespace triagens {
           return _inVariable;
         }
 
+        std::string const getStartVertex () const {
+          return _vertexId;
+        }
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Fill the traversal options with all values known to this node or
 ///        with default values.
@@ -231,14 +252,6 @@ namespace triagens {
         std::vector<TRI_voc_cid_t> const edgeCids () const {
           return _edgeCids;
         }
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief TODO FIXME start
-////////////////////////////////////////////////////////////////////////////////
-
-        AstNode const* _start;
-
-
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private variables
@@ -271,34 +284,34 @@ namespace triagens {
         Variable const* _pathOutVariable;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief input variable
+/// @brief input variable only used if _vertexId is unused
 ////////////////////////////////////////////////////////////////////////////////
 
         Variable const* _inVariable;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief TODO FIXME direction
+/// @brief input vertexId only used if _inVariable is unused
 ////////////////////////////////////////////////////////////////////////////////
 
-        AstNode const* _direction;
+        std::string _vertexId;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief TODO FIXME graph information
+/// @brief The minimal depth included in the result
 ////////////////////////////////////////////////////////////////////////////////
 
-        AstNode const* _graph;
+        uint64_t _minDepth;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief TODO FIXME steps
+/// @brief The maximal depth searched and included in the result
 ////////////////////////////////////////////////////////////////////////////////
 
-        AstNode const* _steps;
+        uint64_t _maxDepth;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief TODO FIXME Resolver
+/// @brief The direction edges are followed
 ////////////////////////////////////////////////////////////////////////////////
 
-        arango::CollectionNameResolver* _resolver;
+        TRI_edge_direction_e _direction;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief the edge collection cid

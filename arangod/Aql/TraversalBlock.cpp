@@ -58,7 +58,7 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
   _traverser.reset(new basics::traverser::DepthFirstTraverser(edgeCollections, opts));
   _resolver = new CollectionNameResolver(_trx->vocbase());
   if (!ep->usesInVariable()) {
-    _vertexId = ep->_start->getStringValue();
+    _vertexId = ep->getStartVertex();
     auto pos = _vertexId.find("/");
     
     _startId = VertexId(

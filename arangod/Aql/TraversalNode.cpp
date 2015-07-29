@@ -38,25 +38,21 @@ TraversalNode::TraversalNode (ExecutionPlan* plan,
                AstNode const* start,
                AstNode const* graph)
   : ExecutionNode(plan, id), 
-    _start(start),
-    _vocbase(vocbase), 
-    _direction(direction),
-    _graph(graph),
-    _steps(nullptr)
+    _vocbase(vocbase),
+    _vertexOutVariable(nullptr),
+    _edgeOutVariable(nullptr),
+    _pathOutVariable(nullptr)
 {
-  _resolver = new arango::CollectionNameResolver(vocbase);
   TRI_ASSERT(_vocbase != nullptr);
-  TRI_ASSERT(_direction != nullptr);
-  TRI_ASSERT(_start != nullptr);
-  TRI_ASSERT(_resolver != nullptr);
-  _vertexOutVariable = nullptr;
-  _edgeOutVariable = nullptr;
-  _pathOutVariable = nullptr;
-  if (_graph->type == NODE_TYPE_COLLECTION_LIST) {
+  TRI_ASSERT(direction != nullptr);
+  TRI_ASSERT(start != nullptr);
+  TRI_ASSERT(graph != nullptr);
+  std::unique_ptr<arango::CollectionNameResolver> resolver(new arango::CollectionNameResolver(vocbase));
+  if (graph->type == NODE_TYPE_COLLECTION_LIST) {
     // List of edge collection names
-    for (size_t i = 0; i <  _graph->numMembers(); ++i) {
-      auto eColName = _graph->getMember(i)->getStringValue();
-      auto edgeStruct = _resolver->getCollectionStruct(eColName);
+    for (size_t i = 0; i <  graph->numMembers(); ++i) {
+      auto eColName = graph->getMember(i)->getStringValue();
+      auto edgeStruct = resolver->getCollectionStruct(eColName);
       if (edgeStruct->_type != TRI_COL_TYPE_EDGE) {
         THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_TYPE_INVALID);
       }
@@ -64,37 +60,125 @@ TraversalNode::TraversalNode (ExecutionPlan* plan,
     }
   } else {
     if (_edgeCids.size() == 0) {
-      if (_graph->isStringValue()) {
-        auto graph = triagens::arango::GraphFactory::factory()->byName(
+      if (graph->isStringValue()) {
+        auto graphObj = triagens::arango::GraphFactory::factory()->byName(
           _vocbase,
-          _graph->getStringValue()
+          graph->getStringValue()
         );
-        auto eColls = graph.edgeCollections();
+        auto eColls = graphObj.edgeCollections();
         for (const auto& n: eColls) {
-          TRI_voc_cid_t cid = _resolver->getCollectionId(n);
+          TRI_voc_cid_t cid = resolver->getCollectionId(n);
           _edgeCids.push_back(cid);
         }
       }
     }
   }
-  if (_start->type == NODE_TYPE_REFERENCE) {
-    _inVariable = static_cast<Variable*>(_start->getData());
+
+  // Parse start node
+  if (start->type == NODE_TYPE_REFERENCE) {
+    _inVariable = static_cast<Variable*>(start->getData());
+    _vertexId = "";
   } else {
     _inVariable = nullptr;
+    _vertexId = start->getStringValue();
   }
+
+  // Parse Steps and direction
+  TRI_ASSERT(direction->type == NODE_TYPE_DIRECTION);
+  TRI_ASSERT(direction->numMembers() == 2);
+  // Member 0 is the direction. Already the correct Integer.
+  // Is not inserted by user but by enum.
+  auto dir = direction->getMember(0);
+  auto steps = direction->getMember(1);
+  TRI_ASSERT(dir->isIntValue());
+  auto dirNum = dir->getIntValue();
+
+  switch (dirNum) {
+    case 0:
+      _direction = TRI_EDGE_ANY;
+      break;
+    case 1:
+      _direction = TRI_EDGE_IN;
+      break;
+    case 2:
+      _direction = TRI_EDGE_OUT;
+      break;
+    default:
+      TRI_ASSERT(false);
+      break;
+  }
+
+  if (steps->isNumericValue()) {
+    // Check if a double value is integer
+    double v = steps->getDoubleValue();
+    double intpart;
+    if (modf(v, &intpart) != 0.0) {
+      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
+    }
+    _minDepth = static_cast<uint64_t>(v);
+    _maxDepth = static_cast<uint64_t>(v);
+  } else if (steps->type == NODE_TYPE_RANGE) {
+    // Range depth
+    auto lhs = steps->getMember(0);
+    auto rhs = steps->getMember(1);
+    if (lhs->isNumericValue()) {
+      // Range is left-closed
+      // Check if a double value is integer
+      double v = lhs->getDoubleValue();
+      double intpart;
+      if (modf(v, &intpart) != 0.0) {
+        THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
+      }
+      _minDepth = static_cast<uint64_t>(v);
+    }
+    if (rhs->isNumericValue()) {
+      // Range is right-closed
+      // Check if a double value is integer
+      double v = rhs->getDoubleValue();
+      double intpart;
+      if (modf(v, &intpart) != 0.0) {
+        THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
+      }
+      _maxDepth = static_cast<uint64_t>(v);
+    }
+  } else {
+    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
+  }
+
 }
 
 
+TraversalNode::TraversalNode (ExecutionPlan* plan,
+                       size_t id,
+                       TRI_vocbase_t* vocbase, 
+                       std::vector<TRI_voc_cid_t> const& edgeCids,
+                       Variable const* inVariable,
+                       std::string const& vertexId,
+                       TRI_edge_direction_e direction,
+                       uint64_t minDepth,
+                       uint64_t maxDepth)
+  : ExecutionNode(plan, id), 
+    _vocbase(vocbase),
+    _vertexOutVariable(nullptr),
+    _edgeOutVariable(nullptr),
+    _pathOutVariable(nullptr),
+    _inVariable(inVariable),
+    _vertexId(vertexId),
+    _minDepth(minDepth),
+    _maxDepth(maxDepth),
+    _direction(direction)
+{
+  for (auto& it : edgeCids) {
+    _edgeCids.push_back(it);
+  }
+}
 
 TraversalNode::TraversalNode (ExecutionPlan* plan,
                               triagens::basics::Json const& base)
   : ExecutionNode(plan, base),
-    _start(nullptr),
-    _vocbase(plan->getAst()->query()->vocbase()),
+    _vocbase(plan->getAst()->query()->vocbase())
     // _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
-    _direction(nullptr),
-    _graph(nullptr),
-    _steps(nullptr) { // TODO: FIXME
+    { // TODO: FIXME
   TRI_ASSERT(false);
 }
 
@@ -128,7 +212,8 @@ void TraversalNode::toJsonHelper (triagens::basics::Json& nodes,
 ExecutionNode* TraversalNode::clone (ExecutionPlan* plan,
                                      bool withDependencies,
                                      bool withProperties) const {
-  auto c = new TraversalNode(plan, _id, _vocbase, _direction, _start, _graph);
+  auto c = new TraversalNode(plan, _id, _vocbase, _edgeCids, _inVariable,
+                                      _vertexId, _direction, _minDepth, _maxDepth);
 
   if (usesVertexOutVariable()) {
     auto vertexOutVariable = _vertexOutVariable;
@@ -175,67 +260,9 @@ double TraversalNode::estimateCost (size_t& nrItems) const {
 }
 
 void TraversalNode::fillTraversalOptions (basics::traverser::TraverserOptions& opts) const {
-  // This check is only necessary during transaction old => new
-  TRI_ASSERT(_direction->type == NODE_TYPE_DIRECTION);
-  TRI_ASSERT(_direction->numMembers() == 2);
-  // Member 0 is the direction. Already the correct Integer.
-  // Is not inserted by user but by enum.
-  auto dir = _direction->getMember(0);
-  auto steps = _direction->getMember(1);
-
-  TRI_ASSERT(dir->isIntValue());
-  auto dirNum = dir->getIntValue();
-  switch (dirNum) {
-    case 0:
-      opts.direction = TRI_EDGE_ANY;
-      break;
-    case 1:
-      opts.direction = TRI_EDGE_IN;
-      break;
-    case 2:
-      opts.direction = TRI_EDGE_OUT;
-      break;
-    default:
-      TRI_ASSERT(false);
-      break;
-  }
-
-  if (steps->isNumericValue()) {
-    // Check if a double value is integer
-    double v = steps->getDoubleValue();
-    double intpart;
-    if (modf(v, &intpart) != 0.0) {
-      THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
-    }
-    opts.minDepth = static_cast<int>(v);
-    opts.maxDepth = static_cast<int>(v);
-  } else if (steps->type == NODE_TYPE_RANGE) {
-    // Range depth
-    auto lhs = steps->getMember(0);
-    auto rhs = steps->getMember(1);
-    if (lhs->isNumericValue()) {
-      // Range is left-closed
-      // Check if a double value is integer
-      double v = lhs->getDoubleValue();
-      double intpart;
-      if (modf(v, &intpart) != 0.0) {
-        THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
-      }
-      opts.minDepth = static_cast<int>(v);
-    }
-    if (rhs->isNumericValue()) {
-      // Range is right-closed
-      // Check if a double value is integer
-      double v = rhs->getDoubleValue();
-      double intpart;
-      if (modf(v, &intpart) != 0.0) {
-        THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
-      }
-      opts.maxDepth = static_cast<int>(v);
-    }
-  } else {
-    THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_QUERY_PARSE, "expecting integer number or range for number of steps.");
-  }
+  opts.direction = _direction;
+  opts.minDepth = _minDepth;
+  opts.maxDepth = _maxDepth;
 }
 
 
