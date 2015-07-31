@@ -839,6 +839,31 @@
         expect(Object.keys(seen).length).toEqual(2);
       });
 
+      it("should be able to handle many results per step", function () {
+        let query = "FOR x IN OUTBOUND @startId @@eCol RETURN x._key";
+        let startId = vn + "/many";
+        let bindVars = {
+          "@eCol": en,
+          "startId": startId
+        };
+        vc.save({_key: startId.split("/")[1]});
+        let amount = 10000;
+        for (let i = 0; i < amount; ++i) {
+          let _id = vc.save({});
+          ec.save(startId, _id, {});
+        }
+        let result = db._query(query, bindVars);
+        let found = 0;
+        // Count has to be correct
+        expect(result.count()).toEqual(amount);
+        while (result.hasNext()) {
+          result.next();
+          ++found;
+        }
+        // All elements must be enumerated
+        expect(found).toEqual(amount);
+      });
+
     });
 
   });
