@@ -257,6 +257,10 @@ size_t TraversalBlock::skipPaths (size_t hint) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TraversalBlock::initializePaths (AqlItemBlock const* items) {
+  if (_paths.size() > 0) {
+    // No Initialisation required.
+    return;
+  }
   if (!_useRegister) {
     if (!_usedConstant) {
       _usedConstant = true;
@@ -315,7 +319,6 @@ void TraversalBlock::initializePaths (AqlItemBlock const* items) {
 
 AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
                                        size_t atMost) {
-
   if (_done) {
     return nullptr;
   }
