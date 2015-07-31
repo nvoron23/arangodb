@@ -176,10 +176,49 @@ TraversalNode::TraversalNode (ExecutionPlan* plan,
 TraversalNode::TraversalNode (ExecutionPlan* plan,
                               triagens::basics::Json const& base)
   : ExecutionNode(plan, base),
-    _vocbase(plan->getAst()->query()->vocbase())
-    // _outVariable(varFromJson(plan->getAst(), base, "outVariable")),
-    { // TODO: FIXME
-  TRI_ASSERT(false);
+    _vocbase(plan->getAst()->query()->vocbase()),
+    _vertexOutVariable(nullptr),
+    _edgeOutVariable(nullptr),
+    _pathOutVariable(nullptr),
+    _inVariable(nullptr)
+    {
+
+  _minDepth = triagens::basics::JsonHelper::stringUInt64(base.json(), "minDepth");
+  _maxDepth = triagens::basics::JsonHelper::stringUInt64(base.json(), "maxDepth");
+  uint64_t dir = triagens::basics::JsonHelper::stringUInt64(base.json(), "direction");
+  switch (dir) {
+    case 0:
+      _direction = TRI_EDGE_ANY;
+      break;
+    case 1:
+      _direction = TRI_EDGE_OUT;
+      break;
+    case 2:
+      _direction = TRI_EDGE_IN;
+      break;
+    default:
+      TRI_ASSERT(false);
+      break;
+  }
+
+  // In Vertex
+  if (base.has("inVariable")) {
+    _inVariable = varFromJson(plan->getAst(), base, "inVariable");
+  }
+  else {
+    triagens::basics::JsonHelper::getStringValue(base.json(), "vertexId", _vertexId);  
+  }
+
+  // Out variables
+  if (base.has("vertexOutVariable")) {
+    _vertexOutVariable = varFromJson(plan->getAst(), base, "vertexOutVariable");
+  }
+  if (base.has("edgeOutVariable")) {
+    _edgeOutVariable = varFromJson(plan->getAst(), base, "edgeOutVariable");
+  }
+  if (base.has("pathOutVariable")) {
+    _pathOutVariable = varFromJson(plan->getAst(), base, "pathOutVariable");
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -196,10 +235,29 @@ void TraversalNode::toJsonHelper (triagens::basics::Json& nodes,
   }
 
   // Now put info about vocbase and cid in there
-  json("database", triagens::basics::Json(_vocbase->_name));
-      // ("outVariable", _outVariable->toJson());
+  json("database", triagens::basics::Json(_vocbase->_name))
+    ("minDepth", triagens::basics::Json(static_cast<int32_t>(_minDepth)))
+    ("maxDepth", triagens::basics::Json(static_cast<int32_t>(_maxDepth)))
+    ("direction", triagens::basics::Json(static_cast<int32_t>(_direction)));
 
-  // TODO: FIXME
+  // In variable
+  if (usesInVariable()) {
+    json("inVariable", inVariable()->toJson());
+  }
+  else {
+    json("vertexId", triagens::basics::Json(_vertexId));
+  }
+
+  // Out variables
+  if (usesVertexOutVariable()) {
+    json("vertexOutVariable", vertexOutVariable()->toJson());
+  }
+  if (usesEdgeOutVariable()) {
+    json("edgeOutVariable", edgeOutVariable()->toJson());
+  }
+  if (usesPathOutVariable()) {
+    json("pathOutVariable", pathOutVariable()->toJson());
+  }
 
   // And add it:
   nodes(json);
