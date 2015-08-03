@@ -103,6 +103,18 @@ TraversalBlock::TraversalBlock (ExecutionEngine* engine,
 
 TraversalBlock::~TraversalBlock () {
   delete _resolver;
+  freeCaches();
+}
+
+void TraversalBlock::freeCaches () {
+  for (auto& v : _vertices) {
+    v.destroy();
+  }
+  _vertices.clear();
+  for (auto& e : _edges) {
+    e.destroy();
+  }
+  _edges.clear();
   for (auto& p : _paths) {
     p.destroy();
   }
@@ -147,6 +159,78 @@ int TraversalBlock::initializeCursor (AqlItemBlock* items,
   return TRI_ERROR_NO_ERROR;
 }
 
+Json TraversalBlock::extractVertexJson (
+  VertexId const& v
+) {
+  auto collection = _trx->trxCollection(v.cid);
+  if (collection == nullptr) {
+    SingleCollectionReadOnlyTransaction intTrx(new StandaloneTransactionContext(), _trx->vocbase(), v.cid);
+    int res = intTrx.begin();
+
+    if (res != TRI_ERROR_NO_ERROR) {
+      THROW_ARANGO_EXCEPTION(res);
+    }
+    collection = intTrx.trxCollection();
+    TRI_doc_mptr_copy_t mptr;
+    intTrx.read(&mptr, v.key);
+    Json tmp = TRI_ExpandShapedJson(
+      collection->_collection->_collection->getShaper(),
+      _resolver,
+      v.cid,
+      &mptr
+    );
+    intTrx.finish(res);
+    return tmp;
+  }
+  TRI_doc_mptr_copy_t mptr;
+  _trx->readSingle(collection, &mptr, v.key);
+  return TRI_ExpandShapedJson(
+    collection->_collection->_collection->getShaper(),
+    _resolver,
+    v.cid,
+    &mptr
+  );
+}
+
+
+Json TraversalBlock::extractEdgeJson (
+  EdgeInfo const& e
+) {
+  auto cid = e.cid;
+  auto collection = _trx->trxCollection(cid);
+  TRI_shaped_json_t shapedJson;
+  TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, &e.mptr);
+  return TRI_ExpandShapedJson(
+    collection->_collection->_collection->getShaper(),
+    _resolver,
+    cid,
+    &e.mptr
+  );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Transform the VertexId to AQLValue object
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue TraversalBlock::vertexToAqlValue (
+  VertexId const& v
+) {
+  // This json is freed by the AqlValue. No unique_ptr here.
+  Json* result = new Json(extractVertexJson(v)); 
+  return AqlValue(result);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Transform the EdgeInfo to AQLValue object
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue TraversalBlock::edgeToAqlValue (
+  EdgeInfo const& e
+) {
+  // This json is freed by the AqlValue. No unique_ptr here.
+  Json* result = new Json(extractEdgeJson(e)); 
+  return AqlValue(result);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Transform the path to AQLValue object
@@ -155,53 +239,15 @@ int TraversalBlock::initializeCursor (AqlItemBlock* items,
 AqlValue TraversalBlock::pathToAqlValue (
   const TraversalPath<EdgeInfo, VertexId>& p
 ) {
+  // This json is freed by the AqlValue. No unique_ptr here.
   Json* path = new Json(Json::Object, 2); 
   Json vertices(Json::Array);
-  // TODO FIXME
   for (size_t i = 0; i < p.vertices.size(); ++i) {
-    auto collection = _trx->trxCollection(p.vertices[i].cid);
-    if (collection == nullptr) {
-      // TODO Might be optimized
-      SingleCollectionReadOnlyTransaction intTrx(new StandaloneTransactionContext(), _trx->vocbase(), p.vertices[i].cid);
-      int res = intTrx.begin();
-
-      if (res != TRI_ERROR_NO_ERROR) {
-        THROW_ARANGO_EXCEPTION(res);
-      }
-      collection = intTrx.trxCollection();
-      TRI_doc_mptr_copy_t mptr;
-      intTrx.read(&mptr, p.vertices[i].key);
-      vertices(TRI_ExpandShapedJson(
-        collection->_collection->_collection->getShaper(),
-        _resolver,
-        p.vertices[i].cid,
-        &mptr
-      ));
-      intTrx.finish(res);
-    } else {
-      TRI_doc_mptr_copy_t mptr;
-      _trx->readSingle(collection, &mptr, p.vertices[i].key);
-      vertices(TRI_ExpandShapedJson(
-        collection->_collection->_collection->getShaper(),
-        _resolver,
-        p.vertices[i].cid,
-        &mptr
-      ));
-    }
+    vertices(extractVertexJson(p.vertices[i]));
   }
   Json edges(Json::Array);
-  // TODO FIXME
   for (size_t i = 0; i < p.edges.size(); ++i) {
-    auto cid = p.edges[i].cid;
-    auto collection = _trx->trxCollection(cid);
-    TRI_shaped_json_t shapedJson;
-    TRI_EXTRACT_SHAPED_JSON_MARKER(shapedJson, &(p.edges[i].mptr));
-    edges(TRI_ExpandShapedJson(
-      collection->_collection->_collection->getShaper(),
-      _resolver,
-      cid,
-      &p.edges[i].mptr
-    ));
+    edges(extractEdgeJson(p.edges[i]));
   }
   (*path)("vertices", vertices)
          ("edges", edges);
@@ -214,10 +260,7 @@ AqlValue TraversalBlock::pathToAqlValue (
 ////////////////////////////////////////////////////////////////////////////////
 
 bool TraversalBlock::morePaths (size_t hint) {
-  for (auto p : _paths) {
-    p.destroy();
-  }
-  _paths.clear();
+  freeCaches();
   _posInPaths = 0;
   if (!_traverser->hasMore()) {
     return false;
@@ -228,12 +271,18 @@ bool TraversalBlock::morePaths (size_t hint) {
       // There are no further paths available.
       break;
     }
-    auto tmp = pathToAqlValue(p);
-    if (!tmp.isEmpty()) {
-      _paths.push_back(tmp);
+    if ( usesVertexOutput() ) {
+      _vertices.push_back(vertexToAqlValue(p.vertices.back()));
+    }
+    if ( usesEdgeOutput() ) {
+      _edges.push_back(edgeToAqlValue(p.edges.back()));
+    }
+    if ( usesPathOutput() ) {
+      _paths.push_back(pathToAqlValue(p));
     }
   }
-  return _paths.size() > 0;
+  // This is only save as long as _vertices is still build
+  return _vertices.size() > 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -241,10 +290,7 @@ bool TraversalBlock::morePaths (size_t hint) {
 ////////////////////////////////////////////////////////////////////////////////
 
 size_t TraversalBlock::skipPaths (size_t hint) {
-  for (auto p : _paths) {
-    p.destroy();
-  }
-  _paths.clear();
+  freeCaches();
   _posInPaths = 0;
   if (!_traverser->hasMore()) {
     return 0;
@@ -257,7 +303,7 @@ size_t TraversalBlock::skipPaths (size_t hint) {
 ////////////////////////////////////////////////////////////////////////////////
 
 void TraversalBlock::initializePaths (AqlItemBlock const* items) {
-  if (_paths.size() > 0) {
+  if (_vertices.size() > 0) {
     // No Initialisation required.
     return;
   }
@@ -343,9 +389,9 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
   }
 
   // Iterate more paths:
-  if (_posInPaths >= _paths.size()) {
+  if (_posInPaths >= _vertices.size()) {
     if (! morePaths(atMost)) {
-      // This input does not have any more paths. maybe the nextone has.
+      // This input does not have any more paths. maybe the next one has.
       // we can only return nullptr iff the buffer is empty.
       if (++_pos >= cur->size()) {
         _buffer.pop_front();  // does not throw
@@ -359,7 +405,7 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
     }
   }
 
-  size_t available = _paths.size() - _posInPaths;
+  size_t available = _vertices.size() - _posInPaths;
   size_t toSend = (std::min)(atMost, available);
 
   RegisterId nrRegs = getPlanNode()->getRegisterPlan()->nrRegs[getPlanNode()->getDepth()];
@@ -381,29 +427,13 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
         // properly since the first one is.
       }
     }
-    if (usesVertexOutput()) {
-      auto p = _paths[_posInPaths].toJson(nullptr, nullptr);
-      Json vertices = p.get("vertices");
-      size_t length = vertices.size();
-      std::unique_ptr<Json> vertex(new Json(vertices.at(length - 1)));
-      AqlValue v(vertex.get());
-      res->setValue(j,
-        _vertexReg,
-        v.clone()
-      );
+    if ( usesVertexOutput() ) {
+      res->setValue(j, _vertexReg, _vertices[_posInPaths].clone());
     }
-    if (usesEdgeOutput()) {
-      auto p = _paths[_posInPaths].toJson(nullptr, nullptr);
-      Json edges = p.get("edges");
-      size_t length = edges.size();
-      std::unique_ptr<Json> edge(new Json(edges.at(length - 1)));
-      AqlValue v(edge.get());
-      res->setValue(j,
-        _edgeReg,
-        v.clone()
-      );
+    if ( usesEdgeOutput() ) {
+      res->setValue(j, _edgeReg, _edges[_posInPaths].clone());
     }
-    if (usesPathOutput()) {
+    if ( usesPathOutput() ) {
       res->setValue(j,
         _pathReg,
         _paths[_posInPaths].clone()
@@ -412,7 +442,7 @@ AqlItemBlock* TraversalBlock::getSome (size_t, // atLeast,
     ++_posInPaths;
   }
   // Advance read position:
-  if (_posInPaths >= _paths.size()) {
+  if (_posInPaths >= _vertices.size()) {
     // we have exhausted our local paths buffer
     // fetch more paths into our buffer
     if (! morePaths(atMost)) {
@@ -458,17 +488,14 @@ size_t TraversalBlock::skipSome (size_t atLeast, size_t atMost) {
     initializePaths(cur);
   }
 
-  size_t available = _paths.size() - _posInPaths;
+  size_t available = _vertices.size() - _posInPaths;
   // We have not yet fetched any paths. We can skip the next atMost many
   if (available == 0) {
     return skipPaths(atMost);
   }
   // We have fewer paths available in our list, so we clear the list and thereby skip these.
   if (available <= atMost) {
-    for (auto p : _paths) {
-      p.destroy();
-    }
-    _paths.clear();
+    freeCaches();
     _posInPaths = 0;
     return available;
   }
