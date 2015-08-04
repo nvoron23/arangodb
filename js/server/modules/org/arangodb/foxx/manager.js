@@ -36,10 +36,11 @@
 // -----------------------------------------------------------------------------
 
 var R = require("ramda");
-var db = require("internal").db;
+var internal = require("internal");
 var fs = require("fs");
 var joi = require("joi");
 var util = require("util");
+var semver = require("semver");
 var utils = require("org/arangodb/foxx/manager-utils");
 var store = require("org/arangodb/foxx/store");
 var console = require("console");
@@ -48,11 +49,14 @@ var TemplateEngine = require("org/arangodb/foxx/templateEngine").Engine;
 var routeApp = require("org/arangodb/foxx/routing").routeApp;
 var exportApp = require("org/arangodb/foxx/routing").exportApp;
 var invalidateExportCache  = require("org/arangodb/foxx/routing").invalidateExportCache;
+var formatUrl = require('url').format;
+var parseUrl = require('url').parse;
 var arangodb = require("org/arangodb");
 var ArangoError = arangodb.ArangoError;
-var cluster = require("org/arangodb/cluster");
+var db = arangodb.db;
 var checkParameter = arangodb.checkParameter;
 var errors = arangodb.errors;
+var cluster = require("org/arangodb/cluster");
 var download = require("internal").download;
 var executeGlobalContextFunction = require("internal").executeGlobalContextFunction;
 var actions = require("org/arangodb/actions");
@@ -131,7 +135,7 @@ var manifestSchema = {
   files: (
     joi.object().optional()
     .pattern(RE_EMPTY, joi.forbidden())
-    .pattern(RE_NOT_EMPTY, joi.string().required())
+    .pattern(RE_NOT_EMPTY, joi.alternatives().try(joi.string().required(), joi.object().required()))
   ),
   isSystem: joi.boolean().default(false),
   keywords: joi.array().optional(),
@@ -297,6 +301,7 @@ var checkManifest = function(filename, manifest) {
   var validationErrors = [];
 
   Object.keys(manifestSchema).forEach(function (key) {
+
     var schema = manifestSchema[key];
     var value = manifest[key];
     var result = joi.validate(value, schema);
@@ -306,47 +311,79 @@ var checkManifest = function(filename, manifest) {
     if (result.error) {
       var message = result.error.message.replace(/^"value"/, util.format('"%s"', key));
       if (value === undefined) {
-        message = util.format('Manifest "%s": attribute %s.', filename, message);
+        message = util.format(
+          'Manifest "%s": attribute %s.',
+          filename,
+          message
+        );
       } else {
-        message = util.format('Manifest "%s": attribute %s (was "%s").', filename, message, manifest[key]);
+        message = util.format(
+          'Manifest "%s": attribute %s (was "%s").',
+          filename,
+          message,
+          manifest[key]
+        );
       }
       validationErrors.push(message);
       console.error(message);
     }
   });
 
-  // TODO Emit deprecation warnings in 2.7
+  if (manifest.engines && manifest.engines.arangodb && !semver.satisfies(internal.version, manifest.engines.arangodb)) {
+    console.warn(
+      'Manifest "%s" for app "%s": ArangoDB version %s probably not compatible with expected version %s.',
+      filename,
+      manifest.name,
+      internal.version,
+      manifest.engines.arangodb
+    );
+  }
 
-  if (manifest.setup) {
-    // console.warn(
-    //   "Manifest '%s' contains deprecated attribute 'setup', use 'scripts.setup' instead.",
-    //   filename
-    // );
-    manifest.scripts.setup = manifest.setup;
+  // TODO Remove in 2.8
+
+  if (manifest.setup && manifest.setup !== manifest.scripts.setup) {
+    console.warn(
+      (
+        'Manifest "%s" for app "%s" contains deprecated attribute "setup",'
+        + ' use "scripts.setup" instead.'
+      ),
+      filename,
+      manifest.name
+    );
+    manifest.scripts.setup = manifest.scripts.setup || manifest.setup;
     delete manifest.setup;
   }
 
-  if (manifest.teardown) {
-    // console.warn(
-    //   "Manifest '%s' contains deprecated attribute 'teardown', use 'scripts.teardown' instead.",
-    //   filename
-    // );
-    manifest.scripts.teardown = manifest.teardown;
+  if (manifest.teardown && manifest.teardown !== manifest.scripts.teardown) {
+    console.warn(
+      (
+        'Manifest "%s" for app "%s" contains deprecated attribute "teardown",'
+        + ' use "scripts.teardown" instead.'
+      ),
+      filename,
+      manifest.name
+    );
+    manifest.scripts.teardown = manifest.scripts.teardown || manifest.teardown;
     delete manifest.teardown;
   }
 
-  // if (manifest.assets) {
-  //   console.warn(
-  //     "Manifest '%s' contains deprecated attribute 'assets', use 'files' and an external build tool instead.",
-  //     filename
-  //   );
-  // }
+  if (manifest.assets) {
+    console.warn(
+      (
+        'Manifest "%s" for app "%s" contains deprecated attribute "assets",'
+        + ' use "files" and an external build tool instead.'
+      ),
+      filename,
+      manifest.name
+    );
+  }
 
   Object.keys(manifest).forEach(function (key) {
     if (!manifestSchema[key]) {
       console.warn(
-        'Manifest "%s": unknown attribute "%s"',
+        'Manifest "%s" for app "%s": unknown attribute "%s"',
         filename,
+        manifest.name,
         key
       );
     }
@@ -699,12 +736,27 @@ var buildGithubUrl = function (appInfo) {
 
 var installAppFromRemote = function(url, targetPath) {
   var tempFile = fs.getTempFile("downloads", false);
+  var auth;
+
+  var urlObj = parseUrl(url);
+  if (urlObj.auth) {
+    require('console').log('old path', url);
+    auth = urlObj.auth.split(':');
+    auth = {
+      username: decodeURIComponent(auth[0]),
+      password: decodeURIComponent(auth[1])
+    };
+    delete urlObj.auth;
+    url = formatUrl(urlObj);
+    require('console').log('new path', url);
+  }
 
   try {
     var result = download(url, "", {
       method: "get",
       followRedirects: true,
-      timeout: 30
+      timeout: 30,
+      auth: auth
     }, tempFile);
 
     if (result.code < 200 || result.code > 299) {
@@ -754,6 +806,34 @@ var runScript = function (scriptName, mount, options) {
   var app = lookupApp(mount);
 
   return executeAppScript(scriptName, app, options) || null;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief return the app's README.md
+///
+/// Input:
+/// * mount: the mount path starting with a "/"
+///
+/// Output:
+/// -
+////////////////////////////////////////////////////////////////////////////////
+
+var readme = function (mount) {
+  checkParameter(
+    "readme(<mount>)",
+    [ [ "Mount path", "string" ] ],
+    [ mount ]
+  );
+  let app = lookupApp(mount);
+  let path, readme;
+
+  path = fs.join(app._root, app._path, 'README.md');
+  readme = fs.exists(path) && fs.read(path);
+  if (!readme) {
+    path = fs.join(app._root, app._path, 'README');
+    readme = fs.exists(path) && fs.read(path);
+  }
+  return readme || null;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1500,6 +1580,7 @@ var syncWithFolder = function(options) {
 
 exports.syncWithFolder = syncWithFolder;
 exports.install = install;
+exports.readme = readme;
 exports.runTests = runTests;
 exports.runScript = runScript;
 exports.setup = R.partial(runScript, 'setup');

@@ -28,6 +28,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Basics/Common.h"
+#include <iostream>
 
 #include "ArangoShell/ArangoClient.h"
 #include "Basics/Mutex.h"
@@ -387,7 +388,7 @@ int main (int argc, char* argv[]) {
 
   // broadcast the start signal to all threads
   {
-    ConditionLocker guard(&startCondition);
+    CONDITION_LOCKER(guard, startCondition);
     guard.broadcast();
   }
 

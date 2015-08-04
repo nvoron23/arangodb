@@ -28,21 +28,137 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Aql/Functions.h"
+#include "Aql/Function.h"
 #include "Aql/Query.h"
 #include "Basics/Exceptions.h"
 #include "Basics/fpconv.h"
 #include "Basics/JsonHelper.h"
 #include "Basics/json-utilities.h"
+#include "Basics/ScopeGuard.h"
 #include "Basics/StringBuffer.h"
 #include "Basics/Utf8Helper.h"
 #include "Rest/SslInterface.h"
+#include "V8Server/V8Traverser.h"
+#include "VocBase/KeyGenerator.h"
+#include "VocBase/VocShaper.h"
 
 using namespace triagens::aql;
 using Json = triagens::basics::Json;
+using CollectionNameResolver = triagens::arango::CollectionNameResolver;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief thread-local cache for compiled regexes
+////////////////////////////////////////////////////////////////////////////////
+
+thread_local std::unordered_map<std::string, RegexMatcher*>* RegexCache = nullptr;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                 private functions
 // -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief clear the regex cache in a thread
+////////////////////////////////////////////////////////////////////////////////
+  
+static void ClearRegexCache () {
+  if (RegexCache != nullptr) {
+    for (auto& it : *RegexCache) {
+      delete it.second;
+    }
+    delete RegexCache; 
+    RegexCache = nullptr;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief compile a regex pattern from a string 
+////////////////////////////////////////////////////////////////////////////////
+
+static std::string BuildRegexPattern (char const* ptr,
+                                      size_t length,
+                                      bool caseInsensitive) {
+  // pattern is always anchored
+  std::string pattern("^");
+  if (caseInsensitive) {
+    pattern.append("(?i)");
+  }
+  
+  bool escaped = false;
+
+  for (size_t i = 0; i < length; ++i) {
+    char const c = ptr[i]; 
+
+    if (c == '\\') {
+      if (escaped) {
+        // literal backslash
+        pattern.append("\\\\");
+      }
+      escaped = ! escaped;
+    }
+    else {
+      if (c == '%') {
+        if (escaped) {
+          // literal %
+          pattern.push_back('%');
+        }
+        else {
+          // wildcard
+          pattern.append(".*");
+        }
+      }
+      else if (c == '_') {
+        if (escaped) {
+          // literal underscore
+          pattern.push_back('_');
+        }
+        else {
+          // wildcard character
+          pattern.push_back('.');
+        }
+      }
+      else if (c == '?' || c == '+' || c == '[' || c == '(' || c == ')' ||
+               c == '{' || c == '}' || c == '^' || c == '$' || c == '|' || 
+               c == '\\' || c == '.') {
+        // character with special meaning in a regex
+        pattern.push_back('\\');
+        pattern.push_back(c);
+      }
+      else {
+        if (escaped) {
+          // found a backslash followed by no special character
+          pattern.append("\\\\");
+        }
+
+        // literal character
+        pattern.push_back(c);
+      }
+
+      escaped = false;
+    }
+  }
+
+  // always anchor the pattern
+  pattern.push_back('$');
+
+  return pattern;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief extract a function parameter from the arguments list
+////////////////////////////////////////////////////////////////////////////////
+
+static Json ExtractFunctionParameter (triagens::arango::AqlTransaction* trx,
+                                      FunctionParameters const& parameters,
+                                      size_t position,
+                                      bool copy) {
+  if (position >= parameters.size()) {
+    // parameter out of range
+    return Json(Json::Null);
+  }
+
+  auto const& parameter = parameters[position];
+  return parameter.first.toJson(trx, parameter.second, copy);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief register warning
@@ -76,37 +192,114 @@ static void RegisterInvalidArgumentWarning (triagens::aql::Query* query,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief converts a value into a number value
+////////////////////////////////////////////////////////////////////////////////
+
+static double ValueToNumber (TRI_json_t const* json, 
+                             bool& isValid) {
+  switch (json->_type) {
+    case TRI_JSON_NULL: {
+      isValid = true;
+      return 0.0;
+    }
+    case TRI_JSON_BOOLEAN: {
+      isValid = true;
+      return (json->_value._boolean ? 1.0 : 0.0);
+    }
+
+    case TRI_JSON_NUMBER: {
+      isValid = true;
+      return json->_value._number;
+    }
+
+    case TRI_JSON_STRING: 
+    case TRI_JSON_STRING_REFERENCE: {
+      try {
+        std::string const str(json->_value._string.data, json->_value._string.length - 1);
+        size_t behind = 0;
+        double value = std::stod(str, &behind);
+        while (behind < str.size()) {
+          char c = str[behind];
+          if (c != ' ' && c != '\t' && c != '\r' && c != '\n' && c != '\f') {
+            isValid = false;
+            return 0.0;
+          }
+          ++behind;
+        }
+        isValid = true;
+        return value;
+      }
+      catch (...) {
+      }
+      // fall-through to invalidity
+      break;
+    }
+
+    case TRI_JSON_ARRAY: {
+      size_t const n = TRI_LengthVector(&json->_value._objects);
+      if (n == 0) {
+        isValid = true;
+        return 0.0;
+      }
+      if (n == 1) {
+        json = static_cast<TRI_json_t const*>(TRI_AtVector(&json->_value._objects, 0));
+        return ValueToNumber(json, isValid); 
+      }
+      break;
+    }  
+
+    case TRI_JSON_OBJECT:
+    case TRI_JSON_UNUSED: {
+      break;
+    }
+  }
+
+  isValid = false;
+  return 0.0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief converts a value into a boolean value
+////////////////////////////////////////////////////////////////////////////////
+
+static bool ValueToBoolean (TRI_json_t const* json) {
+  bool boolValue = false;
+
+  if (json->_type == TRI_JSON_BOOLEAN) {
+    boolValue = json->_value._boolean;
+  }
+  else if (json->_type == TRI_JSON_NUMBER) {
+    boolValue = (json->_value._number != 0.0);
+  }
+  else if (json->_type == TRI_JSON_STRING ||
+           json->_type == TRI_JSON_STRING_REFERENCE) {
+    // the null byte does not count
+    boolValue = (json->_value._string.length > 1);
+  }
+  else if (json->_type == TRI_JSON_ARRAY ||
+           json->_type == TRI_JSON_OBJECT) {
+    boolValue = true;
+  }
+ 
+  return boolValue;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief extract a boolean parameter from an array
 ////////////////////////////////////////////////////////////////////////////////
 
 static bool GetBooleanParameter (triagens::arango::AqlTransaction* trx,
-                                 TRI_document_collection_t const* collection,
-                                 AqlValue const& parameters,
+                                 FunctionParameters const& parameters,
                                  size_t startParameter,
                                  bool defaultValue) {
-  size_t const n = parameters.arraySize();
+  size_t const n = parameters.size();
 
   if (startParameter >= n) {
     return defaultValue;  
   }
     
-  Json temp = parameters.extractArrayMember(trx, collection, startParameter, false);
-  auto const valueJson = temp.json();
-
-  if (TRI_IsBooleanJson(valueJson)) {
-    return valueJson->_value._boolean;
-  } 
-  if (TRI_IsNumberJson(valueJson)) {
-    return valueJson->_value._number != 0.0;
-  }
-  if (TRI_IsStringJson(valueJson)) {
-    return *(valueJson->_value._string.data) != '\0';
-  }
-  if (TRI_IsArrayJson(valueJson) || TRI_IsObjectJson(valueJson)) {
-    return true;
-  }
-
-  return false;
+  auto temp = ExtractFunctionParameter(trx, parameters, startParameter, false);
+  return ValueToBoolean(temp.json());
 }
  
 ////////////////////////////////////////////////////////////////////////////////
@@ -116,14 +309,13 @@ static bool GetBooleanParameter (triagens::arango::AqlTransaction* trx,
 static void ExtractKeys (std::unordered_set<std::string>& names,
                          triagens::aql::Query* query,
                          triagens::arango::AqlTransaction* trx,
-                         TRI_document_collection_t const* collection,
-                         AqlValue const& parameters,
+                         FunctionParameters const& parameters,
                          size_t startParameter,
                          char const* functionName) {  
-  size_t const n = parameters.arraySize();
+  size_t const n = parameters.size();
 
   for (size_t i = startParameter; i < n; ++i) {
-    Json param(parameters.extractArrayMember(trx, collection, i, false));
+    auto param = ExtractFunctionParameter(trx, parameters, i, false);
 
     if (param.isString()) {
       TRI_json_t const* json = param.json();
@@ -209,6 +401,27 @@ static void AppendAsString (triagens::basics::StringBuffer& buffer,
 }
 
 // -----------------------------------------------------------------------------
+// --SECTION--                                      AQL functions public helpers
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief called before a query starts
+/// has the chance to set up any thread-local storage
+////////////////////////////////////////////////////////////////////////////////
+
+void Functions::InitializeThreadContext () {
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief called when a query ends
+/// its responsibility is to clear any thread-local storage
+////////////////////////////////////////////////////////////////////////////////
+
+void Functions::DestroyThreadContext () {
+  ClearRegexCache();
+}
+
+// -----------------------------------------------------------------------------
 // --SECTION--                                             AQL function bindings
 // -----------------------------------------------------------------------------
 
@@ -218,10 +431,9 @@ static void AppendAsString (triagens::basics::StringBuffer& buffer,
 
 AqlValue Functions::IsNull (triagens::aql::Query*, 
                             triagens::arango::AqlTransaction* trx,
-                            TRI_document_collection_t const* collection,
-                            FunctionParameters parameters) {
-  Json j(parameters.extractArrayMember(trx, collection, 0, false));
-  return AqlValue(new Json(j.isNull()));
+                            FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+  return AqlValue(new Json(value.isNull()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -230,10 +442,9 @@ AqlValue Functions::IsNull (triagens::aql::Query*,
 
 AqlValue Functions::IsBool (triagens::aql::Query*,
                             triagens::arango::AqlTransaction* trx,
-                            TRI_document_collection_t const* collection,
-                            FunctionParameters parameters) {
-  Json j(parameters.extractArrayMember(trx, collection, 0, false));
-  return AqlValue(new Json(j.isBoolean()));
+                            FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+  return AqlValue(new Json(value.isBoolean()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -242,10 +453,9 @@ AqlValue Functions::IsBool (triagens::aql::Query*,
 
 AqlValue Functions::IsNumber (triagens::aql::Query*,
                               triagens::arango::AqlTransaction* trx,
-                              TRI_document_collection_t const* collection,
-                              FunctionParameters parameters) {
-  Json j(parameters.extractArrayMember(trx, collection, 0, false));
-  return AqlValue(new Json(j.isNumber()));
+                              FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+  return AqlValue(new Json(value.isNumber()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -254,10 +464,9 @@ AqlValue Functions::IsNumber (triagens::aql::Query*,
 
 AqlValue Functions::IsString (triagens::aql::Query*,
                               triagens::arango::AqlTransaction* trx,
-                              TRI_document_collection_t const* collection,
-                              FunctionParameters parameters) {
-  Json j(parameters.extractArrayMember(trx, collection, 0, false));
-  return AqlValue(new Json(j.isString()));
+                              FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+  return AqlValue(new Json(value.isString()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -266,10 +475,9 @@ AqlValue Functions::IsString (triagens::aql::Query*,
 
 AqlValue Functions::IsArray (triagens::aql::Query*,
                              triagens::arango::AqlTransaction* trx,
-                             TRI_document_collection_t const* collection,
-                             FunctionParameters parameters) {
-  Json j(parameters.extractArrayMember(trx, collection, 0, false));
-  return AqlValue(new Json(j.isArray()));
+                             FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+  return AqlValue(new Json(value.isArray()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -278,10 +486,99 @@ AqlValue Functions::IsArray (triagens::aql::Query*,
 
 AqlValue Functions::IsObject (triagens::aql::Query*,
                               triagens::arango::AqlTransaction* trx,
-                              TRI_document_collection_t const* collection,
-                              FunctionParameters parameters) {
-  Json j(parameters.extractArrayMember(trx, collection, 0, false));
-  return AqlValue(new Json(j.isObject()));
+                              FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+  return AqlValue(new Json(value.isObject()));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief function TO_NUMBER
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue Functions::ToNumber (triagens::aql::Query*,
+                             triagens::arango::AqlTransaction* trx,
+                             FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+
+  bool isValid;
+  double v = ValueToNumber(value.json(), isValid);
+
+  if (! isValid) {
+    return AqlValue(new Json(Json::Null));
+  }
+  return AqlValue(new Json(v));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief function TO_STRING
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue Functions::ToString (triagens::aql::Query*,
+                              triagens::arango::AqlTransaction* trx,
+                              FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+
+  triagens::basics::StringBuffer buffer(TRI_UNKNOWN_MEM_ZONE, 24);
+
+  AppendAsString(buffer, value.json());
+  size_t length = buffer.length();
+  std::unique_ptr<TRI_json_t> j(TRI_CreateStringJson(TRI_UNKNOWN_MEM_ZONE, buffer.steal(), length));
+
+  auto jr = new Json(TRI_UNKNOWN_MEM_ZONE, j.get());
+  j.release();
+  return AqlValue(jr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief function TO_BOOL
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue Functions::ToBool (triagens::aql::Query*,
+                            triagens::arango::AqlTransaction* trx,
+                            FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+
+  return AqlValue(new Json(ValueToBoolean(value.json())));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief function TO_ARRAY
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue Functions::ToArray (triagens::aql::Query*,
+                             triagens::arango::AqlTransaction* trx,
+                             FunctionParameters const& parameters) {
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+
+  if (value.isBoolean() ||
+      value.isNumber() ||
+      value.isString()) {
+    // return array with single member
+    Json array(Json::Array, 1);
+    array.add(TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, value.json()));
+
+    return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, array.steal()));
+  }
+  if (value.isArray()) {
+    // return copy of the original array
+    return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, value.json())));
+  }
+  if (value.isObject()) {
+    // return an array with the attribute values
+    auto const source = value.json();
+    size_t const n = TRI_LengthVector(&source->_value._objects);
+
+    Json array(Json::Array, n);
+    for (size_t i = 1; i < n; i += 2) {
+      auto v = static_cast<TRI_json_t const*>(TRI_AtVector(&source->_value._objects, i));
+      array.add(TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, v));
+    } 
+
+    return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, array.steal()));
+  }
+
+  // return empty array
+  return AqlValue(new Json(Json::Array));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -290,11 +587,16 @@ AqlValue Functions::IsObject (triagens::aql::Query*,
 
 AqlValue Functions::Length (triagens::aql::Query*,
                             triagens::arango::AqlTransaction* trx,
-                            TRI_document_collection_t const* collection,
-                            FunctionParameters parameters) {
-  Json j(parameters.extractArrayMember(trx, collection, 0, false));
+                            FunctionParameters const& parameters) {
+  if (! parameters.empty() &&
+      parameters[0].first.isArray()) {
+    // shortcut!
+    return AqlValue(new Json(static_cast<double>(parameters[0].first.arraySize())));
+  }
 
-  TRI_json_t const* json = j.json();
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+
+  TRI_json_t const* json = value.json();
   size_t length = 0;
 
   if (json != nullptr) {
@@ -354,14 +656,13 @@ AqlValue Functions::Length (triagens::aql::Query*,
 
 AqlValue Functions::Concat (triagens::aql::Query*,
                             triagens::arango::AqlTransaction* trx,
-                            TRI_document_collection_t const* collection,
-                            FunctionParameters parameters) {
+                            FunctionParameters const& parameters) {
   triagens::basics::StringBuffer buffer(TRI_UNKNOWN_MEM_ZONE, 24);
 
-  size_t const n = parameters.arraySize();
+  size_t const n = parameters.size();
 
   for (size_t i = 0; i < n; ++i) {
-    Json member = parameters.at(trx, i);
+    auto const member = ExtractFunctionParameter(trx, parameters, i, false);
 
     if (member.isEmpty() || member.isNull()) {
       continue;
@@ -400,18 +701,90 @@ AqlValue Functions::Concat (triagens::aql::Query*,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief function LIKE
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue Functions::Like (triagens::aql::Query* query,
+                          triagens::arango::AqlTransaction* trx,
+                          FunctionParameters const& parameters) {
+  if (parameters.size() < 2) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "LIKE", (int) 2, (int) 3);
+  }
+
+  bool const caseInsensitive = GetBooleanParameter(trx, parameters, 2, false);
+  triagens::basics::StringBuffer buffer(TRI_UNKNOWN_MEM_ZONE, 24);
+
+  // build pattern from parameter #1
+  auto const regex = ExtractFunctionParameter(trx, parameters, 1, false);
+  AppendAsString(buffer, regex.json());
+  size_t const length = buffer.length();
+
+  std::string const pattern = std::move(BuildRegexPattern(buffer.c_str(), length, caseInsensitive));
+  RegexMatcher* matcher = nullptr;
+
+  if (RegexCache != nullptr) {
+    auto it = RegexCache->find(pattern);
+
+    // check regex cache
+    if (it != RegexCache->end()) {
+      matcher = (*it).second;
+    }
+  }
+
+  if (matcher != nullptr) {
+    matcher = triagens::basics::Utf8Helper::DefaultUtf8Helper.buildMatcher(pattern);
+
+    try {
+      if (RegexCache == nullptr) {
+        RegexCache = new std::unordered_map<std::string, RegexMatcher*>();
+      }
+      // insert into cache, no matter if pattern is valid or not
+      RegexCache->emplace(pattern, matcher);
+    }
+    catch (...) {
+      delete matcher;
+      ClearRegexCache();
+      throw;
+    }
+  }
+  
+  if (matcher == nullptr) {
+    // compiling regular expression failed
+    RegisterWarning(query, "LIKE", TRI_ERROR_QUERY_INVALID_REGEX);
+    return AqlValue(new Json(Json::Null));
+  }
+
+  // extract value
+  buffer.clear();
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
+  AppendAsString(buffer, value.json());
+ 
+  bool error = false;
+  bool const result = triagens::basics::Utf8Helper::DefaultUtf8Helper.matches(matcher, buffer.c_str(), buffer.length(), error);
+
+  if (error) {
+    // compiling regular expression failed
+    RegisterWarning(query, "LIKE", TRI_ERROR_QUERY_INVALID_REGEX);
+    return AqlValue(new Json(Json::Null));
+  }
+        
+  return AqlValue(new Json(result));
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief function PASSTHRU
 ////////////////////////////////////////////////////////////////////////////////
 
 AqlValue Functions::Passthru (triagens::aql::Query*,
                               triagens::arango::AqlTransaction* trx,
-                              TRI_document_collection_t const* collection,
-                              FunctionParameters parameters) {
+                              FunctionParameters const& parameters) {
 
-  Json j(parameters.extractArrayMember(trx, collection, 0, true));
-  auto jr = new Json(TRI_UNKNOWN_MEM_ZONE, j.json());
-  j.steal();
-  return AqlValue(jr);
+  if (parameters.empty()) {
+    return AqlValue(new Json(Json::Null));
+  }
+
+  auto json = ExtractFunctionParameter(trx, parameters, 0, true);
+  return AqlValue(new Json(TRI_UNKNOWN_MEM_ZONE, json.steal()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -420,9 +793,8 @@ AqlValue Functions::Passthru (triagens::aql::Query*,
 
 AqlValue Functions::Unset (triagens::aql::Query* query,
                            triagens::arango::AqlTransaction* trx,
-                           TRI_document_collection_t const* collection,
-                           FunctionParameters parameters) {
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+                           FunctionParameters const& parameters) {
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isObject()) {
     RegisterInvalidArgumentWarning(query, "UNSET");
@@ -430,7 +802,7 @@ AqlValue Functions::Unset (triagens::aql::Query* query,
   }
  
   std::unordered_set<std::string> names;
-  ExtractKeys(names, query, trx, collection, parameters, 1, "UNSET");
+  ExtractKeys(names, query, trx, parameters, 1, "UNSET");
 
 
   // create result object
@@ -478,9 +850,8 @@ AqlValue Functions::Unset (triagens::aql::Query* query,
 
 AqlValue Functions::Keep (triagens::aql::Query* query,
                           triagens::arango::AqlTransaction* trx,
-                          TRI_document_collection_t const* collection,
-                          FunctionParameters parameters) {
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+                          FunctionParameters const& parameters) {
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isObject()) {
     RegisterInvalidArgumentWarning(query, "KEEP");
@@ -488,7 +859,7 @@ AqlValue Functions::Keep (triagens::aql::Query* query,
   }
  
   std::unordered_set<std::string> names;
-  ExtractKeys(names, query, trx, collection, parameters, 1, "KEEP");
+  ExtractKeys(names, query, trx, parameters, 1, "KEEP");
 
 
   // create result object
@@ -528,9 +899,8 @@ AqlValue Functions::Keep (triagens::aql::Query* query,
 
 AqlValue Functions::Merge (triagens::aql::Query* query,
                            triagens::arango::AqlTransaction* trx,
-                           TRI_document_collection_t const* collection,
-                           FunctionParameters parameters) {
-  size_t const n = parameters.arraySize();
+                           FunctionParameters const& parameters) {
+  size_t const n = parameters.size();
 
   if (n == 0) {
     // no parameters
@@ -538,7 +908,7 @@ AqlValue Functions::Merge (triagens::aql::Query* query,
   }
 
   // use the first argument as the preliminary result
-  Json initial(parameters.extractArrayMember(trx, collection, 0, true));
+  auto initial = ExtractFunctionParameter(trx, parameters, 0, true);
 
   if (! initial.isObject()) {
     RegisterInvalidArgumentWarning(query, "MERGE");
@@ -549,7 +919,7 @@ AqlValue Functions::Merge (triagens::aql::Query* query,
 
   // now merge in all other arguments
   for (size_t i = 1; i < n; ++i) {
-    Json param(parameters.extractArrayMember(trx, collection, i, false));
+    auto param = ExtractFunctionParameter(trx, parameters, i, false);
 
     if (! param.isObject()) {
       RegisterInvalidArgumentWarning(query, "MERGE");
@@ -576,16 +946,15 @@ AqlValue Functions::Merge (triagens::aql::Query* query,
 
 AqlValue Functions::Has (triagens::aql::Query* query,
                          triagens::arango::AqlTransaction* trx,
-                         TRI_document_collection_t const* collection,
-                         FunctionParameters parameters) {
-  size_t const n = parameters.arraySize();
+                         FunctionParameters const& parameters) {
+  size_t const n = parameters.size();
 
   if (n < 2) {
     // no parameters
     return AqlValue(new Json(false));
   }
     
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isObject()) {
     // not an object
@@ -593,7 +962,7 @@ AqlValue Functions::Has (triagens::aql::Query* query,
   }
  
   // process name parameter 
-  Json name(parameters.extractArrayMember(trx, collection, 1, false));
+  auto name = ExtractFunctionParameter(trx, parameters, 1, false);
 
   char const* p;
 
@@ -616,16 +985,15 @@ AqlValue Functions::Has (triagens::aql::Query* query,
 
 AqlValue Functions::Attributes (triagens::aql::Query* query,
                                 triagens::arango::AqlTransaction* trx,
-                                TRI_document_collection_t const* collection,
-                                FunctionParameters parameters) {
-  size_t const n = parameters.arraySize();
+                                FunctionParameters const& parameters) {
+  size_t const n = parameters.size();
 
   if (n < 1) {
     // no parameters
     return AqlValue(new Json(Json::Null));
   }
     
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isObject()) {
     // not an object
@@ -633,8 +1001,8 @@ AqlValue Functions::Attributes (triagens::aql::Query* query,
     return AqlValue(new Json(Json::Null));
   }
  
-  bool const removeInternal = GetBooleanParameter(trx, collection, parameters, 1, false);
-  bool const doSort = GetBooleanParameter(trx, collection, parameters, 2, false);
+  bool const removeInternal = GetBooleanParameter(trx, parameters, 1, false);
+  bool const doSort = GetBooleanParameter(trx, parameters, 2, false);
 
   auto const valueJson = value.json();
   TRI_ASSERT(TRI_IsObjectJson(valueJson));
@@ -693,16 +1061,15 @@ AqlValue Functions::Attributes (triagens::aql::Query* query,
 
 AqlValue Functions::Values (triagens::aql::Query* query,
                             triagens::arango::AqlTransaction* trx,
-                            TRI_document_collection_t const* collection,
-                            FunctionParameters parameters) {
-  size_t const n = parameters.arraySize();
+                            FunctionParameters const& parameters) {
+  size_t const n = parameters.size();
 
   if (n < 1) {
     // no parameters
     return AqlValue(new Json(Json::Null));
   }
     
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isObject()) {
     // not an object
@@ -710,7 +1077,7 @@ AqlValue Functions::Values (triagens::aql::Query* query,
     return AqlValue(new Json(Json::Null));
   }
  
-  bool const removeInternal = GetBooleanParameter(trx, collection, parameters, 1, false);
+  bool const removeInternal = GetBooleanParameter(trx, parameters, 1, false);
 
   auto const valueJson = value.json();
   TRI_ASSERT(TRI_IsObjectJson(valueJson));
@@ -752,9 +1119,8 @@ AqlValue Functions::Values (triagens::aql::Query* query,
 
 AqlValue Functions::Min (triagens::aql::Query* query,
                          triagens::arango::AqlTransaction* trx,
-                         TRI_document_collection_t const* collection,
-                         FunctionParameters parameters) {
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+                         FunctionParameters const& parameters) {
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isArray()) {
     // not an array
@@ -798,9 +1164,8 @@ AqlValue Functions::Min (triagens::aql::Query* query,
 
 AqlValue Functions::Max (triagens::aql::Query* query,
                          triagens::arango::AqlTransaction* trx,
-                         TRI_document_collection_t const* collection,
-                         FunctionParameters parameters) {
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+                         FunctionParameters const& parameters) {
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isArray()) {
     // not an array
@@ -844,9 +1209,8 @@ AqlValue Functions::Max (triagens::aql::Query* query,
 
 AqlValue Functions::Sum (triagens::aql::Query* query,
                          triagens::arango::AqlTransaction* trx,
-                         TRI_document_collection_t const* collection,
-                         FunctionParameters parameters) {
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+                         FunctionParameters const& parameters) {
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isArray()) {
     // not an array
@@ -891,9 +1255,8 @@ AqlValue Functions::Sum (triagens::aql::Query* query,
 
 AqlValue Functions::Average (triagens::aql::Query* query,
                              triagens::arango::AqlTransaction* trx,
-                             TRI_document_collection_t const* collection,
-                             FunctionParameters parameters) {
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+                             FunctionParameters const& parameters) {
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isArray()) {
     // not an array
@@ -941,9 +1304,8 @@ AqlValue Functions::Average (triagens::aql::Query* query,
 
 AqlValue Functions::Md5 (triagens::aql::Query* query,
                          triagens::arango::AqlTransaction* trx,
-                         TRI_document_collection_t const* collection,
-                         FunctionParameters parameters) {
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+                         FunctionParameters const& parameters) {
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
     
   triagens::basics::StringBuffer buffer(TRI_UNKNOWN_MEM_ZONE);
   AppendAsString(buffer, value.json());
@@ -970,9 +1332,8 @@ AqlValue Functions::Md5 (triagens::aql::Query* query,
 
 AqlValue Functions::Sha1 (triagens::aql::Query* query,
                           triagens::arango::AqlTransaction* trx,
-                          TRI_document_collection_t const* collection,
-                          FunctionParameters parameters) {
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+                          FunctionParameters const& parameters) {
+  auto value = ExtractFunctionParameter(trx, parameters, 0, false);
     
   triagens::basics::StringBuffer buffer(TRI_UNKNOWN_MEM_ZONE);
   AppendAsString(buffer, value.json());
@@ -999,28 +1360,27 @@ AqlValue Functions::Sha1 (triagens::aql::Query* query,
 
 AqlValue Functions::Unique (triagens::aql::Query* query,
                             triagens::arango::AqlTransaction* trx,
-                            TRI_document_collection_t const* collection,
-                            FunctionParameters parameters) {
-  if (parameters.arraySize() != 1) {
-    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "UNIQUE");
+                            FunctionParameters const& parameters) {
+  if (parameters.size() != 1) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "UNIQUE", (int) 1, (int) 1);
   }
 
-  Json value(parameters.extractArrayMember(trx, collection, 0, false));
+  auto const value = ExtractFunctionParameter(trx, parameters, 0, false);
 
   if (! value.isArray()) {
     // not an array
     RegisterWarning(query, "UNIQUE", TRI_ERROR_QUERY_ARRAY_EXPECTED);
     return AqlValue(new Json(Json::Null));
   }
-
-  TRI_json_t const* valueJson = value.json();
-  size_t const n = TRI_LengthArrayJson(valueJson);
-
+  
   std::unordered_set<TRI_json_t const*, triagens::basics::JsonHash, triagens::basics::JsonEqual> values(
     512, 
     triagens::basics::JsonHash(), 
     triagens::basics::JsonEqual()
   );
+
+  TRI_json_t const* valueJson = value.json();
+  size_t const n = TRI_LengthArrayJson(valueJson);
 
   for (size_t i = 0; i < n; ++i) {
     auto value = static_cast<TRI_json_t const*>(TRI_AddressVector(&valueJson->_value._objects, i));
@@ -1055,18 +1415,17 @@ AqlValue Functions::Unique (triagens::aql::Query* query,
 
 AqlValue Functions::Union (triagens::aql::Query* query,
                            triagens::arango::AqlTransaction* trx,
-                           TRI_document_collection_t const* collection,
-                           FunctionParameters parameters) {
-  size_t const n = parameters.arraySize();
+                           FunctionParameters const& parameters) {
+  size_t const n = parameters.size();
 
-  if (parameters.arraySize() < 2) {
-    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "UNION");
+  if (n < 2) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "UNION", (int) 2, (int) Function::MaxArguments);
   }
 
   std::unique_ptr<TRI_json_t> result(TRI_CreateArrayJson(TRI_UNKNOWN_MEM_ZONE, 16));
 
   for (size_t i = 0; i < n; ++i) {
-    Json value(parameters.extractArrayMember(trx, collection, i, false));
+    auto value = ExtractFunctionParameter(trx, parameters, i, false);
 
     if (! value.isArray()) {
       // not an array
@@ -1116,10 +1475,11 @@ AqlValue Functions::Union (triagens::aql::Query* query,
 
 AqlValue Functions::UnionDistinct (triagens::aql::Query* query,
                                    triagens::arango::AqlTransaction* trx,
-                                   TRI_document_collection_t const* collection,
-                                   FunctionParameters parameters) {
-  if (parameters.arraySize() < 2) {
-    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "UNION_DISTINCT");
+                                   FunctionParameters const& parameters) {
+  size_t const n = parameters.size();
+
+  if (n < 2) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "UNION_DISTINCT", (int) 2, (int) Function::MaxArguments);
   }
 
   std::unordered_set<TRI_json_t*, triagens::basics::JsonHash, triagens::basics::JsonEqual> values(
@@ -1135,11 +1495,10 @@ AqlValue Functions::UnionDistinct (triagens::aql::Query* query,
   };
 
   std::unique_ptr<TRI_json_t> result;
-  size_t const n = parameters.arraySize();
 
   try {
     for (size_t i = 0; i < n; ++i) {
-      Json value(parameters.extractArrayMember(trx, collection, i, false));
+      auto value = ExtractFunctionParameter(trx, parameters, i, false);
 
       if (! value.isArray()) {
         // not an array
@@ -1206,12 +1565,11 @@ AqlValue Functions::UnionDistinct (triagens::aql::Query* query,
 
 AqlValue Functions::Intersection (triagens::aql::Query* query,
                                   triagens::arango::AqlTransaction* trx,
-                                  TRI_document_collection_t const* collection,
-                                  FunctionParameters parameters) {
-  size_t const n = parameters.arraySize();
+                                  FunctionParameters const& parameters) {
+  size_t const n = parameters.size();
 
-  if (parameters.arraySize() < 2) {
-    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "INTERSECTION");
+  if (n < 2) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "INTERSECTION", (int) 2, (int) Function::MaxArguments);
   }
 
   std::unordered_map<TRI_json_t*, size_t, triagens::basics::JsonHash, triagens::basics::JsonEqual> values(
@@ -1231,7 +1589,7 @@ AqlValue Functions::Intersection (triagens::aql::Query* query,
 
   try {
     for (size_t i = 0; i < n; ++i) {
-      Json value(parameters.extractArrayMember(trx, collection, i, false));
+      auto value = ExtractFunctionParameter(trx, parameters, i, false);
 
       if (! value.isArray()) {
         // not an array
@@ -1320,6 +1678,273 @@ AqlValue Functions::Intersection (triagens::aql::Query* query,
   auto jr = new Json(TRI_UNKNOWN_MEM_ZONE, result.get());
   result.release();
   return AqlValue(jr);
+}
+
+// TODO DELETE THESE HELPER FUNCTIONS.
+
+static inline Json TRI_ExpandShapedJson (VocShaper* shaper,
+                                         CollectionNameResolver const* resolver,
+                                         TRI_voc_cid_t const& cid,
+                                         TRI_doc_mptr_t const* mptr) {
+  TRI_df_marker_t const* marker = static_cast<TRI_df_marker_t const*>(mptr->getDataPtr());
+
+  TRI_shaped_json_t shaped;
+  TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, marker);
+  Json json(shaper->memoryZone(), TRI_JsonShapedJson(shaper, &shaped));
+  char const* key = TRI_EXTRACT_MARKER_KEY(marker);
+  std::string id(resolver->getCollectionName(cid));
+  id.push_back('/');
+  id.append(key);
+  json(TRI_VOC_ATTRIBUTE_ID, Json(id));
+  json(TRI_VOC_ATTRIBUTE_REV, Json(std::to_string(TRI_EXTRACT_MARKER_RID(marker))));
+  json(TRI_VOC_ATTRIBUTE_KEY, Json(key));
+
+  if (TRI_IS_EDGE_MARKER(marker)) {
+    std::string from(resolver->getCollectionNameCluster(TRI_EXTRACT_MARKER_FROM_CID(marker)));
+    from.push_back('/');
+    from.append(TRI_EXTRACT_MARKER_FROM_KEY(marker));
+    json(TRI_VOC_ATTRIBUTE_FROM, Json(from));
+    std::string to(resolver->getCollectionNameCluster(TRI_EXTRACT_MARKER_TO_CID(marker)));
+
+    to.push_back('/');
+    to.append(TRI_EXTRACT_MARKER_TO_KEY(marker));
+    json(TRI_VOC_ATTRIBUTE_TO, Json(to));
+  }
+
+  return json;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Transforms VertexId to Json
+////////////////////////////////////////////////////////////////////////////////
+
+static Json VertexIdToJson (triagens::arango::AqlTransaction* trx,
+                            CollectionNameResolver const* resolver,
+                            VertexId const& id) {
+  TRI_doc_mptr_copy_t mptr;
+  auto collection = trx->trxCollection(id.cid);
+  int res = trx->readSingle(collection, &mptr, id.key); 
+
+  if (res != TRI_ERROR_NO_ERROR) {
+    THROW_ARANGO_EXCEPTION(res);
+  }
+
+  return TRI_ExpandShapedJson(
+    collection->_collection->_collection->getShaper(),
+    resolver,
+    id.cid,
+    &mptr
+  );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Transforms VertexId to std::string
+////////////////////////////////////////////////////////////////////////////////
+
+static std::string VertexIdToString (CollectionNameResolver const* resolver,
+                                     VertexId const& id) {
+  return resolver->getCollectionName(id.cid) + "/" + std::string(id.key);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Transforms an unordered_map<VertexId> to AQL json values
+////////////////////////////////////////////////////////////////////////////////
+
+static AqlValue VertexIdsToAqlValue (triagens::arango::AqlTransaction* trx,
+                                     CollectionNameResolver const* resolver,
+                                     std::unordered_set<VertexId>& ids,
+                                     bool includeData = false) {
+  std::unique_ptr<Json> result(new Json(Json::Array, ids.size()));
+
+  if (includeData) {
+    for (auto& it : ids) {
+      result->add(Json(VertexIdToJson(trx, resolver, it)));
+    }
+  } 
+  else {
+    for (auto& it : ids) {
+      result->add(Json(VertexIdToString(resolver, it)));
+    }
+  }
+
+  AqlValue v(result.get());
+  result.release();
+
+  return v;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief function NEIGHBORS
+////////////////////////////////////////////////////////////////////////////////
+
+AqlValue Functions::Neighbors (triagens::aql::Query* query,
+                               triagens::arango::AqlTransaction* trx,
+                               FunctionParameters const& parameters) {
+  size_t const n = parameters.size();
+  basics::traverser::NeighborsOptions opts;
+
+  if (n < 4 || n > 6) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_NUMBER_MISMATCH, "NEIGHBORS", (int) 4, (int) 6);
+  }
+
+  auto resolver = trx->resolver();
+
+  Json vertexCol = ExtractFunctionParameter(trx, parameters, 0, false);
+
+  if (! vertexCol.isString()) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_TYPE_MISMATCH, "NEIGHBORS");
+  }
+  std::string vColName = basics::JsonHelper::getStringValue(vertexCol.json(), "");
+
+  Json edgeCol = ExtractFunctionParameter(trx, parameters, 1, false);
+
+  if (! edgeCol.isString()) {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_TYPE_MISMATCH, "NEIGHBORS");
+  }
+  std::string eColName = basics::JsonHelper::getStringValue(edgeCol.json(), "");
+
+  Json vertexInfo = ExtractFunctionParameter(trx, parameters, 2, false);
+  std::string vertexId;
+  if (vertexInfo.isString()) {
+    vertexId = basics::JsonHelper::getStringValue(vertexInfo.json(), "");
+    if (vertexId.find("/") != std::string::npos) {
+      
+      // TODO tmp can be replaced by Traversal::IdStringToVertexId
+      size_t split;
+      char const* str = vertexId.c_str();
+
+      if (! TRI_ValidateDocumentIdKeyGenerator(str, &split)) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_KEY_BAD);
+      }
+
+      std::string const collectionName = vertexId.substr(0, split);
+      auto coli = resolver->getCollectionStruct(collectionName);
+
+      if (coli == nullptr || collectionName.compare(vColName) != 0) {
+        THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
+      }
+
+      VertexId v(coli->_cid, const_cast<char*>(str + split + 1));
+      opts.start = v;
+    }
+    else {
+      VertexId v(resolver->getCollectionId(vColName), vertexId.c_str());
+      opts.start = v;
+    }
+  }
+  else if (vertexInfo.isObject()) {
+    if (! vertexInfo.has("_id")) {
+      THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_TYPE_MISMATCH, "NEIGHBORS");
+    }
+    vertexId = basics::JsonHelper::getStringValue(vertexInfo.get("_id").json(), "");
+    // TODO tmp can be replaced by Traversal::IdStringToVertexId
+    size_t split;
+    char const* str = vertexId.c_str();
+
+    if (! TRI_ValidateDocumentIdKeyGenerator(str, &split)) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_DOCUMENT_KEY_BAD);
+    }
+
+    std::string const collectionName = vertexId.substr(0, split);
+    auto coli = resolver->getCollectionStruct(collectionName);
+
+    if (coli == nullptr || collectionName.compare(vColName) != 0) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_ARANGO_COLLECTION_NOT_FOUND);
+    }
+
+    VertexId v(coli->_cid, const_cast<char*>(str + split + 1));
+    opts.start = v;
+  }
+  else {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_TYPE_MISMATCH, "NEIGHBORS");
+  }
+
+  Json direction = ExtractFunctionParameter(trx, parameters, 3, false);
+  if (direction.isString()) {
+    std::string const dir = basics::JsonHelper::getStringValue(direction.json(), "");
+    if (dir.compare("outbound") == 0) {
+      opts.direction = TRI_EDGE_OUT;
+    }
+    else if (dir.compare("inbound") == 0) {
+      opts.direction = TRI_EDGE_IN;
+    }
+    else if (dir.compare("any") == 0) {
+      opts.direction = TRI_EDGE_ANY;
+    }
+    else {
+      THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_TYPE_MISMATCH, "NEIGHBORS");
+    }
+  }
+  else {
+    THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_TYPE_MISMATCH, "NEIGHBORS");
+  }
+
+
+  bool includeData = false;
+
+  if (n > 5) {
+    auto options = ExtractFunctionParameter(trx, parameters, 5, false);
+    if (! options.isObject()) {
+      THROW_ARANGO_EXCEPTION_PARAMS(TRI_ERROR_QUERY_FUNCTION_ARGUMENT_TYPE_MISMATCH, "NEIGHBORS");
+    }
+    includeData = basics::JsonHelper::getBooleanValue(options.json(), "includeData", false);
+    opts.minDepth = basics::JsonHelper::getNumericValue<uint64_t>(options.json(), "minDepth", 1);
+    if (opts.minDepth == 0) {
+      opts.maxDepth = basics::JsonHelper::getNumericValue<uint64_t>(options.json(), "maxDepth", 1);
+    } 
+    else {
+      opts.maxDepth = basics::JsonHelper::getNumericValue<uint64_t>(options.json(), "maxDepth", opts.minDepth);
+    }
+  }
+
+  std::unordered_set<VertexId> neighbors;
+
+
+  TRI_voc_cid_t eCid = resolver->getCollectionId(eColName);
+
+
+  // Function to return constant distance
+  auto wc = [](TRI_doc_mptr_copy_t& edge) -> double { return 1; };
+
+  std::unique_ptr<EdgeCollectionInfo> eci(new EdgeCollectionInfo(
+    eCid,
+    trx->documentCollection(eCid),
+    wc
+  ));
+  TRI_IF_FAILURE("EdgeCollectionInfoOOM1") {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+  }
+  
+
+  if (n > 4) {
+    auto edgeExamples = ExtractFunctionParameter(trx, parameters, 4, false);
+    if (! (edgeExamples.isArray() && edgeExamples.size() == 0) ) {
+      opts.addEdgeFilter(edgeExamples, eci->getShaper(), eCid, resolver); 
+    }
+  }
+  
+  std::vector<EdgeCollectionInfo*> edgeCollectionInfos;
+  triagens::basics::ScopeGuard guard{
+    []() -> void { },
+    [&edgeCollectionInfos]() -> void {
+      for (auto& p : edgeCollectionInfos) {
+        delete p;
+      }
+    }
+  };
+  edgeCollectionInfos.emplace_back(eci.get());
+  eci.release();
+  TRI_IF_FAILURE("EdgeCollectionInfoOOM2") {
+    THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+  }
+
+  TRI_RunNeighborsSearch(
+    edgeCollectionInfos,
+    opts,
+    neighbors
+  );
+
+  return VertexIdsToAqlValue(trx, resolver, neighbors, includeData);
 }
 
 // -----------------------------------------------------------------------------

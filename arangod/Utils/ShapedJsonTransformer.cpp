@@ -29,20 +29,20 @@
 
 #include "Utils/ShapedJsonTransformer.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/voc-shaper.h"
+#include "VocBase/VocShaper.h"
 
 using Json = triagens::basics::Json;
 using CollectionNameResolver = triagens::arango::CollectionNameResolver;
 
 Json TRI_ExpandShapedJson (
-  TRI_shaper_t* shaper,
+  VocShaper* shaper,
   CollectionNameResolver const* resolver,
   TRI_voc_cid_t const& cid,
   TRI_df_marker_t const* marker
 ) {
   TRI_shaped_json_t shaped;
   TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, marker);
-  Json json(shaper->_memoryZone, TRI_JsonShapedJson(shaper, &shaped));
+  Json json(shaper->memoryZone(), TRI_JsonShapedJson(shaper, &shaped));
 
   // append the internal attributes
 
@@ -74,7 +74,7 @@ Json TRI_ExpandShapedJson (
 }
 
 Json TRI_ExpandShapedJson (
-  TRI_shaper_t* shaper,
+  VocShaper* shaper,
   CollectionNameResolver const* resolver,
   TRI_voc_cid_t const& cid,
   TRI_doc_mptr_t const* mptr

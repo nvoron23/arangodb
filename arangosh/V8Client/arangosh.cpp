@@ -28,6 +28,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Basics/Common.h"
+#include <iostream>
 
 #include <v8.h>
 #include <libplatform/libplatform.h>
@@ -1821,7 +1822,7 @@ static bool RunScripts (v8::Isolate* isolate,
         current->ForceSet(TRI_V8_ASCII_STRING("__filename"), oldFilename);
       }
       if (oldDirname.IsEmpty() || oldDirname->IsUndefined()) {
-        current->ForceDelete(TRI_V8_ASCII_STRING("__dirname"));
+        current->Delete(TRI_V8_ASCII_STRING("__dirname"));
       }
       else {
         current->ForceSet(TRI_V8_ASCII_STRING("__dirname"), oldDirname);

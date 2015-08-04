@@ -45,45 +45,71 @@ namespace triagens {
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   public typedefs
 // -----------------------------------------------------------------------------
-
-    typedef AqlValue const FunctionParameters;
+    
+    typedef std::function<bool()> ExecutionCondition;
+    
+    typedef std::vector<std::pair<AqlValue, TRI_document_collection_t const*>> FunctionParameters;
 
     typedef std::function<AqlValue(triagens::aql::Query*,
                                    triagens::arango::AqlTransaction*,
-                                   TRI_document_collection_t const*,
-                                   FunctionParameters)> FunctionImplementation;
+                                   FunctionParameters const&)> FunctionImplementation;
+
+
+    struct Functions {
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                      AQL functions public helpers
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief called before a query starts
+/// has the chance to set up any thread-local storage
+////////////////////////////////////////////////////////////////////////////////
+
+      static void InitializeThreadContext ();
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief called when a query ends
+/// its responsibility is to clear any thread-local storage
+////////////////////////////////////////////////////////////////////////////////
+
+      static void DestroyThreadContext ();
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                             AQL function bindings
 // -----------------------------------------------------------------------------
 
-    struct Functions {
-
-      static AqlValue IsNull        (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue IsBool        (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue IsNumber      (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue IsString      (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue IsArray       (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue IsObject      (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Length        (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Concat        (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Passthru      (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Unset         (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Keep          (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Merge         (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Has           (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Attributes    (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Values        (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Min           (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Max           (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Sum           (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Average       (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Md5           (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Sha1          (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Unique        (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Union         (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue UnionDistinct (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
-      static AqlValue Intersection  (triagens::aql::Query*, triagens::arango::AqlTransaction*, TRI_document_collection_t const*, FunctionParameters);
+      static AqlValue IsNull        (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue IsBool        (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue IsNumber      (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue IsString      (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue IsArray       (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue IsObject      (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue ToNumber      (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue ToString      (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue ToBool        (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue ToArray       (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Length        (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Concat        (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Like          (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Passthru      (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Unset         (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Keep          (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Merge         (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Has           (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Attributes    (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Values        (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Min           (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Max           (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Sum           (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Average       (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Md5           (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Sha1          (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Unique        (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Union         (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue UnionDistinct (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Intersection  (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
+      static AqlValue Neighbors     (triagens::aql::Query*, triagens::arango::AqlTransaction*, FunctionParameters const&);
     };
 
   }

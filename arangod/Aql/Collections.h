@@ -34,7 +34,7 @@
 #include "Basics/Exceptions.h"
 #include "Aql/Collection.h"
 
-struct TRI_vocbase_s;
+struct TRI_vocbase_t;
 
 namespace triagens {
   namespace aql {
@@ -49,14 +49,14 @@ namespace triagens {
 
         Collections& operator= (Collections const& other) = delete;
       
-        Collections (struct TRI_vocbase_s* vocbase) 
+        Collections (TRI_vocbase_t* vocbase) 
           : _vocbase(vocbase),
             _collections() {
         }
       
         ~Collections () {
-          for (auto it = _collections.begin(); it != _collections.end(); ++it) {
-            delete (*it).second;
+          for (auto& it : _collections) {
+            delete it.second;
           }
         }
 
@@ -83,15 +83,10 @@ namespace triagens {
               THROW_ARANGO_EXCEPTION(TRI_ERROR_QUERY_TOO_MANY_COLLECTIONS);
             }
 
-            auto collection = new Collection(name, _vocbase, accessType);
-            try {
-              _collections.emplace(std::make_pair(name, collection));
-            }
-            catch (...) {
-              delete collection;
-              throw;
-            }
-            return collection;
+            std::unique_ptr<Collection> collection(new Collection(name, _vocbase, accessType));
+            _collections.emplace(name, collection.get());
+
+            return collection.release();
           }
           else {
             // note that the collection is used in both read & write ops
@@ -112,8 +107,8 @@ namespace triagens {
           std::vector<std::string> result;
           result.reserve(_collections.size());
 
-          for (auto it = _collections.begin(); it != _collections.end(); ++it) {
-            result.emplace_back((*it).first);
+          for (auto const& it : _collections) {
+            result.emplace_back(it.first);
           }
           return result;
         }
@@ -128,7 +123,7 @@ namespace triagens {
 
       private:
 
-        struct TRI_vocbase_s*               _vocbase;
+        TRI_vocbase_t*                      _vocbase;
 
         std::map<std::string, Collection*>  _collections;
 

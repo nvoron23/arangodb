@@ -29,11 +29,11 @@
 
 #include "Utils/Cursor.h"
 #include "Basics/JsonHelper.h"
-#include "ShapedJson/shaped-json.h"
 #include "Utils/CollectionExport.h"
 #include "VocBase/document-collection.h"
+#include "VocBase/shaped-json.h"
 #include "VocBase/vocbase.h"
-#include "VocBase/voc-shaper.h"
+#include "VocBase/VocShaper.h"
 
 using namespace triagens::arango;
 
@@ -82,11 +82,13 @@ JsonCursor::JsonCursor (TRI_vocbase_t* vocbase,
                         size_t batchSize,
                         TRI_json_t* extra,
                         double ttl, 
-                        bool hasCount) 
+                        bool hasCount,
+                        bool cached) 
   : Cursor(id, batchSize, extra, ttl, hasCount),
     _vocbase(vocbase),
     _json(json),
-    _size(TRI_LengthArrayJson(_json)) {
+    _size(TRI_LengthArrayJson(_json)),
+    _cached(cached) {
 
   TRI_UseVocBase(vocbase);
 }
@@ -196,6 +198,9 @@ void JsonCursor::dump (triagens::basics::StringBuffer& buffer) {
     buffer.appendText(",\"extra\":");
     TRI_StringifyJson(buffer.stringBuffer(), extraJson);
   }
+
+  buffer.appendText(",\"cached\":");
+  buffer.appendText(_cached ? "true" : "false");
     
   if (! hasNext()) {
     // mark the cursor as deleted
@@ -287,7 +292,7 @@ size_t ExportCursor::count () const {
 void ExportCursor::dump (triagens::basics::StringBuffer& buffer) {
   TRI_ASSERT(_ex != nullptr);
 
-  TRI_shaper_t* shaper = _ex->_document->getShaper();
+  auto shaper = _ex->_document->getShaper();
   auto const restrictionType = _ex->_restrictions.type;
 
   buffer.appendText("\"result\":[");
@@ -307,7 +312,7 @@ void ExportCursor::dump (triagens::basics::StringBuffer& buffer) {
 
     TRI_shaped_json_t shaped;
     TRI_EXTRACT_SHAPED_JSON_MARKER(shaped, marker);
-    triagens::basics::Json json(shaper->_memoryZone, TRI_JsonShapedJson(shaper, &shaped));
+    triagens::basics::Json json(shaper->memoryZone(), TRI_JsonShapedJson(shaper, &shaped));
 
     // append the internal attributes
 

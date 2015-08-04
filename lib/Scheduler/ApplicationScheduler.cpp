@@ -30,6 +30,7 @@
 #ifdef _WIN32
 #include "Basics/win-utils.h"
 #endif
+#include <iostream>
 
 #include "ApplicationScheduler.h"
 
@@ -336,7 +337,7 @@ ApplicationScheduler::ApplicationScheduler (ApplicationServer* applicationServer
     _applicationServer(applicationServer),
     _scheduler(nullptr),
     _tasks(),
-    _reportInterval(60.0),
+    _reportInterval(0.0),
     _multiSchedulerAllowed(true),
     _nrSchedulerThreads(4),
     _backend(0),

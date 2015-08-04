@@ -811,12 +811,17 @@ ArangoDatabase.prototype._createStatement = function (data) {
 ////////////////////////////////////////////////////////////////////////////////
 
 ArangoDatabase.prototype._query = function (query, bindVars, cursorOptions, options) {
+  if (typeof query === "object" && query !== null && arguments.length === 1) {
+    return new ArangoStatement(this, query).execute();
+  }
+
   var data = {
     query: query,
     bindVars: bindVars || undefined,
     count: (cursorOptions && cursorOptions.count) || false,
     batchSize: (cursorOptions && cursorOptions.batchSize) || undefined,
-    options: options || undefined
+    options: options || undefined,
+    cache: (options && options.cache) || undefined
   };
 
   return new ArangoStatement(this, data).execute();
@@ -944,39 +949,6 @@ ArangoDatabase.prototype._listEndpoints = function () {
   arangosh.checkRequestResult(requestResult);
 
   return requestResult;
-};
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief adds and connects a new endpoint
-////////////////////////////////////////////////////////////////////////////////
-
-ArangoDatabase.prototype._configureEndpoint = function (endpoint, databases) {
-  var requestResult = this._connection.POST("/_api/endpoint",
-    JSON.stringify({ endpoint: endpoint, databases: databases || [ ] }));
-
-  if (requestResult !== null && requestResult.error === true) {
-    throw new ArangoError(requestResult);
-  }
-
-  arangosh.checkRequestResult(requestResult);
-
-  return requestResult.result;
-};
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief disconnects and removes an existing endpoint
-////////////////////////////////////////////////////////////////////////////////
-
-ArangoDatabase.prototype._removeEndpoint = function (endpoint) {
-  var requestResult = this._connection.DELETE("/_api/endpoint/" + encodeURIComponent(endpoint));
-
-  if (requestResult !== null && requestResult.error === true) {
-    throw new ArangoError(requestResult);
-  }
-
-  arangosh.checkRequestResult(requestResult);
-
-  return requestResult.result;
 };
 
 // -----------------------------------------------------------------------------

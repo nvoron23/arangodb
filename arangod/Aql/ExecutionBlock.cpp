@@ -30,6 +30,7 @@
 #include "Aql/ExecutionBlock.h"
 #include "Aql/CollectionScanner.h"
 #include "Aql/ExecutionEngine.h"
+#include "Aql/Functions.h"
 #include "Basics/ScopeGuard.h"
 #include "Basics/StringUtils.h"
 #include "Basics/StringBuffer.h"
@@ -261,41 +262,6 @@ void ExecutionBlock::throwIfKilled () {
   if (isKilled()) {
     THROW_ARANGO_EXCEPTION(TRI_ERROR_QUERY_KILLED);
   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief functionality to walk an execution block recursively
-////////////////////////////////////////////////////////////////////////////////
-
-bool ExecutionBlock::walk (WalkerWorker<ExecutionBlock>* worker) {
-  // Only do every node exactly once:
-  if (worker->done(this)) {
-    return false;
-  }
-
-  if (worker->before(this)) {
-    return true;
-  }
-
-  // Now the children in their natural order:
-  for (auto& c : _dependencies) {
-    if (c->walk(worker)) {
-      return true;
-    }
-  }
-  // Now handle a subquery:
-  if (_exeNode->getType() == ExecutionNode::SUBQUERY) {
-    auto p = static_cast<SubqueryBlock*>(this);
-    if (worker->enterSubquery(this, p->getSubquery())) {
-      bool abort = p->getSubquery()->walk(worker);
-      worker->leaveSubquery(this, p->getSubquery());
-      if (abort) {
-        return true;
-      }
-    }
-  }
-  worker->after(this);
-  return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1188,7 +1154,7 @@ void IndexRangeBlock::buildExpressions () {
           a.destroy();  // the TRI_json_t* of a._json has been stolen
         } 
         else if (a._type == AqlValue::SHAPED || a._type == AqlValue::DOCVEC) {
-          bound = a.toJson(_trx, myCollection);
+          bound = a.toJson(_trx, myCollection, true);
           a.destroy();  // the TRI_json_t* of a._json has been stolen
         } 
         else {
@@ -1258,7 +1224,7 @@ void IndexRangeBlock::buildExpressions () {
             a.destroy();  // the TRI_json_t* of a._json has been stolen
           } 
           else if (a._type == AqlValue::SHAPED || a._type == AqlValue::DOCVEC) {
-            bound = a.toJson(_trx, myCollection);
+            bound = a.toJson(_trx, myCollection, true);
             a.destroy();  // the TRI_json_t* of a._json has been stolen
           } 
           else {
@@ -1374,11 +1340,12 @@ int IndexRangeBlock::initialize () {
 
     // Prepare _inVars and _inRegs:
     _inVars.emplace_back();
-    std::vector<Variable*>& inVarsCur = _inVars.back();
+    std::vector<Variable const*>& inVarsCur = _inVars.back();
     _inRegs.emplace_back();
     std::vector<RegisterId>& inRegsCur = _inRegs.back();
 
-    std::unordered_set<Variable*>&& inVars = expression->variables();
+    std::unordered_set<Variable const*> inVars;
+    expression->variables(inVars);
 
     for (auto const& v : inVars) {
       inVarsCur.emplace_back(v);
@@ -1481,7 +1448,16 @@ bool IndexRangeBlock::initRanges () {
     }
     else {
       // no V8 context required!
-      buildExpressions();
+
+      Functions::InitializeThreadContext();
+      try {
+        buildExpressions();
+        Functions::DestroyThreadContext();
+      }
+      catch (...) {
+        Functions::DestroyThreadContext();
+        throw;
+      }
     }
   }
   
@@ -2185,10 +2161,10 @@ void IndexRangeBlock::readEdgeIndex (size_t atMost) {
 
 void IndexRangeBlock::destroyHashIndexSearchValues () {
   if (_hashIndexSearchValue._values != nullptr) {
-    TRI_shaper_t* shaper = _collection->documentCollection()->getShaper(); 
+    auto shaper = _collection->documentCollection()->getShaper(); 
 
     for (size_t i = 0; i < _hashIndexSearchValue._length; ++i) {
-      TRI_DestroyShapedJson(shaper->_memoryZone, &_hashIndexSearchValue._values[i]);
+      TRI_DestroyShapedJson(shaper->memoryZone(), &_hashIndexSearchValue._values[i]);
     }
 
     TRI_Free(TRI_UNKNOWN_MEM_ZONE, _hashIndexSearchValue._values);
@@ -2208,7 +2184,7 @@ bool IndexRangeBlock::setupHashIndexSearchValue (IndexAndCondition const& range)
   auto hashIndex = static_cast<triagens::arango::HashIndex*>(idx);
   auto const& paths = hashIndex->paths();
 
-  TRI_shaper_t* shaper = _collection->documentCollection()->getShaper(); 
+  auto shaper = _collection->documentCollection()->getShaper(); 
 
   size_t const n = paths.size();
 
@@ -2229,7 +2205,7 @@ bool IndexRangeBlock::setupHashIndexSearchValue (IndexAndCondition const& range)
     TRI_shape_pid_t pid = paths[i];
     TRI_ASSERT(pid != 0);
    
-    char const* name = TRI_AttributeNameShapePid(shaper, pid);
+    char const* name = shaper->attributeNameShapePid(pid);
     std::string const lookFor(name);
 
     for (auto const& x : range) {
@@ -2248,7 +2224,7 @@ bool IndexRangeBlock::setupHashIndexSearchValue (IndexAndCondition const& range)
 
         _hashIndexSearchValue._values[i] = *shaped;
         // free only the pointer, but not the internals
-        TRI_Free(shaper->_memoryZone, shaped);
+        TRI_Free(shaper->memoryZone(), shaped);
         break; 
       }
     }
@@ -2362,7 +2338,7 @@ void IndexRangeBlock::getSkiplistIterator (IndexAndCondition const& ranges) {
   auto idx = en->_index->getInternals();
   TRI_ASSERT(idx != nullptr);
 
-  TRI_shaper_t* shaper = _collection->documentCollection()->getShaper(); 
+  auto shaper = _collection->documentCollection()->getShaper(); 
   TRI_ASSERT(shaper != nullptr);
 
   TRI_index_operator_t* skiplistOperator = nullptr; 
@@ -2799,13 +2775,15 @@ CalculationBlock::CalculationBlock (ExecutionEngine* engine,
     _inRegs(),
     _outReg(ExecutionNode::MaxRegisterId) {
 
-  std::unordered_set<Variable*> const& inVars = _expression->variables();
+  std::unordered_set<Variable const*> inVars;
+  _expression->variables(inVars);
+
   _inVars.reserve(inVars.size());
   _inRegs.reserve(inVars.size());
 
-  for (auto it = inVars.begin(); it != inVars.end(); ++it) {
-    _inVars.emplace_back(*it);
-    auto it2 = en->getRegisterPlan()->varInfo.find((*it)->id);
+  for (auto& it : inVars) {
+    _inVars.emplace_back(it);
+    auto it2 = en->getRegisterPlan()->varInfo.find(it->id);
 
     TRI_ASSERT(it2 != en->getRegisterPlan()->varInfo.end());
     TRI_ASSERT(it2->second.registerId < ExecutionNode::MaxRegisterId);
@@ -2931,7 +2909,16 @@ void CalculationBlock::doEvaluation (AqlItemBlock* result) {
 
   if (! _expression->isV8()) {
     // an expression that does not require V8
-    executeExpression(result);
+
+    Functions::InitializeThreadContext();
+    try {
+      executeExpression(result);
+      Functions::DestroyThreadContext();
+    }
+    catch (...) {
+      Functions::DestroyThreadContext();
+      throw;
+    }
   }
   else {
     bool const isRunningInCluster = triagens::arango::ServerState::instance()->isRunningInCluster();
@@ -3048,7 +3035,7 @@ AqlItemBlock* SubqueryBlock::getSome (size_t atLeast,
       // initial subquery execution or subquery is not constant
 
       // execute the subquery
-      subqueryResults = executeSubquery(); 
+      subqueryResults = executeSubquery();
       TRI_ASSERT(subqueryResults != nullptr);
 
       try {
@@ -3376,13 +3363,20 @@ SortedAggregateBlock::SortedAggregateBlock (ExecutionEngine* engine,
     for (size_t i = 0; i < registerPlan.size(); ++i) {
       _variableNames.emplace_back(""); // initialize with some default value
     }
-
+            
     // iterate over all our variables
     if (en->_keepVariables.empty()) {
+      auto&& usedVariableIds = en->getVariableIdsUsedHere();
+
       for (auto const& vi : registerPlan) {
         if (vi.second.depth > 0 || en->getDepth() == 1) {
           // Do not keep variables from depth 0, unless we are depth 1 ourselves
           // (which means no FOR in which we are contained)
+
+          if (usedVariableIds.find(vi.first) == usedVariableIds.end()) {
+            // variable is not visible to the AggregateBlock
+            continue;
+          }
 
           // find variable in the global variable map
           auto itVar = en->_variableMap.find(vi.first);
@@ -3396,6 +3390,7 @@ SortedAggregateBlock::SortedAggregateBlock (ExecutionEngine* engine,
     else {
       for (auto const& x : en->_keepVariables) {
         auto it = registerPlan.find(x->id);
+
         if (it != registerPlan.end()) {
           _variableNames[(*it).second.registerId] = x->name;
         }
@@ -3625,7 +3620,7 @@ void SortedAggregateBlock::emitGroup (AqlItemBlock const* cur,
       // that a group might theoretically consist of multiple documents, from different collections. but there
       // is only one collection pointer per output register
       auto document = cur->getDocumentCollection((*it).second);
-      res->setValue(row, (*it).first, AqlValue(new Json(_currentGroup.groupValues[i].toJson(_trx, document))));
+      res->setValue(row, (*it).first, AqlValue(new Json(_currentGroup.groupValues[i].toJson(_trx, document, true))));
     }
     else {
       res->setValue(row, (*it).first, _currentGroup.groupValues[i]);
@@ -4811,7 +4806,7 @@ AqlItemBlock* InsertBlock::work (std::vector<AqlItemBlock*>& blocks) {
 
       if (errorCode == TRI_ERROR_NO_ERROR) {
         TRI_doc_mptr_copy_t mptr;
-        auto json = a.toJson(_trx, document);
+        auto json = a.toJson(_trx, document, false);
 
         if (isEdgeCollection) {
           // edge
@@ -4942,7 +4937,7 @@ AqlItemBlock* UpdateBlock::work (std::vector<AqlItemBlock*>& blocks) {
 
       if (errorCode == TRI_ERROR_NO_ERROR) {
         TRI_doc_mptr_copy_t mptr;
-        auto json = a.toJson(_trx, document);
+        auto json = a.toJson(_trx, document, true);
 
         // read old document
         TRI_doc_mptr_copy_t oldDocument;
@@ -5121,8 +5116,8 @@ AqlItemBlock* UpsertBlock::work (std::vector<AqlItemBlock*>& blocks) {
           AqlValue updateDoc = res->getValue(i, updateRegisterId);
 
           if (updateDoc.isObject()) {
-            auto updateJson = updateDoc.toJson(_trx, updateDocument);
-            auto searchJson = a.toJson(_trx, keyDocument);
+            auto const updateJson = updateDoc.toJson(_trx, updateDocument, false);
+            auto searchJson = a.toJson(_trx, keyDocument, true);
 
             if (! searchJson.isObject()) {
               errorCode = TRI_ERROR_ARANGO_DOCUMENT_TYPE_INVALID;
@@ -5217,7 +5212,7 @@ AqlItemBlock* UpsertBlock::work (std::vector<AqlItemBlock*>& blocks) {
           }
 
           if (errorCode == TRI_ERROR_NO_ERROR) {
-            auto insertJson = insertDoc.toJson(_trx, insertDocument);
+            auto const insertJson = insertDoc.toJson(_trx, insertDocument, true);
 
             // use default value
             errorCode = TRI_ERROR_OUT_OF_MEMORY;
@@ -5374,7 +5369,7 @@ AqlItemBlock* ReplaceBlock::work (std::vector<AqlItemBlock*>& blocks) {
 
       if (errorCode == TRI_ERROR_NO_ERROR) {
         TRI_doc_mptr_copy_t mptr;
-        auto json = a.toJson(_trx, document);
+        auto const json = a.toJson(_trx, document, true);
           
         // all exceptions are caught in _trx->update()
         errorCode = _trx->update(trxCollection, key, 0, &mptr, json.json(), TRI_DOC_UPDATE_LAST_WRITE, 0, nullptr, ep->_options.waitForSync);
@@ -6050,7 +6045,6 @@ bool BlockWithClients::skipForShard (size_t number,
 size_t BlockWithClients::getClientId (std::string const& shardId) {
   ENTER_BLOCK
   if (shardId.empty()) {
-    TRI_ASSERT(false);
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_INTERNAL, "got empty shard id");
   }
 
@@ -6821,7 +6815,7 @@ ClusterCommResult* RemoteBlock::sendRequest (
   auto currentThread = triagens::rest::DispatcherThread::currentDispatcherThread;
 
   if (currentThread != nullptr) {
-    triagens::rest::DispatcherThread::currentDispatcherThread->blockThread();
+    triagens::rest::DispatcherThread::currentDispatcherThread->block();
   }
 
   auto result = cc->syncRequest(clientTransactionId,
@@ -6836,7 +6830,7 @@ ClusterCommResult* RemoteBlock::sendRequest (
                                 defaultTimeOut);
 
   if (currentThread != nullptr) {
-    triagens::rest::DispatcherThread::currentDispatcherThread->unblockThread();
+    triagens::rest::DispatcherThread::currentDispatcherThread->unblock();
   }
 
   return result;

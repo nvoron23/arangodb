@@ -117,7 +117,7 @@ function resultsToXml(results, baseName, cluster) {
 
           xml.elem("/testsuite");
           var fn = makePathGeneric(baseName + clprefix + testrun + '_' + test + ".xml").join('_');
-          fs.write(fn, xml.join(""));
+          fs.write("out/" + fn, xml.join(""));
         }
       }
     }
@@ -156,8 +156,8 @@ function main (argv) {
     print(JSON.stringify(r));
   }
 
-  fs.write("UNITTEST_RESULT.json", JSON.stringify(r));
-  fs.write("UNITTEST_RESULT_SUMMARY.txt", JSON.stringify(! r.crashed));
+  fs.write("out/UNITTEST_RESULT.json", JSON.stringify(r));
+  fs.write("out/UNITTEST_RESULT_SUMMARY.txt", JSON.stringify(! r.crashed));
 
   try {
     resultsToXml(r, "UNITTEST_RESULT_", (options.hasOwnProperty('cluster') && options.cluster));

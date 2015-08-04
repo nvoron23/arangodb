@@ -54,6 +54,7 @@ function GeneralArrayCursor (documents, skip, limit, data) {
   this._countTotal = documents.length;
   this._skip = skip;
   this._limit = limit;
+  this._cached = false;
   this._extra = { };
   
   var self = this;
@@ -63,6 +64,7 @@ function GeneralArrayCursor (documents, skip, limit, data) {
         self._extra[d] = data[d];
       }
     });
+    this._cached = data.cached || false;
   }
 
   this.execute();
@@ -123,7 +125,7 @@ GeneralArrayCursor.prototype.execute = function () {
 GeneralArrayCursor.prototype._PRINT = function (context) {
   var text;
 
-  text = "GeneralArrayCursor([.. " + this._documents.length + " docs ..])";
+  text = "GeneralArrayCursor([.. " + this._documents.length + " docs .., cached: " + String(this._cached) + "])";
 
   if (this._skip !== null && this._skip !== 0) {
     text += ".skip(" + this._skip + ")";
@@ -320,11 +322,11 @@ SimpleQuery.prototype.execute = function () {
 /// `query.limit(number)`
 ///
 /// Limits a result to the first *number* documents. Specifying a limit of
-/// *0* returns no documents at all. If you do not need a limit, just do
+/// *0* will return no documents at all. If you do not need a limit, just do
 /// not add the limit operator. The limit must be non-negative.
 ///
 /// In general the input to *limit* should be sorted. Otherwise it will be
-/// unclear which documents are used in the result set.
+/// unclear which documents will be included in the result set.
 ///
 /// @EXAMPLES
 ///
@@ -363,13 +365,14 @@ SimpleQuery.prototype.limit = function (limit) {
 /// @startDocuBlock querySkip
 /// `query.skip(number)`
 ///
-/// Skips the first *number* documents. If *number* is positive, then skip
-/// the number of documents. If *number* is negative, then the total amount N
-/// of documents must be known and the results starts at position (N +
-/// *number*).
+/// Skips the first *number* documents. If *number* is positive, then this
+/// number of documents are skipped before returning the query results.
 ///
-/// In general the input to *limit* should be sorted. Otherwise it will be
-/// unclear which documents are used in the result set.
+/// In general the input to *skip* should be sorted. Otherwise it will be
+/// unclear which documents will be included in the result set.
+///
+/// Note: using negative *skip* values is **deprecated** as of ArangoDB 2.6 and 
+/// will not be supported in future versions of ArangoDB.
 ///
 /// @EXAMPLES
 ///
@@ -1039,7 +1042,9 @@ SimpleQueryNear = function (collection, latitude, longitude, iid) {
   if (this._index === null) {
     var err = new ArangoError();
     err.errorNum = arangodb.ERROR_QUERY_GEO_INDEX_MISSING;
-    err.errorMessage = arangodb.errors.ERROR_QUERY_GEO_INDEX_MISSING.message;
+    err.errorMessage = require("internal").sprintf(
+      arangodb.errors.ERROR_QUERY_GEO_INDEX_MISSING.message,
+      collection.name());
     throw err;
   }
 };

@@ -174,13 +174,14 @@ namespace triagens {
       NODE_TYPE_EXAMPLE                       = 55,
       NODE_TYPE_PASSTHRU                      = 56,
       NODE_TYPE_ARRAY_LIMIT                   = 57,
-      NODE_TYPE_TRAVERSAL                     = 58,
-      NODE_TYPE_COLLECTION_LIST               = 59,
-      NODE_TYPE_DIRECTION                     = 60
+      NODE_TYPE_DISTINCT                      = 58,
+      NODE_TYPE_TRAVERSAL                     = 59,
+      NODE_TYPE_COLLECTION_LIST               = 60,
+      NODE_TYPE_DIRECTION                     = 61
     };
 
-    static_assert(NODE_TYPE_VALUE < NODE_TYPE_ARRAY, "incorrect node types");
-    static_assert(NODE_TYPE_ARRAY < NODE_TYPE_OBJECT, "incorrect node types");
+    static_assert(NODE_TYPE_VALUE < NODE_TYPE_ARRAY,  "incorrect node types order");
+    static_assert(NODE_TYPE_ARRAY < NODE_TYPE_OBJECT, "incorrect node types order");
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                    struct AstNode
@@ -502,6 +503,12 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
         
         bool isDeterministic () const;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not a node (and its subnodes) is cacheable
+////////////////////////////////////////////////////////////////////////////////
+
+        bool isCacheable () const;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief whether or not the object node contains dynamically named attributes

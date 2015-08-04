@@ -1,5 +1,209 @@
-v2.6.0 (XXXX-XX-XX)
+v2.7.0 (XXXX-XX-XX)
 -------------------
+
+* changed HTTP client to use poll instead of select on Linux and MacOS
+
+  This affects the ArangoShell and user-defined JavaScript code running inside 
+  arangod that initiates its own HTTP calls.
+
+  Using poll instead of select allows using arbitrary high file descriptors
+  (bigger than the compiled in FD_SETSIZE). Server connections are still handled using 
+  epoll, which has never been affected by FD_SETSIZE.
+
+* implemented AQL `LIKE` function using ICU regexes
+
+* add `RETURN DISTINCT` for AQL queries to return unique results:
+
+      FOR doc IN collection
+        RETURN DISTINCT doc.status 
+
+* removed `createNamedQueue()` and `addJob()` from org/arangodb/tasks
+
+* moved dispatcher to atomic implementation
+
+* added shorthand notation for attribute names in AQL object literals:
+
+      LET name = "Peter"
+      LET age = 42
+      RETURN { name, age }
+
+  The above is the shorthand equivalent of the generic form
+      
+      LET name = "Peter"
+      LET age = 42
+      RETURN { name : name, age : age }
+
+* removed configure option `--enable-timings`
+
+  This option did not have any effect.
+
+* removed configure option `--enable-figures`
+
+  This option was removed to simplify some statistics code.
+
+* removed run-time manipulation methods for server endpoints:
+
+  * `db._removeEndpoint()` 
+  * `db._configureEndpoint()`
+  * HTTP POST `/_api/endpoint`
+  * HTTP DELETE `/_api/endpoint`
+
+* AQL query result cache
+
+  The query result cache can optionally cache the complete results of all or selected AQL queries.
+  It can be operated in the following modes:
+
+  * `off`: the cache is disabled. No query results will be stored
+  * `on`: the cache will store the results of all AQL queries unless their `cache`
+    attribute flag is set to `false`
+  * `demand`: the cache will store the results of AQL queries that have their
+    `cache` attribute set to `true`, but will ignore all others
+
+  The mode can be set at server startup using the `--database.query-cache-mode` configuration
+  option and later changed at runtime.
+
+  The following HTTP REST APIs have been added for controlling the query cache:
+
+  * HTTP GET `/_api/query-cache/properties`: returns the global query cache configuration
+  * HTTP PUT `/_api/query-cache/properties`: modifies the global query cache configuration
+  * HTTP DELETE `/_api/query-cache`: invalidates all results in the query cache
+  
+  The following JavaScript functions have been added for controlling the query cache:
+
+  * `require("org/arangodb/aql/cache").properties()`: returns the global query cache configuration
+  * `require("org/arangodb/aql/cache").properties(properties)`: modifies the global query cache configuration
+  * `require("org/arangodb/aql/cache").clear()`: invalidates all results in the query cache
+
+* do not link arangoimp against V8
+
+* AQL functon call arguments optimization
+
+  This will lead to arguments in function calls inside AQL queries will not be copied but passed
+  by reference. This may speed up calls to functions with bigger argument values or queries that
+  calls functions a lot of times.
+
+* upgraded V8 version to 4.3.61
+
+* removed deprecated AQL `SKIPLIST` function.
+
+  This function was introduced in older versions of ArangoDB with a less powerful query optimizer to
+  retrieve data from a skiplist index using a `LIMIT` clause. It was marked as deprecated in ArangoDB
+  2.6.
+
+  Since ArangoDB 2.3 the behavior of the `SKIPLIST` function can be emulated using regular AQL 
+  constructs, e.g. 
+
+      FOR doc IN @@collection 
+        FILTER doc.value >= @value 
+        SORT doc.value DESC 
+        LIMIT 1 
+        RETURN doc
+
+* the `skip()` function for simple queries does not accept negative input any longer. 
+  This feature was deprecated in 2.6.0.
+ 
+* based REST API method PUT `/_api/simple/all` on the cursor API and make its use AQL internally.
+
+  The change speeds up this REST API method and will lead to additional query information being
+  returned by the REST API. Clients can use this extra information or ignore it.
+
+* Foxx Queue job success/failure handlers arguments have changed from `(jobId, jobData, result, jobFailures)` to `(result, jobData, job)`.
+
+* added Foxx Queue job options `repeatTimes`, `repeatUntil` and `repeatDelay`.
+
+* added Foxx manifest configuration type `password`.
+
+* fixed handling of default values in Foxx manifest configurations
+
+* fixed handling of optional parameters in Foxx manifest configurations
+
+* updated chai to 3.0.
+
+
+v2.6.4 (2015-08-01)
+-------------------
+
+* V8: Upgrade to version 4.1.0.27 - this is intended to be the stable V8 version.
+
+* fixed issue #1424: Arango shell should not processing arrows pushing on keyboard
+
+
+v2.6.3 (2015-07-21)
+-------------------
+
+* issue #1409: Document values with null character truncated
+
+
+v2.6.2 (2015-07-04)
+-------------------
+
+* fixed issue #1383: bindVars for HTTP API doesn't work with empty string
+
+* fixed handling of default values in Foxx manifest configurations
+
+* fixed handling of optional parameters in Foxx manifest configurations
+
+* fixed a reference error being thrown in Foxx queues when a function-based job type is used that is not available and no options object is passed to queue.push
+
+
+v2.6.1 (2015-06-24)
+-------------------
+
+* Add missing swagger files to cmake build. fixes #1368
+
+* fixed documentation errors
+
+
+v2.6.0 (2015-06-20)
+-------------------
+
+* using negative values for `SimpleQuery.skip()` is deprecated. 
+  This functionality will be removed in future versions of ArangoDB.
+
+* The following simple query functions are now deprecated:
+
+  * collection.near
+  * collection.within 
+  * collection.geo 
+  * collection.fulltext
+  * collection.range 
+  * collection.closedRange 
+
+  This also lead to the following REST API methods being deprecated from now on:
+
+  * PUT /_api/simple/near
+  * PUT /_api/simple/within
+  * PUT /_api/simple/fulltext
+  * PUT /_api/simple/range
+
+  It is recommended to replace calls to these functions or APIs with equivalent AQL queries, 
+  which are more flexible because they can be combined with other operations:
+
+      FOR doc IN NEAR(@@collection, @latitude, @longitude, @limit) 
+        RETURN doc
+
+      FOR doc IN WITHIN(@@collection, @latitude, @longitude, @radius, @distanceAttributeName)
+        RETURN doc
+
+      FOR doc IN FULLTEXT(@@collection, @attributeName, @queryString, @limit) 
+        RETURN doc
+  
+      FOR doc IN @@collection 
+        FILTER doc.value >= @left && doc.value < @right 
+        LIMIT @skip, @limit 
+        RETURN doc`
+  
+  The above simple query functions and REST API methods may be removed in future versions 
+  of ArangoDB.
+
+* deprecated now-obsolete AQL `SKIPLIST` function
+
+  The function was introduced in older versions of ArangoDB with a less powerful query optimizer to
+  retrieve data from a skiplist index using a `LIMIT` clause.
+
+  Since 2.3 the same goal can be achieved by using regular AQL constructs, e.g. 
+
+      FOR doc IN collection FILTER doc.value >= @value SORT doc.value DESC LIMIT 1 RETURN doc
 
 * fixed issues when switching the database inside tasks and during shutdown of database cursors 
 
@@ -375,7 +579,7 @@ v2.6.0 (XXXX-XX-XX)
 * Disallow batchSize value 0 in HTTP `POST /_api/cursor`:
 
   The HTTP REST API `POST /_api/cursor` does not accept a `batchSize` parameter value of 
-  `0` any longer. A batch size of 0 newer made much sense, but previous versions of ArangoDB
+  `0` any longer. A batch size of 0 never made much sense, but previous versions of ArangoDB
   did not check for this value. Now creating a cursor using a `batchSize` value 0 will
   result in an HTTP 400 error response
 
@@ -383,9 +587,9 @@ v2.6.0 (XXXX-XX-XX)
 
 * 'EDGES' AQL Function
 
-  The AQL function EDGES got a new fifth option parameter.
-  Right now only one option is available 'includeVertices' this is a boolean parameter
-  that allows to modify the result of EDGES.
+  The AQL function `EDGES` got a new fifth option parameter.
+  Right now only one option is available: 'includeVertices'. This is a boolean parameter
+  that allows to modify the result of the `EDGES` function.
   Default is 'includeVertices: false' which does not have any effect.
   'includeVertices: true' modifies the result, such that
   {vertex: <vertexDocument>, edge: <edgeDocument>} is returned.
@@ -408,9 +612,9 @@ v2.6.0 (XXXX-XX-XX)
   
       NEIGHBORS(<vertexCollection>, <edgeCollection>, <vertex>, <direction>, <example>)
 
-  Now achieved by:
+  This can now be achieved by:
       
-      EDGES(<vertexCollection>, <edgeCollection>, <vertex>, <direction>, <example>, {includeVertices: true})
+      EDGES(<edgeCollection>, <vertex>, <direction>, <example>, {includeVertices: true})
 
   If you are nesting several NEIGHBORS steps you can speed up their performance in the following way:
 
@@ -418,11 +622,11 @@ v2.6.0 (XXXX-XX-XX)
 
   FOR va IN NEIGHBORS(Users, relations, 'Users/123', 'outbound') FOR vc IN NEIGHBORS(Products, relations, va.vertex._id, 'outbound') RETURN vc
 
-  Can be achieved by:
+  This can now be achieved by:
 
   FOR va IN NEIGHBORS(Users, relations, 'Users/123', 'outbound') FOR vc IN NEIGHBORS(Products, relations, va, 'outbound', null, {includeData: true}) RETURN vc
-                                                                                                          ^^^^            ^^^^^^^^^^^^^^^^^^^
-                                                                                           Use intermediate directly     include Data for final
+                                                                                                          ^^^^                  ^^^^^^^^^^^^^^^^^^^
+                                                                                                  Use intermediate directly     include Data for final
 
 * INCOMPATIBLE CHANGE:
 
@@ -478,6 +682,15 @@ v2.6.0 (XXXX-XX-XX)
   
       GRAPH_SHORTEST_PATH(<graph>, <source>, <target>, { includeData: true, includePath: { edges: true, vertices: true } })
 
+  The attributes `startVertex` and `vertex` that were present in the results of `GRAPH_SHORTEST_PATH`
+  in previous versions of ArangoDB will not be produced in 2.6. To calculate these attributes in 2.6,
+  please extract the first and last elements from the `vertices` result attribute.
+
+* INCOMPATIBLE CHANGE:
+
+  The AQL function `GRAPH_DISTANCE_TO` will now return only the id the destination vertex 
+  in the `vertex` attribute, and not the full vertex data with all vertex attributes.
+
 * INCOMPATIBLE CHANGE:
 
   All graph measurements functions in JavaScript module `general-graph` that calculated a 
@@ -506,7 +719,7 @@ v2.6.0 (XXXX-XX-XX)
   If the `_graphs` collection still has its `waitForSync` value set to `true`, then the HTTP status
   code will not change.
 
-* Upgrade ICU to version 54; this increases performance on many places.
+* Upgraded ICU to version 54; this increases performance in many places.
   based on https://code.google.com/p/chromium/issues/detail?id=428145
 
 * added support for HTTP push aka chunked encoding
@@ -569,6 +782,8 @@ v2.6.0 (XXXX-XX-XX)
   than an assuming the job type is defined globally. It is strongly recommended to convert your
   job types to the new script-based system.
 
+* renamed Foxx sessions option "sessionStorageApp" to "sessionStorage". The option now also accepts session storages directly.
+
 * Added the following JavaScript methods for file access:
   * fs.copyFile() to copy single files
   * fs.copyRecursive() to copy diretory trees
@@ -628,6 +843,32 @@ v2.6.0 (XXXX-XX-XX)
 * allow to split an edge index into buckets which are resized individually.
   This is controlled by the `indexBuckets` attribute in the `properties`
   of the collection.
+
+* fix a cluster deadlock bug in larger clusters by marking a thread waiting
+  for a lock on a DBserver as blocked
+
+
+v2.5.6 (XXXX-XX-XX)
+-------------------
+
+* potentially fixed issue #1313: Wrong metric calculation at dashboard
+
+  Escape whitespace in process name when scanning /proc/pid/stats
+    
+  This fixes statistics values read from that file
+
+* Fixed variable naming in AQL `COLLECT INTO` results in case the COLLECT is placed 
+  in a subquery which itself is followed by other constructs that require variables
+
+
+v2.5.5 (2015-05-29)
+-------------------
+
+* fixed vulnerability in JWT implementation.
+
+* fixed format string for reading /proc/pid/stat
+
+* take into account barriers used in different V8 contexts
 
 
 v2.5.4 (2015-05-14)
@@ -1079,7 +1320,7 @@ v2.5.0-beta2 (2015-02-23)
 
 * use exclusive native SRWLocks on Windows instead of native mutexes
 
-* added AQL functions MD5, SHA1, and RANDOM_TOKEN.
+* added AQL functions `MD5`, `SHA1`, and `RANDOM_TOKEN`.
 
 * reduced number of string allocations when parsing certain AQL queries
 

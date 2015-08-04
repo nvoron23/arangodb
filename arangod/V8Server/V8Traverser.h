@@ -32,9 +32,11 @@
 
 #include "Basics/Common.h"
 #include "Basics/Traverser.h"
+#include "Utils/ExplicitTransaction.h"
 #include "VocBase/edge-collection.h"
 #include "VocBase/ExampleMatcher.h"
-#include "Utils/ExplicitTransaction.h"
+
+class VocShaper;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Template for a vertex id. Is simply a pair of cid and key
@@ -138,6 +140,9 @@ struct VertexFilterInfo {
 typedef triagens::basics::PathFinder<VertexId, EdgeId, double> 
         ArangoDBPathFinder;
 
+typedef triagens::basics::ConstDistanceFinder<VertexId, EdgeId> 
+        ArangoDBConstDistancePathFinder;
+
 namespace triagens {
   namespace basics {
     namespace traverser {
@@ -180,15 +185,20 @@ namespace triagens {
 
           void addEdgeFilter (v8::Isolate* isolate,
                               v8::Handle<v8::Value> const& example,
-                              TRI_shaper_t* shaper,
+                              VocShaper* shaper,
                               TRI_voc_cid_t const& cid,
                               std::string& errorMessage);
+
+          void addEdgeFilter (Json const& example,
+                              VocShaper* shaper,
+                              TRI_voc_cid_t const& cid,
+                              triagens::arango::CollectionNameResolver const* resolver);
 
           void addVertexFilter (v8::Isolate* isolate,
                                 v8::Handle<v8::Value> const& example,
                                 triagens::arango::ExplicitTransaction* trx,
                                 TRI_transaction_collection_t* col,
-                                TRI_shaper_t* shaper,
+                                VocShaper* shaper,
                                 TRI_voc_cid_t const& cid,
                                 std::string& errorMessage);
 
@@ -454,7 +464,7 @@ class EdgeCollectionInfo {
       return _edgeCollectionCid;
     }
 
-    TRI_shaper_t* getShaper () {
+    VocShaper* getShaper () {
       return _edgeCollection->getShaper();
     }
 
@@ -501,7 +511,7 @@ class VertexCollectionInfo {
       return _vertexCollection;
     }
 
-    TRI_shaper_t* getShaper () {
+    VocShaper* getShaper () {
       return _vertexCollection->_collection->_collection->getShaper();
     }
 };
@@ -515,13 +525,18 @@ std::unique_ptr<ArangoDBPathFinder::Path> TRI_RunShortestPathSearch (
     triagens::basics::traverser::ShortestPathOptions& opts
 );
 
+
+std::unique_ptr<ArangoDBConstDistancePathFinder::Path> TRI_RunSimpleShortestPathSearch (
+    std::vector<EdgeCollectionInfo*>& collectionInfos,
+    triagens::basics::traverser::ShortestPathOptions& opts
+);
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Wrapper for the neighbors computation
 ////////////////////////////////////////////////////////////////////////////////
 
 void TRI_RunNeighborsSearch (std::vector<EdgeCollectionInfo*>& collectionInfos,
                              triagens::basics::traverser::NeighborsOptions& opts,
-                             std::unordered_set<VertexId>& distinct,
-                             std::vector<VertexId>& result);
+                             std::unordered_set<VertexId>& distinct);
 
 #endif

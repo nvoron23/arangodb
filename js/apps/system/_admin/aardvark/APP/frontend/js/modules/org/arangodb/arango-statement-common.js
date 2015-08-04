@@ -46,10 +46,19 @@ function ArangoStatement (database, data) {
   this._batchSize = null;
   this._bindVars = {};
   this._options = undefined;
+  this._cache = undefined;
+
+  if (! data) {
+    throw "ArangoStatement needs initial data";
+  }
 
   if (typeof data === "string") {
     data = { query: data };
   }
+  else if (typeof data === 'object' && typeof data.toAQL === 'function') {
+    data = { query: data.toAQL() };
+  }
+
   if (! (data instanceof Object)) {
     throw "ArangoStatement needs initial data";
   }
@@ -70,6 +79,9 @@ function ArangoStatement (database, data) {
   }
   if (data.batchSize !== undefined) {
     this.setBatchSize(data.batchSize);
+  }
+  if (data.cache !== undefined) {
+    this.setCache(data.cache);
   }
 }
 
@@ -119,6 +131,14 @@ ArangoStatement.prototype.getBindVariables = function () {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief gets the cache flag for the statement
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoStatement.prototype.getCache = function () {
+  return this._cache;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief gets the count flag for the statement
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -149,6 +169,14 @@ ArangoStatement.prototype.getOptions = function () {
 
 ArangoStatement.prototype.getQuery = function () {
   return this._query;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief sets the cache flag for the statement
+////////////////////////////////////////////////////////////////////////////////
+
+ArangoStatement.prototype.setCache = function (bool) {
+  this._cache = bool ? true : false;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

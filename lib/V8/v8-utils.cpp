@@ -35,6 +35,7 @@
 #include "v8-buffer.h"
 
 #include <regex.h>
+#include <iostream>
 
 #include "Basics/Dictionary.h"
 #include "Basics/FileUtils.h"
@@ -179,7 +180,7 @@ static bool LoadJavaScriptFile (v8::Isolate* isolate,
   char* content = TRI_SlurpFile(TRI_UNKNOWN_MEM_ZONE, filename, &length);
 
   if (content == nullptr) {
-    LOG_TRACE("cannot load java script file '%s': %s", filename, TRI_last_error());
+    LOG_ERROR("cannot load java script file '%s': %s", filename, TRI_last_error());
     return false;
   }
 
@@ -199,7 +200,7 @@ static bool LoadJavaScriptFile (v8::Isolate* isolate,
   }
 
   if (content == nullptr) {
-    LOG_TRACE("cannot load java script file '%s': %s", filename, TRI_errno_string(TRI_ERROR_OUT_OF_MEMORY));
+    LOG_ERROR("cannot load java script file '%s': %s", filename, TRI_errno_string(TRI_ERROR_OUT_OF_MEMORY));
     return false;
   }
 
@@ -208,16 +209,29 @@ static bool LoadJavaScriptFile (v8::Isolate* isolate,
 
   TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, content);
 
+  v8::TryCatch tryCatch;
+
   v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
+
+  if (tryCatch.HasCaught()) {
+    TRI_LogV8Exception(isolate, &tryCatch);
+    return false;
+  }
 
   // compilation failed, print errors that happened during compilation
   if (script.IsEmpty()) {
+    LOG_ERROR("cannot load java script file '%s': compilation failed.", filename);
     return false;
   }
 
   if (execute) {
     // execute script
     v8::Handle<v8::Value> result = script->Run();
+
+    if (tryCatch.HasCaught()) {
+      TRI_LogV8Exception(isolate, &tryCatch);
+      return false;
+    }
 
     if (result.IsEmpty()) {
       return false;
@@ -350,7 +364,7 @@ static void JS_Options (const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto result = TRI_ObjectJson(isolate, json);
 
     // remove this variable
-    result->ToObject()->ForceDelete(TRI_V8_STRING("server.password"));
+    result->ToObject()->Delete(TRI_V8_STRING("server.password"));
 
     TRI_V8_RETURN(result);
   }
@@ -459,6 +473,7 @@ static void JS_Parse (const v8::FunctionCallbackInfo<v8::Value>& args) {
     if (tryCatch.CanContinue()) {
       string err = TRI_StringifyV8Exception(isolate, &tryCatch);
 
+      tryCatch.ReThrow();
       TRI_V8_THROW_SYNTAX_ERROR(err.c_str());
     }
     else {
@@ -1816,7 +1831,7 @@ static void JS_Load (const v8::FunctionCallbackInfo<v8::Value>& args) {
       current->ForceSet(TRI_V8_ASCII_STRING("__filename"), oldFilename);
     }
     if (oldDirname.IsEmpty() || oldDirname->IsUndefined()) {
-      current->ForceDelete(TRI_V8_ASCII_STRING("__dirname"));
+      current->Delete(TRI_V8_ASCII_STRING("__dirname"));
     }
     else {
       current->ForceSet(TRI_V8_ASCII_STRING("__dirname"), oldDirname);
@@ -2038,20 +2053,25 @@ static void JS_RandomAlphaNum (const v8::FunctionCallbackInfo<v8::Value>& args) 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief generates a salt
 ///
-/// @FUN{internal.genRandomSalt()}
+/// @FUN{internal.genRandomSalt(@FA{length})}
 ///
-/// Generates a string containing numbers and characters (length 8).
+/// Generates a string of a given @FA{length} containing ASCII characters.
 ////////////////////////////////////////////////////////////////////////////////
 
 static void JS_RandomSalt (const v8::FunctionCallbackInfo<v8::Value>& args) {
   TRI_V8_TRY_CATCH_BEGIN(isolate);
   v8::HandleScope scope(isolate);
 
-  if (args.Length() != 0) {
-    TRI_V8_THROW_EXCEPTION_USAGE("genRandomSalt()");
+  if (args.Length() != 1 || ! args[0]->IsNumber()) {
+    TRI_V8_THROW_EXCEPTION_USAGE("genRandomSalt(<length>)");
   }
 
-  string str = JSSaltGenerator.random(8);
+  int length = (int) TRI_ObjectToInt64(args[0]);
+  if (length <= 0 || length > 65536) {
+    TRI_V8_THROW_EXCEPTION_MESSAGE(TRI_ERROR_BAD_PARAMETER, "<length> must be between 0 and 65536");
+  }
+
+  string str = JSSaltGenerator.random(length);
   TRI_V8_RETURN_STD_STRING(str);
   TRI_V8_TRY_CATCH_END
 }

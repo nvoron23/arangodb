@@ -29,6 +29,8 @@
 
 #include "DummyShell.h"
 
+#include <iostream>
+
 #include "Basics/tri-strings.h"
 #include "Basics/files.h"
 
@@ -122,6 +124,11 @@ char* DummyShell::prompt (char const* prompt) {
 
     // remove any prompt at the beginning of the line
     char* result = TRI_DuplicateStringZ(TRI_UNKNOWN_MEM_ZONE, line.c_str());
+
+    if (result == nullptr) {
+      return nullptr;
+    }
+
     bool c1 = strncmp(result, prompt, len1) == 0;
     bool c2 = strncmp(result, dotdot.c_str(), len2) == 0;
 
@@ -141,6 +148,7 @@ char* DummyShell::prompt (char const* prompt) {
     _current += result;
 
     bool ok = _completer->isComplete(_current, lineno, strlen(result));
+    TRI_Free(TRI_UNKNOWN_MEM_ZONE, result);
 
     // stop if line is complete
     if (ok) {

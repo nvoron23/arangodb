@@ -95,14 +95,143 @@ HttpHandler::status_t RestCursorHandler::execute () {
 /// {@inheritDoc}
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RestCursorHandler::cancel (bool running) {
-  if (running) {
-    cancelQuery();
-    return true;
+bool RestCursorHandler::cancel () {
+  return cancelQuery();
+}
+
+// -----------------------------------------------------------------------------
+// --SECTION--                                                 protected methods
+// -----------------------------------------------------------------------------
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief processes the query and returns the results/cursor
+/// this method is also used by derived classes
+////////////////////////////////////////////////////////////////////////////////
+
+void RestCursorHandler::processQuery (TRI_json_t const* json) {
+  if (! TRI_IsObjectJson(json)) {
+    generateError(HttpResponse::BAD, TRI_ERROR_QUERY_EMPTY);
+    return;
   }
 
-  generateCanceled();
-  return true;
+  auto const* queryString = TRI_LookupObjectJson(json, "query");
+
+  if (! TRI_IsStringJson(queryString)) {
+    generateError(HttpResponse::BAD, TRI_ERROR_QUERY_EMPTY);
+    return;
+  }
+
+  auto const* bindVars = TRI_LookupObjectJson(json, "bindVars");
+
+  if (bindVars != nullptr) {
+    if (! TRI_IsObjectJson(bindVars) && 
+        ! TRI_IsNullJson(bindVars)) {
+      generateError(HttpResponse::BAD, TRI_ERROR_TYPE_ERROR, "expecting object for <bindVars>");
+      return;
+    }
+  }
+  
+  auto options = buildOptions(json);
+
+  triagens::aql::Query query(_applicationV8, 
+                             false, 
+                             _vocbase, 
+                             queryString->_value._string.data,
+                             static_cast<size_t>(queryString->_value._string.length - 1),
+                             (bindVars != nullptr ? TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, bindVars) : nullptr),
+                             TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, options.json()), 
+                             triagens::aql::PART_MAIN);
+
+  registerQuery(&query); 
+  auto queryResult = query.execute(_queryRegistry);
+  unregisterQuery(); 
+
+  if (queryResult.code != TRI_ERROR_NO_ERROR) {
+    if (queryResult.code == TRI_ERROR_REQUEST_CANCELED ||
+        (queryResult.code == TRI_ERROR_QUERY_KILLED && wasCancelled())) {
+      THROW_ARANGO_EXCEPTION(TRI_ERROR_REQUEST_CANCELED);
+    }
+
+    THROW_ARANGO_EXCEPTION_MESSAGE(queryResult.code, queryResult.details);
+  }
+
+  TRI_ASSERT(TRI_IsArrayJson(queryResult.json));
+ 
+  { 
+    _response = createResponse(HttpResponse::CREATED);
+    _response->setContentType("application/json; charset=utf-8");
+
+    // build "extra" attribute
+    triagens::basics::Json extra(triagens::basics::Json::Object, 3); 
+
+    if (queryResult.stats != nullptr) {
+      extra.set("stats", triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, queryResult.stats, triagens::basics::Json::AUTOFREE));
+      queryResult.stats = nullptr;
+    }
+    if (queryResult.profile != nullptr) {
+      extra.set("profile", triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, queryResult.profile, triagens::basics::Json::AUTOFREE));
+      queryResult.profile = nullptr;
+    }
+    if (queryResult.warnings == nullptr) {
+      extra.set("warnings", triagens::basics::Json(triagens::basics::Json::Array));
+    }
+    else {
+      extra.set("warnings", triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, queryResult.warnings, triagens::basics::Json::AUTOFREE));
+      queryResult.warnings = nullptr;
+    }
+
+
+    size_t batchSize = triagens::basics::JsonHelper::getNumericValue<size_t>(options.json(), "batchSize", 1000);
+    size_t const n = TRI_LengthArrayJson(queryResult.json);
+
+    if (n <= batchSize) {
+      // result is smaller than batchSize and will be returned directly. no need to create a cursor
+
+      triagens::basics::Json result(triagens::basics::Json::Object, 7);
+      result.set("result", triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, queryResult.json, triagens::basics::Json::AUTOFREE));
+      queryResult.json = nullptr;
+
+      result.set("hasMore", triagens::basics::Json(false));
+
+      if (triagens::basics::JsonHelper::getBooleanValue(options.json(), "count", false)) {
+        result.set("count", triagens::basics::Json(static_cast<double>(n)));
+      }
+    
+      result.set("cached", triagens::basics::Json(queryResult.cached));
+      result.set("extra", extra);
+      result.set("error", triagens::basics::Json(false));
+      result.set("code", triagens::basics::Json(static_cast<double>(_response->responseCode())));
+
+      result.dump(_response->body());
+      return;
+    }
+      
+    // result is bigger than batchSize, and a cursor will be created
+    auto cursors = static_cast<triagens::arango::CursorRepository*>(_vocbase->_cursorRepository);
+    TRI_ASSERT(cursors != nullptr);
+
+    double ttl = triagens::basics::JsonHelper::getNumericValue<double>(options.json(), "ttl", 30);
+    bool count = triagens::basics::JsonHelper::getBooleanValue(options.json(), "count", false);
+    
+    // steal the query JSON, cursor will take over the ownership
+    auto j = queryResult.json;
+    triagens::arango::JsonCursor* cursor = cursors->createFromJson(j, batchSize, extra.steal(), ttl, count, queryResult.cached); 
+    queryResult.json = nullptr;
+
+    try {
+      _response->body().appendChar('{');
+      cursor->dump(_response->body());
+      _response->body().appendText(",\"error\":false,\"code\":");
+      _response->body().appendInteger(static_cast<uint32_t>(_response->responseCode()));
+      _response->body().appendChar('}');
+
+      cursors->release(cursor);
+    }
+    catch (...) {
+      cursors->release(cursor);
+      throw;
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -159,7 +288,7 @@ bool RestCursorHandler::wasCancelled () {
 /// @brief build options for the query as JSON
 ////////////////////////////////////////////////////////////////////////////////
 
-triagens::basics::Json RestCursorHandler::buildOptions (TRI_json_t const* json) {
+triagens::basics::Json RestCursorHandler::buildOptions (TRI_json_t const* json) const {
   auto getAttribute = [&json] (char const* name) {
     return TRI_LookupObjectJson(json, name);
   };
@@ -174,6 +303,11 @@ triagens::basics::Json RestCursorHandler::buildOptions (TRI_json_t const* json) 
 
   if (TRI_IsNumberJson(attribute) && static_cast<size_t>(attribute->_value._number) == 0) {
     THROW_ARANGO_EXCEPTION_MESSAGE(TRI_ERROR_TYPE_ERROR, "expecting non-zero value for <batchSize>");
+  }
+
+  attribute = getAttribute("cache");
+  if (TRI_IsBooleanJson(attribute)) {
+    options.set("cache", triagens::basics::Json(attribute->_value._boolean));
   }
 
   attribute = getAttribute("options");
@@ -193,6 +327,11 @@ triagens::basics::Json RestCursorHandler::buildOptions (TRI_json_t const* json) 
 
       if (strcmp(keyName, "count") != 0 && 
           strcmp(keyName, "batchSize") != 0) { 
+
+        if (strcmp(keyName, "cache") == 0 && options.has("cache")) {
+          continue;
+        }
+
         options.set(keyName, triagens::basics::Json(
           TRI_UNKNOWN_MEM_ZONE, 
           TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, value),
@@ -216,7 +355,7 @@ triagens::basics::Json RestCursorHandler::buildOptions (TRI_json_t const* json) 
 /// several values
 ////////////////////////////////////////////////////////////////////////////////
       
-triagens::basics::Json RestCursorHandler::buildExtra (triagens::aql::QueryResult& queryResult) {
+triagens::basics::Json RestCursorHandler::buildExtra (triagens::aql::QueryResult& queryResult) const {
   // build "extra" attribute
   triagens::basics::Json extra(triagens::basics::Json::Object); 
  
@@ -273,9 +412,14 @@ triagens::basics::Json RestCursorHandler::buildExtra (triagens::aql::QueryResult
 ///   is useful to ensure garbage collection of cursors that are not fully fetched
 ///   by clients. If not set, a server-defined value will be used.
 ///
-/// - *bindVars*: key/value list of bind parameters (optional).
+/// - *cache*: optional boolean flag to determine whether the AQL query cache
+///   shall be used. If set to *false*, then any query cache lookup will be skipped
+///   for the query. If set to *true*, it will lead to the query cache being checked
+///   for the query if the query cache mode is either *on* or *demand*.
 ///
-/// - *options*: key/value list of extra options for the query (optional).
+/// - *bindVars*: key/value object with bind parameters (optional).
+///
+/// - *options*: key/value object with extra options for the query (optional).
 ///
 /// The following options are supported at the moment:
 ///
@@ -298,11 +442,15 @@ triagens::basics::Json RestCursorHandler::buildExtra (triagens::aql::QueryResult
 ///   specific rules. To disable a rule, prefix its name with a `-`, to enable a rule, prefix it
 ///   with a `+`. There is also a pseudo-rule `all`, which will match all optimizer rules.
 ///
+/// - *profile*: if set to *true*, then the additional query profiling information
+///   will be returned in the *extra.stats* return attribute if the query result is not
+///   served from the query cache.
+///
 /// If the result set can be created by the server, the server will respond with
 /// *HTTP 201*. The body of the response will contain a JSON object with the
 /// result set.
 ///
-/// The returned JSON object has the following properties:
+/// The returned JSON object has the following attributes:
 ///
 /// - *error*: boolean flag to indicate that an error occurred (*false*
 ///   in this case)
@@ -319,10 +467,16 @@ triagens::basics::Json RestCursorHandler::buildExtra (triagens::aql::QueryResult
 ///
 /// - *id*: id of temporary cursor created on the server (optional, see above)
 ///
-/// - *extra*: an optional JSON object with extra information about the query result.
-///   For data-modification queries, the *extra* attribute will contain the number
-///   of modified documents and the number of documents that could not be modified
+/// - *extra*: an optional JSON object with extra information about the query result
+///   contained in its *stats* sub-attribute. For data-modification queries, the 
+///   *extra.stats* sub-attribute will contain the number of modified documents and 
+///   the number of documents that could not be modified
 ///   due to an error (if *ignoreErrors* query option is specified)
+///
+/// - *cached*: a boolean flag indicating whether the query result was served 
+///   from the query cache or not. If the query result is served from the query
+///   cache, the *extra* return attribute will not contain any *stats* sub-attribute
+///   and no *profile* sub-attribute.
 ///
 /// If the JSON representation is malformed or the query specification is
 /// missing from the request, the server will respond with *HTTP 400*.
@@ -580,132 +734,19 @@ void RestCursorHandler::createCursor () {
       return;
     }
 
-    if (! TRI_IsObjectJson(json.get())) {
-      generateError(HttpResponse::BAD, TRI_ERROR_QUERY_EMPTY);
-      return;
-    }
-
-    auto const* queryString = TRI_LookupObjectJson(json.get(), "query");
-
-    if (! TRI_IsStringJson(queryString)) {
-      generateError(HttpResponse::BAD, TRI_ERROR_QUERY_EMPTY);
-      return;
-    }
-
-    auto const* bindVars = TRI_LookupObjectJson(json.get(), "bindVars");
-
-    if (bindVars != nullptr) {
-      if (! TRI_IsObjectJson(bindVars) && 
-          ! TRI_IsNullJson(bindVars)) {
-        generateError(HttpResponse::BAD, TRI_ERROR_TYPE_ERROR, "expecting object for <bindVars>");
-        return;
-      }
-    }
-    
-    auto options = buildOptions(json.get());
-  
-    triagens::aql::Query query(_applicationV8, 
-                               false, 
-                               _vocbase, 
-                               queryString->_value._string.data,
-                               static_cast<size_t>(queryString->_value._string.length - 1),
-                               (bindVars != nullptr ? TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, bindVars) : nullptr),
-                               TRI_CopyJson(TRI_UNKNOWN_MEM_ZONE, options.json()), 
-                               triagens::aql::PART_MAIN);
- 
-    registerQuery(&query); 
-    auto queryResult = query.execute(_queryRegistry);
-    unregisterQuery(); 
-
-    if (queryResult.code != TRI_ERROR_NO_ERROR) {
-      if (queryResult.code == TRI_ERROR_REQUEST_CANCELED ||
-          (queryResult.code == TRI_ERROR_QUERY_KILLED && wasCancelled())) {
-        THROW_ARANGO_EXCEPTION(TRI_ERROR_REQUEST_CANCELED);
-      }
-
-      THROW_ARANGO_EXCEPTION_MESSAGE(queryResult.code, queryResult.details);
-    }
-
-    TRI_ASSERT(TRI_IsArrayJson(queryResult.json));
-   
-    { 
-      _response = createResponse(HttpResponse::CREATED);
-      _response->setContentType("application/json; charset=utf-8");
-
-      // build "extra" attribute
-      triagens::basics::Json extra(triagens::basics::Json::Object, 3); 
- 
-      if (queryResult.stats != nullptr) {
-        extra.set("stats", triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, queryResult.stats, triagens::basics::Json::AUTOFREE));
-        queryResult.stats = nullptr;
-      }
-      if (queryResult.profile != nullptr) {
-        extra.set("profile", triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, queryResult.profile, triagens::basics::Json::AUTOFREE));
-        queryResult.profile = nullptr;
-      }
-      if (queryResult.warnings == nullptr) {
-        extra.set("warnings", triagens::basics::Json(triagens::basics::Json::Array));
-      }
-      else {
-        extra.set("warnings", triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, queryResult.warnings, triagens::basics::Json::AUTOFREE));
-        queryResult.warnings = nullptr;
-      }
-
-
-      size_t batchSize = triagens::basics::JsonHelper::getNumericValue<size_t>(options.json(), "batchSize", 1000);
-      size_t const n = TRI_LengthArrayJson(queryResult.json);
-
-      if (n <= batchSize) {
-        // result is smaller than batchSize and will be returned directly. no need to create a cursor
-
-        triagens::basics::Json result(triagens::basics::Json::Object, 6);
-        result.set("result", triagens::basics::Json(TRI_UNKNOWN_MEM_ZONE, queryResult.json, triagens::basics::Json::AUTOFREE));
-        queryResult.json = nullptr;
-
-        result.set("hasMore", triagens::basics::Json(false));
-
-        if (triagens::basics::JsonHelper::getBooleanValue(options.json(), "count", false)) {
-          result.set("count", triagens::basics::Json(static_cast<double>(n)));
-        }
-      
-        result.set("extra", extra);
-        result.set("error", triagens::basics::Json(false));
-        result.set("code", triagens::basics::Json(static_cast<double>(_response->responseCode())));
-
-        result.dump(_response->body());
-        return;
-      }
-        
-      // result is bigger than batchSize, and a cursor will be created
-      auto cursors = static_cast<triagens::arango::CursorRepository*>(_vocbase->_cursorRepository);
-      TRI_ASSERT(cursors != nullptr);
-
-      double ttl = triagens::basics::JsonHelper::getNumericValue<double>(options.json(), "ttl", 30);
-      bool count = triagens::basics::JsonHelper::getBooleanValue(options.json(), "count", false);
-      
-      // steal the query JSON, cursor will take over the ownership
-      auto j = queryResult.json;
-      triagens::arango::JsonCursor* cursor = cursors->createFromJson(j, batchSize, extra.steal(), ttl, count); 
-      queryResult.json = nullptr;
-
-      try {
-        _response->body().appendChar('{');
-        cursor->dump(_response->body());
-        _response->body().appendText(",\"error\":false,\"code\":");
-        _response->body().appendInteger(static_cast<uint32_t>(_response->responseCode()));
-        _response->body().appendChar('}');
-
-        cursors->release(cursor);
-      }
-      catch (...) {
-        cursors->release(cursor);
-        throw;
-      }
-    }
+    processQuery(json.get());
   }  
   catch (triagens::basics::Exception const& ex) {
     unregisterQuery(); 
     generateError(HttpResponse::responseCode(ex.code()), ex.code(), ex.what());
+  }
+  catch (std::bad_alloc const&) {
+    unregisterQuery(); 
+    generateError(HttpResponse::SERVER_ERROR, TRI_ERROR_OUT_OF_MEMORY);
+  }
+  catch (std::exception const& ex) {
+    unregisterQuery(); 
+    generateError(HttpResponse::SERVER_ERROR, TRI_ERROR_INTERNAL, ex.what());
   }
   catch (...) {
     unregisterQuery(); 

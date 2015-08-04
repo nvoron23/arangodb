@@ -89,6 +89,10 @@ namespace triagens {
   return T_LIMIT;
 }
 
+(?i:DISTINCT) {
+  return T_DISTINCT;
+}
+
 (?i:ASC) {
   return T_ASC;
 }
@@ -143,10 +147,6 @@ namespace triagens {
 
 (?i:GRAPH) {
   return T_GRAPH;
-}
-
-(?i:STEPS) {
-  return T_STEPS;
 }
 
 (?i:OUTBOUND) {

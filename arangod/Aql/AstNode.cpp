@@ -149,6 +149,7 @@ std::unordered_map<int, std::string const> const AstNode::TypeNames{
   { static_cast<int>(NODE_TYPE_EXAMPLE),                  "example" },
   { static_cast<int>(NODE_TYPE_PASSTHRU),                 "passthru" },
   { static_cast<int>(NODE_TYPE_ARRAY_LIMIT),              "array limit" },
+  { static_cast<int>(NODE_TYPE_DISTINCT),                 "distinct" },
   { static_cast<int>(NODE_TYPE_TRAVERSAL),                "traversal" },
   { static_cast<int>(NODE_TYPE_DIRECTION),                "direction" },
   { static_cast<int>(NODE_TYPE_COLLECTION_LIST),          "collection list" }
@@ -572,6 +573,7 @@ AstNode::AstNode (Ast* ast,
     case NODE_TYPE_EXAMPLE:
     case NODE_TYPE_PASSTHRU:
     case NODE_TYPE_ARRAY_LIMIT:
+    case NODE_TYPE_DISTINCT:
     case NODE_TYPE_TRAVERSAL:
     case NODE_TYPE_DIRECTION:
     case NODE_TYPE_COLLECTION_LIST:
@@ -1207,16 +1209,23 @@ bool AstNode::isSimple () const {
   }
 
   if (type == NODE_TYPE_REFERENCE ||
-      type == NODE_TYPE_VALUE) {
+      type == NODE_TYPE_VALUE ||
+      type == NODE_TYPE_VARIABLE ||
+      type == NODE_TYPE_NOP) {
     setFlag(DETERMINED_SIMPLE, VALUE_SIMPLE);
     return true;
   }
 
   if (type == NODE_TYPE_ARRAY ||
-      type == NODE_TYPE_OBJECT) {
+      type == NODE_TYPE_OBJECT ||
+      type == NODE_TYPE_EXPANSION ||
+      type == NODE_TYPE_ITERATOR ||
+      type == NODE_TYPE_ARRAY_LIMIT) {
     size_t const n = numMembers();
+
     for (size_t i = 0; i < n; ++i) {
-      auto member = getMember(i);
+      auto member = getMemberUnchecked(i);
+
       if (! member->isSimple()) {
         setFlag(DETERMINED_SIMPLE);
         return false;
@@ -1263,9 +1272,43 @@ bool AstNode::isSimple () const {
     auto func = static_cast<Function*>(getData());
     TRI_ASSERT(func != nullptr);
 
-    if (func->implementation == nullptr || ! getMember(0)->isSimple()) {
+    if (func->implementation == nullptr) {
+      // no C++ handler available for function
       setFlag(DETERMINED_SIMPLE);
       return false;
+    }
+
+    TRI_ASSERT(func->implementation != nullptr);
+
+    TRI_ASSERT(numMembers() == 1);
+
+    // check if there is a C++ function handler condition
+    if (func->condition != nullptr && ! func->condition()) {
+      // function execution condition is false
+      setFlag(DETERMINED_SIMPLE);
+      return false;
+    }
+    
+    // check simplicity of function arguments
+    auto args = getMember(0);
+    size_t const n = args->numMembers();
+
+    for (size_t i = 0; i < n; ++i) {
+      auto member = args->getMemberUnchecked(i);
+      auto conversion = func->getArgumentConversion(i);
+
+      if (member->type == NODE_TYPE_COLLECTION &&
+          (conversion == Function::CONVERSION_REQUIRED || conversion == Function::CONVERSION_OPTIONAL)) {
+        // collection attribute: no need to check for member simplicity
+        continue;
+      }
+      else {
+        // check for member simplicity the usual way
+        if (! member->isSimple()) {
+          setFlag(DETERMINED_SIMPLE);
+          return false;
+        }
+      }
     }
 
     setFlag(DETERMINED_SIMPLE, VALUE_SIMPLE);
@@ -1492,10 +1535,16 @@ bool AstNode::isDeterministic () const {
     return ! hasFlag(VALUE_NONDETERMINISTIC);
   }
 
+  if (isConstant()) {
+    return true;
+  }
+
   // check sub-nodes first
   size_t const n = numMembers();
+
   for (size_t i = 0; i < n; ++i) {
-    auto member = getMember(i);
+    auto member = getMemberUnchecked(i);
+
     if (! member->isDeterministic()) {
       // if any sub-node is non-deterministic, we are neither
       setFlag(DETERMINED_NONDETERMINISTIC, VALUE_NONDETERMINISTIC);
@@ -1506,10 +1555,12 @@ bool AstNode::isDeterministic () const {
   if (type == NODE_TYPE_FCALL) {
     // built-in functions may or may not be deterministic
     auto func = static_cast<Function*>(getData());
+
     if (! func->isDeterministic) {
       setFlag(DETERMINED_NONDETERMINISTIC, VALUE_NONDETERMINISTIC);
       return false;
     }
+
     setFlag(DETERMINED_NONDETERMINISTIC);
     return true;
   }
@@ -1522,6 +1573,41 @@ bool AstNode::isDeterministic () const {
 
   // everything else is deterministic
   setFlag(DETERMINED_NONDETERMINISTIC);
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not a node (and its subnodes) is cacheable
+////////////////////////////////////////////////////////////////////////////////
+
+bool AstNode::isCacheable () const {
+  if (isConstant()) {
+    return true;
+  }
+
+  // check sub-nodes first
+  size_t const n = numMembers();
+
+  for (size_t i = 0; i < n; ++i) {
+    auto member = getMemberUnchecked(i);
+
+    if (! member->isCacheable()) {
+      return false;
+    }
+  }
+
+  if (type == NODE_TYPE_FCALL) {
+    // built-in functions may or may not be cacheable
+    auto func = static_cast<Function*>(getData());
+    return func->isCacheable;
+  }
+  
+  if (type == NODE_TYPE_FCALL_USER) {
+    // user functions are always non-cacheable
+    return false;
+  }
+
+  // everything else is cacheable
   return true;
 }
 

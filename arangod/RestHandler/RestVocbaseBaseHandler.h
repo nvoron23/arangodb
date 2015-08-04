@@ -46,7 +46,8 @@
 
 struct TRI_document_collection_t;
 struct TRI_vocbase_col_s;
-struct TRI_vocbase_s;
+struct TRI_vocbase_t;
+class VocShaper;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                      class RestVocbaseBaseHandler
@@ -116,13 +117,19 @@ namespace triagens {
         static const std::string REPLICATION_PATH;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief simple document batch path
+/// @brief simple query all path
+////////////////////////////////////////////////////////////////////////////////
+        
+        static const std::string SIMPLE_QUERY_ALL_PATH;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief simple batch document lookup path
 ////////////////////////////////////////////////////////////////////////////////
         
         static const std::string SIMPLE_LOOKUP_PATH;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief simple document batch path
+/// @brief simple batch document removal path
 ////////////////////////////////////////////////////////////////////////////////
 
         static const std::string SIMPLE_REMOVE_PATH;
@@ -322,7 +329,7 @@ namespace triagens {
         void generateDocument (SingleCollectionReadOnlyTransaction& trx,
                                TRI_voc_cid_t,
                                TRI_doc_mptr_copy_t const&,
-                               TRI_shaper_t*,
+                               VocShaper*,
                                bool);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -398,7 +405,7 @@ namespace triagens {
 /// @brief the vocbase
 ////////////////////////////////////////////////////////////////////////////////
 
-        struct TRI_vocbase_s* _vocbase;
+        TRI_vocbase_t* _vocbase;
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                   Handler methods

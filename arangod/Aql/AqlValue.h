@@ -36,7 +36,6 @@
 #include "Utils/V8TransactionContext.h"
 #include "Utils/AqlTransaction.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/voc-shaper.h"
 
 namespace triagens {
   namespace aql {
@@ -280,6 +279,12 @@ namespace triagens {
       int64_t toInt64 () const;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief get the numeric value of an AqlValue
+////////////////////////////////////////////////////////////////////////////////
+
+      double toNumber () const;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief get a string representation of the AqlValue
 /// this will fail if the value is not a string
 ////////////////////////////////////////////////////////////////////////////////
@@ -316,7 +321,8 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
       
       triagens::basics::Json toJson (triagens::arango::AqlTransaction*,
-                                     TRI_document_collection_t const*) const;
+                                     TRI_document_collection_t const*,
+                                     bool) const;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief creates a hash value for the AqlValue

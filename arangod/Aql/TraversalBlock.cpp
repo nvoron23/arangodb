@@ -321,7 +321,7 @@ void TraversalBlock::initializePaths (AqlItemBlock const* items) {
       _traverser->setStartVertex(v);
     }
     else if (in.isObject()) {
-      Json input = in.toJson(_trx, nullptr);
+      Json input = in.toJson(_trx, nullptr, false);
       if (input.has("_id") ) {
         Json _idJson = input.get("_id");
         if (_idJson.isString()) {

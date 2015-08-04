@@ -28,6 +28,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "V8Traverser.h"
+#include "Indexes/EdgeIndex.h"
 #include "Utils/transactions.h"
 #include "Utils/V8ResolverGuard.h"
 #include "Utils/CollectionNameResolver.h"
@@ -38,8 +39,9 @@
 #include "V8Server/v8-vocindex.h"
 #include "V8Server/v8-collection.h"
 #include "VocBase/document-collection.h"
-#include "VocBase/key-generator.h"
-#include "Indexes/EdgeIndex.h"
+#include "VocBase/KeyGenerator.h"
+#include "VocBase/VocShaper.h"
+
 #include <v8.h>
 
 using namespace std;
@@ -145,7 +147,7 @@ class MultiCollectionEdgeExpander {
                                   // This is due to multi-threading
 
       equal_to<VertexId> eq;
-      for (auto edgeCollection : _edgeCollections) { 
+      for (auto const& edgeCollection : _edgeCollections) { 
         auto edges = edgeCollection->getEdges(_direction, source); 
 
         unordered_map<VertexId, size_t> candidates;
@@ -162,8 +164,8 @@ class MultiCollectionEdgeExpander {
               auto cand = candidates.find(t);
               if (cand == candidates.end()) {
                 // Add weight
-                result.push_back(new ArangoDBPathFinder::Step(t, s, currentWeight,
-                                 edgeId));
+                result.emplace_back(new ArangoDBPathFinder::Step(t, s, currentWeight,
+                                    edgeId));
                 candidates.emplace(t, result.size() - 1);
               } 
               else {
@@ -224,8 +226,8 @@ class SimpleEdgeExpander {
           auto cand = candidates.find(t);
           if (cand == candidates.end()) {
             // Add weight
-            result.push_back(new ArangoDBPathFinder::Step(t, s, currentWeight, 
-                             _edgeCollection->extractEdgeId(edges[j])));
+            result.emplace_back(new ArangoDBPathFinder::Step(t, s, currentWeight, 
+                                _edgeCollection->extractEdgeId(edges[j])));
             candidates.emplace(t, result.size() - 1);
           } 
           else {
@@ -258,7 +260,7 @@ void BasicOptions::addVertexFilter (v8::Isolate* isolate,
                                     v8::Handle<v8::Value> const& example,
                                     ExplicitTransaction* trx,
                                     TRI_transaction_collection_t* col,
-                                    TRI_shaper_t* shaper,
+                                    VocShaper* shaper,
                                     TRI_voc_cid_t const& cid,
                                     string& errorMessage) {
 
@@ -320,9 +322,10 @@ bool BasicOptions::matchesVertex (VertexId const& v) const {
 
 void BasicOptions::addEdgeFilter (v8::Isolate* isolate,
                                   v8::Handle<v8::Value> const& example,
-                                  TRI_shaper_t* shaper,
+                                  VocShaper* shaper,
                                   TRI_voc_cid_t const& cid,
                                   string& errorMessage) {
+  useEdgeFilter = true;
   auto it = _edgeFilter.find(cid);
 
   if (example->IsArray()) {
@@ -335,6 +338,21 @@ void BasicOptions::addEdgeFilter (v8::Isolate* isolate,
     if (it == _edgeFilter.end()) {
       _edgeFilter.emplace(cid, new ExampleMatcher(isolate, v8::Handle<v8::Object>::Cast(example), shaper, errorMessage));
     }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Insert a new edge matcher object
+////////////////////////////////////////////////////////////////////////////////
+
+void BasicOptions::addEdgeFilter (Json const& example,
+                                  VocShaper* shaper,
+                                  TRI_voc_cid_t const& cid,
+                                  CollectionNameResolver const* resolver) {
+  useEdgeFilter = true;
+  auto it = _edgeFilter.find(cid);
+  if (it == _edgeFilter.end()) {
+    _edgeFilter.emplace(cid, new ExampleMatcher(example.json(), shaper, resolver));
   }
 }
 
@@ -401,7 +419,7 @@ bool NeighborsOptions::matchesVertex (VertexId const& v) const {
 ////////////////////////////////////////////////////////////////////////////////
 
 void NeighborsOptions::addCollectionRestriction (TRI_voc_cid_t cid) {
-  _explicitCollections.insert(cid);
+  _explicitCollections.emplace(cid);
 }
 
 // -----------------------------------------------------------------------------
@@ -457,6 +475,77 @@ unique_ptr<ArangoDBPathFinder::Path> TRI_RunShortestPathSearch (
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief Wrapper for the shortest path computation
+////////////////////////////////////////////////////////////////////////////////
+
+std::unique_ptr<ArangoDBConstDistancePathFinder::Path> TRI_RunSimpleShortestPathSearch ( 
+    vector<EdgeCollectionInfo*>& collectionInfos,
+    ShortestPathOptions& opts) {
+
+  TRI_edge_direction_e forward;
+  TRI_edge_direction_e backward;
+
+  if (opts.direction == "outbound") {
+    forward = TRI_EDGE_OUT;
+    backward = TRI_EDGE_IN;
+  } 
+  else if (opts.direction == "inbound") {
+    forward = TRI_EDGE_IN;
+    backward = TRI_EDGE_OUT;
+  } 
+  else {
+    forward = TRI_EDGE_ANY;
+    backward = TRI_EDGE_ANY;
+  }
+
+  auto fwExpander = [&collectionInfos, forward] (VertexId& v, vector<EdgeId>& res_edges, vector<VertexId>& neighbors) {
+    equal_to<VertexId> eq;
+    for (auto const& edgeCollection : collectionInfos) { 
+      auto edges = edgeCollection->getEdges(forward, v); 
+      for (size_t j = 0;  j < edges.size(); ++j) {
+        EdgeId edgeId = edgeCollection->extractEdgeId(edges[j]);
+        VertexId from = ExtractFromId(edges[j]);
+        if (! eq(from, v)) {
+          res_edges.emplace_back(edgeId);
+          neighbors.emplace_back(from);
+        } else {
+          VertexId to = ExtractToId(edges[j]);
+          if (! eq(to, v)) {
+            res_edges.emplace_back(edgeId);
+            neighbors.emplace_back(to);
+          }
+        }
+      }
+    }
+  };
+  auto bwExpander = [&collectionInfos, backward] (VertexId& v, vector<EdgeId>& res_edges, vector<VertexId>& neighbors) {
+    equal_to<VertexId> eq;
+    for (auto const& edgeCollection : collectionInfos) { 
+      auto edges = edgeCollection->getEdges(backward, v); 
+      for (size_t j = 0;  j < edges.size(); ++j) {
+        EdgeId edgeId = edgeCollection->extractEdgeId(edges[j]);
+        VertexId from = ExtractFromId(edges[j]);
+        if (! eq(from, v)) {
+          res_edges.emplace_back(edgeId);
+          neighbors.emplace_back(from);
+        } else {
+          VertexId to = ExtractToId(edges[j]);
+          if (! eq(to, v)) {
+            res_edges.emplace_back(edgeId);
+            neighbors.emplace_back(to);
+          }
+        }
+      }
+    }
+  };
+
+  ArangoDBConstDistancePathFinder pathFinder(fwExpander, bwExpander);
+  std::unique_ptr<ArangoDBConstDistancePathFinder::Path> path;
+  path.reset(pathFinder.search(opts.start, opts.end));
+  return path;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief search for distinct inbound neighbors
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -465,7 +554,6 @@ static void InboundNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
                               unordered_set<VertexId>& startVertices,
                               unordered_set<VertexId>& visited,
                               unordered_set<VertexId>& distinct,
-                              vector<VertexId>& result,
                               uint64_t depth = 1) {
 
   TRI_edge_direction_e dir = TRI_EDGE_IN;
@@ -483,17 +571,14 @@ static void InboundNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
             // We have already visited this vertex
             continue;
           }
-          visited.insert(v);
+          visited.emplace(v);
           if (depth >= opts.minDepth) {
             if (opts.matchesVertex(v)) {
-              auto p = distinct.insert(v);
-              if (p.second) {
-                result.push_back(*p.first);
-              }
+              distinct.emplace(v);
             }
           }
           if (depth < opts.maxDepth) {
-            nextDepth.insert(v);
+            nextDepth.emplace(v);
           }
         }
       }
@@ -501,7 +586,7 @@ static void InboundNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
   }
 
   if (! nextDepth.empty()) {
-    InboundNeighbors(collectionInfos, opts, nextDepth, visited, distinct, result, depth + 1);
+    InboundNeighbors(collectionInfos, opts, nextDepth, visited, distinct, depth + 1);
   }
 }
 
@@ -514,12 +599,11 @@ static void OutboundNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
                                unordered_set<VertexId>& startVertices,
                                unordered_set<VertexId>& visited,
                                unordered_set<VertexId>& distinct,
-                               vector<VertexId>& result,
                                uint64_t depth = 1) {
 
   TRI_edge_direction_e dir = TRI_EDGE_OUT;
-
   unordered_set<VertexId> nextDepth;
+
   for (auto const& col : collectionInfos) {
     for (VertexId const& start : startVertices) {
       auto edges = col->getEdges(dir, start);
@@ -532,24 +616,21 @@ static void OutboundNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
             // We have already visited this vertex
             continue;
           }
-          visited.insert(v);
+          visited.emplace(v);
           if (depth >= opts.minDepth) {
             if (opts.matchesVertex(v)) {
-              auto p = distinct.insert(v);
-              if (p.second) {
-                result.push_back(*p.first);
-              }
+              distinct.emplace(v);
             }
           }
           if (depth < opts.maxDepth) {
-            nextDepth.insert(v);
+            nextDepth.emplace(v);
           }
         }
       }
     }
   }
   if (! nextDepth.empty()) {
-    OutboundNeighbors(collectionInfos, opts, nextDepth, visited, distinct, result, depth + 1);
+    OutboundNeighbors(collectionInfos, opts, nextDepth, visited, distinct, depth + 1);
   }
 }
 
@@ -562,8 +643,8 @@ static void AnyNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
                           unordered_set<VertexId>& startVertices,
                           unordered_set<VertexId>& visited,
                           unordered_set<VertexId>& distinct,
-                          vector<VertexId>& result,
                           uint64_t depth = 1) {
+
   TRI_edge_direction_e dir = TRI_EDGE_OUT;
   unordered_set<VertexId> nextDepth;
 
@@ -580,17 +661,14 @@ static void AnyNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
             // We have already visited this vertex
             continue;
           }
-          visited.insert(v);
+          visited.emplace(v);
           if (depth >= opts.minDepth) {
             if (opts.matchesVertex(v)) {
-              auto p = distinct.insert(v);
-              if (p.second) {
-                result.push_back(*p.first);
-              }
+              distinct.emplace(v);
             }
           }
           if (depth < opts.maxDepth) {
-            nextDepth.insert(v);
+            nextDepth.emplace(v);
           }
         }
       }
@@ -604,24 +682,21 @@ static void AnyNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
             // We have already visited this vertex
             continue;
           }
-          visited.insert(v);
+          visited.emplace(v);
           if (depth >= opts.minDepth) {
             if (opts.matchesVertex(v)) {
-              auto p = distinct.insert(v);
-              if (p.second) {
-                result.push_back(*p.first);
-              }
+              distinct.emplace(v);
             }
           }
           if (depth < opts.maxDepth) {
-            nextDepth.insert(v);
+            nextDepth.emplace(v);
           }
         }
       }
     }
   }
   if (! nextDepth.empty()) {
-    AnyNeighbors(collectionInfos, opts, nextDepth, visited, distinct, result, depth + 1);
+    AnyNeighbors(collectionInfos, opts, nextDepth, visited, distinct, depth + 1);
   }
 }
 
@@ -632,22 +707,21 @@ static void AnyNeighbors (vector<EdgeCollectionInfo*>& collectionInfos,
 void TRI_RunNeighborsSearch (
     vector<EdgeCollectionInfo*>& collectionInfos,
     NeighborsOptions& opts,
-    unordered_set<VertexId>& distinct,
-    vector<VertexId>& result) {
+    unordered_set<VertexId>& result) {
   unordered_set<VertexId> startVertices;
   unordered_set<VertexId> visited;
-  startVertices.insert(opts.start);
-  visited.insert(opts.start);
+  startVertices.emplace(opts.start);
+  visited.emplace(opts.start);
 
   switch (opts.direction) {
     case TRI_EDGE_IN:
-      InboundNeighbors(collectionInfos, opts, startVertices, visited, distinct, result);
+      InboundNeighbors(collectionInfos, opts, startVertices, visited, result);
       break;
     case TRI_EDGE_OUT:
-      OutboundNeighbors(collectionInfos, opts, startVertices, visited, distinct, result);
+      OutboundNeighbors(collectionInfos, opts, startVertices, visited, result);
       break;
     case TRI_EDGE_ANY:
-      AnyNeighbors(collectionInfos, opts, startVertices, visited, distinct, result);
+      AnyNeighbors(collectionInfos, opts, startVertices, visited, result);
       break;
   }
 }

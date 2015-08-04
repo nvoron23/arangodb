@@ -36,6 +36,7 @@
 
 #include <mutex>
 #include <functional>
+#include <iostream>
 
 namespace triagens {
   namespace basics {
@@ -472,10 +473,13 @@ namespace triagens {
           std::deque<EdgeId> edges; 
           EdgeWeight weight;
 
-          Path (std::deque<VertexId> vertices, std::deque<EdgeId> edges,
+          Path (std::deque<VertexId> const& vertices, 
+                std::deque<EdgeId> const& edges,
                 EdgeWeight weight) 
-            : vertices(vertices), edges(edges), weight(weight) {
-          };
+            : vertices(vertices), 
+              edges(edges), 
+              weight(weight) {
+          }
         };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -483,20 +487,29 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
         struct Step {
+
+          private:
+
+            EdgeWeight _weight;
+
+          public:
+
             VertexId _vertex;
             VertexId _predecessor;
-          private:
-            EdgeWeight _weight;
-          public:
             EdgeId _edge;
             bool _done;
 
             Step () : _done(false) {
             }
 
-            Step (VertexId& vert, VertexId& pred,
-                  EdgeWeight weig, EdgeId const& edge)
-              : _vertex(vert), _predecessor(pred), _weight(weig), _edge(edge),
+            Step (VertexId& vert, 
+                  VertexId& pred,
+                  EdgeWeight weig, 
+                  EdgeId const& edge)
+              : _weight(weig), 
+                _vertex(vert), 
+                _predecessor(pred), 
+                _edge(edge),
                 _done(false) {
             }
 
@@ -566,10 +579,11 @@ namespace triagens {
                                 ThreadInfo& peerInfo,
                                 VertexId& start,
                                 ExpanderFunction expander,
-                                std::string id)
+                                std::string const& id)
               : _pathFinder(pathFinder), _myInfo(myInfo), 
                 _peerInfo(peerInfo), _start(std::move(start)),
                 _expander(expander), _id(id) {
+
             }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -578,8 +592,8 @@ namespace triagens {
 
           private:
 
-            void insertNeighbor (Step* step, EdgeWeight newWeight) {
-
+            void insertNeighbor (Step* step, 
+                                 EdgeWeight newWeight) {
               std::lock_guard<std::mutex> guard(_myInfo._mutex);
               Step* s = _myInfo._pq.find(step->_vertex);
 
@@ -745,11 +759,17 @@ namespace triagens {
 
           public:
 
-            Searcher (PathFinder* pathFinder, ThreadInfo& myInfo, 
-                      ThreadInfo& peerInfo, VertexId& start,
-                      ExpanderFunction expander, std::string id)
-              : _pathFinder(pathFinder), _myInfo(myInfo), 
-                _peerInfo(peerInfo), _start(start), _expander(expander),
+            Searcher (PathFinder* pathFinder, 
+                      ThreadInfo& myInfo, 
+                      ThreadInfo& peerInfo, 
+                      VertexId& start,
+                      ExpanderFunction expander, 
+                      std::string const& id)
+              : _pathFinder(pathFinder), 
+                _myInfo(myInfo), 
+                _peerInfo(peerInfo), 
+                _start(start), 
+                _expander(expander),
                 _id(id) {
             }
 
@@ -759,8 +779,8 @@ namespace triagens {
 
           private:
 
-            void insertNeighbor (Step* step, EdgeWeight newWeight) {
-
+            void insertNeighbor (Step* step, 
+                                 EdgeWeight newWeight) {
               Step* s = _myInfo._pq.find(step->_vertex);
 
               // Not found, so insert it:
@@ -870,8 +890,6 @@ namespace triagens {
         };
 
 // -----------------------------------------------------------------------------
-// --SECTION--                          PathFinder: constructors and destructors
-// -----------------------------------------------------------------------------
 
         PathFinder (PathFinder const&) = delete;
         PathFinder& operator= (PathFinder const&) = delete;
@@ -963,7 +981,7 @@ namespace triagens {
           }
 
           Step* s = forward._pq.find(_intermediate);
-          r_vertices.push_back(_intermediate);
+          r_vertices.emplace_back(_intermediate);
 
           // FORWARD Go path back from intermediate -> start.
           // Insert all vertices and edges at front of vector
@@ -981,8 +999,8 @@ namespace triagens {
           s = backward._pq.find(_intermediate);
           while (s->_predecessor.key != nullptr &&
                  strcmp(s->_predecessor.key, "") != 0) {
-            r_edges.push_back(s->_edge);
-            r_vertices.push_back(s->_predecessor);
+            r_edges.emplace_back(s->_edge);
+            r_vertices.emplace_back(s->_predecessor);
             s = backward._pq.find(s->_predecessor);
           }
 
@@ -1059,7 +1077,7 @@ namespace triagens {
           }
 
           Step* s = forward._pq.find(_intermediate);
-          r_vertices.push_back(_intermediate);
+          r_vertices.emplace_back(_intermediate);
 
           // FORWARD Go path back from intermediate -> start.
           // Insert all vertices and edges at front of vector
@@ -1077,8 +1095,8 @@ namespace triagens {
           s = backward._pq.find(_intermediate);
           while (s->_predecessor.key != nullptr &&
                  strcmp(s->_predecessor.key, "") != 0) {
-            r_edges.push_back(s->_edge);
-            r_vertices.push_back(s->_predecessor);
+            r_edges.emplace_back(s->_edge);
+            r_vertices.emplace_back(s->_predecessor);
             s = backward._pq.find(s->_predecessor);
           }
 
@@ -1358,6 +1376,178 @@ namespace triagens {
 
     };
 
+    template <typename VertexId, typename EdgeId>
+    class ConstDistanceFinder {
+
+
+      public:
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief Path, type for the result
+////////////////////////////////////////////////////////////////////////////////
+
+        // Convention vertices.size() -1 === edges.size()
+        // path is vertices[0] , edges[0], vertices[1] etc.
+        // NOTE Do not forget to compute and set weight!
+        struct Path {
+          std::deque<VertexId> vertices; 
+          std::deque<EdgeId> edges; 
+          size_t weight;
+
+          Path () 
+            : weight(0) {
+
+          };
+        };
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief callback to find neighbours
+////////////////////////////////////////////////////////////////////////////////
+
+        typedef std::function<void(VertexId& V, std::vector<EdgeId>& edges, std::vector<VertexId>& neighbors)>
+                ExpanderFunction;
+
+
+      private:
+
+        struct PathSnippet {
+          VertexId const _pred;
+          EdgeId const _path;
+
+          PathSnippet (VertexId& pred, EdgeId& path) 
+            : _pred(pred),
+              _path(path) {
+
+          }
+
+        };
+
+        std::unordered_map<VertexId, PathSnippet*> _leftFound;
+        std::deque<VertexId> _leftClosure;
+
+        std::unordered_map<VertexId, PathSnippet*> _rightFound;
+        std::deque<VertexId> _rightClosure;
+
+        ExpanderFunction _leftNeighborExpander;
+        ExpanderFunction _rightNeighborExpander;
+
+      public:
+
+        ConstDistanceFinder (ExpanderFunction left, ExpanderFunction right) :
+          _leftNeighborExpander(left),
+          _rightNeighborExpander(right) {
+        }
+
+        ~ConstDistanceFinder () {
+          for (auto& it : _leftFound) {
+            delete it.second;
+          }
+          for (auto& it : _rightFound) {
+            delete it.second;
+          }
+        }
+
+        Path* search (VertexId& start, VertexId& end) {
+          std::unique_ptr<Path> res(new Path());
+          // Init
+          if (start == end) {
+            res->vertices.emplace_back(start);
+            return res.release();
+          }
+          _leftFound.emplace(start, nullptr);
+          _rightFound.emplace(end, nullptr);
+          _leftClosure.emplace_back(start);
+          _rightClosure.emplace_back(end);
+
+          TRI_IF_FAILURE("TraversalOOMInitialize") {
+            THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+          }
+
+          std::vector<EdgeId> edges;
+          std::vector<VertexId> neighbors;
+          while (_leftClosure.size() > 0 && _rightClosure.size() > 0) {
+            edges.clear();
+            neighbors.clear();
+            std::deque<VertexId> _nextClosure;
+            if (_leftClosure.size() < _rightClosure.size()) {
+              for (VertexId& v : _leftClosure) {
+                _leftNeighborExpander(v, edges, neighbors);
+                TRI_ASSERT(edges.size() == neighbors.size());
+                for (size_t i = 0; i < neighbors.size(); ++i) {
+                  VertexId n = neighbors.at(i);
+                  if (_leftFound.find(n) == _leftFound.end()) {
+                    _leftFound.emplace(n, new PathSnippet(v, edges.at(i)));
+                    if (_rightFound.find(n) != _rightFound.end()) {
+                      res->vertices.emplace_back(n);
+                      auto it = _leftFound.find(n);
+                      VertexId next;
+                      while (it->second != nullptr) {
+                        next = it->second->_pred;
+                        res->vertices.push_front(next);
+                        res->edges.push_front(it->second->_path);
+                        it = _leftFound.find(next);
+                      }
+                      it = _rightFound.find(n);
+                      while (it->second != nullptr) {
+                        next = it->second->_pred;
+                        res->vertices.emplace_back(next);
+                        res->edges.emplace_back(it->second->_path);
+                        it = _rightFound.find(next);
+                      }
+                      res->weight = res->edges.size();
+                      TRI_IF_FAILURE("TraversalOOMPath") {
+                        THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+                      }
+                      return res.release();
+                    }
+                    _nextClosure.emplace_back(n);
+                  }
+                }
+              }
+              _leftClosure = _nextClosure;
+            } 
+            else {
+               for (VertexId& v : _rightClosure) {
+                _rightNeighborExpander(v, edges, neighbors);
+                TRI_ASSERT(edges.size() == neighbors.size());
+                for (size_t i = 0; i < neighbors.size(); ++i) {
+                  VertexId n = neighbors.at(i);
+                  if (_rightFound.find(n) == _rightFound.end()) {
+                    _rightFound.emplace(n, new PathSnippet(v, edges.at(i)));
+                    if (_leftFound.find(n) != _leftFound.end()) {
+                      res->vertices.emplace_back(n);
+                      auto it = _leftFound.find(n);
+                      VertexId next;
+                      while (it->second != nullptr) {
+                        next = it->second->_pred;
+                        res->vertices.push_front(next);
+                        res->edges.push_front(it->second->_path);
+                        it = _leftFound.find(next);
+                      }
+                      it = _rightFound.find(n);
+                      while (it->second != nullptr) {
+                        next = it->second->_pred;
+                        res->vertices.emplace_back(next);
+                        res->edges.emplace_back(it->second->_path);
+                        it = _rightFound.find(next);
+                      }
+                      res->weight = res->edges.size();
+
+                      TRI_IF_FAILURE("TraversalOOMPath") {
+                        THROW_ARANGO_EXCEPTION(TRI_ERROR_DEBUG);
+                      }
+                      return res.release();
+                    }
+                    _nextClosure.emplace_back(n);
+                  }
+                }
+              }
+              _rightClosure = _nextClosure;
+            }         
+          }
+          return nullptr;
+        }
+    };
   }
 }
 

@@ -361,7 +361,7 @@ function SetRoutesFoxxControllerSpec () {
         routes = app.routingInfo.routes;
 
       app.activateSessions({
-        sessionStorageApp: 'sessions',
+        sessionStorage: 'sessions',
         type: 'cookie',
         cookie: {
           name: 'sid',
@@ -982,7 +982,7 @@ function DocumentationAndConstraintsSpec () {
       callback(req, res);
 
       assertFalse(called);
-      assertEqual(res.responseCode, 400);
+      assertEqual(res.responseCode, 422);
     },
 
     testSetParamForUndocumentedBodyParam: function () {
@@ -1413,7 +1413,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'cookie',
           cookie: {
             name: 'sid'
@@ -1433,7 +1433,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'cookie',
           cookie: 'sid'
         });
@@ -1451,7 +1451,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'cookie',
           cookie: {
             name: 'sid',
@@ -1472,7 +1472,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Id'
         });
@@ -1490,7 +1490,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Token',
           jwt: {
@@ -1511,7 +1511,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Token',
           jwt: {
@@ -1533,7 +1533,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Token',
           jwt: {
@@ -1554,7 +1554,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Token',
           jwt: {
@@ -1576,7 +1576,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Token',
           jwt: {
@@ -1597,7 +1597,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Token',
           jwt: 'secret'
@@ -1616,7 +1616,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Token',
           jwt: true
@@ -1635,7 +1635,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'header',
           header: 'X-Session-Token',
           jwt: {
@@ -1656,7 +1656,7 @@ function SetupSessions () {
 
       try {
         app.activateSessions({
-          sessionStorageApp: 'sessions',
+          sessionStorage: 'sessions',
           type: 'magic',
           cookie: {
             name: 'sid',

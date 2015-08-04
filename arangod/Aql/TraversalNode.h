@@ -131,20 +131,30 @@ namespace triagens {
           if (usesInVariable()) {
             return std::vector<Variable const*>{ _inVariable };
           }
-            return std::vector<Variable const*>{ };
+          return std::vector<Variable const*>{ };
         }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief getVariablesUsedHere
+////////////////////////////////////////////////////////////////////////////////
+
+        void getVariablesUsedHere (std::unordered_set<Variable const*>& result) const override final {
+          if (usesInVariable()) {
+            result.emplace(_inVariable);
+          }
+        }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief getVariablesSetHere
 ////////////////////////////////////////////////////////////////////////////////
 
         std::vector<Variable const*> getVariablesSetHere () const override final {
-          std::vector<Variable const*> vars;
-          vars.push_back(_vertexOutVariable);
+          std::vector<Variable const*> vars { _vertexOutVariable };
           if (_edgeOutVariable != nullptr) {
-            vars.push_back(_edgeOutVariable);
+            vars.emplace_back(_edgeOutVariable);
             if (_pathOutVariable != nullptr) {
-              vars.push_back(_pathOutVariable);
+              vars.emplace_back(_pathOutVariable);
             }
           }
           return vars;

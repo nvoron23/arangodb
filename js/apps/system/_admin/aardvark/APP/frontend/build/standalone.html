@@ -11,7 +11,7 @@
     <link href="css/sass.css" rel="stylesheet">
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 
-// obsolete file
+<!-- obsolete file -->
 
 <script id="apiView.ejs" type="text/template">
 <div class="headerBar">
@@ -19,17 +19,6 @@
 </div>
 <div class="form-actions api-actions">
   <div id="swagger-ui-container" class="swagger-ui-wrap api-container">
-
-  </div>
-</div>
-</script>
-
-<script id="appDocumentationView.ejs" type="text/template">
-<div class="headerBar">
-  <a class="arangoHeader">API - Documentation</a>
-</div>
-<div class="form-actions api-actions">
-  <div id="swagger-ui-container" class="swagger-ui-wrap">
 
   </div>
 </div>
@@ -75,8 +64,8 @@
         </ul>
       </div>
       <div class="breadcrumb">
-        <a class="activeBread" href="#applications">Applications</a>
-        <span class="disabledBread">&gt;</span>
+        <a class="activeBread" href="#applications">Services</a>
+        <span class="disabledBread"><i class="fa fa-chevron-right"></i></span>
         <span class="disabledBread">
           <%= app.attributes.mount %>
         </span>
@@ -88,11 +77,10 @@
         </span>
       </div>
     </div>
-    <div></div>
     <section class="info">
       <div class="header">
         <div class="header-icon-container">
-          <img src="foxxes/thumbnail?mount=<%= app.encodedMount() %>" alt="Icon for App" class="icon" />
+          <img src="foxxes/thumbnail?mount=<%= app.encodedMount() %>" alt="Icon for Service" class="icon" />
         </div>
         <div class="header_left">
           <input type="button" class="open button-success" disabled="true" value="Open" />
@@ -115,6 +103,12 @@
             </h3>
           </div>
           <p class="description"><%= app.attributes.description %></p>
+          <% if (mode !== 'swagger') { %>
+            <input id="app-show-swagger" type="button" class="button-success" value="Show API" />
+          <% } %>
+          <% if (mode !== 'readme' && app.attributes.readme) { %>
+            <input id="app-show-readme" type="button" class="button-success" value="Show README" />
+          <% } %>
         </div>
         <div id="app-warning" class="app-warning" style="display:<%=app.needsAttention()?'block':'none' %>;">
           <h4>Out of order</h4>
@@ -123,9 +117,19 @@
           <p id="app-warning-deps" style="display:<%=app.hasUnconfiguredDependencies()?'block':'block' %>;">Some dependencies have not yet been set up.</p>
         </div>
       </div>
+      <% if (mode === 'swagger') { %>
       <div class="swagger">
         <iframe src="/_db/<%= db%>/_admin/aardvark/foxxes/docs/index.html?mount=<%= encodeURIComponent(app.get('mount')) %>" name="Documentation"></iframe>
       </div>
+      <% } else if (mode === 'readme') { %>
+      <div class="readme">
+        <% if (app.get('readme')) { %>
+        <%= app.get('readme') %>
+        <% } else { %>
+        <p>ERROR: No README data found!</p>
+        <% } %>
+      </div>
+      <% } %>
     </section>
     <aside class="meta">
       <dl>
@@ -147,8 +151,13 @@
         <dd>
           <ul>
             <li>
-              <a href="./foxxes/docu<%= app.attributes.mount %>" target="_blank">
-                Download API Documentation
+              <a href="./foxxes/docs/standalone/index.html?mount=<%= encodeURIComponent(app.get('mount')) %>" target="_blank">
+                API Documentation
+              </a>
+            </li>
+            <li>
+              <a href="./foxxes/docs/swagger.json?mount=<%= encodeURIComponent(app.get('mount')) %>" target="_blank">
+                Swagger JSON
               </a>
             </li>
             <% if (app.attributes.repository && app.attributes.repository.type == 'git') { %>
@@ -179,7 +188,7 @@
 
 <script id="applicationsView.ejs" type="text/template">
 <div class="headerBar">
-  <a class="arangoHeader">Applications</a>
+  <a class="arangoHeader">Services</a>
   <div class="headerButtonBar">
     <ul class="headerButtonList">
       <li>
@@ -197,22 +206,25 @@
       <li class="nav-header">Type</li>
       <li><a href="#applications">
         <label class="checkbox checkboxLabel">
-          <input class="css-checkbox" type="checkbox" id="checkProduction">
-          <label class="css-label"></label>Production
+          <input class="css-checkbox" type="checkbox" id="checkProduction"/>
+          <i class="fa"></i>
+          Production
         </label>
       </a></li>
 
       <li><a href="#applications">
         <label class="checkbox checkboxLabel">
-          <input class="css-checkbox" type="checkbox" id="checkDevel">
-          <label class="css-label"></label>Development
+          <input class="css-checkbox" type="checkbox" id="checkDevel"/>
+          <i class="fa"></i>
+          Development
         </label>
       </a></li>
 
       <li><a href="#applications">
         <label class="checkbox checkboxLabel">
-          <input class="css-checkbox" id="checkSystem" type="checkbox">
-          <label class="css-label"></label>System applications
+          <input class="css-checkbox" id="checkSystem" type="checkbox"/>
+          <i class="fa"></i>
+          System applications
         </label>
       </a></li>
     </ul>
@@ -223,7 +235,7 @@
   <div id="installed">
     <div id="installedList" class="tileList">
       <div class="tile">
-        <a href="#" id="addApp" class="add"><span class="pull-left icon_arangodb_roundplus arangoicon add-Icon" /> Add Application</a>
+        <a href="#" id="addApp" class="add"><span class="pull-left icon_arangodb_roundplus arangoicon add-Icon" /> Add Service</a>
       </div>
     </div>
   </div>
@@ -274,7 +286,8 @@
   <%}%>
 </div>
 
-<img src="<%= model.get('picture') %>" height="50" width="50" alt="" class="icon">
+<i class="collection-type-icon fa <%= model.get('picture') %>"></i>
+<!--<img src="<%= model.get('picture') %>" height="50" width="50" alt="" class="icon">-->
 <div class="tileBadge">
   <span>
     <div class="corneredBadge <%= model.get('status') %>">
@@ -287,6 +300,11 @@
 
 <script id="collectionsView.ejs" type="text/template">
   <div class="headerBar">
+    <div class="search-field">
+      <input type="text" id="searchInput" class="search-input" placeholder="Search..."/>
+      <!-- <img id="searchSubmit" class="search-submit-icon"/> -->
+      <i id="searchSubmit" class="fa fa-search"></i>
+    </div>
     <div class="headerButtonBar">
       <ul class="headerButtonList">
         <li class="enabled">
@@ -300,10 +318,6 @@
     <div class="pull-left">
       <a class="arangoHeader">Collections</a>
     </div>
-    <div class="search-field">
-      <input type="text" id="searchInput" class="search-input" placeholder="Search..."/><img id="searchSubmit"
-                                                                                            class="search-submit-icon"/>
-    </div>
   </div>
 
 
@@ -316,23 +330,28 @@
         <li><a>
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox checkSystemCollections" type="checkbox">
-            <label class="css-label"></label>System
+            <i class="fa"></i>
+            System
           </label>
         </a></li>
 
         <li><a>
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox" type="checkbox" id="checkDocument">
-            <label class="css-label" id="checkDocument"></label>Document
+            <i class="fa"></i>
+            Document
           </label>
         </a></li>
 
         <li><a>
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox" type="checkbox" id="checkEdge">
-            <label class="css-label" id="checkEdge"></label>Edge
+            <i class="fa"></i>
+            Edge
           </label>
         </a></li>
+
+        </li>
       </ul>
 
       <ul>
@@ -341,14 +360,16 @@
         <li><a href="#">
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox" type="checkbox" id="checkLoaded">
-            <label class="css-label"></label>Loaded
+            <i class="fa"></i>
+            Loaded
           </label>
         </a></li>
 
         <li><a href="#">
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox" type="checkbox" id="checkUnloaded">
-            <label class="css-label"></label>Unloaded
+            <i class="fa"></i>
+            Unloaded
           </label>
         </a></li>
 
@@ -359,21 +380,24 @@
         <li><a href="#">
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox" type="checkbox" id="sortName">
-            <label class="css-label css-label-round"></label>Sort by name
+            <i class="fa css-round-label"></i>
+            Sort by name
           </label>
         </a></li>
 
         <li><a href="#">
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox" type="checkbox" id="sortType">
-            <label class="css-label css-label-round"></label>Sort by type
+            <i class="fa css-round-label"></i>
+            Sort by type
           </label>
         </a></li>
 
         <li><a href="#">
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox" type="checkbox" id="sortOrder">
-            <label class="css-label"></label>Sort descending
+            <i class="fa"></i>
+            Sort descending
           </label>
         </a></li>
       </ul>
@@ -418,15 +442,17 @@
   <% } %>
 
   <% var mediumChart = function(name, title, arrows) { %>
-    <div class="dashboard-medium-chart">
-      <% enlargeButton(name, true); %>
-      <div class="dashboard-medium-chart-inner dashboard-chart" id="<%= name %>Container">
-        <div id="<%= name %>" class="dashboard-interior-chart"></div>
-        <div class="dashboard-legend">
-          <div class="dashboard-legend-inner" id="<%= name %>Legend"></div>
+    <div class="dashboard-medium-chart-outer">
+      <div class="dashboard-medium-chart">
+        <% enlargeButton(name, true); %>
+        <div class="dashboard-medium-chart-inner dashboard-chart" id="<%= name %>Container">
+          <div id="<%= name %>" class="dashboard-interior-chart"></div>
+          <div class="dashboard-legend">
+            <div class="dashboard-legend-inner" id="<%= name %>Legend"></div>
+          </div>
         </div>
+        <% subBar(title) %>
       </div>
-      <% subBar(title) %>
     </div>
   <% } %>
 
@@ -529,6 +555,11 @@
 
 <script id="databaseView.ejs" type="text/template">
   <div class="headerBar">
+    <div class="search-field">
+      <input type="text" value="<%=searchString%>" id="databaseSearchInput" class="search-input" placeholder="Search..."/>
+      <!-- <img id="databaseSearchSubmit" class="search-submit-icon">-->
+      <i id="databaseSearchSubmit" class="fa fa-search"></i>
+    </div>
     <div class="headerButtonBar">
         <ul class="headerButtonList">
           <li class="enabled">
@@ -541,9 +572,6 @@
 
     <div class="pull-left">
       <a class="arangoHeader">Databases</a>
-    </div>
-    <div class="search-field">
-      <input type="text" value="<%=searchString%>" id="databaseSearchInput" class="search-input" placeholder="Search..."/><img id="databaseSearchSubmit" class="search-submit-icon">
     </div>
   </div>
 
@@ -599,7 +627,7 @@
 <%
 if (list.length > 0) {
 %>
-    <li class="dropdown-header">DBs</li>
+    <li class="dropdown-header">Databases</li>
   <%
     _.each(list, function(i) {
   %>
@@ -618,7 +646,7 @@ if (list.length > 0) {
     <% } %>
     <li class="dropdown-header">Manager</li>
     <li id="databaseNavi" class="dropdown-item">
-      <a id="databases" class="tab" href="#databases">Manage DBs</a>
+      <a id="databases" class="tab" href="#databases">Manage Databases</a>
     </li>
     <% } %>
 </ul>
@@ -626,12 +654,14 @@ if (list.length > 0) {
 
 <script id="demoView.ejs" type="text/template">
   <div class="headerBar">
+    <div class="search-field">
+      <input type="text" id="demoSearchInput" class="search-input" placeholder="Search...">
+      <i id="demoSearchSubmit" class="fa fa-search"></i>
+      <!-- <img id="demoSearchSubmit" class="search-submit-icon"> -->
+      <!--<div id="searchResults" class="demo-dropdown-menu"><ul></ul></div>-->
+    </div>
     <div class="pull-left">
       <a class="arangoHeader">Demo</a>
-    </div>
-    <div class="search-field">
-      <input type="text" id="demoSearchInput" class="search-input" placeholder="Search..."><img id="demoSearchSubmit" class="search-submit-icon">
-      <!--<div id="searchResults" class="demo-dropdown-menu"><ul></ul></div>-->
     </div>
     <div class="styled-select">
       <select id="flightQuerySelect" class="query-select" style="margin-top: 5px; height: 25px">
@@ -651,8 +681,8 @@ if (list.length > 0) {
 
   </div>
 
+  <div class="innerContent document-info-div">
 
-  <div id="tableDiv" class="innerContent">
     <div class="document-info">
 
       <div class="document-type-container">
@@ -685,12 +715,19 @@ if (list.length > 0) {
         </div>
 
       </div>
+
     </div>
+
+  </div>
+
+  <div id="tableDiv" class="innerContent document-content-div">
+
     <div id="documentEditor" class="document-editor"></div>
+    <div class="bottomButtonBar">
       <button id="saveDocumentButton" class="button-success pull-right">Save</button>
       <button id="deleteDocumentButton" class="button-danger pull-right">Delete</button>
-    <div class="pull-left shortcuts showHotkeyHelp">
     </div>
+    <div class="pull-left shortcuts showHotkeyHelp"></div>
 	</div>
 
 </script>
@@ -702,6 +739,7 @@ if (list.length > 0) {
 
   <!-- remove marker for docupdiv-->
   <ul class="headerButtonList">
+    <!-- Mark: removed prev/next collection button
     <li class="enabled">
       <a id="collectionNext" class="headerButton">
         <span class="icon_arangodb_arrowright" title="Next collection"></span>
@@ -712,6 +750,20 @@ if (list.length > 0) {
         <span class="icon_arangodb_arrowleft" title="Previous collection"></span>
       </a>
     </li>
+    -->
+    <li class="enabled">
+        <select id="documentSize" class="documents-size">
+          <option value="10" selected="">10 results</option>
+          <option value="20">20 results</option>
+          <option value="50">50 results</option>
+          <option value="100">100 results</option>
+          <option value="500">500 results</option>
+          <option value="1000">1000 results</option>
+          <option value="2500">2500 results</option>
+          <option value="5000">5000 results</option>
+          <option value="all">All results</option>
+        </select>
+      </a>
     <li class="enabled">
       <a id="markDocuments" class="headerButton">
         <span class="icon_arangodb_edit" title="Edit documents"></span>
@@ -742,7 +794,7 @@ if (list.length > 0) {
   </div>
 </div>
 
-<div class="arangoDropdown">
+<div class="arangoDropdown documentsDropdown">
   <div id="filterHeader" class="headerDropdown">
     <div class="queryline">
        <input id="attribute_name0" type="text" placeholder="Attribute name"><select name="operator" id="operator0" class="filterSelect">
@@ -1039,17 +1091,6 @@ if (list.length > 0) {
     <div id="documentsToolbarFL">
       <div id="documentsToolbarF" class="pagination-line">
       </div>
-        <select id="documentSize" class="documents-size">
-          <option value="10" selected="">10 results</option>
-          <option value="20">20 results</option>
-          <option value="50">50 results</option>
-          <option value="100">100 results</option>
-          <option value="500">500 results</option>
-          <option value="1000">1000 results</option>
-          <option value="2500">2500 results</option>
-          <option value="5000">5000 results</option>
-          <option value="all">All results</option>
-        </select>
     </div>
 
 <!-- Delete Modal -->
@@ -1150,11 +1191,16 @@ if (list.length > 0) {
   }
 %>
 <div class="footer-left">
-  <p>Copyright (c) ArangoDB GmbH</p>
+  <div class="social-icons">
+    <p><a href="https://twitter.com/arangodb" target="_blank"><i class="fa fa-twitter"></i></a></p>
+    <p><a href="https://www.arangodb.com/community" target="_blank"></a><i class="fa fa-envelope"></i></a></p>
+    <p><a href="https://stackoverflow.com/questions/tagged/arangodb" target="_blank"></a><i class="fa fa-stack-overflow"></i></a></p>
+    <p><a href="https://groups.google.com/group/arangodb" target="_blank"></a><i class="fa fa-google"></i></a></p>
+  </div>
 </div>
 
 <div class="footer-center">
-  <p>Show Help <i class="fa fa-keyboard-o"></i></p>
+  <p>Help <i class="fa fa-keyboard-o"></i></p>
 </div>
 
 <div class="footer-right">
@@ -1163,7 +1209,7 @@ if (list.length > 0) {
 </script>
 
 <script id="foxxActiveView.ejs" type="text/template">
-  <img src="foxxes/thumbnail?mount=<%= model.encodedMount() %>" height="50" width="50" alt="Icon for App" class="icon">
+  <img src="foxxes/thumbnail?mount=<%= model.encodedMount() %>" height="50" width="50" alt="Icon for Service" class="icon">
     <% if (model.needsAttention()) { %>
       <span class="warning-icons">
         <% if (model.isBroken()) { %>
@@ -1196,7 +1242,7 @@ if (list.length > 0) {
 <div id="change-foxx" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" style="display:none">
   <div class="modal-header">
     <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-    <a class="arangoHeader">Modify Application</a>
+    <a class="arangoHeader">Modify Service</a>
   </div>
   <div class="modal-body">
     <table>
@@ -1260,7 +1306,7 @@ if (list.length > 0) {
 <div id="install-foxx" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" style="display:none">
   <div class="modal-header">
     <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-    <a class="arangoHeader">Install Application</a>
+    <a class="arangoHeader">Install Service</a>
   </div>
   <div class="modal-body">
     <table>
@@ -1302,6 +1348,11 @@ if (list.length > 0) {
 
 <script id="graphManagementView.ejs" type="text/template">
   <div class="headerBar">
+    <div class="search-field">
+      <input type="text" value="<%=searchString%>" id="graphManagementSearchInput" class="search-input" placeholder="Search..."/>
+      <i id="graphManagementSearchSubmit" class="fa fa-search"></i>
+      <!-- <img id="graphManagementSearchSubmit" class="search-submit-icon"> -->
+    </div>
      <div class="headerButtonBar">
         <ul class="headerButtonList">
           <li class="enabled">
@@ -1314,9 +1365,6 @@ if (list.length > 0) {
     <div class="pull-left">
       <a class="arangoHeader">Graphs</a>
     </div>
-    <div class="search-field">
-      <input type="text" value="<%=searchString%>" id="graphManagementSearchInput" class="search-input" placeholder="Search..."/><img id="graphManagementSearchSubmit" class="search-submit-icon">
-    </div>
   </div>
 
 
@@ -1328,7 +1376,8 @@ if (list.length > 0) {
         <li><a>
           <label class="checkbox checkboxLabel">
             <input class="css-checkbox" type="checkbox" id="graphSortDesc">
-            <label class="css-label" id="graphSortDesc"></label>Sort descending
+            <i class="fa"></i>
+            Sort descending
           </label>
         </a></li>
       </ul>
@@ -1356,6 +1405,7 @@ if (list.length > 0) {
         <span class="icon_arangodb_settings2 editGraph" id="<%=graphName %>_settings" alt="Edit graph" title="Edit graph"></span>
       </div>
       <span class="icon_arangodb_edge5 tile-icon"></span>
+      <span class="icon_arangodb_edge5 icon_arangodb_edge5-2 tile-icon"></span>
         <div class="tileBadge">
     </div>
 
@@ -1437,8 +1487,9 @@ if (list.length > 0) {
     <a class="arangoHeader">Logs</a>
   </div>
 
-  <div id="logContent" class="log-content-id innerContent"></div>
-  <div id="logPaginationDiv" class="pagination-line"></>
+  <div id="logContent" class="log-content-id innerContent">
+  </div>
+  <!-- <div id="logPaginationDiv" class="pagination-line"></div> -->
 </script>
 
 <script id="modalApplicationMount.ejs" type="text/template">
@@ -1468,8 +1519,8 @@ if (list.length > 0) {
   </table>
 
   <ul id="infoTab" class="nav nav-tabs">
-    <li class="active"><a href="#newApp" data-toggle="tab" id="tab-new">New App</a></li>
-    <li><a href="#appstore" data-toggle="tab" id="tab-store"><img src="img/arangodblogoAvatar_150.png" alt="ArangoDB" class="tab-icon" />Store</a></li>
+    <li class="active"><a href="#newApp" data-toggle="tab" id="tab-new">New Service</a></li>
+    <li><a href="#appstore" data-toggle="tab" id="tab-store"><img src="img/arangodb_logo_small.png" alt="ArangoDB" class="tab-icon" />Store</a></li>
     <li><a href="#github" data-toggle="tab" id="tab-git">Github</a></li>
     <li><a href="#zip" data-toggle="tab" id="tab-zip">Zip</a></li>
   </ul>
@@ -1491,7 +1542,7 @@ if (list.length > 0) {
             Name*:
           </th>
           <th class="collectionInfoTh">
-            <input type="text" id="new-app-name" value="" placeholder="Name of the App">
+            <input type="text" id="new-app-name" value="" placeholder="Name of the Service">
           </th>
         </tr>
         <tr class="tableRow">
@@ -1499,7 +1550,7 @@ if (list.length > 0) {
             Description*:
           </th>
           <th class="collectionInfoTh">
-            <input type="text" id="new-app-description" value="" placeholder="Please describe your App here">
+            <input type="text" id="new-app-description" value="" placeholder="Please describe your Service here">
           </th>
         </tr>
         <tr class="tableRow">
@@ -1528,7 +1579,7 @@ if (list.length > 0) {
             <input type="hidden" id="new-app-collections" value="" placeholder="Collections"></input>
           </th>
           <th>
-            <a class="modalTooltips" title="A list of collections that will be created specifically for this App. A CRUD API for these will be generated.">
+            <a class="modalTooltips" title="A list of collections that will be created specifically for this Service. A CRUD API for these will be generated.">
               <span class="arangoicon icon_arangodb_info"></span>
             </a>
           </th>
@@ -1571,7 +1622,7 @@ if (list.length > 0) {
       <div>
         <p>
           Upload a ZIP-packed foxx application to ArangoDB.
-          The ZIP file has to be created from the folder containing the manifest.json file of your App, do not include the databases folder structure created by ArangoDB.
+          The ZIP file has to be created from the folder containing the manifest.json file of your Service, do not include the databases folder structure created by ArangoDB.
           This is also compatible with the download format for ZIP files on <a href="https://www.github.com">github.com</a>.
           Remember to change to a new version number in the manifest.json when uploading an update.
         </p>
@@ -1890,7 +1941,7 @@ if (list.length > 0) {
 
 <script id="modalDownloadFoxx.ejs" type="text/template">
   <div>
-    Your new Foxx Application is ready for download.
+    Your new Foxx Service is ready for download.
     You can edit it on your local system and repack it in a zip file to publish it on ArangoDB.
   </div>
 </script>
@@ -2248,7 +2299,7 @@ if (list.length > 0) {
     <li class="demo-menu"><a id="demo" class="tab" href="#demo">Demo</a></li>
     <li class="graphviewer-menu"><a id="graph" class="tab" href="#graph">Graphs</a></li>
     <li class="applications-menu">
-      <a id="applications" class="tab" href="#applications">Applications</a>
+      <a id="applications" class="tab" href="#applications">Services</a>
     </li>
     <li class="query-menu"><a id="query" class="tab" href="#query">AQL Editor</a></li>
     <li class="navbar-spacer big"></li>
@@ -2292,15 +2343,6 @@ if (list.length > 0) {
         <li class="dropdown-item"><a href="https://github.com/arangodb/arangodb" target="_blank">GitHub
           Repository</a></li>
         <li class="dropdown-item"><a href="https://www.arangodb.com" target="_blank">ArangoDB.com</a></li>
-        <li class="divider"></li>
-        <li class="dropdown-header">Social</li>
-        <li class="dropdown-item"><a href="https://twitter.com/arangodb" target="_blank">Twitter</a></li>
-        <li class="dropdown-item"><a href="https://www.arangodb.com/community" target="_blank">Contact</a>
-        </li>
-        <li class="dropdown-item"><a href="https://stackoverflow.com/questions/tagged/arangodb" target="_blank">StackOverflow</a>
-        </li>
-        <li class="dropdown-item"><a href="https://groups.google.com/group/arangodb" target="_blank">Google
-          Groups</a></li>
       </ul>
     </li>
   </ul>
@@ -2317,7 +2359,7 @@ if (list.length > 0) {
 
     <option value="#collections">Collections</option>
     <option value="#demo">Demo</option>
-    <option value="#applications">Applications</option>
+    <option value="#applications">Services</option>
     <option value="#graph">Graph</option>
     <option value="#query">AQL Editor</option>
     <option value="#shell">JS Shell</option>
@@ -2364,9 +2406,12 @@ if (list.length > 0) {
 
 <script id="progressBase.ejs" type="text/template">
   <div class="progress-view">
-    <p class="progress-content">
-      <i class="fa fa-spinner fa-spin"></i>
-    </p>
+    <div class="progress-content">
+      <!--<i style="visibility:hidden" class="fa fa-spinner fa-spin"></i>-->
+      <div class="pong-loader">
+        Loading…
+      </div>
+    </div>
     <div class="progress-message">
       <div class="progress-text"></div>
       <div class="progress-action"></div>
@@ -2391,8 +2436,8 @@ if (list.length > 0) {
   <div id="queryManagementContent" class="innerContent">
   </div>
 
-  <div>
-    <button id="deleteSlowQueryHistory" style="margin-top: 5px" class="button-danger query-button">Delete History</button>
+  <div class="queryManagementBottomActions">
+    <button id="deleteSlowQueryHistory" class="button-danger query-button">Delete History</button>
   </div>
 </script>
 
@@ -2420,7 +2465,7 @@ if (list.length > 0) {
     </div>
   </div>
 
-  <div id="queryContent">
+  <div id="queryContent" class="innerContent">
     <ul class="arango-tab">
       <li><a href="#result" data-toggle="pill" id="result-switch">Result</a></li>
       <!--<li><a href="#explain" data-toggle="pill" id="explain-switch">Explain</a></li>-->
@@ -2438,7 +2483,6 @@ if (list.length > 0) {
     <div class="tab-content" id="tabContentQuery">
       <div class="tab-pane active" id="query">
         <div id="queryDiv" class="query-div">
-          <div id="editorLabel" class="editor-label"></div>
           <div id="editorToolbar" class="query-toolbar editor-toolbar">
             <span class="icon_arangodb icon_arangodb_trash queryTooltips tooltip-margin" title="Clear" id="clearInput"/>
             <span class="icon_arangodb icon_arangodb_adddoc queryTooltips" title="Save current query" id="addAQL"/>
@@ -2456,7 +2500,7 @@ if (list.length > 0) {
               <div id="shortcutDiv" class="shortcuts shortcut-div showHotkeyHelp">
               </div>
             </div>
-            <div>
+            <div class="queryBottomActions">
 
               <button id="submitQueryButton" class="button-success query-button">Execute</button>
               <button id="explainQueryButton" class="button-success query-button">Explain</button>
@@ -2478,7 +2522,6 @@ if (list.length > 0) {
     <div class="tab-content" id="tabContentExplain">
 
       <div class="tab-pane" id="explain">
-        <div id="editorLabel" class="editor-label"></div>
         <div id="outputToolbar" class="query-toolbar output-toolbar">
         </div>
         <div class="explain-warnings"></div>
@@ -2492,7 +2535,6 @@ if (list.length > 0) {
     <div class="tab-content" id="tabContentResult">
 
       <div class="tab-pane" id="result">
-        <div id="editorLabel" class="editor-label"></div>
         <div id="outputToolbar" class="query-toolbar output-toolbar">
           <!--
           <span class="icon_arangodb icon_arangodb_trash queryTooltips tooltip-margin" title="Clear" id="clearOutput"></span>
@@ -2502,7 +2544,9 @@ if (list.length > 0) {
         <div id="queryOutput" class="contentDiv query-output">
         </div>
         <div class="pull-left queryExecutionTime"></div>
-        <button id="downloadQueryResult" class="button-success query-button">Download</button>
+        <div class="queryBottomActions">
+          <button id="downloadQueryResult" style="margin-bottom: 5px" class="button-success query-button">Download</button>
+        </div>
       </div>
 
     </div>
@@ -2556,7 +2600,7 @@ var cutByResolution = function (str) {
 <thead>
   <tr role="row">
     <th class="sorting_disabled docsFirstCol" role="columnheader" rowspan="1" colspan="1">Content</th>
-    <th class="sorting_disabled docsSecCol" role="columnheader" rowspan="1" colspan="1"></th>
+    <th class="sorting_disabled docsSecCol" role="columnheader" rowspan="1" colspan="1">_key</th>
     <th class="sorting_disabled docsThirdCol" role="columnheader" rowspan="1" colspan="1">
       <a id="addDocumentButton" class="pull-right addButton"><span class="arangoicon icon_arangodb_roundplus" title="Add a document"></span></a>
     </th>
@@ -2639,6 +2683,11 @@ var cutByResolution = function (str) {
 
 <script id="userManagementView.ejs" type="text/template">
   <div class="headerBar">
+    <div class="search-field">
+      <input type="text" value="<%=searchString%>" id="userManagementSearchInput" class="search-input" placeholder="Search..."/>
+      <!-- <img id="userManagementSearchSubmit" class="search-submit-icon"> -->
+      <i id="userManagementSearchSubmit" class="fa fa-search"></i>
+    </div>
     <div class="headerButtonBar">
       <ul class="headerButtonList">
         <li class="enabled">
@@ -2651,9 +2700,6 @@ var cutByResolution = function (str) {
 
     <div class="pull-left">
       <a class="arangoHeader">User Management</a>
-    </div>
-    <div class="search-field">
-      <input type="text" value="<%=searchString%>" id="userManagementSearchInput" class="search-input" placeholder="Search..."/><img id="userManagementSearchSubmit" class="search-submit-icon">
     </div>
   </div>
 
@@ -2681,7 +2727,8 @@ var cutByResolution = function (str) {
       <li><a href="#">
         <label class="checkbox checkboxLabel">
           <input class="css-checkbox" type="checkbox" id="userSortDesc">
-          <label class="css-label"></label>Sort descending
+          <i class="fa"></i>
+          Sort descending
         </label>
       </a></li>
     </ul>
@@ -2709,7 +2756,7 @@ var cutByResolution = function (str) {
                 avatar = '<img src="';
 
               if (! img) {
-                avatar += 'img/arangodblogoAvatar_50.png';
+                avatar += 'img/arangodb_logo_small.png';
               } else {
                 avatar += 'https://s.gravatar.com/avatar/';
                 avatar += img;
@@ -2766,7 +2813,7 @@ var cutByResolution = function (str) {
   <nav class="navbar">
     <div class="resizecontainer">
       <div class="navlogo">
-        <a class="logo" href="#"><img src="img/logo_arangodb_white.png"/></a>
+        <a class="logo" href="#"><img class="arangodbLogo" src="img/arangodb_logo_small.png"/></a>
       </div>
       <div id="progressPlaceholderIcon"></div>
         <div class="statmenu" id="statisticBar">
@@ -2797,7 +2844,7 @@ var cutByResolution = function (str) {
     </div>
   </footer>
 
-<script src="app.js?version=1434465978974"></script>
+<script src="app.js?version=1438597487285"></script>
 
   </body>
 </html>

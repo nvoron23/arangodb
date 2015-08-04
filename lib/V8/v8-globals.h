@@ -33,11 +33,12 @@
 #include "Basics/Common.h"
 
 #include <v8.h>
+
 // -----------------------------------------------------------------------------
 // --SECTION--                                              forward declarations
 // -----------------------------------------------------------------------------
 
-struct TRI_vocbase_s;
+struct TRI_vocbase_t;
 
 namespace triagens {
   namespace arango {
@@ -328,7 +329,6 @@ static const uint32_t V8DataSlot = 0;
     TRI_V8_THROW_EXCEPTION(TRI_ERROR_NOT_IMPLEMENTED);                       \
   }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Return undefined (default..)
 ///   implicitely requires 'args and 'isolate' to be available
@@ -457,6 +457,30 @@ typedef struct TRI_v8_global_s {
 ////////////////////////////////////////////////////////////////////////////////
 
   ~TRI_v8_global_s ();
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the context has active externals
+////////////////////////////////////////////////////////////////////////////////
+
+  inline bool hasActiveExternals () const {
+    return _activeExternals > 0;
+  }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief increase the number of active externals
+////////////////////////////////////////////////////////////////////////////////
+
+  inline void increaseActiveExternals () {
+    ++_activeExternals;
+  }
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief decrease the number of active externals
+////////////////////////////////////////////////////////////////////////////////
+
+  inline void decreaseActiveExternals () {
+    --_activeExternals;
+  }
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                           HELPERS
@@ -1044,20 +1068,13 @@ typedef struct TRI_v8_global_s {
 /// @brief pointer to the vocbase (TRI_vocbase_t*)
 ////////////////////////////////////////////////////////////////////////////////
 
-  struct TRI_vocbase_s* _vocbase;
+  TRI_vocbase_t* _vocbase;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not useDatabase() is allowed
+/// @brief number of v8 externals used in the context
 ////////////////////////////////////////////////////////////////////////////////
 
-  bool _allowUseDatabase;
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief whether or not dead objects (ex-wrapped V8 objects) have been
-/// deallocated in the context
-////////////////////////////////////////////////////////////////////////////////
-
-  bool _hasDeadObjects;
+  int64_t _activeExternals; 
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                           GENERAL
@@ -1080,6 +1097,13 @@ typedef struct TRI_v8_global_s {
 ////////////////////////////////////////////////////////////////////////////////
 
   bool _canceled;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not useDatabase() is allowed
+////////////////////////////////////////////////////////////////////////////////
+
+  bool _allowUseDatabase;
+
 }
 TRI_v8_global_t;
 

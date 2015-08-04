@@ -40,7 +40,6 @@
 #include "VocBase/document-collection.h"
 #include "VocBase/server.h"
 #include "VocBase/vocbase.h"
-#include "VocBase/voc-shaper.h"
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                              COLLECTION MIGRATION
@@ -79,7 +78,7 @@ static bool UpgradeShapeIterator (TRI_df_marker_t const* marker,
     TRI_shape_t const* shape = (TRI_shape_t const*) ((char const*) marker + sizeof(TRI_df_shape_marker_t));
 
     // if the shape is of basic type, don't copy it
-    if (TRI_LookupSidBasicShapeShaper(shape->_sid) != nullptr) {
+    if (Shaper::lookupSidBasicShape(shape->_sid) != nullptr) {
       return true;
     }
 
@@ -1643,6 +1642,12 @@ TRI_collection_t* TRI_OpenCollection (TRI_vocbase_t* vocbase,
 
   TRI_FreeCollectionInfoOptions(&info);
 
+  double start = TRI_microtime();
+
+  LOG_ACTION("open-collection { collection: %s/%s }", 
+             vocbase->_name,
+             collection->_info._name);
+
   // check for journals and datafiles
   bool ok = CheckCollection(collection, ignoreErrors);
 
@@ -1656,6 +1661,11 @@ TRI_collection_t* TRI_OpenCollection (TRI_vocbase_t* vocbase,
 
     return nullptr;
   }
+  
+  LOG_TIMER((TRI_microtime() - start),
+            "open-collection { collection: %s/%s }", 
+            vocbase->_name,
+            collection->_info._name);
 
   return collection;
 }

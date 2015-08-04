@@ -35,7 +35,7 @@ var SwaggerDocs = require("org/arangodb/foxx/swaggerDocs").Docs,
   internal = require("org/arangodb/foxx/internals"),
   toJSONSchema = require("org/arangodb/foxx/schema").toJSONSchema,
   is = require("org/arangodb/is"),
-  BadRequest = require("http-errors").BadRequest,
+  UnprocessableEntity = require("http-errors").UnprocessableEntity,
   UnauthorizedError = require("org/arangodb/foxx/authentication").UnauthorizedError;
 
 function createBodyParamExtractor(rootElement, paramName, allowInvalid) {
@@ -101,7 +101,7 @@ function validateOrThrow(raw, schema, allowInvalid) {
   }
   var result = joi.validate(raw, schema);
   if (result.error && !allowInvalid) {
-    throw new BadRequest(result.error.message);
+    throw new UnprocessableEntity(result.error.message.replace(/^"value"/, 'Request body'));
   }
   return result.value;
 }
@@ -516,13 +516,14 @@ extend(RequestContext.prototype, {
 ////////////////////////////////////////////////////////////////////////////////
 /// @startDocuBlock JSF_foxx_RequestContext_notes
 ///
-/// `FoxxController#notes(description)`
+/// `FoxxController#notes(...description)`
 ///
 /// Set the notes for this route in the documentation
 /// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
 
-  notes: function (notes) {
+  notes: function () {
+    var notes = Array.prototype.join.call(arguments, '\n');
     this.docs.addNotes(notes);
     return this;
   },
@@ -665,6 +666,104 @@ extend(RequestContextBuffer.prototype, {
 });
 
 _.each([
+
+////////////////////////////////////////////////////////////////////////////////
+/// @startDocuBlock JSF_foxx_RequestContextBuffer_pathParam
+///
+/// If you defined a route "/foxx/:id", you can constrain which format a path
+/// parameter (*/foxx/12*) can have by giving it a *joi* type.
+///
+/// For more information on *joi* see [the official Joi documentation](https://github.com/spumko/joi).
+///
+/// *Parameter*
+///
+/// * *id*: name of the param.
+/// * *options*: a joi schema or an object with the following properties:
+///  * *type*: a joi schema.
+///  * *description*: documentation description for the parameter.
+///  * *required* (optional): whether the parameter is required. Default: determined by *type*.
+///
+/// *Examples*
+///
+/// ```js
+/// app.allroutes.pathParam("id", joi.number().integer().required().description("Id of the Foxx"));
+///
+/// app.get("/foxx/:id", function {
+///   // Do something
+/// });
+/// ```
+///
+/// You can also pass in a configuration object instead:
+///
+/// ```js
+/// app.allroutes.pathParam("id", {
+///   type: joi.number().integer(),
+///   required: true,
+///   description: "Id of the Foxx"
+/// });
+///
+/// app.get("/foxx/:id", function {
+///   // Do something
+/// });
+/// ```
+/// @endDocuBlock
+////////////////////////////////////////////////////////////////////////////////
+  "pathParam",
+////////////////////////////////////////////////////////////////////////////////
+/// @startDocuBlock JSF_foxx_RequestContextBuffer_queryParam
+///
+/// `FoxxController#queryParam(id, options)`
+///
+/// Describe a query parameter:
+///
+/// If you defined a route "/foxx", you can constrain which format a query
+/// parameter (*/foxx?a=12*) can have by giving it a *joi* type.
+///
+/// For more information on *joi* see [the official Joi documentation](https://github.com/spumko/joi).
+///
+/// You can also provide a description of this parameter and
+/// whether you can provide the parameter multiple times.
+///
+/// *Parameter*
+///
+/// * *id*: name of the parameter
+/// * *options*: a joi schema or an object with the following properties:
+///  * *type*: a joi schema
+///  * *description*: documentation description for this param.
+///  * *required* (optional): whether the param is required. Default: determined by *type*.
+///  * *allowMultiple* (optional): whether the param can be specified more than once. Default: `false`.
+///
+/// *Examples*
+///
+/// ```js
+/// app.allroutes.queryParam("id",
+///   joi.number().integer()
+///   .required()
+///   .description("Id of the Foxx")
+///   .meta({allowMultiple: false})
+/// });
+///
+/// app.get("/foxx", function {
+///   // Do something
+/// });
+/// ```
+///
+/// You can also pass in a configuration object instead:
+///
+/// ```js
+/// app.allroutes.queryParam("id", {
+///   type: joi.number().integer().required().description("Id of the Foxx"),
+///   allowMultiple: false
+/// });
+///
+/// app.get("/foxx", function {
+///   // Do something
+/// });
+/// ```
+/// @endDocuBlock
+////////////////////////////////////////////////////////////////////////////////
+  "queryParam",
+
 ////////////////////////////////////////////////////////////////////////////////
 /// @startDocuBlock JSF_foxx_RequestContextBuffer_errorResponse
 ///

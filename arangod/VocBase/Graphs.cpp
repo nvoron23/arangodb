@@ -107,8 +107,8 @@ Graph const& GraphFactory::byName (TRI_vocbase_t* vocbase, std::string name) {
     if (res != TRI_ERROR_NO_ERROR) {
       THROW_ARANGO_EXCEPTION(res);
     }
-    TRI_shaper_t* shaper = trx.trxCollection()->_collection->_collection->getShaper();
-    auto pid = shaper->lookupAttributePathByName(shaper, _attrEdgeDefs);
+    auto shaper = trx.trxCollection()->_collection->_collection->getShaper();
+    auto pid = shaper->lookupAttributePathByName(_attrEdgeDefs);
     if (pid == 0) {
       //TODO FIXME
       THROW_ARANGO_EXCEPTION(42);
@@ -117,14 +117,13 @@ Graph const& GraphFactory::byName (TRI_vocbase_t* vocbase, std::string name) {
     TRI_EXTRACT_SHAPED_JSON_MARKER(document, mptr.getDataPtr());
     TRI_shaped_json_t result;
     TRI_shape_t const* shape;
-    bool ok = TRI_ExtractShapedJsonVocShaper(shaper,
-                                             &document,
-                                             0,
-                                             pid,
-                                             &result,
-                                             &shape);
+    bool ok = shaper->extractShapedJson(&document,
+                                        0,
+                                        pid,
+                                        &result,
+                                        &shape);
 
-    if (!ok) {
+    if (! ok) {
       //TODO FIXME
       THROW_ARANGO_EXCEPTION(42);
     }
@@ -144,19 +143,18 @@ Graph const& GraphFactory::byName (TRI_vocbase_t* vocbase, std::string name) {
       TRI_ASSERT(e.isArray());
       insertVertexCollectionsFromJsonArray(g, e);
     }
-    pid = shaper->lookupAttributePathByName(shaper, _attrOrphans);
+    pid = shaper->lookupAttributePathByName(_attrOrphans);
     if (pid == 0) {
       //TODO FIXME
       THROW_ARANGO_EXCEPTION(42);
     }
     TRI_EXTRACT_SHAPED_JSON_MARKER(document, mptr.getDataPtr());
-    ok = TRI_ExtractShapedJsonVocShaper(shaper,
-                                        &document,
-                                        0,
-                                        pid,
-                                        &result,
-                                        &shape);
-    if (!ok) {
+    ok = shaper->extractShapedJson(&document,
+                                   0,
+                                   pid,
+                                   &result,
+                                   &shape);
+    if (! ok) {
       //TODO FIXME
       THROW_ARANGO_EXCEPTION(42);
     }

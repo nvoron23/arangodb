@@ -57,11 +57,13 @@ namespace triagens {
       Function (std::string const& externalName,
                 std::string const& internalName,
                 std::string const& arguments,
+                bool isCacheable,
                 bool isDeterministic,
                 bool canThrow,
                 bool canRunOnDBServer,
                 bool canPassArgumentsByReference,
-                FunctionImplementation implementation = nullptr);
+                FunctionImplementation implementation = nullptr,
+                ExecutionCondition = nullptr);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief destroy the function
@@ -132,6 +134,12 @@ namespace triagens {
       std::string const       arguments;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief whether or not the function results may be cached by the query cache
+////////////////////////////////////////////////////////////////////////////////
+
+      bool const              isCacheable;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief whether or not the function is deterministic (i.e. its results are
 /// identical when called repeatedly with the same input values)
 ////////////////////////////////////////////////////////////////////////////////
@@ -173,6 +181,14 @@ namespace triagens {
 ////////////////////////////////////////////////////////////////////////////////
 
       FunctionImplementation  implementation;
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief condition under which the C++ implementation of the function is 
+/// executed (if returns false, the function will be executed as its JavaScript
+/// variant)
+////////////////////////////////////////////////////////////////////////////////
+
+      ExecutionCondition      condition;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief function argument conversion information

@@ -7,17 +7,11 @@
 %error-verbose
 
 %{
-#include <stdio.h>
-#include <stdlib.h>
-#include <iostream>
-
-#include <Basics/Common.h>
-#include <Basics/conversions.h>
-#include <Basics/tri-strings.h>
-
 #include "Aql/AstNode.h"
 #include "Aql/Function.h"
 #include "Aql/Parser.h"
+#include "Basics/conversions.h"
+#include "Basics/tri-strings.h"
 %}
 
 %union {
@@ -75,11 +69,9 @@ void Aqlerror (YYLTYPE* locp,
 %token T_IN "IN keyword"
 %token T_WITH "WITH keyword"
 %token T_INTO "INTO keyword"
-%token T_FROM "FROM keyword"
 
 %token T_GRAPH "GRAPH keyword"
-%token T_TRAVERSE "TRAVERSE keyword"
-%token T_STEPS "STEPS keyword"
+%token T_DISTINCT "DISTINCT modifier"
 
 %token T_REMOVE "REMOVE command"
 %token T_INSERT "INSERT command"
@@ -135,7 +127,8 @@ void Aqlerror (YYLTYPE* locp,
 %token T_ANY "any direction"
 
 /* define operator precedence */
-%left T_COMMA 
+%left T_COMMA
+%left T_DISTINCT
 %right T_QUESTION T_COLON
 %right T_ASSIGN
 %left T_WITH
@@ -172,6 +165,7 @@ void Aqlerror (YYLTYPE* locp,
 %type <strval> count_into;
 %type <node> expression;
 %type <node> expression_or_query;
+%type <node> distinct_expression;
 %type <node> operator_unary;
 %type <node> operator_binary;
 %type <node> operator_ternary;
@@ -596,7 +590,7 @@ limit_statement:
   ;
 
 return_statement:
-    T_RETURN expression {
+    T_RETURN distinct_expression {
       auto node = parser->ast()->createNodeReturn($2);
       parser->ast()->addOperation(node);
       parser->ast()->scopes()->endNested();
@@ -713,7 +707,7 @@ upsert_statement:
       parser->ast()->startSubQuery();
       
       scopes->start(triagens::aql::AQL_SCOPE_FOR);
-      std::string const variableName = parser->ast()->variables()->nextName();
+      std::string const variableName = std::move(parser->ast()->variables()->nextName());
       auto forNode = parser->ast()->createNodeFor(variableName.c_str(), $8, false);
       parser->ast()->addOperation(forNode);
 
@@ -733,7 +727,7 @@ upsert_statement:
       AstNode* subqueryNode = parser->ast()->endSubQuery();
       scopes->endCurrent();
       
-      std::string const subqueryName = parser->ast()->variables()->nextName();
+      std::string const subqueryName = std::move(parser->ast()->variables()->nextName());
       auto subQuery = parser->ast()->createNodeLet(subqueryName.c_str(), subqueryNode, false);
       parser->ast()->addOperation(subQuery);
       
@@ -744,6 +738,22 @@ upsert_statement:
       auto node = parser->ast()->createNodeUpsert(static_cast<AstNodeType>($6), parser->ast()->createNodeReference(Variable::NAME_OLD), $5, $7, $8, $9);
       parser->ast()->addOperation(node);
       parser->setWriteNode(node);
+    }
+  ;
+
+distinct_expression:
+    T_DISTINCT {
+      auto const scopeType = parser->ast()->scopes()->type();
+
+      if (scopeType == AQL_SCOPE_MAIN ||
+          scopeType == AQL_SCOPE_SUBQUERY) {
+        parser->registerParseError(TRI_ERROR_QUERY_PARSE, "cannot use DISTINCT modifier on top-level query element", yylloc.first_line, yylloc.first_column);
+      }
+    } expression {
+      $$ = parser->ast()->createNodeDistinct($3);
+    }
+  | expression {
+      $$ = $1;
     }
   ;
 
@@ -891,7 +901,7 @@ expression_or_query:
       AstNode* node = parser->ast()->endSubQuery();
       parser->ast()->scopes()->endCurrent();
 
-      std::string const variableName = parser->ast()->variables()->nextName();
+      std::string const variableName = std::move(parser->ast()->variables()->nextName());
       auto subQuery = parser->ast()->createNodeLet(variableName.c_str(), node, false);
       parser->ast()->addOperation(subQuery);
 
@@ -983,13 +993,26 @@ object_elements_list:
   ;
 
 object_element: 
-    object_element_name T_COLON expression {
+    T_STRING {
+      // attribute-name-only (comparable to JS enhanced object literals, e.g. { foo, bar })
+      auto ast = parser->ast();
+      auto variable = ast->scopes()->getVariable($1);
+      
+      if (variable == nullptr) {
+        // variable does not exist
+        parser->registerParseError(TRI_ERROR_QUERY_VARIABLE_NAME_UNKNOWN, "use of unknown variable '%s' in object literal", $1, yylloc.first_line, yylloc.first_column);
+      }
+
+      // create a reference to the variable
+      auto node = ast->createNodeReference(variable);
+      parser->pushObjectElement($1, node);
+    }
+  | object_element_name T_COLON expression {
+      // attribute-name : attribute-value
       parser->pushObjectElement($1, $3);
     }
-  | T_ARRAY_OPEN expression T_ARRAY_CLOSE T_COLON expression {
-      parser->pushObjectElement($2, $5);
-    }
   | T_PARAMETER T_COLON expression {
+      // bind-parameter : attribute-value
       if ($1 == nullptr) {
         ABORT_OOM
       }
@@ -1000,6 +1023,10 @@ object_element:
 
       auto param = parser->ast()->createNodeParameter($1);
       parser->pushObjectElement(param, $3);
+    }
+  | T_ARRAY_OPEN expression T_ARRAY_CLOSE T_COLON expression {
+      // [ attribute-name-expression ] : attribute-value
+      parser->pushObjectElement($2, $5);
     }
   ;
 
@@ -1187,7 +1214,7 @@ reference:
       AstNode* node = parser->ast()->endSubQuery();
       parser->ast()->scopes()->endCurrent();
 
-      std::string const variableName = parser->ast()->variables()->nextName();
+      std::string const variableName = std::move(parser->ast()->variables()->nextName());
       auto subQuery = parser->ast()->createNodeLet(variableName.c_str(), node, false);
       parser->ast()->addOperation(subQuery);
 
@@ -1272,13 +1299,6 @@ reference:
         auto expand = parser->ast()->createNodeExpansion($3, iterator, parser->ast()->createNodeReference(variable->name.c_str()), $5, $6, $7);
         $1->changeMember(1, expand);
         $$ = $1;
-/*
-        auto current = const_cast<AstNode*>(parser->ast()->findExpansionSubNode($1));
-        TRI_ASSERT(current->type == NODE_TYPE_EXPANSION);
-        auto expand = parser->ast()->createNodeExpansion($3, iterator, parser->ast()->createNodeReference(variable->name.c_str()), $5, $6, $7);
-        current->changeMember(1, expand);
-        $$ = $1;
-*/
       }
       else {
         $$ = parser->ast()->createNodeExpansion($3, iterator, parser->ast()->createNodeReference(variable->name.c_str()), $5, $6, $7);

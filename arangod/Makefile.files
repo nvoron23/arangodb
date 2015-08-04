@@ -40,6 +40,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Aql/OptimizerRules.cpp \
 	arangod/Aql/Parser.cpp \
 	arangod/Aql/Query.cpp \
+	arangod/Aql/QueryCache.cpp \
 	arangod/Aql/QueryList.cpp \
 	arangod/Aql/QueryRegistry.cpp \
 	arangod/Aql/RangeInfo.cpp \
@@ -92,9 +93,11 @@ arangod_libarangod_a_SOURCES = \
 	arangod/RestHandler/RestExportHandler.cpp \
 	arangod/RestHandler/RestImportHandler.cpp \
 	arangod/RestHandler/RestPleaseUpgradeHandler.cpp \
+	arangod/RestHandler/RestQueryCacheHandler.cpp \
 	arangod/RestHandler/RestQueryHandler.cpp \
 	arangod/RestHandler/RestReplicationHandler.cpp \
 	arangod/RestHandler/RestSimpleHandler.cpp \
+	arangod/RestHandler/RestSimpleQueryHandler.cpp \
 	arangod/RestHandler/RestUploadHandler.cpp \
 	arangod/RestHandler/RestVocbaseBaseHandler.cpp \
 	arangod/RestServer/ArangoServer.cpp \
@@ -112,7 +115,6 @@ arangod_libarangod_a_SOURCES = \
 	arangod/Utils/TransactionContext.cpp \
 	arangod/Utils/V8TransactionContext.cpp \
 	arangod/V8Server/ApplicationV8.cpp \
-	arangod/V8Server/V8DispatcherThread.cpp \
 	arangod/V8Server/V8Job.cpp \
 	arangod/V8Server/V8PeriodicTask.cpp \
 	arangod/V8Server/V8QueueJob.cpp \
@@ -124,6 +126,7 @@ arangod_libarangod_a_SOURCES = \
 	arangod/V8Server/v8-dispatcher.cpp \
 	arangod/V8Server/v8-query.cpp \
 	arangod/V8Server/v8-replication.cpp \
+	arangod/V8Server/v8-shape-conv.cpp \
 	arangod/V8Server/v8-vocbase.cpp \
 	arangod/V8Server/v8-vocindex.cpp \
 	arangod/V8Server/v8-voccursor.cpp \
@@ -141,16 +144,20 @@ arangod_libarangod_a_SOURCES = \
 	arangod/VocBase/edge-collection.cpp \
 	arangod/VocBase/Graphs.cpp \
 	arangod/VocBase/headers.cpp \
-	arangod/VocBase/key-generator.cpp \
+	arangod/VocBase/KeyGenerator.cpp \
+	arangod/VocBase/Legends.cpp \
 	arangod/VocBase/replication-applier.cpp \
 	arangod/VocBase/replication-common.cpp \
 	arangod/VocBase/replication-dump.cpp \
 	arangod/VocBase/replication-master.cpp \
 	arangod/VocBase/server.cpp \
+	arangod/VocBase/shape-accessor.cpp \
+	arangod/VocBase/shaped-json.cpp \
+	arangod/VocBase/Shaper.cpp \
 	arangod/VocBase/transaction.cpp \
-	arangod/VocBase/voc-shaper.cpp \
 	arangod/VocBase/vocbase.cpp \
 	arangod/VocBase/vocbase-defaults.cpp \
+	arangod/VocBase/VocShaper.cpp \
 	arangod/Wal/AllocatorThread.cpp \
 	arangod/Wal/CollectorThread.cpp \
 	arangod/Wal/LogfileManager.cpp \

@@ -96,14 +96,17 @@ AqlItemBlock::AqlItemBlock (Json const& json) {
   // Now put in the data:
   Json data(json.get("data"));
   Json raw(json.get("raw"));
-  size_t posInRaw = 2;
-  size_t posInData = 0;
-  int64_t emptyRun = 0;
+
   std::vector<AqlValue> madeHere;
   madeHere.reserve(raw.size());
   madeHere.emplace_back();   // an empty AqlValue
   madeHere.emplace_back();   // another empty AqlValue, indices start w. 2
+
   try {
+    size_t posInRaw = 2;
+    size_t posInData = 0;
+    int64_t emptyRun = 0;
+
     for (RegisterId column = 0; column < _nrRegs; column++) {
       for (size_t i = 0; i < _nrItems; i++) {
         if (emptyRun > 0) {
@@ -597,7 +600,7 @@ Json AqlItemBlock::toJson (triagens::arango::AqlTransaction* trx) const {
         else {
           auto it = table.find(a);
           if (it == table.end()) {
-            raw(a.toJson(trx, _docColls[column]));
+            raw(a.toJson(trx, _docColls[column], true));
             data(Json(1.0));
             table.emplace(std::make_pair(a, pos++));
           }

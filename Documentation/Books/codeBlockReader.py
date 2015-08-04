@@ -5,7 +5,9 @@ import inspect
 import cgi
 
 validExtensions = (".cpp", ".h", ".js")
-searchPaths = ["arangod/", "lib/", "js/"]
+# specify the paths in which docublocks are searched. note that js/apps/* must not be included because it contains js/apps/system/
+# and that path also contains copies of some files present in js/ anyway.
+searchPaths = ["arangod/", "lib/", "js/actions", "js/client", "js/apps/system/_system/cerberus", "js/apps/system/_api/gharial", "js/common", "js/server"]
 fullSuccess = True
 
 def file_content(filepath):
@@ -23,8 +25,12 @@ def file_content(filepath):
     if "@startDocuBlock" in line[1]:
       _start = line[0]
     if "@endDocuBlock" in line[1]:
-      _end = line[0] + 1
-      comment_indexes.append([_start, _end])
+      try:
+        _end = line[0] + 1
+        comment_indexes.append([_start, _end])
+      except NameError:
+        print "endDocuBlock without previous startDocublock seen while analyzing %s [%s]" %(filepath, line)
+        raise
 
   for index in comment_indexes:
     comments.append(filelines[index[0]: index[1]])

@@ -30,6 +30,7 @@
 #include "ArangoServer.h"
 
 #include <v8.h>
+#include <iostream>
 
 #include "Actions/RestActionHandler.h"
 #include "Actions/actions.h"
@@ -37,6 +38,7 @@
 #include "Admin/RestHandlerCreator.h"
 #include "Admin/RestShutdownHandler.h"
 #include "Aql/Query.h"
+#include "Aql/QueryCache.h"
 #include "Aql/RestAqlHandler.h"
 #include "Basics/FileUtils.h"
 #include "Basics/Nonce.h"
@@ -68,9 +70,11 @@
 #include "RestHandler/RestExportHandler.h"
 #include "RestHandler/RestImportHandler.h"
 #include "RestHandler/RestPleaseUpgradeHandler.h"
+#include "RestHandler/RestQueryCacheHandler.h"
 #include "RestHandler/RestQueryHandler.h"
 #include "RestHandler/RestReplicationHandler.h"
 #include "RestHandler/RestSimpleHandler.h"
+#include "RestHandler/RestSimpleQueryHandler.h"
 #include "RestHandler/RestUploadHandler.h"
 #include "RestServer/ConsoleThread.h"
 #include "RestServer/VocbaseContext.h"
@@ -102,12 +106,13 @@ bool IGNORE_DATAFILE_ERRORS;
 /// @brief converts list of size_t to string
 ////////////////////////////////////////////////////////////////////////////////
 
-template<typename A> string to_string (vector<A> v) {
-  string result = "";
-  string sep = "[";
+template<typename T> 
+static std::string ToString (std::vector<T> const& v) {
+  std::string result = "";
+  std::string sep = "[";
 
-  for (auto e : v) {
-    result += sep + to_string(e);
+  for (auto const& e : v) {
+    result += sep + std::to_string(e);
     sep = ",";
   }
 
@@ -161,6 +166,11 @@ void ArangoServer::defineHandlers (HttpHandlerFactory* factory) {
   factory->addPrefixHandler(RestVocbaseBaseHandler::REPLICATION_PATH,
                             RestHandlerCreator<RestReplicationHandler>::createNoData);
   
+  // add "/simple/all" handler
+  factory->addPrefixHandler(RestVocbaseBaseHandler::SIMPLE_QUERY_ALL_PATH,
+                            RestHandlerCreator<RestSimpleQueryHandler>::createData<std::pair<ApplicationV8*, aql::QueryRegistry*>*>,
+                            _pairForAql);
+  
   // add "/simple/lookup-by-key" handler
   factory->addPrefixHandler(RestVocbaseBaseHandler::SIMPLE_LOOKUP_PATH,
                             RestHandlerCreator<RestSimpleHandler>::createData<std::pair<ApplicationV8*, aql::QueryRegistry*>*>,
@@ -189,6 +199,8 @@ void ArangoServer::defineHandlers (HttpHandlerFactory* factory) {
                             RestHandlerCreator<RestQueryHandler>::createData<ApplicationV8*>,
                             _applicationV8);
 
+  factory->addPrefixHandler("/_api/query-cache",
+                            RestHandlerCreator<RestQueryCacheHandler>::createNoData);
 
   // And now the "_admin" handlers
 
@@ -332,6 +344,8 @@ ArangoServer::ArangoServer (int argc, char** argv)
     _v8Contexts(8),
     _indexThreads(2),
     _databasePath(),
+    _queryCacheMode("off"),
+    _queryCacheMaxResults(128),
     _defaultMaximalSize(TRI_JOURNAL_DEFAULT_MAXIMAL_SIZE),
     _defaultWaitForSync(false),
     _forceSyncProperties(true),
@@ -364,11 +378,7 @@ ArangoServer::ArangoServer (int argc, char** argv)
 
   TRI_InitServerGlobals();
 
-  _server = TRI_CreateServer();
-
-  if (_server == nullptr) {
-    LOG_FATAL_AND_EXIT("could not create server instance");
-  }
+  _server = new TRI_server_t;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -377,14 +387,8 @@ ArangoServer::ArangoServer (int argc, char** argv)
 
 ArangoServer::~ArangoServer () {
   delete _indexPool;
-
   delete _jobManager;
-
-  if (_server != nullptr) {
-    TRI_FreeServer(_server);
-  }
-
-  TRI_FreeServerGlobals();
+  delete _server;
 
   Nonce::destroy();
 }
@@ -398,13 +402,7 @@ ArangoServer::~ArangoServer () {
 ////////////////////////////////////////////////////////////////////////////////
 
 void ArangoServer::buildApplicationServer () {
-  map<string, ProgramOptionsDescription> additional;
-
   _applicationServer = new ApplicationServer("arangod", "[<options>] <database-directory>", rest::Version::getDetailed());
-
-  if (_applicationServer == nullptr) {
-    LOG_FATAL_AND_EXIT("out of memory");
-  }
 
   string conf = TRI_BinaryName(_argv[0]) + ".conf";
 
@@ -424,11 +422,6 @@ void ArangoServer::buildApplicationServer () {
   // .............................................................................
 
   _applicationDispatcher = new ApplicationDispatcher();
-
-  if (_applicationDispatcher == nullptr) {
-    LOG_FATAL_AND_EXIT("out of memory");
-  }
-
   _applicationServer->addFeature(_applicationDispatcher);
 
   // .............................................................................
@@ -451,7 +444,7 @@ void ArangoServer::buildApplicationServer () {
   // ...........................................................................
 
   _queryRegistry = new aql::QueryRegistry();
-  _server->_queryRegistry = static_cast<void*>(_queryRegistry);
+  _server->_queryRegistry = _queryRegistry;
 
   // .............................................................................
   // V8 engine
@@ -462,10 +455,6 @@ void ArangoServer::buildApplicationServer () {
                                      _applicationScheduler,
                                      _applicationDispatcher);
 
-  if (_applicationV8 == nullptr) {
-    LOG_FATAL_AND_EXIT("out of memory");
-  }
-
   _applicationServer->addFeature(_applicationV8);
 
   // .............................................................................
@@ -473,6 +462,7 @@ void ArangoServer::buildApplicationServer () {
   // .............................................................................
 
   string ignoreOpt;
+  map<string, ProgramOptionsDescription> additional;
 
   additional["Hidden Options"]
     ("ruby.gc-interval", &ignoreOpt, "Ruby garbage collection interval (each x requests)")
@@ -489,9 +479,6 @@ void ArangoServer::buildApplicationServer () {
   // .............................................................................
 
   _applicationAdminServer = new ApplicationAdminServer();
-  if (_applicationAdminServer == nullptr) {
-    LOG_FATAL_AND_EXIT("out of memory");
-  }
 
   _applicationServer->addFeature(_applicationAdminServer);
   _applicationAdminServer->allowLogViewer();
@@ -584,6 +571,8 @@ void ArangoServer::buildApplicationServer () {
     ("database.force-sync-properties", &_forceSyncProperties, "force syncing of collection properties to disk, will use waitForSync value of collection when turned off")
     ("database.ignore-datafile-errors", &_ignoreDatafileErrors, "load collections even if datafiles may contain errors")
     ("database.disable-query-tracking", &_disableQueryTracking, "turn off AQL query tracking by default")
+    ("database.query-cache-mode", &_queryCacheMode, "mode for the AQL query cache (on, off, demand)")
+    ("database.query-cache-max-results", &_queryCacheMaxResults, "maximum number of results in query cache per database")
     ("database.index-threads", &_indexThreads, "threads to start for parallel background index creation")
   ;
 
@@ -592,11 +581,6 @@ void ArangoServer::buildApplicationServer () {
   // .............................................................................
 
   _applicationCluster = new ApplicationCluster(_server, _applicationDispatcher, _applicationV8);
-
-  if (_applicationCluster == nullptr) {
-    LOG_FATAL_AND_EXIT("out of memory");
-  }
-
   _applicationServer->addFeature(_applicationCluster);
 
   // .............................................................................
@@ -623,11 +607,9 @@ void ArangoServer::buildApplicationServer () {
 
   bool disableStatistics = false;
 
-#if TRI_ENABLE_FIGURES
   additional["Server Options:help-admin"]
     ("server.disable-statistics", &disableStatistics, "turn off statistics gathering")
   ;
-#endif
 
   additional["Javascript Options:help-admin"]
     ("javascript.v8-contexts", &_v8Contexts, "number of V8 contexts that are created for executing JavaScript actions")
@@ -651,10 +633,6 @@ void ArangoServer::buildApplicationServer () {
                                                              "arangodb",
                                                              &SetRequestContext,
                                                              (void*) _server);
-  if (_applicationEndpointServer == nullptr) {
-    LOG_FATAL_AND_EXIT("out of memory");
-  }
-
   _applicationServer->addFeature(_applicationEndpointServer);
 
   // .............................................................................
@@ -739,6 +717,11 @@ void ArangoServer::buildApplicationServer () {
   // set global query tracking flag
   triagens::aql::Query::DisableQueryTracking(_disableQueryTracking);
 
+  // configure the query cache
+  {
+    std::pair<std::string, size_t> cacheProperties{ _queryCacheMode, _queryCacheMaxResults };
+    triagens::aql::QueryCache::instance()->setProperties(cacheProperties);
+  }
 
   // .............................................................................
   // now run arangod
@@ -779,7 +762,7 @@ void ArangoServer::buildApplicationServer () {
     string currentDir = FileUtils::currentDirectory(&err);
     char* absoluteFile = TRI_GetAbsolutePath(_pidFile.c_str(), currentDir.c_str());
 
-    if (absoluteFile != 0) {
+    if (absoluteFile != nullptr) {
       _pidFile = string(absoluteFile);
       TRI_Free(TRI_UNKNOWN_MEM_ZONE, absoluteFile);
 
@@ -808,6 +791,7 @@ int ArangoServer::startupServer () {
 
   if (_applicationServer->programOptions().has("no-server")) {
     startServer = false;
+    TRI_ENABLE_STATISTICS = false;
   }
 
   // check version
@@ -975,7 +959,6 @@ int ArangoServer::startupServer () {
   // we pass the options by reference, so keep them until shutdown
   RestActionHandler::action_options_t httpOptions;
   httpOptions._vocbase = vocbase;
-  httpOptions._queue = "STANDARD";
 
   if (startServer) {
 
@@ -1010,7 +993,7 @@ int ArangoServer::startupServer () {
 
     if (ns != 0 && nd != 0) {
       LOG_INFO("the server has %d (hyper) cores, using %d scheduler threads, %d dispatcher threads",
-               (int) n, (int) ns, (int) nd);
+          (int) n, (int) ns, (int) nd);
     }
     else {
       _threadAffinity = 0;
@@ -1046,22 +1029,22 @@ int ArangoServer::startupServer () {
         break;
 
       case 3:
-	if (n < ns) {
-	  ns = n;
-	}
+        if (n < ns) {
+          ns = n;
+        }
 
-	nd = 0;
+        nd = 0;
 
-	break;
+        break;
 
       case 4:
-	if (n < nd) {
-	  nd = n;
-	}
+        if (n < nd) {
+          nd = n;
+        }
 
-	ns = 0;
+        ns = 0;
 
-	break;
+        break;
 
       default:
         _threadAffinity = 0;
@@ -1084,22 +1067,18 @@ int ArangoServer::startupServer () {
       }
 
       if (0 < ns) {
-	_applicationScheduler->setProcessorAffinity(ps);
+        _applicationScheduler->setProcessorAffinity(ps);
       }
 
       if (0 < nd) {
-	_applicationDispatcher->setProcessorAffinity(pd);
+        _applicationDispatcher->setProcessorAffinity(pd);
       }
 
-      if (0 < ns && 0 < nd) {
-	LOG_INFO("scheduler cores: %s, dispatcher cores: %s",
-		 to_string(ps).c_str(), to_string(pd).c_str());
+      if (0 < ns) {
+        LOG_INFO("scheduler cores: %s", ToString(ps).c_str());
       }
-      else if (0 < ns) {
-	LOG_INFO("scheduler cores: %s", to_string(ps).c_str());
-      }
-      else if (0 < nd) {
-	LOG_INFO("dispatcher cores: %s", to_string(pd).c_str());
+      if (0 < nd) {
+        LOG_INFO("dispatcher cores: %s", ToString(pd).c_str());
       }
     }
     else {
@@ -1257,7 +1236,7 @@ int ArangoServer::runConsole (TRI_vocbase_t* vocbase) {
 ////////////////////////////////////////////////////////////////////////////////
 
 int ArangoServer::runUnitTests (TRI_vocbase_t* vocbase) {
-  ApplicationV8::V8Context* context = _applicationV8->enterContext("STANDARD", vocbase, true);
+  ApplicationV8::V8Context* context = _applicationV8->enterContext(vocbase, true);
 
   auto isolate = context->isolate;
 
@@ -1313,7 +1292,7 @@ int ArangoServer::runUnitTests (TRI_vocbase_t* vocbase) {
 
 int ArangoServer::runScript (TRI_vocbase_t* vocbase) {
   bool ok = false;
-  ApplicationV8::V8Context* context = _applicationV8->enterContext("STANDARD", vocbase, true);
+  ApplicationV8::V8Context* context = _applicationV8->enterContext(vocbase, true);
   auto isolate = context->isolate;
 
   {

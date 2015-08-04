@@ -36,8 +36,6 @@
 #include "Basics/shell-colors.h"
 #include "Basics/string-buffer.h"
 #include "Basics/tri-strings.h"
-#include "ShapedJson/shaped-json.h"
-
 #include "V8/v8-globals.h"
 #include "V8/v8-conv.h"
 #include "V8/v8-json.h"
@@ -284,7 +282,7 @@ static void JS_ProcessJsonFile (const v8::FunctionCallbackInfo<v8::Value>& args)
       if (object->IsUndefined()) {
         if (error != nullptr) {
           string msg = error;
-          TRI_FreeString(TRI_CORE_MEM_ZONE, error);
+          TRI_FreeString(TRI_UNKNOWN_MEM_ZONE, error);
           TRI_V8_THROW_SYNTAX_ERROR(msg.c_str());
         }
         else {

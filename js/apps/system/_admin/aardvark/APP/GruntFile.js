@@ -17,6 +17,34 @@
             "frontend/js/lib/underscore.js",
             "frontend/js/lib/backbone.js",
             "frontend/js/lib/bootstrap.js"
+          ],
+          css: [
+            "frontend/css/swagger/hightlight.default.css",
+            "frontend/css/bootstrap.css",
+            "frontend/css/jquery-ui-1.9.2.custom.css",
+            "frontend/css/jquery.contextmenu.css",
+            "frontend/css/select2.css",
+            "frontend/css/jquery.dataTables.css",
+            "frontend/css/nv.d3.css",
+            "frontend/css/swaggerView.css",
+            "frontend/css/ansi.css",
+            "frontend/css/highlightjs.css",
+            "frontend/css/jsoneditor.css",
+            "frontend/ttf/arangofont/style.css"
+          ],
+          documentation: [
+            "frontend/js/lib/jquery-2.1.0.min.js",
+            "frontend/js/lib/handlebars-1.0.rc.1.js",
+            "frontend/js/lib/underscore.js",
+            "frontend/js/lib/backbone.js",
+            "frontend/js/lib/swagger.js",
+            "frontend/js/lib/swagger-ui.js",
+            "frontend/js/lib/highlight.7.3.pack.js",
+            "frontend/js/arango/arango.js",
+            "frontend/js/shell/browser.js",
+            "frontend/js/bootstrap/module-internal.js",
+            "frontend/js/client/bootstrap/module-internal.js",
+            "frontend/js/documentation/documentation.js"
           ]
         },
         standalone: {
@@ -56,7 +84,6 @@
             "frontend/src/theme-textmate.js",
             "frontend/src/mode-json.js",
             "frontend/src/mode-aql.js"
-
           ],
           graphViewer: [
             "frontend/js/graphViewer/graph/*",
@@ -139,6 +166,195 @@
         }
       },
 
+      htmlmin: {
+        dist: {
+          options: {
+            minifyJS: true,
+            removeComments: true,
+            collapseWhitespace: true
+          },
+          files: {
+            'frontend/build/standalone-min.html' : 'frontend/build/standalone.html',
+            'clusterFrontend/build/cluster-min.html' : 'clusterFrontend/build/cluster.html',
+            'frontend/build/documentation-min.html' : 'frontend/html/documentation.html'
+          }
+        }
+      },
+
+      compress: {
+        main: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['frontend/build/*min*.html'],
+            dest: '.',
+            ext: '.html.gz'
+          }]
+        },
+        standaloneCSS: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['frontend/build/*.css'],
+            dest: '.',
+            ext: '.css.gz'
+          }]
+        },
+        clusterCSS: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['clusterFrontend/build/*.css'],
+            dest: '.',
+            ext: '.css.gz'
+          }]
+        },
+        sharedCSS: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['build/*.css'],
+            dest: '.',
+            ext: '.css.gz'
+          }]
+        },
+        standaloneJSMinified: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['frontend/build/app.min.js'],
+            dest: '.',
+            ext: '.min.js.gz'
+          }]
+        },
+        standaloneJS: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['frontend/build/app.js'],
+            dest: '.',
+            ext: '.js.gz'
+          }]
+        },
+        clusterJS: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['clusterFrontend/build/cluster.js'],
+            dest: '.',
+            ext: '.js.gz'
+          }]
+        },
+        aceJS: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['frontend/src/ace.js'],
+            dest: '.',
+            ext: '.js.gz'
+          }]
+        },
+        workerJSON: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['frontend/src/worker-json.js'],
+            dest: '.',
+            ext: '.js.gz'
+          }]
+        },
+        sharedJS: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['build/sharedLibs.js'],
+            dest: '.',
+            ext: '.js.gz'
+          }]
+        },
+        docuJS: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['build/documentation.js'],
+            dest: '.',
+            ext: '.js.gz'
+          }]
+        },
+        docuHTML: {
+          options: {
+            mode: 'gzip'
+          },
+          files: [{
+            expand: true,
+            src: ['build/documentation-min.html'],
+            dest: '.',
+            ext: '.html.gz'
+          }]
+        }
+      },
+
+      cssmin: {
+        dist: {
+          options: {
+            banner: '/* arangodb */'
+          },
+          files: {
+            'frontend/build/style-minified.css': ['frontend/build/style.css'],
+            'build/extra-minified.css': ['build/extra.css'],
+            'clusterFrontend/build/cluster-minified.css': ['frontend/scss/cluster.css'],
+            'clusterFrontend/build/style-minified.css': ['clusterFrontend/build/style.css']
+          }
+        }
+      },
+
+      imagemin: {
+        dist: {
+          options: {
+            optimizationLevel: 7
+          },
+          files: [{
+             expand: true,
+             cwd: 'frontend/img',
+             src: ['**/*.{png,jpg,gif}'],
+             dest: 'frontend/compressed-img/'
+          }]
+        }
+      },
+
+      concat: {
+        css: {
+          src: ['<%=project.shared.css %>'],
+          dest: 'build/extra.css'
+        },
+        documentation: {
+          src: ['<%=project.shared.documentation %>'],
+          dest: "build/documentation.js"
+        }
+      },
+
       concat_in_order: {
         default: {
           files: {
@@ -178,6 +394,10 @@
         },
         jsCluster: {
           src: [
+            "frontend/js/lib/dygraph-combined.js",
+            "frontend/js/config/dygraphConfig.js",
+            "frontend/js/lib/d3.v3.min.js",
+            "frontend/js/lib/nv.d3.js",
             "frontend/js/arango/arango.js",
             "clusterFrontend/js/models/*",
             "clusterFrontend/js/collections/*",
@@ -191,7 +411,6 @@
             "frontend/js/views/footerView.js",
             "frontend/js/views/dashboardView.js",
             "frontend/js/views/modalView.js",
-            "frontend/js/config/dygraphConfig.js",
             "frontend/js/collections/arangoStatisticsDescriptionCollection.js",
             "clusterFrontend/js/views/*",
             "clusterFrontend/js/routers/*"
@@ -268,11 +487,15 @@
           '<%=project.standalone.js %>'
         ]
       },
-      
+
       uglify: {
         dist: {
           files: {
-            'frontend/build/app.min.js': 'frontend/build/app.js'
+            'frontend/build/app.min.js': 'frontend/build/app.js',
+            'build/documentation.min.js': 'build/documentation.js',
+            'clusterFrontend/build/cluster.min.js': 'clusterFrontend/build/cluster.js',
+            'frontend/src/ace.min.js': 'frontend/src/ace.js',
+            'build/sharedLibs.min.js': 'build/sharedLibs.js'
           }
         }
       },
@@ -283,7 +506,18 @@
             'frontend/scss/{,*/}*.{scss,sass}',
             'clusterFrontend/scss/{,*/}*.{scss,sass}',
           ],
-          tasks: ['sass:dev']
+          tasks: ['sass:dev', 'cssmin', 'compress']
+        },
+        imagemin: {
+          files: [
+            'frontend/img/*.gif',
+            'frontend/img/*.png',
+            'frontend/img/*.jpg',
+            'frontend/img/*.jpeg'
+          ],
+          tasks: [
+            'imagemin'
+          ]
         },
         concat_in_order: {
           files: [
@@ -295,6 +529,7 @@
             'concat_in_order:sharedLibs',
             'concat_in_order:default',
             'concat_in_order:jsCluster',
+            'compress',
           ]
         },
         html: {
@@ -305,13 +540,21 @@
           ],
           tasks: [
             'concat_in_order:htmlCluster',
-            'concat_in_order:htmlStandalone'
+            'concat_in_order:htmlStandalone',
+            'compress',
+            'htmlmin'
           ]
         }
       }
     });
 
     grunt.loadNpmTasks("grunt-sass");
+    grunt.loadNpmTasks("grunt-contrib-imagemin");
+    grunt.loadNpmTasks('grunt-contrib-cssmin');
+    grunt.loadNpmTasks('grunt-contrib-compress');
+    grunt.loadNpmTasks("grunt-contrib-concat");
+    grunt.loadNpmTasks('grunt-contrib-htmlmin')
+    grunt.loadNpmTasks('grunt-contrib-uglify')
 
     require('matchdep').filterDev('grunt-*').forEach(grunt.loadNpmTasks);
     grunt.loadNpmTasks('grunt-text-replace');
@@ -320,11 +563,17 @@
       'sass:dev',
       'jshint:default',
       'replace',
+      'imagemin',
+      'concat',
       'concat_in_order:sharedLibs',
       'concat_in_order:default',
       'concat_in_order:jsCluster',
       'concat_in_order:htmlCluster',
       'concat_in_order:htmlStandalone',
+      'cssmin',
+      'uglify',
+      'htmlmin',
+      'compress',
       'watch'
     ]);
 
@@ -332,6 +581,7 @@
     grunt.registerTask('devel', [
       'sass:dev',
       'replace',
+      'concat',
       'concat_in_order:sharedLibs',
       'concat_in_order:default',
       'concat_in_order:jsCluster',

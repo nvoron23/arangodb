@@ -1,8 +1,8 @@
 #!/bin/bash
 
-V8_VERSION=3.31.74.1
+V8_VERSION=4.3.61
 
-tar cvzf precompiled-libraries.tar.gz \
+tar cvzf precompiled-libraries-${V8_VERSION}.tar.gz \
   .v8-build-64 \
   3rdParty/V8-${V8_VERSION}/include \
   3rdParty/V8-${V8_VERSION}/out/x64.release/obj.target/tools/gyp \

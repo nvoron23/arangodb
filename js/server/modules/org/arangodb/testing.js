@@ -61,6 +61,7 @@ var optionsDocumentation = [
   '   - `skipRanges`: if set to true the ranges tests are skipped',
   '   - `skipTimeCritical`: if set to true, time critical tests will be skipped.',
   '   - `skipMemoryIntense`: tests using lots of resources will be skippet.',
+  '   - `skipAuth : testing authentication will be skipped.',
   '   - `skipSsl`: ommit the ssl_server rspec tests.',
   '   - `skipLogAnalysis`: don\'t try to crawl the server logs',
   '   - `skipConfig`: ommit the noisy configuration tests',
@@ -346,7 +347,7 @@ function startInstance (protocol, options, addArgs, testname, tmpDir) {
                          "useSSLonCoordinators"   : protocol === "ssl",
                          "valgrind"               : runInValgrind,
                          "valgrindopts"           : toArgv(valgrindopts, true),
-                         "valgrindXmlFileBase"    : '_cluster' + valgrindXmlFileBase,
+                         "valgrindXmlFileBase"    : valgrindXmlFileBase + '_cluster',
                          "valgrindTestname"       : testname,
                          "valgrindHosts"          : valgrindHosts
                         });
@@ -495,6 +496,30 @@ function analyzeCoreDump(instanceInfo, options, storeArangodPath, pid) {
 
 }
 
+function analyzeCoreDumpWindows(instanceInfo) {
+
+  var coreFN = instanceInfo.tmpDataDir + "\\" + "core.dmp";
+  if (!fs.exists(coreFN)) {
+    print("core file "+ coreFN + " not found?");
+    return;
+  }
+  var dbgCmds = [
+    "kp", // print backtrace with arguments
+    "dv", // analyze local variables (if)
+    "!analyze -v", // print verbose analysis
+    "q" //quit the debugger
+  ];
+
+  var args = [
+    "-z",
+    coreFN,
+    "-c",
+    dbgCmds.join("; ")
+  ];
+
+  print("running cdb " + JSON.stringify(args));
+  executeExternalAndWait("cdb", args);
+}
 
 function checkInstanceAlive(instanceInfo, options) {
   var storeArangodPath;
@@ -522,10 +547,9 @@ function checkInstanceAlive(instanceInfo, options) {
           storeArangodPath + " " + options.coreDirectory + 
           "/core*" + instanceInfo.pid.pid + "*'";
         if (require("internal").platform.substr(0,3) === 'win') {
-          fs.copyFile("bin\\arangod.exe", instanceInfo.tmpDataDir + "\\arangod.exe");
-          fs.copyFile("bin\\arangod.pdb", instanceInfo.tmpDataDir + "\\arangod.pdb");
           // Windows: wait for procdump to do its job...
           statusExternal(instanceInfo.monitor, true);
+          analyzeCoreDumpWindows(instanceInfo);
         }
         else {
           fs.copyFile("bin/arangod", storeArangodPath);
@@ -535,6 +559,7 @@ function checkInstanceAlive(instanceInfo, options) {
       instanceInfo.exitStatus = res;
     }
     if (!ret) {
+      print("marking crashy");
       serverCrashed = true;
     }
     return ret;
@@ -556,10 +581,9 @@ function checkInstanceAlive(instanceInfo, options) {
               " /var/tmp/core*" + checkpid.pid + "*'";
 
             if (require("internal").platform.substr(0,3) === 'win') {
-              fs.copyFile("bin\\arangod.exe", instanceInfo.tmpDataDir + "\\arangod.exe");
-              fs.copyFile("bin\\arangod.pdb", instanceInfo.tmpDataDir + "\\arangod.pdb");
               // Windows: wait for procdump to do its job...
               statusExternal(instanceInfo.monitor, true);
+              analyzeCoreDumpWindows(instanceInfo);
             }
             else {
               fs.copyFile("bin/arangod", storeArangodPath);
@@ -577,6 +601,7 @@ function checkInstanceAlive(instanceInfo, options) {
     return true;
   }
   else {
+    print("marking crashy");
     serverCrashed = true;
     return false;
   }
@@ -640,6 +665,7 @@ function shutdownInstance (instanceInfo, options) {
                 print("Server " + serverState + " shut down with:\n" +
                       yaml.safeDump(rc.results[i].serverStates[serverState]) +
                       " marking run as crashy.");
+                print("marking crashy");
                 serverCrashed = true;
               }
             }
@@ -669,7 +695,8 @@ function shutdownInstance (instanceInfo, options) {
             bar = bar + "#";
           }
           if (count > 600) {
-            print("forcefully terminating " + yaml.safeDump(instanceInfo.pid) + " after 600 s grace period.");
+            print("forcefully terminating " + yaml.safeDump(instanceInfo.pid) +
+                  " after 600 s grace period; marking crashy.");
             serverCrashed = true;
             killExternal(instanceInfo.pid);
             break;
@@ -680,7 +707,9 @@ function shutdownInstance (instanceInfo, options) {
         }
         else if (instanceInfo.exitStatus.status !== "TERMINATED") {
           if (instanceInfo.exitStatus.hasOwnProperty('signal')) {
-            print("Server shut down with : " + yaml.safeDump(instanceInfo.exitStatus) + " marking build as crashy.");
+            print("Server shut down with : " +
+                  yaml.safeDump(instanceInfo.exitStatus) +
+                  " marking build as crashy.");
             serverCrashed = true;
             break;
           }
@@ -981,7 +1010,7 @@ function performTests(options, testList, testname, remote) {
 
   if (testList.length === 0) {
     print("Testsuite is empty!");
-    return {};
+    return {"EMPTY TESTSUITE": {status: false, message: "no testsuites found!"}};
   }
 
   for (i = 0; i < testList.length; i++) {
@@ -1475,6 +1504,8 @@ function runArangoBenchmark (options, instanceInfo, cmds) {
     "server.username": options.username,
     "server.password": options.password,
     "server.endpoint": instanceInfo.endpoint,
+    //"server.request-timeout": 1200 // default now. 
+    "server.connect-timeout": 10 // 5s default
   };
 
   args = _.extend(args, cmds);
@@ -1883,6 +1914,11 @@ testFuncs.arangob = function (options) {
 };
 
 testFuncs.authentication = function (options) {
+  if (options.skipAuth === true) {
+    print("skipping Authentication tests!");
+    return {};
+  }
+
   print("Authentication tests...");
   var instanceInfo = startInstance("tcp", options,
                                    {"server.disable-authentication": "false"},
@@ -1932,6 +1968,10 @@ var authTestExpectRC = [
 ];
 
 testFuncs.authentication_parameters = function (options) {
+  if (options.skipAuth === true) {
+    print("skipping Authentication with parameters tests!");
+    return {};
+  }
   print("Authentication with parameters tests...");
   var results = {};
 

@@ -6,7 +6,7 @@ dnl ============================================================================
 dnl --SECTION--                                  triAGENS GmbH Build Environment
 dnl ============================================================================
 
-AC_INIT([triAGENS ArangoDB], [2.6.0-devel], [info@arangodb.com], [arangodb], [https://www.arangodb.com])
+AC_INIT([triAGENS ArangoDB], [2.7.0-devel], [info@arangodb.com], [arangodb], [https://www.arangodb.com])
 
 dnl ----------------------------------------------------------------------------
 dnl auxillary directory for install-sh and missing
@@ -100,6 +100,7 @@ AC_ARG_ENABLE(internal-go,
   AS_HELP_STRING([--enable-internal-go], [use go binaries from 3rdParty directory (default: no)]),
   [tr_INTERNAL_GO="${enableval:-yes}"],
   [tr_INTERNAL_GO=no]
+  GOPROG=x$tr_INTERNAL_GO
 )
 
 AM_CONDITIONAL(ENABLE_INTERNAL_GO, test "x$tr_INTERNAL_GO" = xyes)
@@ -112,7 +113,10 @@ if test "x$tr_INTERNAL_GO" = "xno"; then
   else
     BASIC_INFO="$BASIC_INFO|GO BINARY: $GO"
   fi
+  GOPROG=$GO
 fi
+
+AM_CONDITIONAL(GO_AVAILABLE, test "x$GOPROG" != x)
 
 dnl ============================================================================
 dnl --SECTION--                                                          OPTIONS
@@ -211,10 +215,26 @@ dnl ----------------------------------------------------------------------------
 m4_include([m4/external.openssl])
 
 dnl ----------------------------------------------------------------------------
+dnl BOOST
+dnl ----------------------------------------------------------------------------
+
+BOOST_VERSION="1.58.0"
+BOOST_CPPFLAGS="-I${srcdir}/3rdParty/boost/${BOOST_VERSION}"
+
+AC_SUBST(BOOST_VERSION)
+AC_SUBST(BOOST_CPPFLAGS)
+
+LIB_INFO="$LIB_INFO|BOOST: 3rdParty version"
+LIB_INFO="$LIB_INFO|BOOST VERSION: ${BOOST_VERSION}"
+
+LIB_INFO="$LIB_INFO|BOOST_CPPFLAGS: ${BOOST_CPPFLAGS}"
+LIB_INFO="$LIB_INFO|."
+
+dnl ----------------------------------------------------------------------------
 dnl V8
 dnl ----------------------------------------------------------------------------
 
-V8_VERSION="3.31.74.1"
+V8_VERSION="4.3.61"
 V8_DIR=V8-${V8_VERSION}
 
 V8_CPPFLAGS="-I${srcdir}/3rdParty/${V8_DIR}/include -DTRI_V8_VERSION='\"${V8_VERSION}\"'"

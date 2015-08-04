@@ -14,7 +14,7 @@
   "contributors": [
     {
       "name": "Heiko Kernbach",
-      "email": "h.kernbach@triagens.de"
+      "email": "heiko@arangodb.com"
     },
     {
       "name": "Michael Hackstein",
@@ -34,136 +34,70 @@
     "/templates": "foxxTemplates.js"
   },
 
-  "assets": {
-    "documentation.html": {
-      "files": [
-        "frontend/html/documentation.html"
-      ]
-    },
-
-    "documentation.js": {
-      "files": [
-        "frontend/js/lib/jquery-2.1.0.min.js",
-        "frontend/js/lib/handlebars-1.0.rc.1.js",
-        "frontend/js/lib/underscore.js",
-        "frontend/js/lib/backbone.js",
-        "frontend/js/lib/swagger.js",
-        "frontend/js/lib/swagger-ui.js",
-        "frontend/js/lib/highlight.7.3.pack.js",
-        "frontend/js/arango/arango.js",
-        "frontend/js/shell/browser.js",
-        "frontend/js/bootstrap/module-internal.js",
-        "frontend/js/client/bootstrap/module-internal.js",
-        "frontend/js/documentation/documentation.js"
-      ]
-    },
-
-    "standalone.html": {
-      "files": [
-        "frontend/build/standalone.html"
-      ]
-    },
-
-    "cluster.html": {
-      "files": [
-        "clusterFrontend/build/cluster.html"
-      ]
-    },
-
-    "cluster.js": {
-      "files": [
-        "clusterFrontend/build/cluster.js"
-      ]
-    },
-
-    "ace.js": {
-      "files": [
-        "frontend/src/ace.js"
-      ]
-    },
-
-    "sharedLibs.js": {
-      "files": [
-        "build/sharedLibs.js"
-      ]
-    },
-
-    "app.js": {
-      "files": [
-        "frontend/build/app.js"
-      ]
-    },
-
-    "libs.js": {
-      "files": [
-        "frontend/js/lib/jquery-ui-1.9.2.custom.js",
-        "frontend/js/lib/jquery.snippet.js",
-        "frontend/js/lib/jquery.slideto.min.js",
-        "frontend/js/lib/jquery.wiggle.min.js",
-        "frontend/js/lib/jquery.contextmenu.js",
-        "frontend/js/lib/jquery.hotkeys.js",
-        "frontend/js/lib/jquery.form.js",
-        "frontend/js/lib/jquery.uploadfile.js",
-        "frontend/js/lib/select2.min.js",
-        "frontend/js/lib/handlebars-1.0.rc.1.js",
-        "frontend/js/lib/underscore.js",
-        "frontend/js/lib/backbone.js",
-        "frontend/js/lib/jsoneditor-min.js",
-        "frontend/js/lib/d3.v3.min.js",
-        "frontend/js/lib/nv.d3.js",
-        "frontend/js/lib/strftime-min.js",
-        "frontend/js/lib/dygraph-combined.js",
-        "frontend/js/lib/d3.fisheye.js",
-        "frontend/js/lib/bootstrap-pagination.js",
-        "frontend/js/lib/jqconsole.min.js",
-        "frontend/js/lib/swagger.js",
-        "frontend/js/lib/swagger-ui.js",
-        "frontend/js/lib/highlight.7.3.pack.js",
-        "frontend/js/lib/joi.browser.js",
-        "frontend/js/lib/md5.js"
-      ]
-    },
-
-    "css/sass.css": {
-      "files": [
-        "frontend/build/style.css"
-      ]
-    },
-
-    "css/style.css": {
-      "files": [
-        "frontend/css/swagger/hightlight.default.css",
-        "frontend/css/bootstrap.css",
-        "frontend/css/jquery-ui-1.9.2.custom.css",
-        "frontend/css/jquery.contextmenu.css",
-        "frontend/css/select2.css",
-        "frontend/css/jquery.dataTables.css",
-        "frontend/css/nv.d3.css",
-        "frontend/css/swaggerView.css",
-        "frontend/css/ansi.css",
-        "frontend/css/jsoneditor.css",
-        "frontend/ttf/arangofont/style.css"
-      ]
-    },
-
-    "css/cluster.css": {
-        "files": [
-         "frontend/scss/cluster.css",
-         "frontend/scss/generated.css"
-        ]
-    }
-  },
-
   "files": {
-    "/favicon.ico" : "favicon.ico",
+    "/documentation.js": {
+      "path": "build/documentation.min.js",
+      "gzip": true
+    },
+    "/documentation.html": {
+      "path": "build/documentation-min.html",
+      "gzip": true
+    },
+    "/standalone.html": {
+      "path": "frontend/build/standalone-min.html",
+      "gzip": true
+    },
+    "/cluster.html": {
+      "path": "clusterFrontend/build/cluster-min.html",
+      "gzip": false
+    },
+    "/css/sass.css": {
+      "path": "frontend/build/style-minified.css",
+      "gzip": true
+    },
+    "/css/style.css": {
+      "path": "build/extra-minified.css",
+      "gzip": true
+    },
+    "/css/cluster.css": {
+      "path": "clusterFrontend/build/cluster-minified.css",
+      "gzip": true
+    },
+    "/css/cluster2.css": {
+      "path": "clusterFrontend/build/style-minified.css",
+      "gzip": true
+    },
+    "/cluster.js": {
+      "path": "clusterFrontend/build/cluster.min.js",
+      "gzip": true
+    },
+    "/ace.js": {
+      "path": "frontend/src/ace.min.js",
+      "gzip": true
+    },
+    "/sharedLibs.js": {
+      "path": "build/sharedLibs.min.js",
+      "gzip": true
+    },
+    "/app.js": {
+      "path": "frontend/build/app.min.js",
+      "gzip": true
+    },
+    "/favicon.ico": {
+      "path": "favicon.ico",
+      "gzip": false
+    },
     "/api-docs.json": "api-docs.json",
     "/api-docs": "api-docs",
     "/fonts": "frontend/fonts",
-    "/img" : "frontend/img",
-    "/ammapLibs" : "frontend/js/lib/ammap/plugins/export/libs",
-    "/data" : "frontend/data",
-    "/js/arango/aqltemplates.json" : "frontend/aqltemplates.json",
-    "/worker-json.js" : "frontend/src/worker-json.js"
+    "/img": "frontend/compressed-img",
+    "/ammapLibs": "frontend/js/lib/ammap/plugins/export/libs",
+    "/data": "frontend/data",
+    "/js/arango/aqltemplates.json": "frontend/aqltemplates.json",
+    "/worker-json.js": {
+      "path": "frontend/src/worker-json.js",
+      "gzip": true
+    }
   },
 
   "lib": "."

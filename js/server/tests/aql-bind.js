@@ -242,6 +242,27 @@ function ahuacatlBindTestSuite () {
     },
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief test different value types
+////////////////////////////////////////////////////////////////////////////////
+
+    testBindValueTypes : function () {
+      var values = { 
+        nullValue: null, 
+        falseValue: false, 
+        trueValue: true, 
+        intValue: 2, 
+        doubleValue: -4.2, 
+        emptyString : "", 
+        nonemptyString : "foo", 
+        arrayValue: [ 1, 2, 3, null, "", "one", "two", "foobarbaz" ], 
+        objectValues: { "" : 1, "foo-bar-baz" : "test", "a b c" : -42 } 
+      };
+
+      var actual = getQueryResults("RETURN @values", { values: values });
+      assertEqual([ values ], actual);
+    },
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief test a string bind variable
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -275,34 +296,12 @@ function ahuacatlBindTestSuite () {
     },
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief test a list bind variable
-////////////////////////////////////////////////////////////////////////////////
-
-    testBindList1 : function () {
-      var expected = [ "" ];
-      var actual = getQueryResults("FOR u IN @list FILTER u == @value RETURN u", { "list" : [ "the quick fox", true, false, -5, 0, 1, null, "", [ ], { } ], "value" : [ ] });
-
-      assertEqual(expected, actual);
-    },
-
-////////////////////////////////////////////////////////////////////////////////
-/// @brief test a list bind variable
-////////////////////////////////////////////////////////////////////////////////
-
-    testBindList2 : function () {
-      var expected = [ true, false, 1, null, [ ] ];
-      var actual = getQueryResults("FOR u IN @list FILTER u IN @value RETURN u", { "list" : [ "the quick fox", true, false, -5, 0, 1, null, "", [ ], { } ], "value" : [ true, false, 1, null, [ ] ] });
-
-      assertEqual(expected, actual);
-    },
-
-////////////////////////////////////////////////////////////////////////////////
 /// @brief test an array bind variable
 ////////////////////////////////////////////////////////////////////////////////
 
     testBindArray1 : function () {
-      var expected = [ { } ];
-      var actual = getQueryResults("FOR u IN @list FILTER u == @value RETURN u", { "list" : [ "the quick fox", true, false, -5, 0, 1, null, "", [ ], { } ], "value" : { } });
+      var expected = [ "" ];
+      var actual = getQueryResults("FOR u IN @list FILTER u == @value RETURN u", { "list" : [ "the quick fox", true, false, -5, 0, 1, null, "", [ ], { } ], "value" : [ ] });
 
       assertEqual(expected, actual);
     },
@@ -312,6 +311,28 @@ function ahuacatlBindTestSuite () {
 ////////////////////////////////////////////////////////////////////////////////
 
     testBindArray2 : function () {
+      var expected = [ true, false, 1, null, [ ] ];
+      var actual = getQueryResults("FOR u IN @list FILTER u IN @value RETURN u", { "list" : [ "the quick fox", true, false, -5, 0, 1, null, "", [ ], { } ], "value" : [ true, false, 1, null, [ ] ] });
+
+      assertEqual(expected, actual);
+    },
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test an object bind variable
+////////////////////////////////////////////////////////////////////////////////
+
+    testBindObject1 : function () {
+      var expected = [ { } ];
+      var actual = getQueryResults("FOR u IN @list FILTER u == @value RETURN u", { "list" : [ "the quick fox", true, false, -5, 0, 1, null, "", [ ], { } ], "value" : { } });
+
+      assertEqual(expected, actual);
+    },
+
+////////////////////////////////////////////////////////////////////////////////
+/// @brief test an object bind variable
+////////////////////////////////////////////////////////////////////////////////
+
+    testBindObject2 : function () {
       var expected = [ { "brown" : true, "fox" : true, "quick" : true } ];
       var list = [ { "fox" : false, "brown" : false, "quick" : false },
                    { "fox" : true,  "brown" : false, "quick" : false },

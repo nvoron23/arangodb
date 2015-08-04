@@ -169,7 +169,7 @@ ArangoCollection.prototype.toString = function () {
 /// @startDocuBlock collectionAll
 /// `collection.all()`
 ///
-/// Selects all documents of a collection and returns a cursor. You can use
+/// Fetches all documents from a collection and returns a cursor. You can use
 /// *toArray*, *next*, or *hasNext* to access the result. The result
 /// can be limited using the *skip* and *limit* operator.
 ///
@@ -213,7 +213,7 @@ ArangoCollection.prototype.all = function () {
 /// @startDocuBlock collectionByExample
 /// `collection.byExample(example)`
 ///
-/// Selects all documents of a collection that match the specified
+/// Fetches all documents from a collection that match the specified
 /// example and returns a cursor.
 ///
 /// You can use *toArray*, *next*, or *hasNext* to access the
@@ -251,7 +251,7 @@ ArangoCollection.prototype.all = function () {
 ///
 /// `collection.byExample(path1, value1, ...)`
 ///
-/// As alternative you can supply a list of paths and values.
+/// As alternative you can supply an array of paths and values.
 ///
 /// @EXAMPLES
 ///
@@ -429,7 +429,7 @@ ArangoCollection.prototype.byConditionSkiplist = function (index, condition) {
 /// @startDocuBlock collectionRange
 /// `collection.range(attribute, left, right)`
 ///
-/// Selects all documents of a collection such that the *attribute* is
+/// Returns all documents from a collection such that the *attribute* is
 /// greater or equal than *left* and strictly less than *right*.
 ///
 /// You can use *toArray*, *next*, or *hasNext* to access the
@@ -442,6 +442,16 @@ ArangoCollection.prototype.byConditionSkiplist = function (index, condition) {
 /// For range queries it is required that a skiplist index is present for the
 /// queried attribute. If no skiplist index is present on the attribute, an
 /// error will be thrown.
+///
+/// Note: the *range* simple query function is **deprecated** as of ArangoDB 2.6. 
+/// The function may be removed in future versions of ArangoDB. The preferred
+/// way for retrieving documents from a collection within a specific range
+/// is to use an AQL query as follows: 
+///
+///     FOR doc IN @@collection 
+///       FILTER doc.value >= @left && doc.value < @right 
+///       LIMIT @skip, @limit 
+///       RETURN doc
 ///
 /// @EXAMPLES
 ///
@@ -469,7 +479,7 @@ ArangoCollection.prototype.range = function (name, left, right) {
 /// @startDocuBlock collectionClosedRange
 /// `collection.closedRange(attribute, left, right)`
 ///
-/// Selects all documents of a collection such that the *attribute* is
+/// Returns all documents of a collection such that the *attribute* is
 /// greater or equal than *left* and less or equal than *right*.
 ///
 /// You can use *toArray*, *next*, or *hasNext* to access the
@@ -478,6 +488,16 @@ ArangoCollection.prototype.range = function (name, left, right) {
 ///
 /// An attribute name of the form *a.b* is interpreted as attribute path,
 /// not as attribute.
+///
+/// Note: the *closedRange* simple query function is **deprecated** as of ArangoDB 2.6. 
+/// The function may be removed in future versions of ArangoDB. The preferred
+/// way for retrieving documents from a collection within a specific range
+/// is to use an AQL query as follows: 
+///
+///     FOR doc IN @@collection 
+///       FILTER doc.value >= @left && doc.value <= @right 
+///       LIMIT @skip, @limit 
+///       RETURN doc
 ///
 /// @EXAMPLES
 ///
@@ -506,8 +526,8 @@ ArangoCollection.prototype.closedRange = function (name, left, right) {
 ///
 /// Looks up a geo index defined on attribute *location_attribute*.
 ///
-/// Returns a geo index object if an index was found. The *near* or
-/// *within* operators can then be used to execute a geo-spatial query on
+/// Returns a geo index object if an index was found. The `near` or
+/// `within` operators can then be used to execute a geo-spatial query on
 /// this particular index.
 ///
 /// This is useful for collections with multiple defined geo indexes.
@@ -516,8 +536,8 @@ ArangoCollection.prototype.closedRange = function (name, left, right) {
 ///
 /// Looks up a geo index on a compound attribute *location_attribute*.
 ///
-/// Returns a geo index object if an index was found. The *near* or
-/// *within* operators can then be used to execute a geo-spatial query on
+/// Returns a geo index object if an index was found. The `near` or
+/// `within` operators can then be used to execute a geo-spatial query on
 /// this particular index.
 ///
 /// `collection.geo(latitude_attribute, longitude_attribute)`
@@ -525,56 +545,40 @@ ArangoCollection.prototype.closedRange = function (name, left, right) {
 /// Looks up a geo index defined on the two attributes *latitude_attribute*
 /// and *longitude-attribute*.
 ///
-/// Returns a geo index object if an index was found. The *near* or
-/// *within* operators can then be used to execute a geo-spatial query on
+/// Returns a geo index object if an index was found. The `near` or
+/// `within` operators can then be used to execute a geo-spatial query on
 /// this particular index.
+///
+/// Note: the *geo* simple query helper function is **deprecated** as of ArangoDB 
+/// 2.6. The function may be removed in future versions of ArangoDB. The preferred
+/// way for running geo queries is to use their AQL equivalents.
 ///
 /// @EXAMPLES
 ///
 /// Assume you have a location stored as list in the attribute *home*
 /// and a destination stored in the attribute *work*. Then you can use the
-/// *geo* operator to select which geo-spatial attributes (and thus which
-/// index) to use in a near query.
+/// `geo` operator to select which geo-spatial attributes (and thus which
+/// index) to use in a `near` query.
 ///
-/// ```
-/// arango> for (i = -90;  i <= 90;  i += 10) {
-/// .......>   for (j = -180;  j <= 180;  j += 10) {
-/// .......>     db.complex.save({ name : "Name/" + i + "/" + j,
-/// .......>                       home : [ i, j ],
-/// .......>                       work : [ -i, -j ] });
-/// .......>   }
-/// .......> }
+/// @EXAMPLE_ARANGOSH_OUTPUT{geoIndexSimpleQuery}
+/// ~db._create("complex")
+/// |for (i = -90;  i <= 90;  i += 10) {
+/// |  for (j = -180;  j <= 180;  j += 10) {
+/// |    db.complex.save({ name : "Name/" + i + "/" + j,
+/// |                      home : [ i, j ],
+/// |                      work : [ -i, -j ] });
+/// |  }
+/// |}
 ///
-/// arango> db.complex.near(0, 170).limit(5);
-///
-/// arango> db.complex.ensureGeoIndex("home");
-/// arango> db.complex.near(0, 170).limit(5).toArray();
-/// [ { "_id" : "complex/74655276", "_key" : "74655276", "_rev" : "74655276", "name" :
-/// "Name/0/170", "home" : [ 0, 170 ], "work" : [ 0, -170 ] },
-///   { "_id" : "complex/74720812", "_key" : "74720812", "_rev" : "74720812", "name" :
-/// "Name/0/180", "home" : [ 0, 180 ], "work" : [ 0, -180 ] },
-///   { "_id" : "complex/77080108", "_key" : "77080108", "_rev" : "77080108", "name" :
-/// "Name/10/170", "home" : [ 10, 170 ], "work" : [ -10, -170 ] },
-///   { "_id" : "complex/72230444", "_key" : "72230444", "_rev" : "72230444", "name" :
-/// "Name/-10/170", "home" : [ -10, 170 ], "work" : [ 10, -170 ] },
-///   { "_id" : "complex/72361516", "_key" : "72361516", "_rev" : "72361516", "name" :
-/// "Name/0/-180", "home" : [ 0, -180 ], "work" : [ 0, 180 ] } ]
-///
-/// arango> db.complex.geo("work").near(0, 170).limit(5);
-///
-/// arango> db.complex.ensureGeoIndex("work");
-/// arango> db.complex.geo("work").near(0, 170).limit(5).toArray();
-/// [ { "_id" : "complex/72427052", "_key" : "72427052", "_rev" : "72427052", "name" :
-/// "Name/0/-170", "home" : [ 0, -170 ], "work" : [ 0, 170 ] },
-///   { "_id" : "complex/72361516", "_key" : "72361516", "_rev" : "72361516", "name" :
-/// "Name/0/-180", "home" : [ 0, -180 ], "work" : [ 0, 180 ] },
-///   { "_id" : "complex/70002220", "_key" : "70002220", "_rev" : "70002220", "name" :
-/// "Name/-10/-170", "home" : [ -10, -170 ], "work" : [ 10, 170 ] },
-///   { "_id" : "complex/74851884", "_key" : "74851884", "_rev" : "74851884", "name" :
-/// "Name/10/-170", "home" : [ 10, -170 ], "work" : [ -10, 170 ] },
-///   { "_id" : "complex/74720812", "_key" : "74720812", "_rev" : "74720812", "name" :
-/// "Name/0/180", "home" : [ 0, 180 ], "work" : [ 0, -180 ] } ]
-/// ```
+///  db.complex.near(0, 170).limit(5); // xpError(ERROR_QUERY_GEO_INDEX_MISSING)
+///  db.complex.ensureGeoIndex("home");
+///  db.complex.near(0, 170).limit(5).toArray();
+///  db.complex.geo("work").near(0, 170).limit(5); // xpError(ERROR_QUERY_GEO_INDEX_MISSING)
+///  db.complex.ensureGeoIndex("work");
+///  db.complex.geo("work").near(0, 170).limit(5).toArray();
+/// ~ db._drop("complex");
+/// @END_EXAMPLE_ARANGOSH_OUTPUT
+/// 
 ///
 /// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
@@ -634,7 +638,7 @@ ArangoCollection.prototype.geo = function(loc, order) {
   if (idx === null) {
     var err = new ArangoError();
     err.errorNum = arangodb.errors.ERROR_QUERY_GEO_INDEX_MISSING.code;
-    err.errorMessage = arangodb.errors.ERROR_QUERY_GEO_INDEX_MISSING.message;
+    err.errorMessage = require("internal").sprintf(arangodb.errors.ERROR_QUERY_GEO_INDEX_MISSING.message, this.name());
     throw err;
   }
 
@@ -657,39 +661,47 @@ ArangoCollection.prototype.geo = function(loc, order) {
 /// for the document.  If you have more then one geo-spatial index, you can use
 /// the *geo* operator to select a particular index.
 ///
-/// **Note**: *near* does not support negative skips. However, you can still use
-/// *limit* followed to *skip*.
+/// *Note*: `near` does not support negative skips.
+//     However, you can still use `limit` followed to skip.
 ///
 /// `collection.near(latitude, longitude).limit(limit)`
 ///
 /// Limits the result to limit documents instead of the default 100.
 ///
-/// **Note**: Unlike with multiple explicit limits, limit will raise
-/// the implicit default limit imposed by *within*.
+/// *Note*: Unlike with multiple explicit limits, `limit` will raise
+/// the implicit default limit imposed by `within`.
 ///
 /// `collection.near(latitude, longitude).distance()`
 ///
-/// This will add an attribute *distance* to all documents returned, which
-/// contains the distance between the given point and the document in meter.
+/// This will add an attribute `distance` to all documents returned, which
+/// contains the distance between the given point and the document in meters.
 ///
 /// `collection.near(latitude, longitude).distance(name)`
 ///
 /// This will add an attribute *name* to all documents returned, which
-/// contains the distance between the given point and the document in meter.
+/// contains the distance between the given point and the document in meters.
+///
+/// Note: the *near* simple query function is **deprecated** as of ArangoDB 2.6. 
+/// The function may be removed in future versions of ArangoDB. The preferred
+/// way for retrieving documents from a collection using the near operator is
+/// to use the AQL *NEAR* function in an [AQL query](../Aql/GeoFunctions.md) as follows: 
+///
+///     FOR doc IN NEAR(@@collection, @latitude, @longitude, @limit) 
+///       RETURN doc
 ///
 /// @EXAMPLES
 ///
-/// To get the nearst two locations:
+/// To get the nearest two locations:
 ///
 /// @EXAMPLE_ARANGOSH_OUTPUT{007_collectionNear}
 /// ~ db._create("geo");
 ///   db.geo.ensureGeoIndex("loc");
 ///   for (var i = -90;  i <= 90;  i += 10) { for (var j = -180; j <= 180; j += 10) { db.geo.save({ name : "Name/" + i + "/" + j, loc: [ i, j ] }); } }
-///   db.geo.near(0,0).limit(2).toArray();
+///   db.geo.near(0, 0).limit(2).toArray();
 /// ~ db._drop("geo");
 /// @END_EXAMPLE_ARANGOSH_OUTPUT
 ///
-/// If you need the distance as well, then you can use the *distance*
+/// If you need the distance as well, then you can use the `distance`
 /// operator:
 ///
 /// @EXAMPLE_ARANGOSH_OUTPUT{008_collectionNearDistance}
@@ -713,23 +725,32 @@ ArangoCollection.prototype.near = function (lat, lon) {
 /// `collection.within(latitude, longitude, radius)`
 ///
 /// This will find all documents within a given radius around the coordinate
-/// (*latitude*, *longitude*). The returned list is sorted by distance,
+/// (*latitude*, *longitude*). The returned array is sorted by distance,
 /// beginning with the nearest document.
 ///
 /// In order to use the *within* operator, a geo index must be defined for the
 /// collection. This index also defines which attribute holds the coordinates
 /// for the document.  If you have more then one geo-spatial index, you can use
-/// the *geo* operator to select a particular index.
+/// the `geo` operator to select a particular index.
+///
 ///
 /// `collection.within(latitude, longitude, radius).distance()`
 ///
-/// This will add an attribute *_distance* to all documents returned, which
-/// contains the distance between the given point and the document in meter.
+/// This will add an attribute `_distance` to all documents returned, which
+/// contains the distance between the given point and the document in meters.
 ///
 /// `collection.within(latitude, longitude, radius).distance(name)`
 ///
 /// This will add an attribute *name* to all documents returned, which
-/// contains the distance between the given point and the document in meter.
+/// contains the distance between the given point and the document in meters.
+///
+/// Note: the *within* simple query function is **deprecated** as of ArangoDB 2.6. 
+/// The function may be removed in future versions of ArangoDB. The preferred
+/// way for retrieving documents from a collection using the within operator  is
+/// to use the AQL *WITHIN* function in an [AQL query](../Aql/GeoFunctions.md) as follows: 
+///
+///     FOR doc IN WITHIN(@@collection, @latitude, @longitude, @radius, @distanceAttributeName)
+///       RETURN doc
 ///
 /// @EXAMPLES
 ///
@@ -759,7 +780,8 @@ ArangoCollection.prototype.fulltext = function (attribute, query, iid) {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief iterators over some elements of a collection
+/// @startDocuBlock collectionIterate
+/// @brief iterates over some elements of a collection
 /// `collection.iterate(iterator, options)`
 ///
 /// Iterates over some elements of the collection and apply the function
@@ -776,12 +798,23 @@ ArangoCollection.prototype.fulltext = function (attribute, query, iid) {
 ///
 /// @EXAMPLES
 ///
-/// ```
-/// arango> db.example.getIndexes().map(function(x) { return x.id; });
-/// ["93013/0"]
-/// arango> db.example.index("93013/0");
-/// { "id" : "93013/0", "type" : "primary", "fields" : ["_id"] }
-/// ```
+/// @EXAMPLE_ARANGOSH_OUTPUT{accessViaGeoIndex}
+/// ~db._create("example")
+/// |for (i = -90;  i <= 90;  i += 10) {
+/// |  for (j = -180;  j <= 180;  j += 10) {
+/// |    db.example.save({ name : "Name/" + i + "/" + j,
+/// |                      home : [ i, j ],
+/// |                      work : [ -i, -j ] });
+/// |  }
+/// |}
+///
+///  db.example.ensureGeoIndex("home");
+///  |items = db.example.getIndexes().map(function(x) { return x.id; });
+///  db.example.index(items[1]);
+/// ~ db._drop("example");
+/// @END_EXAMPLE_ARANGOSH_OUTPUT
+///
+/// @endDocuBlock
 ////////////////////////////////////////////////////////////////////////////////
 
 ArangoCollection.prototype.iterate = function (iterator, options) {

@@ -30,10 +30,10 @@
 
 #include "Basics/Common.h"
 #include "Basics/JsonHelper.h"
-#include "ShapedJson/json-shaper.h"
 #include "Utils/CollectionNameResolver.h"
 #include "VocBase/document-collection.h"
 
+class VocShaper;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Transforms a given df_marker into a JSON object.
@@ -41,7 +41,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 triagens::basics::Json TRI_ExpandShapedJson (
-  TRI_shaper_t* shaper,
+  VocShaper* shaper,
   triagens::arango::CollectionNameResolver const* resolver,
   TRI_voc_cid_t const& cid,
   TRI_df_marker_t const* marker
@@ -53,7 +53,7 @@ triagens::basics::Json TRI_ExpandShapedJson (
 ////////////////////////////////////////////////////////////////////////////////
 
 triagens::basics::Json TRI_ExpandShapedJson (
-  TRI_shaper_t* shaper,
+  VocShaper* shaper,
   triagens::arango::CollectionNameResolver const* resolver,
   TRI_voc_cid_t const& cid,
   TRI_doc_mptr_t const* mptr

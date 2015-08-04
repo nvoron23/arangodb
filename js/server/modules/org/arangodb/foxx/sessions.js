@@ -27,8 +27,10 @@
 /// @author Copyright 2013, triAGENS GmbH, Cologne, Germany
 ////////////////////////////////////////////////////////////////////////////////
 
+var joi = require('joi');
 var Foxx = require('org/arangodb/foxx');
 var crypto = require('org/arangodb/crypto');
+var paramSchema = joi.string().optional().description('Foxx session ID');
 
 // -----------------------------------------------------------------------------
 // --SECTION--                                                  helper functions
@@ -41,10 +43,17 @@ var crypto = require('org/arangodb/crypto');
 function decorateController(auth, controller) {
   var cfg = auth.configuration;
 
+  if (cfg.param) {
+    controller.allRoutes.queryParam(cfg.param, paramSchema);
+  }
+
   controller.before('/*', function (req) {
     var sessions = auth.getSessionStorage();
     var sid;
-    if (cfg.cookie) {
+    if (cfg.param) {
+      sid = req.params(cfg.param);
+    }
+    if (!sid && cfg.cookie) {
       sid = req.cookie(cfg.cookie.name, cfg.cookie.secret ? {
         signed: {
           secret: cfg.cookie.secret,
@@ -197,7 +206,15 @@ function Sessions(opts) {
       throw new Error('Header name must be true, a string or empty.');
     }
   }
+  if (opts.param) {
+    if (opts.param === true) {
+      opts.param = 'FOXXSID';
+    } else if (typeof opts.param !== 'string') {
+      throw new Error('Param name must be true, a string or empty.');
+    }
+  }
   if (opts.jwt) {
+    // TODO Remove this in 2.7
     console.warn(
       'The Foxx session option "jwt" is deprecated and will be removed.'
       + ' Please use the session-jwt app instead.'
@@ -233,8 +250,17 @@ function Sessions(opts) {
   if (opts.autoCreateSession !== false) {
     opts.autoCreateSession = true;
   }
-  if (!opts.sessionStorageApp) {
-    opts.sessionStorageApp = '/_system/sessions';
+  if (!opts.sessionStorage) {
+    if (opts.sessionStorageApp) {
+      // TODO Remove this in 2.7
+      console.warn(
+        'The Foxx session option "sessionStorageApp" has been renamed to "sessionStorage".'
+        + ' Use the option "sessionStorage" instead.'
+      );
+      opts.sessionStorage = opts.sessionStorageApp;
+    } else {
+      opts.sessionStorage = '/_system/sessions';
+    }
   }
   this.configuration = opts;
 }
@@ -248,7 +274,10 @@ function Sessions(opts) {
 ////////////////////////////////////////////////////////////////////////////////
 
 Sessions.prototype.getSessionStorage = function () {
-  return Foxx.requireApp(this.configuration.sessionStorageApp).sessionStorage;
+  if (typeof this.configuration.sessionStorage !== 'string') {
+    return this.configuration.sessionStorage;
+  }
+  return Foxx.requireApp(this.configuration.sessionStorage).sessionStorage;
 };
 
 // -----------------------------------------------------------------------------
