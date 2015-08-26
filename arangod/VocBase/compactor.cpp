@@ -766,8 +766,8 @@ static compaction_initial_context_t InitCompaction (TRI_document_collection_t* d
 
     // We will sequentially scan the logfile for collection:
     if (df->isPhysical(df)) {
-      TRI_MMFileAdvise(df->_data, df->_maximalSize,
-                       TRI_MADVISE_SEQUENTIAL | TRI_MADVISE_WILLNEED);
+      TRI_MMFileAdvise(df->_data, df->_maximalSize, TRI_MADVISE_SEQUENTIAL);
+      TRI_MMFileAdvise(df->_data, df->_maximalSize, TRI_MADVISE_WILLNEED);
     }
 
     if (i == 0) {

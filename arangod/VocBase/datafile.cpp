@@ -1899,7 +1899,9 @@ TRI_datafile_t* TRI_OpenDatafile (char const* filename,
 
   // Advise on sequential use:
   TRI_MMFileAdvise(datafile->_data, datafile->_maximalSize,
-                   TRI_MADVISE_SEQUENTIAL | TRI_MADVISE_WILLNEED);
+                   TRI_MADVISE_SEQUENTIAL);
+  TRI_MMFileAdvise(datafile->_data, datafile->_maximalSize,
+                   TRI_MADVISE_WILLNEED);
 
   return datafile;
 }

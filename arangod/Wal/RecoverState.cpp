@@ -1358,7 +1358,9 @@ int RecoverState::replayLogfile (Logfile* logfile,
 
   // Advise on sequential use:
   TRI_MMFileAdvise(logfile->df()->_data, logfile->df()->_maximalSize,
-                   TRI_MADVISE_SEQUENTIAL | TRI_MADVISE_WILLNEED);
+                   TRI_MADVISE_SEQUENTIAL);
+  TRI_MMFileAdvise(logfile->df()->_data, logfile->df()->_maximalSize,
+                   TRI_MADVISE_WILLNEED);
 
   if (! TRI_IterateDatafile(logfile->df(), &RecoverState::ReplayMarker, static_cast<void*>(this))) {
     LOG_WARNING("WAL inspection failed when scanning logfile '%s'", logfile->filename().c_str());

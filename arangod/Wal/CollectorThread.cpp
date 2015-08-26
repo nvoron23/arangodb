@@ -741,8 +741,8 @@ int CollectorThread::collect (Logfile* logfile) {
   TRI_ASSERT(df != nullptr);
 
   // We will sequentially scan the logfile for collection:
-  TRI_MMFileAdvise(df->_data, df->_maximalSize,
-                   TRI_MADVISE_SEQUENTIAL | TRI_MADVISE_WILLNEED);
+  TRI_MMFileAdvise(df->_data, df->_maximalSize, TRI_MADVISE_SEQUENTIAL);
+  TRI_MMFileAdvise(df->_data, df->_maximalSize, TRI_MADVISE_WILLNEED);
   TRI_DEFER (TRI_MMFileAdvise(df->_data, df->_maximalSize,
                               TRI_MADVISE_RANDOM));
 
