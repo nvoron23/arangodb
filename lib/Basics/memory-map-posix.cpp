@@ -165,9 +165,9 @@ int TRI_MMFileAdvise (void* memoryAddress, size_t numOfBytes, int advice) {
     return TRI_ERROR_NO_ERROR;
   }
   else {
-    strerror_r(errno, buffer, 256);
+    char* p = strerror_r(errno, buffer, 256);
     LOG_INFO("madvise %d for %lu length %lu failed with: %s ",
-             advice, (uint64_t) memoryAddress, numOfBytes, buffer);
+             advice, (uint64_t) memoryAddress, numOfBytes, p);
     return TRI_ERROR_INTERNAL;
   }
 #else
