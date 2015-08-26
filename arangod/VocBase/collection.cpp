@@ -745,6 +745,11 @@ static bool IterateDatafilesVector (const TRI_vector_pointer_t* const files,
     if (! TRI_IterateDatafile(datafile, iterator, data)) {
       return false;
     }
+
+    if (datafile->isPhysical(datafile) && datafile->_isSealed) {
+      TRI_MMFileAdvise(datafile->_data, datafile->_maximalSize,
+                       TRI_MADVISE_RANDOM);
+    }
   }
 
   return true;
