@@ -40,6 +40,7 @@
 #include "Basics/logging.h"
 #include "Basics/Mutex.h"
 #include "Basics/MutexLocker.h"
+#include "Basics/memory-map.h"
 
 namespace triagens {
   namespace basics {
@@ -213,6 +214,9 @@ namespace triagens {
 
               // may fail...
               b._table = new Entry[b._nrAlloc];
+
+              TRI_MMFileAdvise(b._table, b._nrAlloc * sizeof(Entry),
+                               TRI_MADVISE_RANDOM);
 
               for (IndexType i = 0; i < b._nrAlloc; i++) {
                 invalidateEntry(b, i);
@@ -1017,6 +1021,9 @@ namespace triagens {
           b._nrAlloc = static_cast<IndexType>(TRI_NearPrime(size));
           try {
             b._table = new Entry[b._nrAlloc];
+            TRI_MMFileAdvise(b._table, b._nrAlloc * sizeof(Entry),
+                             TRI_MADVISE_RANDOM);
+
             IndexType i;
             for (i = 0; i < b._nrAlloc; i++) {
               invalidateEntry(b, i);
