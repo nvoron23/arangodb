@@ -215,8 +215,16 @@ namespace triagens {
               // may fail...
               b._table = new Entry[b._nrAlloc];
 
-              TRI_MMFileAdvise(b._table, b._nrAlloc * sizeof(Entry),
-                               TRI_MADVISE_RANDOM);
+#if __linux__
+              if (b._nrAlloc > 1000000) {
+                uintptr_t mem = static_cast<uintptr_t>(b._table);
+                uintptr_t pageSize = getpagesize();
+                mem = (mem / pageSize) * pageSize;
+                void* memptr = static_cast<void*>(mem);
+                TRI_MMFileAdvise(memptr, b._nrAlloc * sizeof(Entry),
+                                 TRI_MADVISE_RANDOM);
+              }
+#endif
 
               for (IndexType i = 0; i < b._nrAlloc; i++) {
                 invalidateEntry(b, i);
@@ -1021,8 +1029,16 @@ namespace triagens {
           b._nrAlloc = static_cast<IndexType>(TRI_NearPrime(size));
           try {
             b._table = new Entry[b._nrAlloc];
-            TRI_MMFileAdvise(b._table, b._nrAlloc * sizeof(Entry),
-                             TRI_MADVISE_RANDOM);
+#if __linux__
+            if (b._nrAlloc > 1000000) {
+              uintptr_t mem = static_cast<uintptr_t>(b._table);
+              uintptr_t pageSize = getpagesize();
+              mem = (mem / pageSize) * pageSize;
+              void* memptr = static_cast<void*>(mem);
+              TRI_MMFileAdvise(memptr, b._nrAlloc * sizeof(Entry),
+                               TRI_MADVISE_RANDOM);
+            }
+#endif
 
             IndexType i;
             for (i = 0; i < b._nrAlloc; i++) {
