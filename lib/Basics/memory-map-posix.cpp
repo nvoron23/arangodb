@@ -157,6 +157,8 @@ int TRI_ProtectMMFile (void* memoryAddress,
 
 int TRI_MMFileAdvise (void* memoryAddress, size_t numOfBytes, int advice) {
 #ifdef __linux__
+  LOG_DEBUG("Doing madvise %d for %lu length %lu", advice,
+            (uint64_t) memoryAddress, numOfBytes);
   char buffer[256];
   int res = madvise(memoryAddress, numOfBytes, advice);
   if (res == 0) {

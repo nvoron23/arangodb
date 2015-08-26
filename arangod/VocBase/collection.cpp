@@ -37,6 +37,7 @@
 #include "Basics/JsonHelper.h"
 #include "Basics/logging.h"
 #include "Basics/tri-strings.h"
+#include "Basics/memory-map.h"
 #include "VocBase/document-collection.h"
 #include "VocBase/server.h"
 #include "VocBase/vocbase.h"
@@ -543,6 +544,12 @@ static bool CheckCollection (TRI_collection_t* collection,
           TRI_FreeString(TRI_CORE_MEM_ZONE, filename);
           stop = true;
           break;
+        }
+
+        // Advise on upcoming usage:
+        if (datafile->isPhysical(datafile)) {
+          TRI_MMFileAdvise(datafile->_data, datafile->_maximalSize,
+                           TRI_MADVISE_WILLNEED);
         }
 
         TRI_PushBackVectorPointer(&all, datafile);
