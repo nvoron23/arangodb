@@ -546,12 +546,6 @@ static bool CheckCollection (TRI_collection_t* collection,
           break;
         }
 
-        // Advise on upcoming usage:
-        if (datafile->isPhysical(datafile)) {
-          TRI_MMFileAdvise(datafile->_data, datafile->_maximalSize,
-                           TRI_MADVISE_WILLNEED);
-        }
-
         TRI_PushBackVectorPointer(&all, datafile);
 
         // check the document header
