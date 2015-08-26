@@ -217,10 +217,10 @@ namespace triagens {
 
 #if __linux__
               if (b._nrAlloc > 1000000) {
-                uintptr_t mem = static_cast<uintptr_t>(b._table);
+                uintptr_t mem = reinterpret_cast<uintptr_t>(b._table);
                 uintptr_t pageSize = getpagesize();
-                mem = (mem / pageSize) * pageSize;
-                void* memptr = static_cast<void*>(mem);
+                mem = ((mem + pageSize - 1) / pageSize) * pageSize;
+                void* memptr = reinterpret_cast<void*>(mem);
                 TRI_MMFileAdvise(memptr, b._nrAlloc * sizeof(Entry),
                                  TRI_MADVISE_RANDOM);
               }
@@ -1031,10 +1031,10 @@ namespace triagens {
             b._table = new Entry[b._nrAlloc];
 #if __linux__
             if (b._nrAlloc > 1000000) {
-              uintptr_t mem = static_cast<uintptr_t>(b._table);
+              uintptr_t mem = reinterpret_cast<uintptr_t>(b._table);
               uintptr_t pageSize = getpagesize();
-              mem = (mem / pageSize) * pageSize;
-              void* memptr = static_cast<void*>(mem);
+              mem = ((mem + pageSize - 1) / pageSize) * pageSize;
+              void* memptr = reinterpret_cast<void*>(mem);
               TRI_MMFileAdvise(memptr, b._nrAlloc * sizeof(Entry),
                                TRI_MADVISE_RANDOM);
             }
