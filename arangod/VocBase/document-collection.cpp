@@ -3210,7 +3210,7 @@ static int FillIndexBatch (TRI_document_collection_t* document,
   int res = TRI_ERROR_NO_ERROR;
         
   std::vector<TRI_doc_mptr_t const*> documents;
-  documents.reserve(primaryIndex->_nrUsed);
+  documents.reserve(blockSize);
 
   for (;  ptr < end;  ++ptr) {
     auto mptr = static_cast<TRI_doc_mptr_t const*>(*ptr);
@@ -3218,7 +3218,6 @@ static int FillIndexBatch (TRI_document_collection_t* document,
     if (mptr != nullptr) {
       documents.emplace_back(mptr);
 
-#if 0
       if (documents.size() == blockSize) {
         res = idx->batchInsert(&documents, indexPool->numThreads());
         documents.clear();
@@ -3228,18 +3227,8 @@ static int FillIndexBatch (TRI_document_collection_t* document,
           break;
         }
       }
-#endif
     }
   }
-
-  LOG_INFO("Sorting master pointers...");
-
-  std::sort(documents.begin(), documents.end(),
-            [] (TRI_doc_mptr_t const* left, TRI_doc_mptr_t const* right) {
-              return left->getDataPtr() < right->getDataPtr();
-            });
-
-  LOG_INFO("Sorting done.");
 
   // process the remainder of the documents
   if (res == TRI_ERROR_NO_ERROR &&
@@ -3247,8 +3236,6 @@ static int FillIndexBatch (TRI_document_collection_t* document,
     res = idx->batchInsert(&documents, indexPool->numThreads());
   }
   
-  LOG_INFO("Insert done.");
-
   LOG_TIMER((TRI_microtime() - start),
             "fill-index-batch { collection: %s/%s }, %s, threads: %d, buckets: %d", 
             document->_vocbase->_name,
