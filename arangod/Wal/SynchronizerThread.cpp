@@ -282,7 +282,7 @@ int SynchronizerThread::doSync (bool& checkMore) {
 
   if (_syncMinSize > 0 && 
       _numSyncs % 100 == 0) {
-    LOG_TRACE("total number of WAL syncs: %llu, total memory synced: %llu", 
+    LOG_INFO("total number of WAL syncs: %llu, total memory synced: %llu", 
               (unsigned long long) _numSyncs,
               (unsigned long long) _sizeSyncs);
   }
