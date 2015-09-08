@@ -37,6 +37,10 @@ a replication backlog.
 <!-- arangod/Wal/LogfileManager.h -->
 @startDocuBlock WalLogfileSyncInterval
 
+!SUBSECTION Sync minimum size
+<!-- arangod/Wal/LogfileManager.h -->
+@startDocuBlock WalLogfileSyncMinSize
+
 !SUBSECTION Throttling
 <!-- arangod/Wal/LogfileManager.h -->
 @startDocuBlock WalLogfileThrottling

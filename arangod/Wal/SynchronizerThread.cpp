@@ -52,13 +52,18 @@ using namespace triagens::wal;
 ////////////////////////////////////////////////////////////////////////////////
 
 SynchronizerThread::SynchronizerThread (LogfileManager* logfileManager,
-                                        uint64_t syncInterval)
+                                        uint64_t syncInterval,
+                                        uint64_t syncMinSize)
   : Thread("WalSynchronizer"),
     _logfileManager(logfileManager),
     _condition(),
     _waiting(0),
     _stop(0),
     _syncInterval(syncInterval),
+    _syncMinSize(syncMinSize),
+    _lastSyncStamp(0.0),
+    _numSyncs(0),
+    _sizeSyncs(0),
     _logfileCache({ 0, -1 }) {
 
   allowAsynchronousCancelation();
@@ -195,6 +200,24 @@ int SynchronizerThread::doSync (bool& checkMore) {
     return TRI_ERROR_NO_ERROR;
   }
 
+  double now = 0.0;
+  
+  if (_syncMinSize > 0 && 
+      ! region.canSeal &&
+      region.size < _syncMinSize) {
+    now = TRI_microtime();
+
+    if (now - static_cast<double>(_syncInterval) / 1000000.0 < _lastSyncStamp) {
+      // postpone syncing
+      // LOG_TRACE("postponing sync. region size: %lu, current timestamp: %f, last sync: %f", 
+      //           (unsigned long) region.size, 
+      //           now, 
+      //           _lastSyncStamp); 
+
+      return TRI_ERROR_NO_ERROR;
+    }
+  }
+
   // now perform the actual syncing
   auto status = region.logfileStatus;
   TRI_ASSERT(status == Logfile::StatusType::OPEN || status == Logfile::StatusType::SEAL_REQUESTED);
@@ -202,6 +225,10 @@ int SynchronizerThread::doSync (bool& checkMore) {
   // get the logfile's file descriptor
   int fd = getLogfileDescriptor(region.logfileId);
   TRI_ASSERT(fd >= 0);
+  
+  // increase number of syncs
+  ++_numSyncs;
+  _sizeSyncs += region.size;
 
   bool result = TRI_MSync(fd, region.mem, region.mem + region.size);
 
@@ -248,10 +275,22 @@ int SynchronizerThread::doSync (bool& checkMore) {
       _logfileManager->setLogfileSealed(id);
     }
   }
-  
+
+  if (_syncMinSize > 0 && now != 0.0) {
+    _lastSyncStamp = now; 
+  }
+
+  if (_syncMinSize > 0 && 
+      _numSyncs % 100 == 0) {
+    LOG_TRACE("total number of WAL syncs: %llu, total memory synced: %llu", 
+              (unsigned long long) _numSyncs,
+              (unsigned long long) _sizeSyncs);
+  }
+
   checkMore = region.checkMore;
 
   _logfileManager->slots()->returnSyncRegion(region);
+
   return TRI_ERROR_NO_ERROR;
 }
 

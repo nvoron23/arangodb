@@ -950,6 +950,22 @@ namespace triagens {
         uint64_t _syncInterval;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// @brief minimum size for sync operations
+/// @startDocuBlock WalLogfileSyncMinSize
+/// `--wal.sync-min-size`
+///
+/// The minimum size (in bytes) for memory regions in the write-ahead logfile
+/// that will trigger a disk sync operation. If this value is greater than 0,
+/// then WAL operations will only be synced to disk if the to-be-synchronized
+/// memory region is at least as big as the specified size. Smaller regions
+/// will not be synced immediately, but their synchronization is postponed up
+/// to until the WAL sync interval elapses.
+/// @endDocuBlock
+////////////////////////////////////////////////////////////////////////////////
+        
+        uint64_t _syncMinSize;
+
+////////////////////////////////////////////////////////////////////////////////
 /// @brief maximum wait time for write-throttling
 ////////////////////////////////////////////////////////////////////////////////
 

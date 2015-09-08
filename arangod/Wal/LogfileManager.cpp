@@ -139,6 +139,7 @@ LogfileManager::LogfileManager (TRI_server_t* server,
     _maxOpenLogfiles(0),
     _numberOfSlots(1048576),
     _syncInterval(100),
+    _syncMinSize(0),
     _maxThrottleWait(15000),
     _throttleWhenPending(0),
     _allowOversizeEntries(true),
@@ -250,6 +251,7 @@ void LogfileManager::setupOptions (std::map<std::string, triagens::basics::Progr
     ("wal.slots", &_numberOfSlots, "number of logfile slots to use")
     ("wal.suppress-shape-information", &_suppressShapeInformation, "do not write shape information for markers (saves a lot of disk space, but effectively disables using the write-ahead log for replication)")
     ("wal.sync-interval", &_syncInterval, "interval for automatic, non-requested disk syncs (in milliseconds)")
+    ("wal.sync-min-size", &_syncMinSize, "minimum size (in bytes) for sync operations")
     ("wal.throttle-when-pending", &_throttleWhenPending, "throttle writes when at least this many operations are waiting for collection (set to 0 to deactivate write-throttling)")
     ("wal.throttle-wait", &_maxThrottleWait, "maximum wait time per operation when write-throttled (in milliseconds)")
   ;
@@ -384,11 +386,12 @@ bool LogfileManager::start () {
 
   started = true;
 
-  LOG_TRACE("WAL logfile manager configuration: historic logfiles: %lu, reserve logfiles: %lu, filesize: %lu, sync interval: %lu",
+  LOG_TRACE("WAL logfile manager configuration: historic logfiles: %lu, reserve logfiles: %lu, filesize: %lu, sync interval: %llu, sync min size: %llu",
             (unsigned long) _historicLogfiles,
             (unsigned long) _reserveLogfiles,
             (unsigned long) _filesize,
-            (unsigned long) _syncInterval);
+            (unsigned long long) _syncInterval,
+            (unsigned long long) _syncMinSize);
 
   return true;
 }
@@ -1879,7 +1882,7 @@ int LogfileManager::writeShutdownInfo (bool writeShutdownTime) {
 ////////////////////////////////////////////////////////////////////////////////
 
 int LogfileManager::startSynchronizerThread () {
-  _synchronizerThread = new SynchronizerThread(this, _syncInterval);
+  _synchronizerThread = new SynchronizerThread(this, _syncInterval, _syncMinSize);
 
   if (_synchronizerThread == nullptr) {
     return TRI_ERROR_INTERNAL;

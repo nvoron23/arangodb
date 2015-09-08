@@ -421,10 +421,10 @@ void Slots::returnUsed (SlotInfo& slotInfo,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// @brief get the next synchronisable region
+/// @brief get the next synchronizable region
 ////////////////////////////////////////////////////////////////////////////////
 
-SyncRegion Slots::getSyncRegion () { 
+SyncRegion Slots::getSyncRegion () const { 
   bool sealRequested = false;
   SyncRegion region;
 
